@@ -60,24 +60,27 @@ jobs:
       - name: Run deterministic compiler synthetic and negative tests
         run: python tools/dyn-atlas-semantic/self_test.py
 
-      - name: Validate metadata-only exact pixel dedupe evidence
+      - name: Validate consolidated metadata-only pixel dedupe evidence
         shell: bash
         run: |
           set -euo pipefail
           python - <<'PY'
           import json
           from pathlib import Path
-          path = Path('docs/evidence/DYN-ATLAS-001-15-32-pixel-dedupe-metadata.json')
+          path = Path('docs/evidence/DYN-ATLAS-001-15-32-pixel-dedupe-metrics.json')
           data = json.loads(path.read_text(encoding='utf-8'))
+          assert data['version'] == 1
           assert data['source']['assetZipSha256'] == '1a6bad8b7598cd874f534cd4aae2d249fb3d9b4458b3ccfa75754f91bb27870f'
           assert data['source']['gameSemanticArtifact'] == 'sha256:d38a98acaf019b07a05c0bee922505fe4c9852b38e65644e488e92df9031da2e'
-          assert data['decode']['spriteSourceIdsDecoded'] == 990
-          assert data['decode']['spriteSheetsRead'] == 136
+          assert data['source']['semanticSpriteSourceIds'] == 990
+          assert data['source']['spriteSheetsTouched'] == 136
+          assert data['pixelIdentity']['domain'] == 'OTERYN-DYN-ATLAS-PIXEL-RGBA-V0'
           assert data['dedupe']['uniquePixelBlobs'] == 987
           assert data['dedupe']['duplicateSpriteReferencesByContent'] == 3
           assert data['dedupe']['rawRgbaBytesBeforeContentDedupe'] == 7741440
           assert data['dedupe']['rawRgbaBytesAfterContentDedupe'] == 7725056
-          assert data['measurement']['pixelPublication'] is False
+          assert data['dedupe']['rawRgbaBytesSaved'] == 16384
+          assert data['measurement']['pixelBytesPublished'] is False
           PY
 
   browser-semantic:
