@@ -10,10 +10,14 @@ permissions:
 
 jobs:
   repository-contract:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - name: Validate bootstrap contract
+      - name: Check out exact repository revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Validate repository contract
         shell: bash
         run: |
           set -euo pipefail
@@ -23,13 +27,57 @@ jobs:
             echo 'Forbidden raw legacy/proprietary runtime input committed to repository.' >&2
             exit 1
           fi
+          if grep -R --line-number --include='*.ts' --include='*.js' --include='*.svelte' -E '(\.otbm|Legacy IR|world\.otbm)' src 2>/dev/null; then
+            echo 'Browser source must not reference legacy world formats.' >&2
+            exit 1
+          fi
+
+  semantic-proof:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out exact repository revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Compile semantic tooling
+        run: |
+          python -m py_compile \
+            tools/dyn-atlas-semantic/fetch_game_fixture.py \
+            tools/dyn-atlas-semantic/compiler.py \
+            tools/dyn-atlas-semantic/verify.py \
+            tools/dyn-atlas-semantic/self_test.py \
+            tools/dyn-atlas-semantic/benchmark.py
+
+      - name: Fetch exact Game-owned semantic artifact
+        run: python tools/dyn-atlas-semantic/fetch_game_fixture.py /tmp/game-fixture
+
+      - name: Prove deterministic compiler and locality
+        run: python tools/dyn-atlas-semantic/self_test.py --source /tmp/game-fixture
+
+      - name: Compile and verify selected proof candidate
+        run: |
+          python tools/dyn-atlas-semantic/compiler.py /tmp/game-fixture /tmp/atlas-semantic --span 32
+          python tools/dyn-atlas-semantic/verify.py /tmp/atlas-semantic
+
+      - name: Measure proof-local chunk candidates
+        run: python tools/dyn-atlas-semantic/benchmark.py /tmp/game-fixture --output /tmp/chunk-benchmark.json
+
+  project:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out exact repository revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
       - name: Run project checks when package exists
         shell: bash
         run: |
           set -euo pipefail
           if [ -f package.json ]; then
-            corepack enable
             if [ -f pnpm-lock.yaml ]; then
+              corepack enable
               pnpm install --frozen-lockfile
               pnpm run check
               pnpm run test
