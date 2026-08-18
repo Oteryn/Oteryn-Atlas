@@ -3,20 +3,21 @@
 ```yaml
 task_id: DYN-ATLAS-001
 title: Semantic Thais Z7 Proof
-status: implementing
+status: implementing_pixel_gate
 repository: Oteryn/Oteryn-Atlas
 base_branch: main
 base_sha: 0b56d9a95279f1ec02fddd0dfcf8bd6ffd16b539
 branch: feat/DYN-ATLAS-001-semantic-thais-z7-proof
-pr: pending
+pr: 4
 owner: ChatGPT autonomous execution
 created_at: 2026-08-18T09:24:00+02:00
-updated_at: 2026-08-18T11:25:00+02:00
+updated_at: 2026-08-18T12:32:00+02:00
 owned_paths:
   - docs/agents/tasks/active/DYN-ATLAS-001-semantic-thais-z7-proof.md
   - docs/evidence/DYN-ATLAS-001-*.md
   - tools/**
   - src/**
+  - web/**
   - static/**
   - tests/**
   - package.json
@@ -34,23 +35,19 @@ Execute the canonical `DYN-ATLAS-001 — Semantic Thais Z7 Proof` as a bounded A
 ## Live authority
 
 - Platform execution authority: `blakinio/Oteryn-Platform@132cc41d5c722911bdb4f3e30c200c5d8b47f1ec`.
-  - `docs/architecture/oteryn-dynamic-semantic-atlas.md`
-  - `docs/maps/oteryn-dynamic-semantic-atlas-program.md`
-  - `docs/maps/oteryn-dynamic-semantic-atlas-execution-prompt.md`
-- Game semantic exporter merged on `blakinio/Oteryn-v2` as PR #335 / merge `bf8a65ca0d6b0fbc1b6c521b16e613824b048f0d`.
+- Game semantic exporter merged by PR #335 as `bf8a65ca0d6b0fbc1b6c521b16e613824b048f0d`; terminal Game task closeout is merged as `16afdf31a15bd49d454cdbcdd98fa7ec72213ef9`.
 - Game contracts used by the proof:
   - `oteryn-game-atlas-export-v1`;
   - `oteryn-world-spatial-v1`;
   - `oteryn-crystalserver-legacy-spatial-import-v1`;
   - `oteryn-atlas-15-32-appearance-spatial-v1`.
-- Legacy migration/reference code remains pinned to `blakinio/Otheryn@e417c5e7c22986bf4acef0495eb47f7b72c97cce` and is not an Atlas/browser runtime source.
+- Legacy/reference code remains pinned to `blakinio/Otheryn@e417c5e7c22986bf4acef0495eb47f7b72c97cce` and is never an Atlas/browser runtime source.
 
 ## Canonical bounded Game artifact
 
 Atlas consumes one exact immutable Game-produced semantic artifact:
 
 ```text
-producer repository = blakinio/Oteryn-v2
 producer final head = 8553e2b6e354a7ccb7d273d16f1a2e0cf49b6ad0
 producer merge = bf8a65ca0d6b0fbc1b6c521b16e613824b048f0d
 workflow run = 32119580912
@@ -61,7 +58,9 @@ semantic artifact digest = sha256:d38a98acaf019b07a05c0bee922505fe4c9852b38e6564
 physical profile = dyn-atlas-thais-z7-jsonl-v0
 ```
 
-Stable source projection facts:
+A byte-identical semantic-only durability copy is stored on Google Drive as file ID `1dInqWd6oC5c_2nAFF0RXrJm5Rj0UVV8h`, size `1723168` bytes. Drive metadata reports `shared=false`; it is evidence/storage, not claimed as anonymous CI/browser distribution.
+
+Stable source facts:
 
 ```text
 legacy selection = X 32280..32440, Y 32155..32305, Z 7
@@ -76,68 +75,95 @@ unique appearance source ids = 862
 unique sprite source ids = 990
 tiles.jsonl bytes = 28040344
 tiles.jsonl sha256 = ff14efee3fc376d8f18432c628294c64ffe89450a59aaa498a28e6d705815984
-diagnostics.json bytes = 19
 diagnostics.json sha256 = 60326e4e048106d4366a2fd8fe472ccfdf06667fcd0f234977febfeaa38f31b8
 ```
 
-The Game producer proves byte-identical double builds, exact ordering/bounds, fail-closed corruption handling and a default-deny public field allowlist. Three nested source descendants are intentionally excluded from visible spatial presentation rather than flattened into the stack.
+## Completed in Atlas PR #4
+
+- [x] Deterministic source-to-Atlas semantic compiler with logical chunk addresses separated from content IDs.
+- [x] Fail-closed compact semantic verifier.
+- [x] Same input -> identical chunk/root identities.
+- [x] Local semantic edit invalidates exactly one expected chunk plus aggregate/root identity.
+- [x] Candidate chunk spans compared without freezing a permanent format.
+- [x] Current proof-local 32x32 compact candidate: 30 chunks, root `sha256:6d5c452c8bff7c74345f489db8b5ba1d3f52947a68673099bde73052159d6fc1`.
+- [x] Strict browser semantic manifest/chunk/tile/presentation/primitive decoder.
+- [x] Stable tile/stack inspector preserving source appearance/sprite refs, ordering and provenance.
+- [x] Stable x/y/floor/zoom deep-link round trip.
+- [x] Pan/zoom wireframe browser shell.
+- [x] Deterministic camera itinerary that is explicitly `movementAuthority=false`.
+- [x] Malformed bounds/order/identity/primitive negative cases fail closed.
+- [x] Browser/runtime source scanner rejects legacy world-format references.
+- [x] Cross-repo GitHub Actions artifact 401 was not bypassed; CI separates immutable exact-source evidence from repository-local exact-head algorithm/consumer tests.
+
+## Current exact-head evidence
+
+Semantic/browser generation evidence is recorded in `docs/evidence/DYN-ATLAS-001-semantic-browser-generation.md`.
+
+Exact Atlas head that first passed the semantic/browser generation:
+
+```text
+461eaaf72128a3690da25ea4f21afe07c4fcbc01
+CI run 32127818016 (#25) = SUCCESS
+```
+
+A predecessor run exposed an order-sensitive object-serialization comparison in the browser validator; the comparison was changed to structural field checks and the successor head passed. The failed run remains visible as repaired evidence.
+
+## Proof-local chunk measurements on exact Game source
+
+| span | chunks | raw bytes incl. manifest | deterministic gzip bytes incl. manifest | max chunk bytes |
+|---:|---:|---:|---:|---:|
+| 8 | 399 | 6,112,180 | 1,800,663 | 20,804 |
+| 16 | 110 | 5,986,223 | 1,679,335 | 72,688 |
+| 24 | 49 | 5,959,678 | 1,645,708 | 155,345 |
+| 32 | 30 | 5,951,385 | 1,635,218 | 276,189 |
+| 48 | 16 | 5,945,280 | 1,628,476 | 592,808 |
+| 64 | 9 | 5,942,225 | 1,626,062 | 1,036,858 |
+
+These are proof measurements, not production SLOs or permanent format decisions.
 
 ## PROVEN
 
-- Atlas repository/authority boundary is established and browser-runtime OTBM fallback is forbidden.
-- Native coordinate/floor/order semantics required by the proof are accepted by Game.
-- The current latest asset source is the exact Drive object `15.32.zip`, Drive ID `1Dlo3bS4K1nS3mw4BhPZdlHT7lX5zRAvv`, ZIP SHA-256 `1a6bad8b7598cd874f534cd4aae2d249fb3d9b4458b3ccfa75754f91bb27870f`.
-- Game-owned 15.32 appearance semantics are accepted: 32 units/tile, south-east visual anchor, west/north visual coverage, explicit displacement, producer-owned frame/phase/pattern/layer/sprite resolution.
-- The bounded Game semantic export artifact exists, is digest-pinned and contains zero source pixel payload.
-- Exact Game final semantic artifact has been downloaded for consumer development; Atlas need not and must not regenerate it from OTBM.
-- There is no overlapping open Atlas DYN-ATLAS implementation PR at this generation start.
+- Atlas/browser consumes Game-owned semantic projection semantics and never OTBM/Legacy IR fallback.
+- Native x/y/floor/order and 15.32 appearance presentation semantics required by the current semantic proof are accepted by Game.
+- Semantic records reconcile: 24,311 tiles and 39,282 visible presentation/resolved primitive records; three nested source descendants remain excluded rather than silently flattened.
+- Compiler/chunk identity/locality behavior is deterministic.
+- Browser semantic decode, inspector, deep-link state and advisory camera navigation are exact-head tested.
+- No source pixel bytes are present in the current Atlas semantic/browser generation.
 
 ## DERIVED
 
-- Atlas may proceed with semantic consumer validation, deterministic derived chunking, content identity, inspector schema, malformed-input tests and browser application scaffolding using only the exact Game artifact.
-- Proof-local physical chunk candidates may be compared without promoting any chunk size/encoding to canonical authority.
-- The single-floor bounded Game export means floor-switch UI is not an applicable multi-floor acceptance dimension for this exact slice; Atlas must not invent additional floor data.
+- `dyn-atlas-compact-json-v0` span 32 is a replaceable current proof candidate, not permanent serialization/chunk authority.
+- The dependency-free Canvas wireframe is an interim semantic consumer/interaction harness while the exact pixel-publication gate remains closed; it is not the final visual renderer decision.
+- The single exported floor makes multi-floor switching not applicable to this exact bounded fixture; no additional floor data is invented.
 
-## UNKNOWN / explicit remaining gates
+## UNKNOWN / remaining hard gates
 
 ### 1. Exact 15.32 pixel publication authorization
 
-The existing owner rights attestation in `docs/legal/DYN-ATLAS-001-tibia-asset-rights-attestation.md` is scoped to the **different** supplied 15.25 archive SHA-256 `01c45146e2fcec3f4087844e0cbc1817fb1d60b310a35ac5d88c07aab6f73d1a`.
+The existing owner rights attestation is scoped to the different 15.25 archive SHA `01c45146e2fcec3f4087844e0cbc1817fb1d60b310a35ac5d88c07aab6f73d1a`.
 
-It does not automatically authorize publication/redistribution of the distinct `15.32.zip` SHA-256:
+It does **not** automatically cover exact `15.32.zip` SHA:
 
 ```text
 1a6bad8b7598cd874f534cd4aae2d249fb3d9b4458b3ccfa75754f91bb27870f
 ```
 
-Semantic work proceeds because the Game artifact contains no pixels. Decoding/committing/publicly publishing 15.32 pixel blobs remains fail-closed until the exact digest is explicitly covered by project authorization.
+Until that exact digest is explicitly authorized for the bounded public Atlas use, decoded pixel blobs, public sprite publication, pixel-content deduplication, real visual parity evidence and PixiJS/WebGL2 real-sprite measurements remain fail-closed.
 
-### 2. Static navigation semantics
+### 2. Gameplay/static path navigation semantics
 
-The current Game artifact declares `semantic-tiles-v0` and `resolved-appearance-primitives-v0`. It does not declare authoritative walkability/collision/navigation capability.
+The Game artifact declares `semantic-tiles-v0` and `resolved-appearance-primitives-v0`, not walkability/collision/navigation capability. Atlas does not infer passability from sprite IDs, pixels, tile presence or presentation order.
 
-Atlas must not derive passability from sprite IDs, pixel alpha, presentation order, tile presence or legacy item IDs. DYN-ATLAS deterministic navigation must either consume a later explicit public Game navigation capability or remain blocked/limited to an explicitly authored advisory route fixture whose facts do not claim movement authority and whose acceptance is supported by the programme authority.
+The implemented deterministic itinerary is camera/view navigation only and cannot be presented as a gameplay movement/path proof. A movement/path acceptance claim requires explicit public Game navigation semantics or a separately accepted interpretation of the canonical requirement.
 
-## Implementation generation plan
+## Next action
 
-1. Validate the exact Game artifact and copy only its immutable identity/provenance into Atlas evidence.
-2. Implement a deterministic bounded semantic chunk compiler/consumer adapter.
-3. Compare at least two proof-local chunking/encoding candidates for size/locality without freezing a permanent winner.
-4. Prove deterministic rebuild and local-edit invalidation.
-5. Implement browser consumer schema/resource validation and malformed/unsupported negative tests.
-6. Scaffold the preferred Svelte 5 + TypeScript + PixiJS 8 proof candidate behind replaceable semantic interfaces.
-7. Implement semantic tile/stack inspector and stable deep-link/pan/zoom state using Game projection data only.
-8. Resolve the exact 15.32 pixel-publication gate before committing/publicly publishing decoded sprite pixels and visual parity evidence.
-9. Resolve/clarify the static-navigation capability before claiming deterministic navigation acceptance.
-10. Record required measurements and exact-head CI before Ready/merge.
+1. Keep PR #4 Draft.
+2. Attach an explicit rights attestation to exact 15.32 ZIP SHA `1a6bad8b7598cd874f534cd4aae2d249fb3d9b4458b3ccfa75754f91bb27870f` before decoding/publishing its source pixels.
+3. After that gate closes, build deterministic pixel content IDs/deduplication and the PixiJS 8/WebGL2 visual candidate over the existing semantic boundary; record visual parity, GPU memory/upload, batching/draw-call/frame measurements.
+4. Treat gameplay path navigation as unsupported unless Game exports the needed public semantics.
+5. Perform final full-diff review and exact-head CI before Ready/merge.
 
 ## Stop conditions retained
 
-Stop rather than workaround if:
-
-- exact 15.32 pixel rights remain unresolved at the point pixel publication is required;
-- navigation acceptance would require inventing walkability/collision facts not exported by Game;
-- any consumer shortcut would reopen OTBM/legacy files as world authority;
-- merge/readiness would require bypassing repository review/CI governance.
-
-A semantic/compiler/browser partial generation is useful evidence but is not DYN-ATLAS-001 completion until all applicable canonical acceptance criteria are proven or a named upstream stop condition is recorded.
+Stop rather than workaround if pixel rights remain unresolved when visual publication is required; if movement acceptance would require invented walkability/collision; if any shortcut would reopen legacy world formats as authority; or if readiness would require bypassing CI/review governance.
