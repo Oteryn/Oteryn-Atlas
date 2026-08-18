@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  repository-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate bootstrap contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s README.md
+          test -s AGENTS.md
+          if find . -type f \( -name '*.otbm' -o -name '*.otb' -o -name '*.spr' -o -name '*.dat' \) -print -quit | grep -q .; then
+            echo 'Forbidden raw legacy/proprietary runtime input committed to repository.' >&2
+            exit 1
+          fi
+      - name: Run project checks when package exists
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -f package.json ]; then
+            corepack enable
+            if [ -f pnpm-lock.yaml ]; then
+              pnpm install --frozen-lockfile
+              pnpm run check
+              pnpm run test
+              pnpm run build
+            elif [ -f package-lock.json ]; then
+              npm ci
+              npm run check
+              npm test
+              npm run build
+            else
+              echo 'package.json exists without a supported lockfile' >&2
+              exit 1
+            fi
+          fi
