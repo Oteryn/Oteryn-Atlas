@@ -1,4 +1,5 @@
-import { cameraItinerary, inspectTile, parseViewState, serializeViewState } from '../src/browser/semantic.mjs';
+import { cameraItinerary, decodeCompactTile, inspectTile, parseViewState, serializeViewState } from '../src/browser/semantic.mjs';
+import { loadChunk, loadManifest } from '../src/browser/loader.mjs';
 
 const canvas = document.querySelector('#atlas');
 const context = canvas.getContext('2d');
@@ -50,7 +51,6 @@ function render() {
   const halfX = Math.ceil(canvas.width / tilePixels / 2) + 1;
   const halfY = Math.ceil(canvas.height / tilePixels / 2) + 1;
 
-  context.lineWidth = 1;
   for (let y = view.y - halfY; y <= view.y + halfY; y += 1) {
     for (let x = view.x - halfX; x <= view.x + halfX; x += 1) {
       if (x < 32280 || x >= 32441 || y < 32155 || y >= 32306) continue;
@@ -81,25 +81,17 @@ function inspectAt(position) {
   render();
 }
 
-async function loadChunk(url) {
-  const response = await fetch(url, { cache: 'no-store' });
-  if (!response.ok) throw new Error(`chunk fetch failed: ${response.status}`);
-  const chunk = await response.json();
-  if (!Array.isArray(chunk.tiles)) throw new Error('chunk tiles missing');
-  for (const raw of chunk.tiles) {
-    const { decodeCompactTile } = await import('../src/browser/semantic.mjs');
-    const tile = decodeCompactTile(raw);
-    semanticTiles.set(tileKey(tile.x, tile.y, tile.floor), tile);
+export async function loadProof(manifestUrl = './proof/manifest.json') {
+  const manifest = await loadManifest(manifestUrl);
+  const baseUrl = new URL('./proof/', new URL(manifestUrl, location.href));
+  const chunks = await Promise.all(manifest.chunks.map((entry) => loadChunk(baseUrl, entry, manifest)));
+  for (const chunk of chunks) {
+    for (const raw of chunk.tiles) {
+      const tile = decodeCompactTile(raw);
+      semanticTiles.set(tileKey(tile.x, tile.y, tile.floor), tile);
+    }
   }
   render();
-}
-
-export async function loadProof(manifestUrl = './proof/manifest.json') {
-  const response = await fetch(manifestUrl, { cache: 'no-store' });
-  if (!response.ok) throw new Error(`manifest fetch failed: ${response.status}`);
-  const { validateManifest } = await import('../src/browser/semantic.mjs');
-  const manifest = validateManifest(await response.json());
-  await Promise.all(manifest.chunks.map((entry) => loadChunk(`./proof/${entry.path}`)));
   return manifest;
 }
 
