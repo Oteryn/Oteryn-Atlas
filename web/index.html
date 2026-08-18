@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Oteryn Atlas — Semantic Thais Z7 Proof</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <p class="eyebrow">DYN-ATLAS-001 · semantic browser consumer</p>
+      <h1>Semantic Thais Z7 Proof</h1>
+      <p class="notice">Wireframe semantic view only. No source pixels are published by this generation and no movement authority is inferred.</p>
+    </header>
+    <section class="layout">
+      <div class="viewport-panel">
+        <div class="toolbar">
+          <button id="zoom-out" type="button">−</button>
+          <output id="view-state"></output>
+          <button id="zoom-in" type="button">+</button>
+        </div>
+        <canvas id="atlas" width="960" height="640" aria-label="Semantic atlas viewport"></canvas>
+        <p class="hint">Drag to pan. Click a tile to inspect. Deep-link state is stored in the query string.</p>
+      </div>
+      <aside>
+        <h2>Inspector</h2>
+        <pre id="inspector">Select a semantic tile.</pre>
+        <h2>Camera itinerary</h2>
+        <ol id="itinerary"></ol>
+      </aside>
+    </section>
+  </main>
+  <script type="module" src="./app.mjs"></script>
+</body>
+</html>
