@@ -1,14 +1,39 @@
 {
+  "alpha": {
+    "nonTransparentFraction": 0.4281797701719577,
+    "nonTransparentPixelsAcrossReferencedSprites": 828682,
+    "totalPixelsAcrossReferencedSprites": 1935360
+  },
   "dedupe": {
+    "duplicateGroups": [
+      {
+        "contentDigest": "sha256:0f0e687397cb1347ccb0b92eaf1d71d0ba91fe5eb06fdc573ef8a6bb5985930d",
+        "height": 32,
+        "spriteSourceIds": [203366, 203375],
+        "width": 32
+      },
+      {
+        "contentDigest": "sha256:972b3e921c346d66089159208b9abdd17b78e0cd524dad974cd642b97611f6fd",
+        "height": 32,
+        "spriteSourceIds": [203379, 203399],
+        "width": 32
+      },
+      {
+        "contentDigest": "sha256:ecc431ed74f5f3aa285b34f3263a58f82df6d1e34e97bef66fbdcef9de7e5618",
+        "height": 32,
+        "spriteSourceIds": [270005, 270006],
+        "width": 64
+      }
+    ],
     "duplicatePixelGroups": 3,
-    "duplicateSpriteRefs": 3,
+    "duplicateSpriteReferencesByContent": 3,
     "largestDuplicateGroup": 2,
-    "rawRgbaBytesWithoutDedupe": 7741440,
-    "savedRatio": 0.002116,
-    "savedRgbaBytes": 16384,
-    "sourceSpriteIds": 990,
-    "uniquePixelBlobs": 987,
-    "uniqueRgbaBytes": 7725056
+    "rawRgbaBytesAfterContentDedupe": 7725056,
+    "rawRgbaBytesBeforeContentDedupe": 7741440,
+    "rawRgbaBytesSaved": 16384,
+    "referenceDedupeFraction": 0.0030303030303030303,
+    "savedByteFraction": 0.0021164021164021165,
+    "uniquePixelBlobs": 987
   },
   "dimensions": {
     "32x32": 620,
@@ -17,28 +42,25 @@
     "64x64": 265
   },
   "measurement": {
+    "classification": "private exact-source metadata-only analysis",
+    "decoderSecondsObserved": 4.941453695297241,
     "pixelBytesPublished": false,
-    "scope": "private exact-source measurement; metrics only",
-    "toolSemantics": "decode pinned CipSoft LZMA/BMP sheet, extract resolved semantic sprite IDs, hash domain + dimensions + exact RGBA",
-    "verifiedAssetZipSha256": "1a6bad8b7598cd874f534cd4aae2d249fb3d9b4458b3ccfa75754f91bb27870f"
+    "productionSlo": false,
+    "tool": "tools/dyn-atlas-pixels/measure_metadata.py",
+    "toolSemantics": "decode exact pinned CipSoft LZMA/BMP sheets only for resolved semantic sprite IDs; hash domain + dimensions + exact RGBA; emit metadata only"
   },
   "pixelIdentity": {
-    "domain": "OTERYN-ATLAS-PIXEL-RGBA-V0",
+    "domain": "OTERYN-DYN-ATLAS-PIXEL-RGBA-V0",
     "includesDimensions": true
   },
-  "sampleDuplicateGroups": [
-    [203366, 203375],
-    [203379, 203399],
-    [270005, 270006]
-  ],
   "source": {
     "assetDriveFileId": "1Dlo3bS4K1nS3mw4BhPZdlHT7lX5zRAvv",
     "assetName": "15.32.zip",
     "assetZipSha256": "1a6bad8b7598cd874f534cd4aae2d249fb3d9b4458b3ccfa75754f91bb27870f",
+    "gameSemanticArtifact": "sha256:d38a98acaf019b07a05c0bee922505fe4c9852b38e65644e488e92df9031da2e",
     "semanticAppearanceSourceIds": 862,
-    "semanticArtifactDigest": "sha256:d38a98acaf019b07a05c0bee922505fe4c9852b38e65644e488e92df9031da2e",
     "semanticSpriteSourceIds": 990,
     "spriteSheetsTouched": 136
   },
-  "version": 0
+  "version": 1
 }
