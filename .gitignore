@@ -1,0 +1,17 @@
+node_modules/
+dist/
+.svelte-kit/
+coverage/
+playwright-report/
+test-results/
+.DS_Store
+*.log
+.env
+.env.*
+!.env.example
+
+# Legacy/raw world and proprietary asset inputs must never become browser-runtime authority.
+*.otbm
+*.otb
+*.spr
+*.dat
