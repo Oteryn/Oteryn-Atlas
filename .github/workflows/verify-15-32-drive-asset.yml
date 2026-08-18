@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - evidence/DYN-ATLAS-001-15-32-drive-probe
+  pull_request:
 
 permissions:
   contents: read
