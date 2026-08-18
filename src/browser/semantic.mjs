@@ -27,11 +27,22 @@ function boundedCoordinate(value, min, maxExclusive, name) {
   return value;
 }
 
+function exactBounds(bounds) {
+  return Boolean(
+    bounds && typeof bounds === 'object' && !Array.isArray(bounds) &&
+    bounds.floor === PROOF_BOUNDS.floor &&
+    bounds.xMin === PROOF_BOUNDS.xMin &&
+    bounds.xMaxExclusive === PROOF_BOUNDS.xMaxExclusive &&
+    bounds.yMin === PROOF_BOUNDS.yMin &&
+    bounds.yMaxExclusive === PROOF_BOUNDS.yMaxExclusive
+  );
+}
+
 export function validateManifest(manifest) {
   if (!manifest || typeof manifest !== 'object' || Array.isArray(manifest)) throw new SemanticError('manifest must be an object');
   if (manifest.profile !== PROOF_PROFILE || manifest.version !== 0) throw new SemanticError('unsupported manifest profile/version');
   if (manifest.source?.artifactDigest !== SOURCE_ARTIFACT) throw new SemanticError('unexpected Game source artifact');
-  if (JSON.stringify(manifest.bounds) !== JSON.stringify(PROOF_BOUNDS)) throw new SemanticError('unexpected proof bounds');
+  if (!exactBounds(manifest.bounds)) throw new SemanticError('unexpected proof bounds');
   if (!Array.isArray(manifest.chunks) || manifest.chunks.length < 1 || manifest.chunks.length > 512) throw new SemanticError('invalid chunk index');
   if (manifest.counts?.tiles !== 24311 || manifest.counts?.presentationRecords !== 39282 || manifest.counts?.resolvedPrimitives !== 39282) {
     throw new SemanticError('manifest count reconciliation failed');
