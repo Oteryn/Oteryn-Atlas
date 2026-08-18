@@ -11,6 +11,14 @@ import {
   validateChunk,
   validateManifest,
 } from '../src/browser/semantic.mjs';
+import {
+  LoadError,
+  canonicalJsonBytes,
+  computeRootContentId,
+  loadChunk,
+  loadManifest,
+  sha256ContentId,
+} from '../src/browser/loader.mjs';
 
 function primitive(sprite = 200) {
   return [sprite, 0, 'OBJECT_INITIAL', 0, 0, 0, 0, 0, 32, 32, 0, 0, [0, 0]];
@@ -42,6 +50,16 @@ function manifest() {
     rootContentId: `sha256:${'b'.repeat(64)}`,
     source: { artifactDigest: 'sha256:d38a98acaf019b07a05c0bee922505fe4c9852b38e65644e488e92df9031da2e' },
     version: 0,
+  };
+}
+
+function chunk() {
+  return {
+    address: { cx: 2, cy: 2, floor: -7, span: 32 },
+    appearanceProfile: 'oteryn-atlas-15-32-appearance-spatial-v1',
+    profile: 'dyn-atlas-compact-json-v0',
+    sourceArtifact: 'sha256:d38a98acaf019b07a05c0bee922505fe4c9852b38e65644e488e92df9031da2e',
+    tiles: [tile()],
   };
 }
 
@@ -90,18 +108,57 @@ test('manifest validation rejects alternate Game artifact identity', () => {
 
 test('chunk validation rejects duplicate or unordered tiles', () => {
   const value = manifest();
-  const chunk = {
-    address: { cx: 2, cy: 2, floor: -7, span: 32 },
-    appearanceProfile: 'oteryn-atlas-15-32-appearance-spatial-v1',
-    profile: 'dyn-atlas-compact-json-v0',
-    sourceArtifact: 'sha256:d38a98acaf019b07a05c0bee922505fe4c9852b38e65644e488e92df9031da2e',
-    tiles: [tile(32360, 32230), tile(32359, 32230)],
-  };
-  assert.throws(() => validateChunk(chunk, value), /tile order is not deterministic/);
+  const bad = chunk();
+  bad.tiles = [tile(32360, 32230), tile(32359, 32230)];
+  assert.throws(() => validateChunk(bad, value), /tile order is not deterministic/);
 });
 
 test('primitive dimensions fail closed rather than guessing visual semantics', () => {
   const value = tile();
   value[7][0][6][0][8] = 48;
   assert.throws(() => decodeCompactTile(value), /unsupported primitive dimensions/);
+});
+
+test('browser manifest loader verifies root content identity before use', async () => {
+  const value = manifest();
+  value.rootContentId = await computeRootContentId(value);
+  const bytes = canonicalJsonBytes(value);
+  const fetcher = async () => new Response(bytes, { status: 200, headers: { 'content-length': String(bytes.byteLength) } });
+  const loaded = await loadManifest('https://atlas.invalid/proof/manifest.json', fetcher);
+  assert.equal(loaded.rootContentId, value.rootContentId);
+});
+
+test('browser manifest loader rejects a forged root identity', async () => {
+  const value = manifest();
+  value.rootContentId = `sha256:${'0'.repeat(64)}`;
+  const bytes = canonicalJsonBytes(value);
+  const fetcher = async () => new Response(bytes, { status: 200 });
+  await assert.rejects(() => loadManifest('https://atlas.invalid/proof/manifest.json', fetcher), /root content identity mismatch/);
+});
+
+test('browser chunk loader verifies exact bytes and semantic shape', async () => {
+  const value = manifest();
+  value.rootContentId = await computeRootContentId(value);
+  const body = canonicalJsonBytes(chunk());
+  value.chunks[0] = {
+    ...value.chunks[0],
+    bytes: body.byteLength,
+    contentId: await sha256ContentId(body),
+  };
+  const fetcher = async () => new Response(body, { status: 200, headers: { 'content-length': String(body.byteLength) } });
+  const loaded = await loadChunk('https://atlas.invalid/proof/', value.chunks[0], value, fetcher);
+  assert.equal(loaded.tiles.length, 1);
+});
+
+test('browser chunk loader rejects bytes that do not match indexed content identity', async () => {
+  const value = manifest();
+  value.rootContentId = await computeRootContentId(value);
+  const body = canonicalJsonBytes(chunk());
+  value.chunks[0] = {
+    ...value.chunks[0],
+    bytes: body.byteLength,
+    contentId: `sha256:${'0'.repeat(64)}`,
+  };
+  const fetcher = async () => new Response(body, { status: 200 });
+  await assert.rejects(() => loadChunk('https://atlas.invalid/proof/', value.chunks[0], value, fetcher), LoadError);
 });
