@@ -1,0 +1,44 @@
+{
+  "dedupe": {
+    "duplicatePixelGroups": 3,
+    "duplicateSpriteRefs": 3,
+    "largestDuplicateGroup": 2,
+    "rawRgbaBytesWithoutDedupe": 7741440,
+    "savedRatio": 0.002116,
+    "savedRgbaBytes": 16384,
+    "sourceSpriteIds": 990,
+    "uniquePixelBlobs": 987,
+    "uniqueRgbaBytes": 7725056
+  },
+  "dimensions": {
+    "32x32": 620,
+    "32x64": 54,
+    "64x32": 51,
+    "64x64": 265
+  },
+  "measurement": {
+    "pixelBytesPublished": false,
+    "scope": "private exact-source measurement; metrics only",
+    "toolSemantics": "decode pinned CipSoft LZMA/BMP sheet, extract resolved semantic sprite IDs, hash domain + dimensions + exact RGBA",
+    "verifiedAssetZipSha256": "1a6bad8b7598cd874f534cd4aae2d249fb3d9b4458b3ccfa75754f91bb27870f"
+  },
+  "pixelIdentity": {
+    "domain": "OTERYN-ATLAS-PIXEL-RGBA-V0",
+    "includesDimensions": true
+  },
+  "sampleDuplicateGroups": [
+    [203366, 203375],
+    [203379, 203399],
+    [270005, 270006]
+  ],
+  "source": {
+    "assetDriveFileId": "1Dlo3bS4K1nS3mw4BhPZdlHT7lX5zRAvv",
+    "assetName": "15.32.zip",
+    "assetZipSha256": "1a6bad8b7598cd874f534cd4aae2d249fb3d9b4458b3ccfa75754f91bb27870f",
+    "semanticAppearanceSourceIds": 862,
+    "semanticArtifactDigest": "sha256:d38a98acaf019b07a05c0bee922505fe4c9852b38e65644e488e92df9031da2e",
+    "semanticSpriteSourceIds": 990,
+    "spriteSheetsTouched": 136
+  },
+  "version": 0
+}
