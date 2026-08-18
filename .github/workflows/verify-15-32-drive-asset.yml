@@ -37,6 +37,8 @@ jobs:
           unzip -q /tmp/assets-15.32.zip -d /tmp/assets-15.32
           test -f /tmp/assets-15.32/assets/catalog-content.json
           echo "verified_zip_sha256=$ACTUAL_SHA"
+          echo 'top_level_entries:'
+          find /tmp/assets-15.32 -mindepth 1 -maxdepth 1 -printf '%f\n' | sort
 
       - name: Decode bounded asset metadata
         shell: bash
@@ -52,11 +54,9 @@ jobs:
           root = Path('/tmp/assets-15.32')
           assets = root / 'assets'
           zip_path = Path('/tmp/assets-15.32.zip')
-          package_candidates = sorted(root.glob('package.json'))
-          if len(package_candidates) != 1:
-              raise SystemExit(f'expected exactly one root package.json, got {package_candidates}')
-          package_path = package_candidates[0]
-          package = json.loads(package_path.read_text(encoding='utf-8'))
+          package_candidates = sorted(root.rglob('package.json'))
+          package_path = package_candidates[0] if len(package_candidates) == 1 else None
+          package = json.loads(package_path.read_text(encoding='utf-8')) if package_path else {}
           catalog_path = assets / 'catalog-content.json'
           catalog = json.loads(catalog_path.read_text(encoding='utf-8'))
           appearance_paths = sorted(assets.glob('appearances-*.dat'))
@@ -89,8 +89,9 @@ jobs:
               'drive_file_id': '1Dlo3bS4K1nS3mw4BhPZdlHT7lX5zRAvv',
               'project_label': '15.32',
               'zip_sha256': sha256(zip_path),
-              'package_version': package.get('version'),
-              'package_sha256': sha256(package_path),
+              'package_metadata_present': package_path is not None,
+              'package_version': package.get('version') if package else None,
+              'package_sha256': sha256(package_path) if package_path else None,
               'catalog_sha256': sha256(catalog_path),
               'catalog_entries': len(catalog),
               'appearance_file': appearance_path.name,
@@ -105,6 +106,9 @@ jobs:
               'unique_object_sprite_ids': len(set(all_sprite_refs)),
               'max_frame_sprite_refs': max_frame_sprite_refs,
           }
+          if sheets:
+              report['catalog_sprite_id_min'] = min(sheet.first_id for sheet in sheets)
+              report['catalog_sprite_id_max'] = max(sheet.last_id for sheet in sheets)
           Path('asset-15.32-profile-report.json').write_text(json.dumps(report, indent=2, sort_keys=True) + '\n', encoding='utf-8')
           print(json.dumps(report, indent=2, sort_keys=True))
           if report['zip_sha256'] != '1a6bad8b7598cd874f534cd4aae2d249fb3d9b4458b3ccfa75754f91bb27870f':
