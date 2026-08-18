@@ -1,0 +1,40 @@
+{
+  "artifact_evidence": {
+    "artifact_id": 9316452985,
+    "artifact_name": "asset-15-32-profile-report",
+    "job_id": 95643523890,
+    "run_id": 32115353176
+  },
+  "appearance_file": "appearances-dc4f4c01e3701c77877c67895168e4399837046122d6d17e3e608a12a2fed075.dat",
+  "appearance_sha256": "dc4f4c01e3701c77877c67895168e4399837046122d6d17e3e608a12a2fed075",
+  "catalog_entries": 5090,
+  "catalog_sha256": "35639e000c4c108665a091cfbdf699d549d995b37670bc08de575ab6cd380d85",
+  "catalog_sprite_id_max": 301200,
+  "catalog_sprite_id_min": 0,
+  "drive_file_id": "1Dlo3bS4K1nS3mw4BhPZdlHT7lX5zRAvv",
+  "height_appearances": 2192,
+  "max_frame_sprite_refs": 855,
+  "object_appearances": 43514,
+  "object_frame_records": 43514,
+  "package_metadata_present": false,
+  "package_sha256": null,
+  "package_version": null,
+  "project_label": "15.32",
+  "shift_appearances": 567,
+  "source_build_script": {
+    "repository": "blakinio/Otheryn",
+    "revision": "e417c5e7c22986bf4acef0495eb47f7b72c97cce",
+    "path": "tools/otbm_atlas/build_latest_local.sh"
+  },
+  "sprite_layout_sizes": [[32, 32], [32, 64], [64, 32], [64, 64]],
+  "sprite_sheets": 5084,
+  "total_object_sprite_refs": 111957,
+  "unique_object_sprite_ids": 79269,
+  "verification": {
+    "decoder_repository": "blakinio/Otheryn",
+    "decoder_revision": "e417c5e7c22986bf4acef0495eb47f7b72c97cce",
+    "result": "PASS",
+    "verified_at_utc": "2026-08-18T08:14:41Z"
+  },
+  "zip_sha256": "1a6bad8b7598cd874f534cd4aae2d249fb3d9b4458b3ccfa75754f91bb27870f"
+}
