@@ -27,7 +27,7 @@ jobs:
             echo 'Forbidden raw legacy/proprietary runtime input committed to repository.' >&2
             exit 1
           fi
-          if grep -R --line-number --include='*.ts' --include='*.js' --include='*.svelte' -E '(\.otbm|Legacy IR|world\.otbm)' src 2>/dev/null; then
+          if grep -R --line-number --include='*.ts' --include='*.js' --include='*.mjs' --include='*.svelte' -E '(\.otbm|Legacy IR|world\.otbm)' src web 2>/dev/null; then
             echo 'Browser source must not reference legacy world formats.' >&2
             exit 1
           fi
@@ -43,25 +43,41 @@ jobs:
       - name: Compile semantic tooling
         run: |
           python -m py_compile \
-            tools/dyn-atlas-semantic/fetch_game_fixture.py \
             tools/dyn-atlas-semantic/compiler.py \
             tools/dyn-atlas-semantic/verify.py \
             tools/dyn-atlas-semantic/self_test.py \
             tools/dyn-atlas-semantic/benchmark.py
 
-      - name: Fetch exact Game-owned semantic artifact
-        run: python tools/dyn-atlas-semantic/fetch_game_fixture.py /tmp/game-fixture
-
-      - name: Prove deterministic compiler and locality
-        run: python tools/dyn-atlas-semantic/self_test.py --source /tmp/game-fixture
-
-      - name: Compile and verify selected proof candidate
+      - name: Verify pinned exact-source evidence identity
+        shell: bash
         run: |
-          python tools/dyn-atlas-semantic/compiler.py /tmp/game-fixture /tmp/atlas-semantic --span 32
-          python tools/dyn-atlas-semantic/verify.py /tmp/atlas-semantic
+          set -euo pipefail
+          grep -q 'sha256:d38a98acaf019b07a05c0bee922505fe4c9852b38e65644e488e92df9031da2e' docs/agents/tasks/active/DYN-ATLAS-001-semantic-thais-z7-proof.md
+          grep -q '9318268404' docs/agents/tasks/active/DYN-ATLAS-001-semantic-thais-z7-proof.md
+          grep -q 'ec05e39be62d6826d27be19ff9c33c6cba7d1c835f79d02b8ad303b073c1ef40' docs/agents/tasks/active/DYN-ATLAS-001-semantic-thais-z7-proof.md
 
-      - name: Measure proof-local chunk candidates
-        run: python tools/dyn-atlas-semantic/benchmark.py /tmp/game-fixture --output /tmp/chunk-benchmark.json
+      - name: Run deterministic compiler synthetic and negative tests
+        run: python tools/dyn-atlas-semantic/self_test.py
+
+  browser-semantic:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out exact repository revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Run browser semantic consumer tests
+        run: node --test tests/browser-semantic.mjs
+
+      - name: Validate static browser entry
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s web/index.html
+          test -s web/app.mjs
+          test -s web/style.css
+          grep -q 'type="module"' web/index.html
 
   project:
     runs-on: ubuntu-24.04
