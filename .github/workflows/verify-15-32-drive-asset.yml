@@ -1,0 +1,121 @@
+name: Verify 15.32 Drive asset
+
+on:
+  push:
+    branches:
+      - evidence/DYN-ATLAS-001-15-32-drive-probe
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out Atlas evidence branch
+        uses: actions/checkout@v4
+
+      - name: Check out pinned legacy decoder evidence
+        uses: actions/checkout@v4
+        with:
+          repository: blakinio/Otheryn
+          ref: e417c5e7c22986bf4acef0495eb47f7b72c97cce
+          path: legacy
+
+      - name: Download and verify exact 15.32 Drive bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          FILE_ID='1Dlo3bS4K1nS3mw4BhPZdlHT7lX5zRAvv'
+          EXPECTED_SHA='1a6bad8b7598cd874f534cd4aae2d249fb3d9b4458b3ccfa75754f91bb27870f'
+          URL="https://drive.usercontent.google.com/download?id=${FILE_ID}&export=download&confirm=t"
+          curl -fL --retry 5 --retry-delay 2 "$URL" -o /tmp/assets-15.32.zip
+          ACTUAL_SHA="$(sha256sum /tmp/assets-15.32.zip | awk '{print $1}')"
+          test "$ACTUAL_SHA" = "$EXPECTED_SHA"
+          mkdir -p /tmp/assets-15.32
+          unzip -q /tmp/assets-15.32.zip -d /tmp/assets-15.32
+          test -f /tmp/assets-15.32/assets/catalog-content.json
+          echo "verified_zip_sha256=$ACTUAL_SHA"
+
+      - name: Decode bounded asset metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONPATH="$GITHUB_WORKSPACE/legacy" python3 - <<'PY'
+          from __future__ import annotations
+          import hashlib
+          import json
+          from pathlib import Path
+          from tools.otbm_atlas.assets import load_object_appearances, load_sprite_catalog
+
+          root = Path('/tmp/assets-15.32')
+          assets = root / 'assets'
+          zip_path = Path('/tmp/assets-15.32.zip')
+          package_candidates = sorted(root.glob('package.json'))
+          if len(package_candidates) != 1:
+              raise SystemExit(f'expected exactly one root package.json, got {package_candidates}')
+          package_path = package_candidates[0]
+          package = json.loads(package_path.read_text(encoding='utf-8'))
+          catalog_path = assets / 'catalog-content.json'
+          catalog = json.loads(catalog_path.read_text(encoding='utf-8'))
+          appearance_paths = sorted(assets.glob('appearances-*.dat'))
+          if len(appearance_paths) != 1:
+              raise SystemExit(f'expected exactly one appearance file, got {appearance_paths}')
+          appearance_path = appearance_paths[0]
+          appearances = load_object_appearances(appearance_path)
+          sheets = load_sprite_catalog(assets)
+          all_sprite_refs = []
+          shift_count = 0
+          height_count = 0
+          frame_count = 0
+          max_frame_sprite_refs = 0
+          for appearance in appearances.values():
+              shift_count += int(appearance.shift is not None)
+              height_count += int(appearance.height is not None)
+              frame_count += len(appearance.frames)
+              for frame in appearance.frames:
+                  refs = list(frame.sprite_ids)
+                  all_sprite_refs.extend(refs)
+                  max_frame_sprite_refs = max(max_frame_sprite_refs, len(refs))
+          layout_sizes = sorted({sheet.sprite_size for sheet in sheets})
+          def sha256(path: Path) -> str:
+              h = hashlib.sha256()
+              with path.open('rb') as f:
+                  for block in iter(lambda: f.read(1024 * 1024), b''):
+                      h.update(block)
+              return h.hexdigest()
+          report = {
+              'drive_file_id': '1Dlo3bS4K1nS3mw4BhPZdlHT7lX5zRAvv',
+              'project_label': '15.32',
+              'zip_sha256': sha256(zip_path),
+              'package_version': package.get('version'),
+              'package_sha256': sha256(package_path),
+              'catalog_sha256': sha256(catalog_path),
+              'catalog_entries': len(catalog),
+              'appearance_file': appearance_path.name,
+              'appearance_sha256': sha256(appearance_path),
+              'object_appearances': len(appearances),
+              'object_frame_records': frame_count,
+              'sprite_sheets': len(sheets),
+              'sprite_layout_sizes': [list(size) for size in layout_sizes],
+              'shift_appearances': shift_count,
+              'height_appearances': height_count,
+              'total_object_sprite_refs': len(all_sprite_refs),
+              'unique_object_sprite_ids': len(set(all_sprite_refs)),
+              'max_frame_sprite_refs': max_frame_sprite_refs,
+          }
+          Path('asset-15.32-profile-report.json').write_text(json.dumps(report, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+          print(json.dumps(report, indent=2, sort_keys=True))
+          if report['zip_sha256'] != '1a6bad8b7598cd874f534cd4aae2d249fb3d9b4458b3ccfa75754f91bb27870f':
+              raise SystemExit('unexpected 15.32 zip digest')
+          if layout_sizes and any(w % 32 or h % 32 for w, h in layout_sizes):
+              raise SystemExit(f'non-32-integral sprite layout found: {layout_sizes}')
+          PY
+
+      - name: Upload metadata-only evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: asset-15-32-profile-report
+          path: asset-15.32-profile-report.json
+          if-no-files-found: error
+          retention-days: 7
