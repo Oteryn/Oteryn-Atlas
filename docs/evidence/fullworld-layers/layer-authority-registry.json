@@ -1,0 +1,243 @@
+{
+  "schema_version": 1,
+  "task_id": "ATLAS-SEMANTIC-LAYERS-AND-INDEXES",
+  "status": "AUTHORITY_AUDIT_COMPLETE_IMPLEMENTATION_BLOCKED",
+  "atlas": {
+    "repository": "Oteryn/Oteryn-Atlas",
+    "base_sha": "e87bdd54207ba9a1e412a24315c28e0507a23e5f",
+    "prompt_path": "docs/agents/prompts/ATLAS-FULLWORLD-AGENT-SUITE.md",
+    "prompt_blob_sha": "028588791be23d23ed0f647970cfa7345c7c7601"
+  },
+  "game": {
+    "repository": "Oteryn/Oteryn-Game",
+    "source_sha": "63a6cb8cb3e69b7c2f792475f24093e90bd7fd81",
+    "export_contract": {
+      "path": "docs/contracts/OTERYN_GAME_ATLAS_EXPORT_CONTRACT_V1.md",
+      "blob_sha": "355874fec7a3ee888fadd7539b12bc2b575b2e56",
+      "contract_id": "oteryn-game-atlas-export-v1",
+      "semantic_revision": 1
+    },
+    "coordinate_profile": {
+      "path": "docs/contracts/OTERYN_WORLD_SPATIAL_COORDINATE_PROFILE_V1.md",
+      "blob_sha": "98390ab1785eeccb3675ebbb72861867009be62e",
+      "profile_id": "oteryn-world-spatial-v1"
+    },
+    "world_model": {
+      "path": "docs/architecture/ADR-0005-native-world-format-and-oteryn-studio.md",
+      "blob_sha": "ee5ca606505e2384e0bf5a47ad60ce8a5580f8a9"
+    },
+    "audited_producer": {
+      "path": "tools/game-atlas-thais-fixture/export.py",
+      "blob_sha": "0e36ca9e43d78a919eb673f9dc423ed1c178c727",
+      "scope": "bounded-thais-z7-proof",
+      "capabilities": [
+        "resolved-appearance-primitives-v0",
+        "semantic-tiles-v0"
+      ]
+    },
+    "public_policy": {
+      "path": "tools/game-atlas-thais-fixture/public_policy.py",
+      "blob_sha": "07c183e053d76b113178b69fb60523e4b2a30e91",
+      "revision": "dyn-atlas-001-static-public-presentation-v0"
+    }
+  },
+  "publication_dependency": {
+    "required_gate": "G3",
+    "status": "BLOCKED",
+    "reason": "No canonical full-world publication hand-off exists on the audited Atlas base."
+  },
+  "rules": {
+    "default_deny_public_projection": true,
+    "legacy_runtime_fallback_forbidden": true,
+    "pixel_or_sprite_semantic_inference_forbidden": true,
+    "blocked_or_unknown_layers_enabled": false,
+    "overview_derivation_requires_verified_semantic_publication": true
+  },
+  "layers": [
+    {
+      "id": "towns",
+      "priority": 1,
+      "status": "BLOCKED",
+      "blocker_code": "GAME_EXPORT_NOT_ALLOWLISTED_OR_EMITTED",
+      "current_export_presence": false,
+      "authority_evidence": [
+        "OTERYN_GAME_ATLAS_EXPORT_CONTRACT_V1.md#entity-and-overlay-records",
+        "ADR-0005-native-world-format-and-oteryn-studio.md"
+      ],
+      "required_upstream": "Public-safe town record semantics, capability and deterministic producer output.",
+      "enabled": false
+    },
+    {
+      "id": "temples",
+      "priority": 1,
+      "status": "UNKNOWN",
+      "blocker_code": "NO_GAME_ATLAS_SEMANTIC_CONTRACT",
+      "current_export_presence": false,
+      "authority_evidence": [],
+      "required_upstream": "Define canonical temple/respawn semantics and public-safe Atlas projection in Game.",
+      "enabled": false
+    },
+    {
+      "id": "teleports-transitions",
+      "priority": 2,
+      "status": "BLOCKED",
+      "blocker_code": "GAME_EXPORT_NOT_ALLOWLISTED_OR_EMITTED",
+      "current_export_presence": false,
+      "authority_evidence": [
+        "OTERYN_GAME_ATLAS_EXPORT_CONTRACT_V1.md#entity-and-overlay-records",
+        "ADR-0005-native-world-format-and-oteryn-studio.md"
+      ],
+      "required_upstream": "Public-safe transition identity, endpoints/direction semantics and deterministic producer output.",
+      "enabled": false
+    },
+    {
+      "id": "houses",
+      "priority": 3,
+      "status": "BLOCKED",
+      "blocker_code": "GAME_EXPORT_NOT_ALLOWLISTED_OR_EMITTED",
+      "current_export_presence": false,
+      "authority_evidence": [
+        "OTERYN_GAME_ATLAS_EXPORT_CONTRACT_V1.md#entity-and-overlay-records",
+        "ADR-0005-native-world-format-and-oteryn-studio.md"
+      ],
+      "required_upstream": "Public-safe house identity/geometry semantics and deterministic producer output.",
+      "enabled": false
+    },
+    {
+      "id": "house-doors",
+      "priority": 3,
+      "status": "UNKNOWN",
+      "blocker_code": "NO_GAME_ATLAS_SEMANTIC_CONTRACT",
+      "current_export_presence": false,
+      "authority_evidence": [
+        "ADR-0005-native-world-format-and-oteryn-studio.md"
+      ],
+      "required_upstream": "Define canonical house-door relationship and public-safe projection in Game.",
+      "enabled": false
+    },
+    {
+      "id": "action-ids",
+      "priority": 4,
+      "status": "BLOCKED",
+      "blocker_code": "LEGACY_IDENTIFIER_NOT_PROMOTED_OR_ALLOWLISTED",
+      "current_export_presence": false,
+      "authority_evidence": [
+        "OTERYN_GAME_ATLAS_EXPORT_CONTRACT_V1.md#stable-identity-rules"
+      ],
+      "required_upstream": "Game must explicitly classify any Action ID semantics as public metadata; Atlas cannot promote legacy numeric IDs itself.",
+      "enabled": false
+    },
+    {
+      "id": "unique-ids",
+      "priority": 4,
+      "status": "BLOCKED",
+      "blocker_code": "LEGACY_IDENTIFIER_NOT_PROMOTED_OR_ALLOWLISTED",
+      "current_export_presence": false,
+      "authority_evidence": [
+        "OTERYN_GAME_ATLAS_EXPORT_CONTRACT_V1.md#stable-identity-rules"
+      ],
+      "required_upstream": "Game must explicitly classify any Unique ID semantics as public metadata; Atlas cannot promote legacy numeric IDs itself.",
+      "enabled": false
+    },
+    {
+      "id": "waypoints",
+      "priority": 5,
+      "status": "BLOCKED",
+      "blocker_code": "GAME_EXPORT_NOT_ALLOWLISTED_OR_EMITTED",
+      "current_export_presence": false,
+      "authority_evidence": [
+        "OTERYN_GAME_ATLAS_EXPORT_CONTRACT_V1.md#entity-and-overlay-records",
+        "ADR-0005-native-world-format-and-oteryn-studio.md"
+      ],
+      "required_upstream": "Public-safe waypoint identity/position semantics and deterministic producer output.",
+      "enabled": false
+    },
+    {
+      "id": "mechanics",
+      "priority": 6,
+      "status": "BLOCKED",
+      "blocker_code": "GAME_EXPORT_NOT_ALLOWLISTED_OR_EMITTED",
+      "current_export_presence": false,
+      "authority_evidence": [
+        "OTERYN_GAME_ATLAS_EXPORT_CONTRACT_V1.md#entity-and-overlay-records"
+      ],
+      "required_upstream": "Game must explicitly classify deliberately public mechanics evidence and fields.",
+      "enabled": false
+    },
+    {
+      "id": "raids-encounters",
+      "priority": 6,
+      "status": "BLOCKED",
+      "blocker_code": "GAME_EXPORT_NOT_ALLOWLISTED_OR_EMITTED",
+      "current_export_presence": false,
+      "authority_evidence": [
+        "OTERYN_GAME_ATLAS_EXPORT_CONTRACT_V1.md#entity-and-overlay-records",
+        "ADR-0005-native-world-format-and-oteryn-studio.md"
+      ],
+      "required_upstream": "Public-safe encounter/raid geometry and identity semantics plus deterministic producer output.",
+      "enabled": false
+    },
+    {
+      "id": "quest-areas",
+      "priority": 6,
+      "status": "UNKNOWN",
+      "blocker_code": "NO_GAME_ATLAS_SEMANTIC_CONTRACT",
+      "current_export_presence": false,
+      "authority_evidence": [
+        "ADR-0005-native-world-format-and-oteryn-studio.md"
+      ],
+      "required_upstream": "Define which quest-area facts are public and how quest-zone geometry is represented without exposing private progression state.",
+      "enabled": false
+    },
+    {
+      "id": "pois",
+      "priority": 6,
+      "status": "BLOCKED",
+      "blocker_code": "GAME_EXPORT_NOT_ALLOWLISTED_OR_EMITTED",
+      "current_export_presence": false,
+      "authority_evidence": [
+        "OTERYN_GAME_ATLAS_EXPORT_CONTRACT_V1.md#entity-and-overlay-records"
+      ],
+      "required_upstream": "Public-safe POI category/label/position-or-bounds semantics and deterministic producer output.",
+      "enabled": false
+    },
+    {
+      "id": "npcs",
+      "priority": 7,
+      "status": "BLOCKED",
+      "blocker_code": "GAME_EXPORT_NOT_ALLOWLISTED_OR_EMITTED",
+      "current_export_presence": false,
+      "authority_evidence": [
+        "OTERYN_GAME_ATLAS_EXPORT_CONTRACT_V1.md#entity-and-overlay-records",
+        "ADR-0005-native-world-format-and-oteryn-studio.md"
+      ],
+      "required_upstream": "Public-safe NPC definition/placement/spawn records with stable identity and deterministic producer output.",
+      "enabled": false
+    },
+    {
+      "id": "monsters-spawns",
+      "priority": 8,
+      "status": "BLOCKED",
+      "blocker_code": "GAME_EXPORT_NOT_ALLOWLISTED_OR_EMITTED",
+      "current_export_presence": false,
+      "authority_evidence": [
+        "OTERYN_GAME_ATLAS_EXPORT_CONTRACT_V1.md#entity-and-overlay-records",
+        "ADR-0005-native-world-format-and-oteryn-studio.md"
+      ],
+      "required_upstream": "Public-safe monster definition/placement/spawn records with stable identity and deterministic producer output.",
+      "enabled": false
+    },
+    {
+      "id": "minimap-overview",
+      "priority": 9,
+      "status": "BLOCKED",
+      "blocker_code": "FULLWORLD_SEMANTIC_PUBLICATION_MISSING",
+      "current_export_presence": false,
+      "authority_evidence": [
+        "ATLAS-FULLWORLD-AGENT-SUITE.md#agent-3-atlas-semantic-layers-and-indexes"
+      ],
+      "required_upstream": "Verified complete semantic publication for every exported floor; derive overview only from that publication, never from legacy raster authority.",
+      "enabled": false
+    }
+  ]
+}
