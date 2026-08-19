@@ -1,0 +1,2904 @@
+{
+  "authority_basis": "blakinio/Otheryn/docs/architecture/OTERYN_ATLAS_EXTRACTION_REVIEW_2026-08-15.md plus current Atlas PR #4 architecture/provenance evidence",
+  "rows": [
+    {
+      "final_disposition": "MONOREPO_WORKFLOW_RETIRED_REPLACED_BY_PROVIDER_CI",
+      "ownership_classification": "SPLIT_REWRITE_WORKFLOW",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "ef5d80385d1b8d235d19fd06e4276959c74a09ff",
+      "source_path": ".github/workflows/otbm-atlas-ci-ingest-tests.yml",
+      "source_size": 10136,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "d127f8c5d5da5fed1ea545f663f6ff73f1c39abb",
+          "path": ".github/workflows/ci.yml"
+        }
+      ],
+      "transformation": "rewritten as Atlas-owned CI consuming normalized Atlas inputs; Game-side truth stays in Game"
+    },
+    {
+      "final_disposition": "MONOREPO_WORKFLOW_RETIRED_REPLACED_BY_PROVIDER_CI",
+      "ownership_classification": "SPLIT_REWRITE_WORKFLOW",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "d195a1ca8bde0d61d1f57a8b6a2b10ab553667c4",
+      "source_path": ".github/workflows/otbm-atlas-controlled-beta.yml",
+      "source_size": 1150,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "d127f8c5d5da5fed1ea545f663f6ff73f1c39abb",
+          "path": ".github/workflows/ci.yml"
+        }
+      ],
+      "transformation": "rewritten as Atlas-owned CI consuming normalized Atlas inputs; Game-side truth stays in Game"
+    },
+    {
+      "final_disposition": "MONOREPO_WORKFLOW_RETIRED_REPLACED_BY_PROVIDER_CI",
+      "ownership_classification": "SPLIT_REWRITE_WORKFLOW",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "f1182392b8a159c19c25d51033ad2f72bf4f5245",
+      "source_path": ".github/workflows/otbm-atlas-deploy-request.yml",
+      "source_size": 2333,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "d127f8c5d5da5fed1ea545f663f6ff73f1c39abb",
+          "path": ".github/workflows/ci.yml"
+        }
+      ],
+      "transformation": "rewritten as Atlas-owned CI consuming normalized Atlas inputs; Game-side truth stays in Game"
+    },
+    {
+      "final_disposition": "MONOREPO_WORKFLOW_RETIRED_REPLACED_BY_PROVIDER_CI",
+      "ownership_classification": "SPLIT_REWRITE_WORKFLOW",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "e822f6d5ba6ec49e217cceec4afeb42b383cfb71",
+      "source_path": ".github/workflows/otbm-atlas-facts-tests.yml",
+      "source_size": 6427,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "d127f8c5d5da5fed1ea545f663f6ff73f1c39abb",
+          "path": ".github/workflows/ci.yml"
+        }
+      ],
+      "transformation": "rewritten as Atlas-owned CI consuming normalized Atlas inputs; Game-side truth stays in Game"
+    },
+    {
+      "final_disposition": "MONOREPO_WORKFLOW_RETIRED_REPLACED_BY_PROVIDER_CI",
+      "ownership_classification": "SPLIT_REWRITE_WORKFLOW",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "58480157451e720ecd912178fc9bcdc6e7a57077",
+      "source_path": ".github/workflows/otbm-atlas-factual-layers-audit.yml",
+      "source_size": 6529,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "d127f8c5d5da5fed1ea545f663f6ff73f1c39abb",
+          "path": ".github/workflows/ci.yml"
+        }
+      ],
+      "transformation": "rewritten as Atlas-owned CI consuming normalized Atlas inputs; Game-side truth stays in Game"
+    },
+    {
+      "final_disposition": "MONOREPO_WORKFLOW_RETIRED_REPLACED_BY_PROVIDER_CI",
+      "ownership_classification": "SPLIT_REWRITE_WORKFLOW",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "7fbdd4f9acdd2c0e69ff01945dea9db512e1fdb6",
+      "source_path": ".github/workflows/otbm-atlas-factual-layers-tests.yml",
+      "source_size": 12508,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "d127f8c5d5da5fed1ea545f663f6ff73f1c39abb",
+          "path": ".github/workflows/ci.yml"
+        }
+      ],
+      "transformation": "rewritten as Atlas-owned CI consuming normalized Atlas inputs; Game-side truth stays in Game"
+    },
+    {
+      "final_disposition": "MONOREPO_WORKFLOW_RETIRED_REPLACED_BY_PROVIDER_CI",
+      "ownership_classification": "SPLIT_REWRITE_WORKFLOW",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "ca15a215a61f36564d95700f2a3e9f4541d4d0d7",
+      "source_path": ".github/workflows/otbm-atlas-full-world-16.yml",
+      "source_size": 40079,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "d127f8c5d5da5fed1ea545f663f6ff73f1c39abb",
+          "path": ".github/workflows/ci.yml"
+        }
+      ],
+      "transformation": "rewritten as Atlas-owned CI consuming normalized Atlas inputs; Game-side truth stays in Game"
+    },
+    {
+      "final_disposition": "MONOREPO_WORKFLOW_RETIRED_REPLACED_BY_PROVIDER_CI",
+      "ownership_classification": "SPLIT_REWRITE_WORKFLOW",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "5d4d64f6fc583bb1b19216b2fc8dbb8e40c221a4",
+      "source_path": ".github/workflows/otbm-atlas-full-world-release.yml",
+      "source_size": 5488,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "d127f8c5d5da5fed1ea545f663f6ff73f1c39abb",
+          "path": ".github/workflows/ci.yml"
+        }
+      ],
+      "transformation": "rewritten as Atlas-owned CI consuming normalized Atlas inputs; Game-side truth stays in Game"
+    },
+    {
+      "final_disposition": "MONOREPO_WORKFLOW_RETIRED_REPLACED_BY_PROVIDER_CI",
+      "ownership_classification": "SPLIT_REWRITE_WORKFLOW",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "a2ee38d898226ba39d5bd468d32b0812b4f75399",
+      "source_path": ".github/workflows/otbm-atlas-incremental.yml",
+      "source_size": 16027,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "d127f8c5d5da5fed1ea545f663f6ff73f1c39abb",
+          "path": ".github/workflows/ci.yml"
+        }
+      ],
+      "transformation": "rewritten as Atlas-owned CI consuming normalized Atlas inputs; Game-side truth stays in Game"
+    },
+    {
+      "final_disposition": "MONOREPO_WORKFLOW_RETIRED_REPLACED_BY_PROVIDER_CI",
+      "ownership_classification": "SPLIT_REWRITE_WORKFLOW",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "358b64de40db9dd23af4cb1ca0d945b114f949f8",
+      "source_path": ".github/workflows/otbm-atlas-ingest-orphan-cleanup.yml",
+      "source_size": 1718,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "d127f8c5d5da5fed1ea545f663f6ff73f1c39abb",
+          "path": ".github/workflows/ci.yml"
+        }
+      ],
+      "transformation": "rewritten as Atlas-owned CI consuming normalized Atlas inputs; Game-side truth stays in Game"
+    },
+    {
+      "final_disposition": "MONOREPO_WORKFLOW_RETIRED_REPLACED_BY_PROVIDER_CI",
+      "ownership_classification": "SPLIT_REWRITE_WORKFLOW",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "7a9c430ea9b5a450072b389ec25674f59baf9d97",
+      "source_path": ".github/workflows/otbm-atlas-smb-transfer.yml",
+      "source_size": 4803,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "d127f8c5d5da5fed1ea545f663f6ff73f1c39abb",
+          "path": ".github/workflows/ci.yml"
+        }
+      ],
+      "transformation": "rewritten as Atlas-owned CI consuming normalized Atlas inputs; Game-side truth stays in Game"
+    },
+    {
+      "final_disposition": "MONOREPO_WORKFLOW_RETIRED_REPLACED_BY_PROVIDER_CI",
+      "ownership_classification": "SPLIT_REWRITE_WORKFLOW",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "4c7f82a654a4beb5b38adbc2a1bc8b68b4ec5092",
+      "source_path": ".github/workflows/otbm-atlas-synology-preview.yml",
+      "source_size": 5656,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "d127f8c5d5da5fed1ea545f663f6ff73f1c39abb",
+          "path": ".github/workflows/ci.yml"
+        }
+      ],
+      "transformation": "rewritten as Atlas-owned CI consuming normalized Atlas inputs; Game-side truth stays in Game"
+    },
+    {
+      "final_disposition": "MONOREPO_WORKFLOW_RETIRED_REPLACED_BY_PROVIDER_CI",
+      "ownership_classification": "SPLIT_REWRITE_WORKFLOW",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "f587d0cf5a1d9d39e249f069414557b433780a5b",
+      "source_path": ".github/workflows/otbm-atlas-tests.yml",
+      "source_size": 18785,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "d127f8c5d5da5fed1ea545f663f6ff73f1c39abb",
+          "path": ".github/workflows/ci.yml"
+        }
+      ],
+      "transformation": "rewritten as Atlas-owned CI consuming normalized Atlas inputs; Game-side truth stays in Game"
+    },
+    {
+      "final_disposition": "LEGACY_REFERENCE_ONLY_NOT_COPIED",
+      "ownership_classification": "LEGACY_REFERENCE_REVIEWED",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "aef5ac5f4971500c3758980ee179d4aaa8b0b3cd",
+      "source_path": "tools/otbm_atlas/ANIMATION.md",
+      "source_size": 7840,
+      "target_owner": "Legacy reference",
+      "target_paths": [],
+      "transformation": "none; no durable Atlas dependency"
+    },
+    {
+      "final_disposition": "LEGACY_REFERENCE_ONLY_NOT_COPIED",
+      "ownership_classification": "LEGACY_REFERENCE_REVIEWED",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "d27a34491056a8c0aa0b4ce6dcf1769bef244c7c",
+      "source_path": "tools/otbm_atlas/CREATURES.md",
+      "source_size": 6831,
+      "target_owner": "Legacy reference",
+      "target_paths": [],
+      "transformation": "none; no durable Atlas dependency"
+    },
+    {
+      "final_disposition": "LEGACY_REFERENCE_ONLY_NOT_COPIED",
+      "ownership_classification": "LEGACY_REFERENCE_REVIEWED",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "9036403d18cc2f2c378a90d89ae43ca2be806435",
+      "source_path": "tools/otbm_atlas/README.md",
+      "source_size": 11887,
+      "target_owner": "Legacy reference",
+      "target_paths": [],
+      "transformation": "none; no durable Atlas dependency"
+    },
+    {
+      "final_disposition": "LEGACY_REFERENCE_ONLY_NOT_COPIED",
+      "ownership_classification": "LEGACY_REFERENCE_REVIEWED",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "047d1274022e1d2a71d6aa23d6efcf420a24535d",
+      "source_path": "tools/otbm_atlas/__init__.py",
+      "source_size": 440,
+      "target_owner": "Legacy reference",
+      "target_paths": [],
+      "transformation": "none; no durable Atlas dependency"
+    },
+    {
+      "final_disposition": "LEGACY_REFERENCE_ONLY_NOT_COPIED",
+      "ownership_classification": "LEGACY_REFERENCE_REVIEWED",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "fe9af33bc228ec805607806035f40567333c5dbb",
+      "source_path": "tools/otbm_atlas/_deployed_browser_probe_core.py",
+      "source_size": 25409,
+      "target_owner": "Legacy reference",
+      "target_paths": [],
+      "transformation": "none; no durable Atlas dependency"
+    },
+    {
+      "final_disposition": "LEGACY_REFERENCE_ONLY_NOT_COPIED",
+      "ownership_classification": "LEGACY_REFERENCE_REVIEWED",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "d7b1326a9001eff66110a6e6d2018bd858194eaa",
+      "source_path": "tools/otbm_atlas/accessibility_runtime.js",
+      "source_size": 3053,
+      "target_owner": "Legacy reference",
+      "target_paths": [],
+      "transformation": "none; no durable Atlas dependency"
+    },
+    {
+      "final_disposition": "ATLAS_CAPABILITY_REIMPLEMENTED_NO_CONTENT_COPY",
+      "ownership_classification": "ATLAS_REIMPLEMENTED",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "25ed2400813bb3ccdc54482967ed05197eb1a850",
+      "source_path": "tools/otbm_atlas/assets.py",
+      "source_size": 10922,
+      "target_owner": "Oteryn/Oteryn-Atlas",
+      "target_paths": [
+        {
+          "blob": "9d77089b8a67c0edead8cb5bab5ad2cedc6526c1",
+          "path": "src/browser/pixels.mjs"
+        },
+        {
+          "blob": "a0bae608e00e168d41f29190c90ce5d66a55cbe7",
+          "path": "tools/dyn-atlas-pixels/publish_store.py"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "reimplemented behind the Game-export/Atlas-projection boundary; legacy source code is not runtime authority"
+    },
+    {
+      "final_disposition": "BOUNDARY_SPLIT_REIMPLEMENTED",
+      "ownership_classification": "SPLIT_REIMPLEMENTED",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "56cb6d90b6600bd6ab54940425eab98bd6f55060",
+      "source_path": "tools/otbm_atlas/atlas.py",
+      "source_size": 20375,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "13f396ac8dbf05ac66e1f9b1d86a191995e30946",
+          "path": "tools/dyn-atlas-semantic/compiler.py"
+        },
+        {
+          "blob": "6e2fd31367a367189148a642c9e2bf930dcaee9c",
+          "path": "tools/dyn-atlas-semantic/verify.py"
+        },
+        {
+          "blob": "61df75f257812eea13ddaddb7b771ac3c722ad97",
+          "path": "src/browser/semantic.mjs"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "Game owns canonical truth/import; Atlas owns derived projection/publication; no monolithic source copy"
+    },
+    {
+      "final_disposition": "LEGACY_REFERENCE_ONLY_NOT_COPIED",
+      "ownership_classification": "LEGACY_REFERENCE_REVIEWED",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "f3a46240f0e1dcb9d4c6b236c8a5fc4c54de6801",
+      "source_path": "tools/otbm_atlas/build_latest_local.sh",
+      "source_size": 4711,
+      "target_owner": "Legacy reference",
+      "target_paths": [],
+      "transformation": "none; no durable Atlas dependency"
+    },
+    {
+      "final_disposition": "LEGACY_REFERENCE_ONLY_NOT_COPIED",
+      "ownership_classification": "LEGACY_REFERENCE_REVIEWED",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "ca6cb49f4f6a1a03675ae0e308b06f8bff92b072",
+      "source_path": "tools/otbm_atlas/chunk_benchmark.py",
+      "source_size": 3813,
+      "target_owner": "Legacy reference",
+      "target_paths": [],
+      "transformation": "none; no durable Atlas dependency"
+    },
+    {
+      "final_disposition": "ATLAS_CAPABILITY_REIMPLEMENTED_NO_CONTENT_COPY",
+      "ownership_classification": "ATLAS_REIMPLEMENTED",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "ae141729a4507890dfcb24169887a05af0911d3c",
+      "source_path": "tools/otbm_atlas/codec_benchmark.py",
+      "source_size": 11504,
+      "target_owner": "Oteryn/Oteryn-Atlas",
+      "target_paths": [
+        {
+          "blob": "13f396ac8dbf05ac66e1f9b1d86a191995e30946",
+          "path": "tools/dyn-atlas-semantic/compiler.py"
+        },
+        {
+          "blob": "6e2fd31367a367189148a642c9e2bf930dcaee9c",
+          "path": "tools/dyn-atlas-semantic/verify.py"
+        },
+        {
+          "blob": "61df75f257812eea13ddaddb7b771ac3c722ad97",
+          "path": "src/browser/semantic.mjs"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "reimplemented behind the Game-export/Atlas-projection boundary; legacy source code is not runtime authority"
+    },
+    {
+      "final_disposition": "NOT_MIGRATED_TO_ATLAS_GAME_OWNS_TRUTH",
+      "ownership_classification": "GAME_OWNED_LEGACY_REFERENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "a8ea7acbd717c5265a6a61f2e51ad894ea06184c",
+      "source_path": "tools/otbm_atlas/composition.py",
+      "source_size": 2810,
+      "target_owner": "Oteryn/Oteryn-Game",
+      "target_paths": [],
+      "transformation": "none; retained only as pinned legacy evidence for Game-side importer/content authority"
+    },
+    {
+      "final_disposition": "ATLAS_CAPABILITY_REIMPLEMENTED_NO_CONTENT_COPY",
+      "ownership_classification": "ATLAS_REIMPLEMENTED",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "a24900578048006a88ed194480f8cbbeec817b40",
+      "source_path": "tools/otbm_atlas/creature_animation_runtime.js",
+      "source_size": 5515,
+      "target_owner": "Oteryn/Oteryn-Atlas",
+      "target_paths": [
+        {
+          "blob": "9d77089b8a67c0edead8cb5bab5ad2cedc6526c1",
+          "path": "src/browser/pixels.mjs"
+        },
+        {
+          "blob": "a0bae608e00e168d41f29190c90ce5d66a55cbe7",
+          "path": "tools/dyn-atlas-pixels/publish_store.py"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "reimplemented behind the Game-export/Atlas-projection boundary; legacy source code is not runtime authority"
+    },
+    {
+      "final_disposition": "LEGACY_REFERENCE_ONLY_NOT_COPIED",
+      "ownership_classification": "LEGACY_REFERENCE_REVIEWED",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "cf92cdbe02fd4f49a135dd3c06e53d6b812fd716",
+      "source_path": "tools/otbm_atlas/creature_resolution_audit.py",
+      "source_size": 5840,
+      "target_owner": "Legacy reference",
+      "target_paths": [],
+      "transformation": "none; no durable Atlas dependency"
+    },
+    {
+      "final_disposition": "BOUNDARY_SPLIT_REIMPLEMENTED",
+      "ownership_classification": "SPLIT_REIMPLEMENTED",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "f70e0f18e7c10434412b4506ff8cc92cea2dbe7b",
+      "source_path": "tools/otbm_atlas/creature_sprites.py",
+      "source_size": 18496,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "9d77089b8a67c0edead8cb5bab5ad2cedc6526c1",
+          "path": "src/browser/pixels.mjs"
+        },
+        {
+          "blob": "a0bae608e00e168d41f29190c90ce5d66a55cbe7",
+          "path": "tools/dyn-atlas-pixels/publish_store.py"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "Game owns canonical truth/import; Atlas owns derived projection/publication; no monolithic source copy"
+    },
+    {
+      "final_disposition": "LEGACY_REFERENCE_ONLY_NOT_COPIED",
+      "ownership_classification": "LEGACY_REFERENCE_REVIEWED",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "426813da9be3684bf10344b5eb7e2d21ffccf611",
+      "source_path": "tools/otbm_atlas/deploy_preflight.py",
+      "source_size": 21216,
+      "target_owner": "Legacy reference",
+      "target_paths": [],
+      "transformation": "none; no durable Atlas dependency"
+    },
+    {
+      "final_disposition": "LEGACY_REFERENCE_ONLY_NOT_COPIED",
+      "ownership_classification": "LEGACY_REFERENCE_REVIEWED",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "0a82acdeb4c0fabf2e45fec7222628b4f3837da5",
+      "source_path": "tools/otbm_atlas/deployed_browser_probe.py",
+      "source_size": 8196,
+      "target_owner": "Legacy reference",
+      "target_paths": [],
+      "transformation": "none; no durable Atlas dependency"
+    },
+    {
+      "final_disposition": "LEGACY_REFERENCE_ONLY_NOT_COPIED",
+      "ownership_classification": "LEGACY_REFERENCE_REVIEWED",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "8a376baab7d212c9532df8b3c12a8c7147b74ff5",
+      "source_path": "tools/otbm_atlas/domain_probe.py",
+      "source_size": 3520,
+      "target_owner": "Legacy reference",
+      "target_paths": [],
+      "transformation": "none; no durable Atlas dependency"
+    },
+    {
+      "final_disposition": "BOUNDARY_SPLIT_REIMPLEMENTED",
+      "ownership_classification": "SPLIT_REIMPLEMENTED",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "47f39090923da05374c959ec6df7d279719868a0",
+      "source_path": "tools/otbm_atlas/environment_animation.py",
+      "source_size": 16708,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "13f396ac8dbf05ac66e1f9b1d86a191995e30946",
+          "path": "tools/dyn-atlas-semantic/compiler.py"
+        },
+        {
+          "blob": "6e2fd31367a367189148a642c9e2bf930dcaee9c",
+          "path": "tools/dyn-atlas-semantic/verify.py"
+        },
+        {
+          "blob": "61df75f257812eea13ddaddb7b771ac3c722ad97",
+          "path": "src/browser/semantic.mjs"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "Game owns canonical truth/import; Atlas owns derived projection/publication; no monolithic source copy"
+    },
+    {
+      "final_disposition": "LEGACY_REFERENCE_ONLY_NOT_COPIED",
+      "ownership_classification": "LEGACY_REFERENCE_REVIEWED",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "61b823e741f2860fae185a8ffcda3fa59ded1018",
+      "source_path": "tools/otbm_atlas/environment_animation_resume.py",
+      "source_size": 33524,
+      "target_owner": "Legacy reference",
+      "target_paths": [],
+      "transformation": "none; no durable Atlas dependency"
+    },
+    {
+      "final_disposition": "LEGACY_REFERENCE_ONLY_NOT_COPIED",
+      "ownership_classification": "LEGACY_REFERENCE_REVIEWED",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "fe75d3dca77e5bc1bb30441f8a07b4a779ab3c3a",
+      "source_path": "tools/otbm_atlas/environment_incremental.py",
+      "source_size": 4957,
+      "target_owner": "Legacy reference",
+      "target_paths": [],
+      "transformation": "none; no durable Atlas dependency"
+    },
+    {
+      "final_disposition": "BOUNDARY_SPLIT_REIMPLEMENTED",
+      "ownership_classification": "SPLIT_REIMPLEMENTED",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "fdeacd33cbe120872b600e22207644b317c997d8",
+      "source_path": "tools/otbm_atlas/environment_spool.py",
+      "source_size": 1839,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "13f396ac8dbf05ac66e1f9b1d86a191995e30946",
+          "path": "tools/dyn-atlas-semantic/compiler.py"
+        },
+        {
+          "blob": "6e2fd31367a367189148a642c9e2bf930dcaee9c",
+          "path": "tools/dyn-atlas-semantic/verify.py"
+        },
+        {
+          "blob": "61df75f257812eea13ddaddb7b771ac3c722ad97",
+          "path": "src/browser/semantic.mjs"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "Game owns canonical truth/import; Atlas owns derived projection/publication; no monolithic source copy"
+    },
+    {
+      "final_disposition": "BOUNDARY_SPLIT_REIMPLEMENTED",
+      "ownership_classification": "SPLIT_REIMPLEMENTED",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "938f4b402216e057f890a08e28b0227a0af460d7",
+      "source_path": "tools/otbm_atlas/factual_layers.py",
+      "source_size": 14744,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "13f396ac8dbf05ac66e1f9b1d86a191995e30946",
+          "path": "tools/dyn-atlas-semantic/compiler.py"
+        },
+        {
+          "blob": "6e2fd31367a367189148a642c9e2bf930dcaee9c",
+          "path": "tools/dyn-atlas-semantic/verify.py"
+        },
+        {
+          "blob": "61df75f257812eea13ddaddb7b771ac3c722ad97",
+          "path": "src/browser/semantic.mjs"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "Game owns canonical truth/import; Atlas owns derived projection/publication; no monolithic source copy"
+    },
+    {
+      "final_disposition": "LEGACY_REFERENCE_ONLY_NOT_COPIED",
+      "ownership_classification": "LEGACY_REFERENCE_REVIEWED",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "f2cefb1d7a1f7934b5235c2e2e36536be4865d58",
+      "source_path": "tools/otbm_atlas/floor_build.py",
+      "source_size": 8357,
+      "target_owner": "Legacy reference",
+      "target_paths": [],
+      "transformation": "none; no durable Atlas dependency"
+    },
+    {
+      "final_disposition": "NOT_MIGRATED_TO_ATLAS_GAME_OWNS_TRUTH",
+      "ownership_classification": "GAME_OWNED_LEGACY_REFERENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "149e0db1b846aaf06ce86cbe6e21aded7ff44abd",
+      "source_path": "tools/otbm_atlas/houses.py",
+      "source_size": 1486,
+      "target_owner": "Oteryn/Oteryn-Game",
+      "target_paths": [],
+      "transformation": "none; retained only as pinned legacy evidence for Game-side importer/content authority"
+    },
+    {
+      "final_disposition": "LEGACY_REFERENCE_ONLY_NOT_COPIED",
+      "ownership_classification": "LEGACY_REFERENCE_REVIEWED",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "17e9c10e003b2cfd8c2c2a02382feb59d552706f",
+      "source_path": "tools/otbm_atlas/incremental.py",
+      "source_size": 21873,
+      "target_owner": "Legacy reference",
+      "target_paths": [],
+      "transformation": "none; no durable Atlas dependency"
+    },
+    {
+      "final_disposition": "LEGACY_REFERENCE_ONLY_NOT_COPIED",
+      "ownership_classification": "LEGACY_REFERENCE_REVIEWED",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "0a5e231d0db6f2fef197a5d3d235b185f5f085e1",
+      "source_path": "tools/otbm_atlas/incremental_cached.py",
+      "source_size": 6566,
+      "target_owner": "Legacy reference",
+      "target_paths": [],
+      "transformation": "none; no durable Atlas dependency"
+    },
+    {
+      "final_disposition": "LEGACY_REFERENCE_ONLY_NOT_COPIED",
+      "ownership_classification": "LEGACY_REFERENCE_REVIEWED",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "452094009e2e79ad2a1840549846dc0a430e0523",
+      "source_path": "tools/otbm_atlas/incremental_core.py",
+      "source_size": 25848,
+      "target_owner": "Legacy reference",
+      "target_paths": [],
+      "transformation": "none; no durable Atlas dependency"
+    },
+    {
+      "final_disposition": "LEGACY_REFERENCE_ONLY_NOT_COPIED",
+      "ownership_classification": "LEGACY_REFERENCE_REVIEWED",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "3311352130849a1b8b1b5c0b3169d58cba963b08",
+      "source_path": "tools/otbm_atlas/incremental_core_guard.py",
+      "source_size": 4744,
+      "target_owner": "Legacy reference",
+      "target_paths": [],
+      "transformation": "none; no durable Atlas dependency"
+    },
+    {
+      "final_disposition": "LEGACY_REFERENCE_ONLY_NOT_COPIED",
+      "ownership_classification": "LEGACY_REFERENCE_REVIEWED",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "5173bb458825f0fda03ed08f3705e5add8b40c90",
+      "source_path": "tools/otbm_atlas/incremental_sharded.py",
+      "source_size": 4020,
+      "target_owner": "Legacy reference",
+      "target_paths": [],
+      "transformation": "none; no durable Atlas dependency"
+    },
+    {
+      "final_disposition": "LEGACY_REFERENCE_ONLY_NOT_COPIED",
+      "ownership_classification": "LEGACY_REFERENCE_REVIEWED",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "869d9d3a923ae7d553c5096c59073bb0958721a3",
+      "source_path": "tools/otbm_atlas/incremental_shards.py",
+      "source_size": 8493,
+      "target_owner": "Legacy reference",
+      "target_paths": [],
+      "transformation": "none; no durable Atlas dependency"
+    },
+    {
+      "final_disposition": "LEGACY_REFERENCE_ONLY_NOT_COPIED",
+      "ownership_classification": "LEGACY_REFERENCE_REVIEWED",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "a36a40abcdc44f9cd42724502126834353128e61",
+      "source_path": "tools/otbm_atlas/incremental_state.py",
+      "source_size": 10170,
+      "target_owner": "Legacy reference",
+      "target_paths": [],
+      "transformation": "none; no durable Atlas dependency"
+    },
+    {
+      "final_disposition": "LEGACY_REFERENCE_ONLY_NOT_COPIED",
+      "ownership_classification": "LEGACY_REFERENCE_REVIEWED",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "8332be1459edf940bd6e43d3fbf640941ce4704d",
+      "source_path": "tools/otbm_atlas/local_parallel_build.py",
+      "source_size": 17493,
+      "target_owner": "Legacy reference",
+      "target_paths": [],
+      "transformation": "none; no durable Atlas dependency"
+    },
+    {
+      "final_disposition": "NOT_MIGRATED_TO_ATLAS_GAME_OWNS_TRUTH",
+      "ownership_classification": "GAME_OWNED_LEGACY_REFERENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "8a8127cd8d8129d62d66c99890040a429466493a",
+      "source_path": "tools/otbm_atlas/mechanics.py",
+      "source_size": 3320,
+      "target_owner": "Oteryn/Oteryn-Game",
+      "target_paths": [],
+      "transformation": "none; retained only as pinned legacy evidence for Game-side importer/content authority"
+    },
+    {
+      "final_disposition": "BOUNDARY_SPLIT_REIMPLEMENTED",
+      "ownership_classification": "SPLIT_REIMPLEMENTED",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "dfb161dd52710a053b71ee3c018de1f86c9a822e",
+      "source_path": "tools/otbm_atlas/monster_sprites.py",
+      "source_size": 2905,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "9d77089b8a67c0edead8cb5bab5ad2cedc6526c1",
+          "path": "src/browser/pixels.mjs"
+        },
+        {
+          "blob": "a0bae608e00e168d41f29190c90ce5d66a55cbe7",
+          "path": "tools/dyn-atlas-pixels/publish_store.py"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "Game owns canonical truth/import; Atlas owns derived projection/publication; no monolithic source copy"
+    },
+    {
+      "final_disposition": "NOT_MIGRATED_TO_ATLAS_GAME_OWNS_TRUTH",
+      "ownership_classification": "GAME_OWNED_LEGACY_REFERENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "bed6f7a803d9de485c1f03cbdca4be0cb1521d30",
+      "source_path": "tools/otbm_atlas/nodefile.py",
+      "source_size": 3641,
+      "target_owner": "Oteryn/Oteryn-Game",
+      "target_paths": [],
+      "transformation": "none; retained only as pinned legacy evidence for Game-side importer/content authority"
+    },
+    {
+      "final_disposition": "BOUNDARY_SPLIT_REIMPLEMENTED",
+      "ownership_classification": "SPLIT_REIMPLEMENTED",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "8ca99189500bb13b10597fbaa4b3d520795cb306",
+      "source_path": "tools/otbm_atlas/npc_sprites.py",
+      "source_size": 4612,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "9d77089b8a67c0edead8cb5bab5ad2cedc6526c1",
+          "path": "src/browser/pixels.mjs"
+        },
+        {
+          "blob": "a0bae608e00e168d41f29190c90ce5d66a55cbe7",
+          "path": "tools/dyn-atlas-pixels/publish_store.py"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "Game owns canonical truth/import; Atlas owns derived projection/publication; no monolithic source copy"
+    },
+    {
+      "final_disposition": "ATLAS_CAPABILITY_REIMPLEMENTED_NO_CONTENT_COPY",
+      "ownership_classification": "ATLAS_REIMPLEMENTED",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "8dfde581e113f61270508deb10854511e5621596",
+      "source_path": "tools/otbm_atlas/overview.py",
+      "source_size": 2783,
+      "target_owner": "Oteryn/Oteryn-Atlas",
+      "target_paths": [
+        {
+          "blob": "9d77089b8a67c0edead8cb5bab5ad2cedc6526c1",
+          "path": "src/browser/pixels.mjs"
+        },
+        {
+          "blob": "a0bae608e00e168d41f29190c90ce5d66a55cbe7",
+          "path": "tools/dyn-atlas-pixels/publish_store.py"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "reimplemented behind the Game-export/Atlas-projection boundary; legacy source code is not runtime authority"
+    },
+    {
+      "final_disposition": "LEGACY_REFERENCE_ONLY_NOT_COPIED",
+      "ownership_classification": "LEGACY_REFERENCE_REVIEWED",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "6a4e84a014f9076dba5238484f661533e83cdb5a",
+      "source_path": "tools/otbm_atlas/product_acceptance_probe.py",
+      "source_size": 15612,
+      "target_owner": "Legacy reference",
+      "target_paths": [],
+      "transformation": "none; no durable Atlas dependency"
+    },
+    {
+      "final_disposition": "LEGACY_REFERENCE_ONLY_NOT_COPIED",
+      "ownership_classification": "LEGACY_REFERENCE_REVIEWED",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "5fc6b20eb0400ee675c567bbdbbcd43b4a1e6e00",
+      "source_path": "tools/otbm_atlas/production_data.py",
+      "source_size": 17202,
+      "target_owner": "Legacy reference",
+      "target_paths": [],
+      "transformation": "none; no durable Atlas dependency"
+    },
+    {
+      "final_disposition": "LEGACY_REFERENCE_ONLY_NOT_COPIED",
+      "ownership_classification": "LEGACY_REFERENCE_REVIEWED",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "91e613c80d30fe166f4a18a544fe8d18fff65967",
+      "source_path": "tools/otbm_atlas/production_incremental.py",
+      "source_size": 22559,
+      "target_owner": "Legacy reference",
+      "target_paths": [],
+      "transformation": "none; no durable Atlas dependency"
+    },
+    {
+      "final_disposition": "LEGACY_REFERENCE_ONLY_NOT_COPIED",
+      "ownership_classification": "LEGACY_REFERENCE_REVIEWED",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "a3b3584c5819415f50864a64e80e0d14c8f48165",
+      "source_path": "tools/otbm_atlas/production_phases.py",
+      "source_size": 5708,
+      "target_owner": "Legacy reference",
+      "target_paths": [],
+      "transformation": "none; no durable Atlas dependency"
+    },
+    {
+      "final_disposition": "LEGACY_REFERENCE_ONLY_NOT_COPIED",
+      "ownership_classification": "LEGACY_REFERENCE_REVIEWED",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "fa084fa6258e8d873239b81cda8f1a30e9b83d3c",
+      "source_path": "tools/otbm_atlas/release_pointer.py",
+      "source_size": 3180,
+      "target_owner": "Legacy reference",
+      "target_paths": [],
+      "transformation": "none; no durable Atlas dependency"
+    },
+    {
+      "final_disposition": "BOUNDARY_SPLIT_REIMPLEMENTED",
+      "ownership_classification": "SPLIT_REIMPLEMENTED",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "9d66d9ff2128663eda9eb07943c60ee4ef79c9e3",
+      "source_path": "tools/otbm_atlas/render.py",
+      "source_size": 8432,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "9d77089b8a67c0edead8cb5bab5ad2cedc6526c1",
+          "path": "src/browser/pixels.mjs"
+        },
+        {
+          "blob": "a0bae608e00e168d41f29190c90ce5d66a55cbe7",
+          "path": "tools/dyn-atlas-pixels/publish_store.py"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "Game owns canonical truth/import; Atlas owns derived projection/publication; no monolithic source copy"
+    },
+    {
+      "final_disposition": "LEGACY_REFERENCE_ONLY_NOT_COPIED",
+      "ownership_classification": "LEGACY_REFERENCE_REVIEWED",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "c3eea4c68a824e9609f0f6a843d801bb41608db0",
+      "source_path": "tools/otbm_atlas/repair_asset_checkout.py",
+      "source_size": 1461,
+      "target_owner": "Legacy reference",
+      "target_paths": [],
+      "transformation": "none; no durable Atlas dependency"
+    },
+    {
+      "final_disposition": "LEGACY_REFERENCE_ONLY_NOT_COPIED",
+      "ownership_classification": "LEGACY_REFERENCE_REVIEWED",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "b0cce5a8a5752da98c11969468719bdcecbab4c0",
+      "source_path": "tools/otbm_atlas/resume_latest_local.sh",
+      "source_size": 2698,
+      "target_owner": "Legacy reference",
+      "target_paths": [],
+      "transformation": "none; no durable Atlas dependency"
+    },
+    {
+      "final_disposition": "LEGACY_REFERENCE_ONLY_NOT_COPIED",
+      "ownership_classification": "LEGACY_REFERENCE_REVIEWED",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "8337dc60bd90808b4942a327f1861e355e417a29",
+      "source_path": "tools/otbm_atlas/resume_partial_local.py",
+      "source_size": 11606,
+      "target_owner": "Legacy reference",
+      "target_paths": [],
+      "transformation": "none; no durable Atlas dependency"
+    },
+    {
+      "final_disposition": "NOT_MIGRATED_TO_ATLAS_GAME_OWNS_TRUTH",
+      "ownership_classification": "GAME_OWNED_LEGACY_REFERENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "1daee77f7e8b7a78838156c1ce1b65011c38fcef",
+      "source_path": "tools/otbm_atlas/scan.py",
+      "source_size": 4680,
+      "target_owner": "Oteryn/Oteryn-Game",
+      "target_paths": [],
+      "transformation": "none; retained only as pinned legacy evidence for Game-side importer/content authority"
+    },
+    {
+      "final_disposition": "NOT_MIGRATED_TO_ATLAS_GAME_OWNS_TRUTH",
+      "ownership_classification": "GAME_OWNED_LEGACY_REFERENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "a11343a472145aee4d9cf65c6ce28b3e4a71a2b3",
+      "source_path": "tools/otbm_atlas/semantic.py",
+      "source_size": 10531,
+      "target_owner": "Oteryn/Oteryn-Game",
+      "target_paths": [],
+      "transformation": "none; retained only as pinned legacy evidence for Game-side importer/content authority"
+    },
+    {
+      "final_disposition": "ATLAS_CAPABILITY_REIMPLEMENTED_NO_CONTENT_COPY",
+      "ownership_classification": "ATLAS_REIMPLEMENTED",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "99cc071d543fb87d6a2d96599e6431f1d774084e",
+      "source_path": "tools/otbm_atlas/spatial.py",
+      "source_size": 4114,
+      "target_owner": "Oteryn/Oteryn-Atlas",
+      "target_paths": [
+        {
+          "blob": "2f56433f797b4178e28d7bf1cbf86487ac2832e8",
+          "path": "src/browser/loader.mjs"
+        },
+        {
+          "blob": "61df75f257812eea13ddaddb7b771ac3c722ad97",
+          "path": "src/browser/semantic.mjs"
+        },
+        {
+          "blob": "105ec5c24c3eebc50626ced8456787c38b8a2244",
+          "path": "src/browser/webgl.mjs"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "reimplemented behind the Game-export/Atlas-projection boundary; legacy source code is not runtime authority"
+    },
+    {
+      "final_disposition": "NOT_MIGRATED_TO_ATLAS_GAME_OWNS_TRUTH",
+      "ownership_classification": "GAME_OWNED_LEGACY_REFERENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "9fa18dfac8310756b96c06ea86d323eb3b4c0ef2",
+      "source_path": "tools/otbm_atlas/spawns.py",
+      "source_size": 4026,
+      "target_owner": "Oteryn/Oteryn-Game",
+      "target_paths": [],
+      "transformation": "none; retained only as pinned legacy evidence for Game-side importer/content authority"
+    },
+    {
+      "final_disposition": "LEGACY_REFERENCE_ONLY_NOT_COPIED",
+      "ownership_classification": "LEGACY_REFERENCE_REVIEWED",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "ddd0ba0fa8f2c07d4ff45226c6de4ba20b3730f7",
+      "source_path": "tools/otbm_atlas/sprite_dependency.py",
+      "source_size": 7625,
+      "target_owner": "Legacy reference",
+      "target_paths": [],
+      "transformation": "none; no durable Atlas dependency"
+    },
+    {
+      "final_disposition": "TEST_EVIDENCE_SPLIT_BY_TARGET_OWNER",
+      "ownership_classification": "SPLIT_REWRITE_TEST_EVIDENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "source_path": "tools/otbm_atlas/tests/__init__.py",
+      "source_size": 0,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "13f396ac8dbf05ac66e1f9b1d86a191995e30946",
+          "path": "tools/dyn-atlas-semantic/compiler.py"
+        },
+        {
+          "blob": "6e2fd31367a367189148a642c9e2bf930dcaee9c",
+          "path": "tools/dyn-atlas-semantic/verify.py"
+        },
+        {
+          "blob": "61df75f257812eea13ddaddb7b771ac3c722ad97",
+          "path": "src/browser/semantic.mjs"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "behavioral evidence retained conceptually; monorepo fixtures/runtime assumptions not copied wholesale"
+    },
+    {
+      "final_disposition": "TEST_EVIDENCE_SPLIT_BY_TARGET_OWNER",
+      "ownership_classification": "SPLIT_REWRITE_TEST_EVIDENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "25c3f43f498a34926832a3e66927b9cb56795e28",
+      "source_path": "tools/otbm_atlas/tests/test_animation_metadata.py",
+      "source_size": 1255,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "13f396ac8dbf05ac66e1f9b1d86a191995e30946",
+          "path": "tools/dyn-atlas-semantic/compiler.py"
+        },
+        {
+          "blob": "6e2fd31367a367189148a642c9e2bf930dcaee9c",
+          "path": "tools/dyn-atlas-semantic/verify.py"
+        },
+        {
+          "blob": "61df75f257812eea13ddaddb7b771ac3c722ad97",
+          "path": "src/browser/semantic.mjs"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "behavioral evidence retained conceptually; monorepo fixtures/runtime assumptions not copied wholesale"
+    },
+    {
+      "final_disposition": "TEST_EVIDENCE_SPLIT_BY_TARGET_OWNER",
+      "ownership_classification": "SPLIT_REWRITE_TEST_EVIDENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "81ea1507a231e72cd12fa80bf16de8528186e8dc",
+      "source_path": "tools/otbm_atlas/tests/test_assets.py",
+      "source_size": 3521,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "13f396ac8dbf05ac66e1f9b1d86a191995e30946",
+          "path": "tools/dyn-atlas-semantic/compiler.py"
+        },
+        {
+          "blob": "6e2fd31367a367189148a642c9e2bf930dcaee9c",
+          "path": "tools/dyn-atlas-semantic/verify.py"
+        },
+        {
+          "blob": "61df75f257812eea13ddaddb7b771ac3c722ad97",
+          "path": "src/browser/semantic.mjs"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "behavioral evidence retained conceptually; monorepo fixtures/runtime assumptions not copied wholesale"
+    },
+    {
+      "final_disposition": "TEST_EVIDENCE_SPLIT_BY_TARGET_OWNER",
+      "ownership_classification": "SPLIT_REWRITE_TEST_EVIDENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "8f74bcbabb6fedbe55ddcc46d6d86d04b2e55808",
+      "source_path": "tools/otbm_atlas/tests/test_atlas.py",
+      "source_size": 3905,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "13f396ac8dbf05ac66e1f9b1d86a191995e30946",
+          "path": "tools/dyn-atlas-semantic/compiler.py"
+        },
+        {
+          "blob": "6e2fd31367a367189148a642c9e2bf930dcaee9c",
+          "path": "tools/dyn-atlas-semantic/verify.py"
+        },
+        {
+          "blob": "61df75f257812eea13ddaddb7b771ac3c722ad97",
+          "path": "src/browser/semantic.mjs"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "behavioral evidence retained conceptually; monorepo fixtures/runtime assumptions not copied wholesale"
+    },
+    {
+      "final_disposition": "TEST_EVIDENCE_SPLIT_BY_TARGET_OWNER",
+      "ownership_classification": "SPLIT_REWRITE_TEST_EVIDENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "047bdc67e9cda9f6a3c121330503f3c635934948",
+      "source_path": "tools/otbm_atlas/tests/test_atlas_overview_parallel.py",
+      "source_size": 8751,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "13f396ac8dbf05ac66e1f9b1d86a191995e30946",
+          "path": "tools/dyn-atlas-semantic/compiler.py"
+        },
+        {
+          "blob": "6e2fd31367a367189148a642c9e2bf930dcaee9c",
+          "path": "tools/dyn-atlas-semantic/verify.py"
+        },
+        {
+          "blob": "61df75f257812eea13ddaddb7b771ac3c722ad97",
+          "path": "src/browser/semantic.mjs"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "behavioral evidence retained conceptually; monorepo fixtures/runtime assumptions not copied wholesale"
+    },
+    {
+      "final_disposition": "TEST_EVIDENCE_SPLIT_BY_TARGET_OWNER",
+      "ownership_classification": "SPLIT_REWRITE_TEST_EVIDENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "c55c1fe6549c18155a103b63b3689f03478733a9",
+      "source_path": "tools/otbm_atlas/tests/test_atlas_partial_resume.py",
+      "source_size": 2652,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "13f396ac8dbf05ac66e1f9b1d86a191995e30946",
+          "path": "tools/dyn-atlas-semantic/compiler.py"
+        },
+        {
+          "blob": "6e2fd31367a367189148a642c9e2bf930dcaee9c",
+          "path": "tools/dyn-atlas-semantic/verify.py"
+        },
+        {
+          "blob": "61df75f257812eea13ddaddb7b771ac3c722ad97",
+          "path": "src/browser/semantic.mjs"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "behavioral evidence retained conceptually; monorepo fixtures/runtime assumptions not copied wholesale"
+    },
+    {
+      "final_disposition": "TEST_EVIDENCE_SPLIT_BY_TARGET_OWNER",
+      "ownership_classification": "SPLIT_REWRITE_TEST_EVIDENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "2794828992ed42a1218fe0c51e481726c8a8b931",
+      "source_path": "tools/otbm_atlas/tests/test_atlas_report_recovery.py",
+      "source_size": 1353,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "13f396ac8dbf05ac66e1f9b1d86a191995e30946",
+          "path": "tools/dyn-atlas-semantic/compiler.py"
+        },
+        {
+          "blob": "6e2fd31367a367189148a642c9e2bf930dcaee9c",
+          "path": "tools/dyn-atlas-semantic/verify.py"
+        },
+        {
+          "blob": "61df75f257812eea13ddaddb7b771ac3c722ad97",
+          "path": "src/browser/semantic.mjs"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "behavioral evidence retained conceptually; monorepo fixtures/runtime assumptions not copied wholesale"
+    },
+    {
+      "final_disposition": "TEST_EVIDENCE_SPLIT_BY_TARGET_OWNER",
+      "ownership_classification": "SPLIT_REWRITE_TEST_EVIDENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "b60c7d1547e4f26996df71bcb916290045e03a5c",
+      "source_path": "tools/otbm_atlas/tests/test_canonical_creatures.py",
+      "source_size": 6291,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "13f396ac8dbf05ac66e1f9b1d86a191995e30946",
+          "path": "tools/dyn-atlas-semantic/compiler.py"
+        },
+        {
+          "blob": "6e2fd31367a367189148a642c9e2bf930dcaee9c",
+          "path": "tools/dyn-atlas-semantic/verify.py"
+        },
+        {
+          "blob": "61df75f257812eea13ddaddb7b771ac3c722ad97",
+          "path": "src/browser/semantic.mjs"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "behavioral evidence retained conceptually; monorepo fixtures/runtime assumptions not copied wholesale"
+    },
+    {
+      "final_disposition": "TEST_EVIDENCE_SPLIT_BY_TARGET_OWNER",
+      "ownership_classification": "SPLIT_REWRITE_TEST_EVIDENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "c9253ce2c08761a26584843ab6dcb4f79a497d19",
+      "source_path": "tools/otbm_atlas/tests/test_checkpoint_contract.py",
+      "source_size": 1628,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "13f396ac8dbf05ac66e1f9b1d86a191995e30946",
+          "path": "tools/dyn-atlas-semantic/compiler.py"
+        },
+        {
+          "blob": "6e2fd31367a367189148a642c9e2bf930dcaee9c",
+          "path": "tools/dyn-atlas-semantic/verify.py"
+        },
+        {
+          "blob": "61df75f257812eea13ddaddb7b771ac3c722ad97",
+          "path": "src/browser/semantic.mjs"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "behavioral evidence retained conceptually; monorepo fixtures/runtime assumptions not copied wholesale"
+    },
+    {
+      "final_disposition": "TEST_EVIDENCE_SPLIT_BY_TARGET_OWNER",
+      "ownership_classification": "SPLIT_REWRITE_TEST_EVIDENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "e48908e367efd5c8754e45e908d168d32ffacd92",
+      "source_path": "tools/otbm_atlas/tests/test_chunk_benchmark.py",
+      "source_size": 1189,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "13f396ac8dbf05ac66e1f9b1d86a191995e30946",
+          "path": "tools/dyn-atlas-semantic/compiler.py"
+        },
+        {
+          "blob": "6e2fd31367a367189148a642c9e2bf930dcaee9c",
+          "path": "tools/dyn-atlas-semantic/verify.py"
+        },
+        {
+          "blob": "61df75f257812eea13ddaddb7b771ac3c722ad97",
+          "path": "src/browser/semantic.mjs"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "behavioral evidence retained conceptually; monorepo fixtures/runtime assumptions not copied wholesale"
+    },
+    {
+      "final_disposition": "TEST_EVIDENCE_SPLIT_BY_TARGET_OWNER",
+      "ownership_classification": "SPLIT_REWRITE_TEST_EVIDENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "80271629f1dbade16a948b146104547ac1f090cf",
+      "source_path": "tools/otbm_atlas/tests/test_composition.py",
+      "source_size": 2335,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "13f396ac8dbf05ac66e1f9b1d86a191995e30946",
+          "path": "tools/dyn-atlas-semantic/compiler.py"
+        },
+        {
+          "blob": "6e2fd31367a367189148a642c9e2bf930dcaee9c",
+          "path": "tools/dyn-atlas-semantic/verify.py"
+        },
+        {
+          "blob": "61df75f257812eea13ddaddb7b771ac3c722ad97",
+          "path": "src/browser/semantic.mjs"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "behavioral evidence retained conceptually; monorepo fixtures/runtime assumptions not copied wholesale"
+    },
+    {
+      "final_disposition": "TEST_EVIDENCE_SPLIT_BY_TARGET_OWNER",
+      "ownership_classification": "SPLIT_REWRITE_TEST_EVIDENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "fe606360492578dae2c48570d25b4f659f94443a",
+      "source_path": "tools/otbm_atlas/tests/test_creature_animation_runtime.mjs",
+      "source_size": 1596,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "13f396ac8dbf05ac66e1f9b1d86a191995e30946",
+          "path": "tools/dyn-atlas-semantic/compiler.py"
+        },
+        {
+          "blob": "6e2fd31367a367189148a642c9e2bf930dcaee9c",
+          "path": "tools/dyn-atlas-semantic/verify.py"
+        },
+        {
+          "blob": "61df75f257812eea13ddaddb7b771ac3c722ad97",
+          "path": "src/browser/semantic.mjs"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "behavioral evidence retained conceptually; monorepo fixtures/runtime assumptions not copied wholesale"
+    },
+    {
+      "final_disposition": "TEST_EVIDENCE_SPLIT_BY_TARGET_OWNER",
+      "ownership_classification": "SPLIT_REWRITE_TEST_EVIDENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "b36a830af1f232aafe677baf8cef2dab2e0033ee",
+      "source_path": "tools/otbm_atlas/tests/test_creature_resolution_audit.py",
+      "source_size": 2047,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "13f396ac8dbf05ac66e1f9b1d86a191995e30946",
+          "path": "tools/dyn-atlas-semantic/compiler.py"
+        },
+        {
+          "blob": "6e2fd31367a367189148a642c9e2bf930dcaee9c",
+          "path": "tools/dyn-atlas-semantic/verify.py"
+        },
+        {
+          "blob": "61df75f257812eea13ddaddb7b771ac3c722ad97",
+          "path": "src/browser/semantic.mjs"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "behavioral evidence retained conceptually; monorepo fixtures/runtime assumptions not copied wholesale"
+    },
+    {
+      "final_disposition": "TEST_EVIDENCE_SPLIT_BY_TARGET_OWNER",
+      "ownership_classification": "SPLIT_REWRITE_TEST_EVIDENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "fd49787fa8c2621e30bb70c79163304fde770ffc",
+      "source_path": "tools/otbm_atlas/tests/test_creature_sprites.py",
+      "source_size": 8030,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "13f396ac8dbf05ac66e1f9b1d86a191995e30946",
+          "path": "tools/dyn-atlas-semantic/compiler.py"
+        },
+        {
+          "blob": "6e2fd31367a367189148a642c9e2bf930dcaee9c",
+          "path": "tools/dyn-atlas-semantic/verify.py"
+        },
+        {
+          "blob": "61df75f257812eea13ddaddb7b771ac3c722ad97",
+          "path": "src/browser/semantic.mjs"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "behavioral evidence retained conceptually; monorepo fixtures/runtime assumptions not copied wholesale"
+    },
+    {
+      "final_disposition": "TEST_EVIDENCE_SPLIT_BY_TARGET_OWNER",
+      "ownership_classification": "SPLIT_REWRITE_TEST_EVIDENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "b60904aeb79549098a73d12987648ba0cc817e7d",
+      "source_path": "tools/otbm_atlas/tests/test_deploy_preflight.py",
+      "source_size": 6534,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "13f396ac8dbf05ac66e1f9b1d86a191995e30946",
+          "path": "tools/dyn-atlas-semantic/compiler.py"
+        },
+        {
+          "blob": "6e2fd31367a367189148a642c9e2bf930dcaee9c",
+          "path": "tools/dyn-atlas-semantic/verify.py"
+        },
+        {
+          "blob": "61df75f257812eea13ddaddb7b771ac3c722ad97",
+          "path": "src/browser/semantic.mjs"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "behavioral evidence retained conceptually; monorepo fixtures/runtime assumptions not copied wholesale"
+    },
+    {
+      "final_disposition": "TEST_EVIDENCE_SPLIT_BY_TARGET_OWNER",
+      "ownership_classification": "SPLIT_REWRITE_TEST_EVIDENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "8e5139d767b5462490c8bc98ad10e3a944bc23b0",
+      "source_path": "tools/otbm_atlas/tests/test_domain_probe.py",
+      "source_size": 2478,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "13f396ac8dbf05ac66e1f9b1d86a191995e30946",
+          "path": "tools/dyn-atlas-semantic/compiler.py"
+        },
+        {
+          "blob": "6e2fd31367a367189148a642c9e2bf930dcaee9c",
+          "path": "tools/dyn-atlas-semantic/verify.py"
+        },
+        {
+          "blob": "61df75f257812eea13ddaddb7b771ac3c722ad97",
+          "path": "src/browser/semantic.mjs"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "behavioral evidence retained conceptually; monorepo fixtures/runtime assumptions not copied wholesale"
+    },
+    {
+      "final_disposition": "TEST_EVIDENCE_SPLIT_BY_TARGET_OWNER",
+      "ownership_classification": "SPLIT_REWRITE_TEST_EVIDENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "c64dea8a1616ce901404ec826cfd3f58e20bb744",
+      "source_path": "tools/otbm_atlas/tests/test_environment_animation.py",
+      "source_size": 3496,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "13f396ac8dbf05ac66e1f9b1d86a191995e30946",
+          "path": "tools/dyn-atlas-semantic/compiler.py"
+        },
+        {
+          "blob": "6e2fd31367a367189148a642c9e2bf930dcaee9c",
+          "path": "tools/dyn-atlas-semantic/verify.py"
+        },
+        {
+          "blob": "61df75f257812eea13ddaddb7b771ac3c722ad97",
+          "path": "src/browser/semantic.mjs"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "behavioral evidence retained conceptually; monorepo fixtures/runtime assumptions not copied wholesale"
+    },
+    {
+      "final_disposition": "TEST_EVIDENCE_SPLIT_BY_TARGET_OWNER",
+      "ownership_classification": "SPLIT_REWRITE_TEST_EVIDENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "919a6e901a2f4cffc0b72bab2c9526f71d221df3",
+      "source_path": "tools/otbm_atlas/tests/test_environment_animation_resume.py",
+      "source_size": 11990,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "13f396ac8dbf05ac66e1f9b1d86a191995e30946",
+          "path": "tools/dyn-atlas-semantic/compiler.py"
+        },
+        {
+          "blob": "6e2fd31367a367189148a642c9e2bf930dcaee9c",
+          "path": "tools/dyn-atlas-semantic/verify.py"
+        },
+        {
+          "blob": "61df75f257812eea13ddaddb7b771ac3c722ad97",
+          "path": "src/browser/semantic.mjs"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "behavioral evidence retained conceptually; monorepo fixtures/runtime assumptions not copied wholesale"
+    },
+    {
+      "final_disposition": "TEST_EVIDENCE_SPLIT_BY_TARGET_OWNER",
+      "ownership_classification": "SPLIT_REWRITE_TEST_EVIDENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "211016a171cfe1518ba72f88215ee8481c2bf1d4",
+      "source_path": "tools/otbm_atlas/tests/test_environment_incremental.py",
+      "source_size": 5549,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "13f396ac8dbf05ac66e1f9b1d86a191995e30946",
+          "path": "tools/dyn-atlas-semantic/compiler.py"
+        },
+        {
+          "blob": "6e2fd31367a367189148a642c9e2bf930dcaee9c",
+          "path": "tools/dyn-atlas-semantic/verify.py"
+        },
+        {
+          "blob": "61df75f257812eea13ddaddb7b771ac3c722ad97",
+          "path": "src/browser/semantic.mjs"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "behavioral evidence retained conceptually; monorepo fixtures/runtime assumptions not copied wholesale"
+    },
+    {
+      "final_disposition": "TEST_EVIDENCE_SPLIT_BY_TARGET_OWNER",
+      "ownership_classification": "SPLIT_REWRITE_TEST_EVIDENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "95007f58f43257efe918b6f1b0829fdcd9d71810",
+      "source_path": "tools/otbm_atlas/tests/test_environment_parallel.py",
+      "source_size": 2528,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "13f396ac8dbf05ac66e1f9b1d86a191995e30946",
+          "path": "tools/dyn-atlas-semantic/compiler.py"
+        },
+        {
+          "blob": "6e2fd31367a367189148a642c9e2bf930dcaee9c",
+          "path": "tools/dyn-atlas-semantic/verify.py"
+        },
+        {
+          "blob": "61df75f257812eea13ddaddb7b771ac3c722ad97",
+          "path": "src/browser/semantic.mjs"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "behavioral evidence retained conceptually; monorepo fixtures/runtime assumptions not copied wholesale"
+    },
+    {
+      "final_disposition": "TEST_EVIDENCE_SPLIT_BY_TARGET_OWNER",
+      "ownership_classification": "SPLIT_REWRITE_TEST_EVIDENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "e9d7307834395531ca149567bf1dd19e92c91616",
+      "source_path": "tools/otbm_atlas/tests/test_environment_spool_guard.py",
+      "source_size": 1567,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "13f396ac8dbf05ac66e1f9b1d86a191995e30946",
+          "path": "tools/dyn-atlas-semantic/compiler.py"
+        },
+        {
+          "blob": "6e2fd31367a367189148a642c9e2bf930dcaee9c",
+          "path": "tools/dyn-atlas-semantic/verify.py"
+        },
+        {
+          "blob": "61df75f257812eea13ddaddb7b771ac3c722ad97",
+          "path": "src/browser/semantic.mjs"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "behavioral evidence retained conceptually; monorepo fixtures/runtime assumptions not copied wholesale"
+    },
+    {
+      "final_disposition": "TEST_EVIDENCE_SPLIT_BY_TARGET_OWNER",
+      "ownership_classification": "SPLIT_REWRITE_TEST_EVIDENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "969bb37ef110994c4ac3b4ccc6dc7ecdcfb84750",
+      "source_path": "tools/otbm_atlas/tests/test_factual_layers.py",
+      "source_size": 7528,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "13f396ac8dbf05ac66e1f9b1d86a191995e30946",
+          "path": "tools/dyn-atlas-semantic/compiler.py"
+        },
+        {
+          "blob": "6e2fd31367a367189148a642c9e2bf930dcaee9c",
+          "path": "tools/dyn-atlas-semantic/verify.py"
+        },
+        {
+          "blob": "61df75f257812eea13ddaddb7b771ac3c722ad97",
+          "path": "src/browser/semantic.mjs"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "behavioral evidence retained conceptually; monorepo fixtures/runtime assumptions not copied wholesale"
+    },
+    {
+      "final_disposition": "TEST_EVIDENCE_SPLIT_BY_TARGET_OWNER",
+      "ownership_classification": "SPLIT_REWRITE_TEST_EVIDENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "10e1ac9a966e66367b23129772c048e7bdf8be41",
+      "source_path": "tools/otbm_atlas/tests/test_floor_build.py",
+      "source_size": 1772,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "13f396ac8dbf05ac66e1f9b1d86a191995e30946",
+          "path": "tools/dyn-atlas-semantic/compiler.py"
+        },
+        {
+          "blob": "6e2fd31367a367189148a642c9e2bf930dcaee9c",
+          "path": "tools/dyn-atlas-semantic/verify.py"
+        },
+        {
+          "blob": "61df75f257812eea13ddaddb7b771ac3c722ad97",
+          "path": "src/browser/semantic.mjs"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "behavioral evidence retained conceptually; monorepo fixtures/runtime assumptions not copied wholesale"
+    },
+    {
+      "final_disposition": "TEST_EVIDENCE_SPLIT_BY_TARGET_OWNER",
+      "ownership_classification": "SPLIT_REWRITE_TEST_EVIDENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "1b50eb30ac1a9bec3dc4b891dcf6e6e7b5ad7041",
+      "source_path": "tools/otbm_atlas/tests/test_houses.py",
+      "source_size": 723,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "13f396ac8dbf05ac66e1f9b1d86a191995e30946",
+          "path": "tools/dyn-atlas-semantic/compiler.py"
+        },
+        {
+          "blob": "6e2fd31367a367189148a642c9e2bf930dcaee9c",
+          "path": "tools/dyn-atlas-semantic/verify.py"
+        },
+        {
+          "blob": "61df75f257812eea13ddaddb7b771ac3c722ad97",
+          "path": "src/browser/semantic.mjs"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "behavioral evidence retained conceptually; monorepo fixtures/runtime assumptions not copied wholesale"
+    },
+    {
+      "final_disposition": "TEST_EVIDENCE_SPLIT_BY_TARGET_OWNER",
+      "ownership_classification": "SPLIT_REWRITE_TEST_EVIDENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "b190227c66bcdf4d7252bd95c1342678dc243c7d",
+      "source_path": "tools/otbm_atlas/tests/test_incremental.py",
+      "source_size": 12929,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "13f396ac8dbf05ac66e1f9b1d86a191995e30946",
+          "path": "tools/dyn-atlas-semantic/compiler.py"
+        },
+        {
+          "blob": "6e2fd31367a367189148a642c9e2bf930dcaee9c",
+          "path": "tools/dyn-atlas-semantic/verify.py"
+        },
+        {
+          "blob": "61df75f257812eea13ddaddb7b771ac3c722ad97",
+          "path": "src/browser/semantic.mjs"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "behavioral evidence retained conceptually; monorepo fixtures/runtime assumptions not copied wholesale"
+    },
+    {
+      "final_disposition": "TEST_EVIDENCE_SPLIT_BY_TARGET_OWNER",
+      "ownership_classification": "SPLIT_REWRITE_TEST_EVIDENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "7a8e0a7e27073e5c95661b47b402b0066712aa4a",
+      "source_path": "tools/otbm_atlas/tests/test_incremental_core_guard.py",
+      "source_size": 3445,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "13f396ac8dbf05ac66e1f9b1d86a191995e30946",
+          "path": "tools/dyn-atlas-semantic/compiler.py"
+        },
+        {
+          "blob": "6e2fd31367a367189148a642c9e2bf930dcaee9c",
+          "path": "tools/dyn-atlas-semantic/verify.py"
+        },
+        {
+          "blob": "61df75f257812eea13ddaddb7b771ac3c722ad97",
+          "path": "src/browser/semantic.mjs"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "behavioral evidence retained conceptually; monorepo fixtures/runtime assumptions not copied wholesale"
+    },
+    {
+      "final_disposition": "TEST_EVIDENCE_SPLIT_BY_TARGET_OWNER",
+      "ownership_classification": "SPLIT_REWRITE_TEST_EVIDENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "a25c3c92389797ad17e8bfdf25a0368d38477ddc",
+      "source_path": "tools/otbm_atlas/tests/test_incremental_shards.py",
+      "source_size": 5677,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "13f396ac8dbf05ac66e1f9b1d86a191995e30946",
+          "path": "tools/dyn-atlas-semantic/compiler.py"
+        },
+        {
+          "blob": "6e2fd31367a367189148a642c9e2bf930dcaee9c",
+          "path": "tools/dyn-atlas-semantic/verify.py"
+        },
+        {
+          "blob": "61df75f257812eea13ddaddb7b771ac3c722ad97",
+          "path": "src/browser/semantic.mjs"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "behavioral evidence retained conceptually; monorepo fixtures/runtime assumptions not copied wholesale"
+    },
+    {
+      "final_disposition": "TEST_EVIDENCE_SPLIT_BY_TARGET_OWNER",
+      "ownership_classification": "SPLIT_REWRITE_TEST_EVIDENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "2434a38e162b531e344ae35e1d5792d46c9c9961",
+      "source_path": "tools/otbm_atlas/tests/test_incremental_state.py",
+      "source_size": 9881,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "13f396ac8dbf05ac66e1f9b1d86a191995e30946",
+          "path": "tools/dyn-atlas-semantic/compiler.py"
+        },
+        {
+          "blob": "6e2fd31367a367189148a642c9e2bf930dcaee9c",
+          "path": "tools/dyn-atlas-semantic/verify.py"
+        },
+        {
+          "blob": "61df75f257812eea13ddaddb7b771ac3c722ad97",
+          "path": "src/browser/semantic.mjs"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "behavioral evidence retained conceptually; monorepo fixtures/runtime assumptions not copied wholesale"
+    },
+    {
+      "final_disposition": "TEST_EVIDENCE_SPLIT_BY_TARGET_OWNER",
+      "ownership_classification": "SPLIT_REWRITE_TEST_EVIDENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "cdc6e09bcbea5ab510ac293a9fd77b9f004e0cea",
+      "source_path": "tools/otbm_atlas/tests/test_mechanics.py",
+      "source_size": 1594,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "13f396ac8dbf05ac66e1f9b1d86a191995e30946",
+          "path": "tools/dyn-atlas-semantic/compiler.py"
+        },
+        {
+          "blob": "6e2fd31367a367189148a642c9e2bf930dcaee9c",
+          "path": "tools/dyn-atlas-semantic/verify.py"
+        },
+        {
+          "blob": "61df75f257812eea13ddaddb7b771ac3c722ad97",
+          "path": "src/browser/semantic.mjs"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "behavioral evidence retained conceptually; monorepo fixtures/runtime assumptions not copied wholesale"
+    },
+    {
+      "final_disposition": "TEST_EVIDENCE_SPLIT_BY_TARGET_OWNER",
+      "ownership_classification": "SPLIT_REWRITE_TEST_EVIDENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "a4f7febef0b227e8c4185c1581578bf2c868acd8",
+      "source_path": "tools/otbm_atlas/tests/test_monster_sprites.py",
+      "source_size": 3595,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "13f396ac8dbf05ac66e1f9b1d86a191995e30946",
+          "path": "tools/dyn-atlas-semantic/compiler.py"
+        },
+        {
+          "blob": "6e2fd31367a367189148a642c9e2bf930dcaee9c",
+          "path": "tools/dyn-atlas-semantic/verify.py"
+        },
+        {
+          "blob": "61df75f257812eea13ddaddb7b771ac3c722ad97",
+          "path": "src/browser/semantic.mjs"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "behavioral evidence retained conceptually; monorepo fixtures/runtime assumptions not copied wholesale"
+    },
+    {
+      "final_disposition": "TEST_EVIDENCE_SPLIT_BY_TARGET_OWNER",
+      "ownership_classification": "SPLIT_REWRITE_TEST_EVIDENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "bd7ba4afa4325c9f4fbd91b84607aae08173635e",
+      "source_path": "tools/otbm_atlas/tests/test_nodefile.py",
+      "source_size": 1803,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "13f396ac8dbf05ac66e1f9b1d86a191995e30946",
+          "path": "tools/dyn-atlas-semantic/compiler.py"
+        },
+        {
+          "blob": "6e2fd31367a367189148a642c9e2bf930dcaee9c",
+          "path": "tools/dyn-atlas-semantic/verify.py"
+        },
+        {
+          "blob": "61df75f257812eea13ddaddb7b771ac3c722ad97",
+          "path": "src/browser/semantic.mjs"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "behavioral evidence retained conceptually; monorepo fixtures/runtime assumptions not copied wholesale"
+    },
+    {
+      "final_disposition": "TEST_EVIDENCE_SPLIT_BY_TARGET_OWNER",
+      "ownership_classification": "SPLIT_REWRITE_TEST_EVIDENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "73570b701a364ca0f8e2348dc8fc7c26a053a0ca",
+      "source_path": "tools/otbm_atlas/tests/test_npc_sprites.py",
+      "source_size": 3243,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "13f396ac8dbf05ac66e1f9b1d86a191995e30946",
+          "path": "tools/dyn-atlas-semantic/compiler.py"
+        },
+        {
+          "blob": "6e2fd31367a367189148a642c9e2bf930dcaee9c",
+          "path": "tools/dyn-atlas-semantic/verify.py"
+        },
+        {
+          "blob": "61df75f257812eea13ddaddb7b771ac3c722ad97",
+          "path": "src/browser/semantic.mjs"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "behavioral evidence retained conceptually; monorepo fixtures/runtime assumptions not copied wholesale"
+    },
+    {
+      "final_disposition": "TEST_EVIDENCE_SPLIT_BY_TARGET_OWNER",
+      "ownership_classification": "SPLIT_REWRITE_TEST_EVIDENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "0a003951d73447a102449ccbce2dd399f64acbe4",
+      "source_path": "tools/otbm_atlas/tests/test_overview.py",
+      "source_size": 451,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "13f396ac8dbf05ac66e1f9b1d86a191995e30946",
+          "path": "tools/dyn-atlas-semantic/compiler.py"
+        },
+        {
+          "blob": "6e2fd31367a367189148a642c9e2bf930dcaee9c",
+          "path": "tools/dyn-atlas-semantic/verify.py"
+        },
+        {
+          "blob": "61df75f257812eea13ddaddb7b771ac3c722ad97",
+          "path": "src/browser/semantic.mjs"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "behavioral evidence retained conceptually; monorepo fixtures/runtime assumptions not copied wholesale"
+    },
+    {
+      "final_disposition": "TEST_EVIDENCE_SPLIT_BY_TARGET_OWNER",
+      "ownership_classification": "SPLIT_REWRITE_TEST_EVIDENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "bf46f3147c8c85ffd101dee8933f192282cbf4ab",
+      "source_path": "tools/otbm_atlas/tests/test_product_acceptance_probe.py",
+      "source_size": 950,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "13f396ac8dbf05ac66e1f9b1d86a191995e30946",
+          "path": "tools/dyn-atlas-semantic/compiler.py"
+        },
+        {
+          "blob": "6e2fd31367a367189148a642c9e2bf930dcaee9c",
+          "path": "tools/dyn-atlas-semantic/verify.py"
+        },
+        {
+          "blob": "61df75f257812eea13ddaddb7b771ac3c722ad97",
+          "path": "src/browser/semantic.mjs"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "behavioral evidence retained conceptually; monorepo fixtures/runtime assumptions not copied wholesale"
+    },
+    {
+      "final_disposition": "TEST_EVIDENCE_SPLIT_BY_TARGET_OWNER",
+      "ownership_classification": "SPLIT_REWRITE_TEST_EVIDENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "9a51d4211692b40221044cb8c996f87b55bf1817",
+      "source_path": "tools/otbm_atlas/tests/test_product_rebase_contract.py",
+      "source_size": 2576,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "13f396ac8dbf05ac66e1f9b1d86a191995e30946",
+          "path": "tools/dyn-atlas-semantic/compiler.py"
+        },
+        {
+          "blob": "6e2fd31367a367189148a642c9e2bf930dcaee9c",
+          "path": "tools/dyn-atlas-semantic/verify.py"
+        },
+        {
+          "blob": "61df75f257812eea13ddaddb7b771ac3c722ad97",
+          "path": "src/browser/semantic.mjs"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "behavioral evidence retained conceptually; monorepo fixtures/runtime assumptions not copied wholesale"
+    },
+    {
+      "final_disposition": "TEST_EVIDENCE_SPLIT_BY_TARGET_OWNER",
+      "ownership_classification": "SPLIT_REWRITE_TEST_EVIDENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "29cc4f1f5cd237e9daf1632626a853c9e6f73682",
+      "source_path": "tools/otbm_atlas/tests/test_production_incremental.py",
+      "source_size": 12187,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "13f396ac8dbf05ac66e1f9b1d86a191995e30946",
+          "path": "tools/dyn-atlas-semantic/compiler.py"
+        },
+        {
+          "blob": "6e2fd31367a367189148a642c9e2bf930dcaee9c",
+          "path": "tools/dyn-atlas-semantic/verify.py"
+        },
+        {
+          "blob": "61df75f257812eea13ddaddb7b771ac3c722ad97",
+          "path": "src/browser/semantic.mjs"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "behavioral evidence retained conceptually; monorepo fixtures/runtime assumptions not copied wholesale"
+    },
+    {
+      "final_disposition": "TEST_EVIDENCE_SPLIT_BY_TARGET_OWNER",
+      "ownership_classification": "SPLIT_REWRITE_TEST_EVIDENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "b5b95069b236f3c07079df07c9034d04ccaff6b1",
+      "source_path": "tools/otbm_atlas/tests/test_production_incremental_guard.py",
+      "source_size": 2246,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "13f396ac8dbf05ac66e1f9b1d86a191995e30946",
+          "path": "tools/dyn-atlas-semantic/compiler.py"
+        },
+        {
+          "blob": "6e2fd31367a367189148a642c9e2bf930dcaee9c",
+          "path": "tools/dyn-atlas-semantic/verify.py"
+        },
+        {
+          "blob": "61df75f257812eea13ddaddb7b771ac3c722ad97",
+          "path": "src/browser/semantic.mjs"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "behavioral evidence retained conceptually; monorepo fixtures/runtime assumptions not copied wholesale"
+    },
+    {
+      "final_disposition": "TEST_EVIDENCE_SPLIT_BY_TARGET_OWNER",
+      "ownership_classification": "SPLIT_REWRITE_TEST_EVIDENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "11772d8cdff53cff9e89ff010cc9abf39c60a88a",
+      "source_path": "tools/otbm_atlas/tests/test_production_legacy_integrity.py",
+      "source_size": 1856,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "13f396ac8dbf05ac66e1f9b1d86a191995e30946",
+          "path": "tools/dyn-atlas-semantic/compiler.py"
+        },
+        {
+          "blob": "6e2fd31367a367189148a642c9e2bf930dcaee9c",
+          "path": "tools/dyn-atlas-semantic/verify.py"
+        },
+        {
+          "blob": "61df75f257812eea13ddaddb7b771ac3c722ad97",
+          "path": "src/browser/semantic.mjs"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "behavioral evidence retained conceptually; monorepo fixtures/runtime assumptions not copied wholesale"
+    },
+    {
+      "final_disposition": "TEST_EVIDENCE_SPLIT_BY_TARGET_OWNER",
+      "ownership_classification": "SPLIT_REWRITE_TEST_EVIDENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "62a1274d04373f886fd3c887b4d5c510a873c000",
+      "source_path": "tools/otbm_atlas/tests/test_production_phases.py",
+      "source_size": 1961,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "13f396ac8dbf05ac66e1f9b1d86a191995e30946",
+          "path": "tools/dyn-atlas-semantic/compiler.py"
+        },
+        {
+          "blob": "6e2fd31367a367189148a642c9e2bf930dcaee9c",
+          "path": "tools/dyn-atlas-semantic/verify.py"
+        },
+        {
+          "blob": "61df75f257812eea13ddaddb7b771ac3c722ad97",
+          "path": "src/browser/semantic.mjs"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "behavioral evidence retained conceptually; monorepo fixtures/runtime assumptions not copied wholesale"
+    },
+    {
+      "final_disposition": "TEST_EVIDENCE_SPLIT_BY_TARGET_OWNER",
+      "ownership_classification": "SPLIT_REWRITE_TEST_EVIDENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "155dd0e89455cc6b5bcbad427155a9b7eff40880",
+      "source_path": "tools/otbm_atlas/tests/test_release_pointer.py",
+      "source_size": 2258,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "13f396ac8dbf05ac66e1f9b1d86a191995e30946",
+          "path": "tools/dyn-atlas-semantic/compiler.py"
+        },
+        {
+          "blob": "6e2fd31367a367189148a642c9e2bf930dcaee9c",
+          "path": "tools/dyn-atlas-semantic/verify.py"
+        },
+        {
+          "blob": "61df75f257812eea13ddaddb7b771ac3c722ad97",
+          "path": "src/browser/semantic.mjs"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "behavioral evidence retained conceptually; monorepo fixtures/runtime assumptions not copied wholesale"
+    },
+    {
+      "final_disposition": "TEST_EVIDENCE_SPLIT_BY_TARGET_OWNER",
+      "ownership_classification": "SPLIT_REWRITE_TEST_EVIDENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "b0d4fc2e7bedc1a2dad6ac86c520fe38cd9384fc",
+      "source_path": "tools/otbm_atlas/tests/test_render.py",
+      "source_size": 487,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "13f396ac8dbf05ac66e1f9b1d86a191995e30946",
+          "path": "tools/dyn-atlas-semantic/compiler.py"
+        },
+        {
+          "blob": "6e2fd31367a367189148a642c9e2bf930dcaee9c",
+          "path": "tools/dyn-atlas-semantic/verify.py"
+        },
+        {
+          "blob": "61df75f257812eea13ddaddb7b771ac3c722ad97",
+          "path": "src/browser/semantic.mjs"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "behavioral evidence retained conceptually; monorepo fixtures/runtime assumptions not copied wholesale"
+    },
+    {
+      "final_disposition": "TEST_EVIDENCE_SPLIT_BY_TARGET_OWNER",
+      "ownership_classification": "SPLIT_REWRITE_TEST_EVIDENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "388296931f1c2041161ceae14d51954ff248bddd",
+      "source_path": "tools/otbm_atlas/tests/test_scan.py",
+      "source_size": 1532,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "13f396ac8dbf05ac66e1f9b1d86a191995e30946",
+          "path": "tools/dyn-atlas-semantic/compiler.py"
+        },
+        {
+          "blob": "6e2fd31367a367189148a642c9e2bf930dcaee9c",
+          "path": "tools/dyn-atlas-semantic/verify.py"
+        },
+        {
+          "blob": "61df75f257812eea13ddaddb7b771ac3c722ad97",
+          "path": "src/browser/semantic.mjs"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "behavioral evidence retained conceptually; monorepo fixtures/runtime assumptions not copied wholesale"
+    },
+    {
+      "final_disposition": "TEST_EVIDENCE_SPLIT_BY_TARGET_OWNER",
+      "ownership_classification": "SPLIT_REWRITE_TEST_EVIDENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "4f59147fe949dc34ab3d55cde825af8421f68d6c",
+      "source_path": "tools/otbm_atlas/tests/test_semantic.py",
+      "source_size": 5516,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "13f396ac8dbf05ac66e1f9b1d86a191995e30946",
+          "path": "tools/dyn-atlas-semantic/compiler.py"
+        },
+        {
+          "blob": "6e2fd31367a367189148a642c9e2bf930dcaee9c",
+          "path": "tools/dyn-atlas-semantic/verify.py"
+        },
+        {
+          "blob": "61df75f257812eea13ddaddb7b771ac3c722ad97",
+          "path": "src/browser/semantic.mjs"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "behavioral evidence retained conceptually; monorepo fixtures/runtime assumptions not copied wholesale"
+    },
+    {
+      "final_disposition": "TEST_EVIDENCE_SPLIT_BY_TARGET_OWNER",
+      "ownership_classification": "SPLIT_REWRITE_TEST_EVIDENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "15f62fc95a68d125369cb4d76269d91b014f4293",
+      "source_path": "tools/otbm_atlas/tests/test_spatial.py",
+      "source_size": 1196,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "13f396ac8dbf05ac66e1f9b1d86a191995e30946",
+          "path": "tools/dyn-atlas-semantic/compiler.py"
+        },
+        {
+          "blob": "6e2fd31367a367189148a642c9e2bf930dcaee9c",
+          "path": "tools/dyn-atlas-semantic/verify.py"
+        },
+        {
+          "blob": "61df75f257812eea13ddaddb7b771ac3c722ad97",
+          "path": "src/browser/semantic.mjs"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "behavioral evidence retained conceptually; monorepo fixtures/runtime assumptions not copied wholesale"
+    },
+    {
+      "final_disposition": "TEST_EVIDENCE_SPLIT_BY_TARGET_OWNER",
+      "ownership_classification": "SPLIT_REWRITE_TEST_EVIDENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "60cb94c360f34cd4b77a92571ca624506bc7fb37",
+      "source_path": "tools/otbm_atlas/tests/test_spatial_incremental.py",
+      "source_size": 2096,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "13f396ac8dbf05ac66e1f9b1d86a191995e30946",
+          "path": "tools/dyn-atlas-semantic/compiler.py"
+        },
+        {
+          "blob": "6e2fd31367a367189148a642c9e2bf930dcaee9c",
+          "path": "tools/dyn-atlas-semantic/verify.py"
+        },
+        {
+          "blob": "61df75f257812eea13ddaddb7b771ac3c722ad97",
+          "path": "src/browser/semantic.mjs"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "behavioral evidence retained conceptually; monorepo fixtures/runtime assumptions not copied wholesale"
+    },
+    {
+      "final_disposition": "TEST_EVIDENCE_SPLIT_BY_TARGET_OWNER",
+      "ownership_classification": "SPLIT_REWRITE_TEST_EVIDENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "7f647ceb944bb45afdb6d0df169285841ee3f927",
+      "source_path": "tools/otbm_atlas/tests/test_spawns.py",
+      "source_size": 1634,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "13f396ac8dbf05ac66e1f9b1d86a191995e30946",
+          "path": "tools/dyn-atlas-semantic/compiler.py"
+        },
+        {
+          "blob": "6e2fd31367a367189148a642c9e2bf930dcaee9c",
+          "path": "tools/dyn-atlas-semantic/verify.py"
+        },
+        {
+          "blob": "61df75f257812eea13ddaddb7b771ac3c722ad97",
+          "path": "src/browser/semantic.mjs"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "behavioral evidence retained conceptually; monorepo fixtures/runtime assumptions not copied wholesale"
+    },
+    {
+      "final_disposition": "TEST_EVIDENCE_SPLIT_BY_TARGET_OWNER",
+      "ownership_classification": "SPLIT_REWRITE_TEST_EVIDENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "5f76a041ab949081b4059b7e0436821ec7ff2a0d",
+      "source_path": "tools/otbm_atlas/tests/test_sprite_dependency.py",
+      "source_size": 2683,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "13f396ac8dbf05ac66e1f9b1d86a191995e30946",
+          "path": "tools/dyn-atlas-semantic/compiler.py"
+        },
+        {
+          "blob": "6e2fd31367a367189148a642c9e2bf930dcaee9c",
+          "path": "tools/dyn-atlas-semantic/verify.py"
+        },
+        {
+          "blob": "61df75f257812eea13ddaddb7b771ac3c722ad97",
+          "path": "src/browser/semantic.mjs"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "behavioral evidence retained conceptually; monorepo fixtures/runtime assumptions not copied wholesale"
+    },
+    {
+      "final_disposition": "TEST_EVIDENCE_SPLIT_BY_TARGET_OWNER",
+      "ownership_classification": "SPLIT_REWRITE_TEST_EVIDENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "9b6bb72b682491ea7f32251e6cb2e73b4b15e4a7",
+      "source_path": "tools/otbm_atlas/tests/test_tile_inspector.py",
+      "source_size": 4936,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "13f396ac8dbf05ac66e1f9b1d86a191995e30946",
+          "path": "tools/dyn-atlas-semantic/compiler.py"
+        },
+        {
+          "blob": "6e2fd31367a367189148a642c9e2bf930dcaee9c",
+          "path": "tools/dyn-atlas-semantic/verify.py"
+        },
+        {
+          "blob": "61df75f257812eea13ddaddb7b771ac3c722ad97",
+          "path": "src/browser/semantic.mjs"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "behavioral evidence retained conceptually; monorepo fixtures/runtime assumptions not copied wholesale"
+    },
+    {
+      "final_disposition": "TEST_EVIDENCE_SPLIT_BY_TARGET_OWNER",
+      "ownership_classification": "SPLIT_REWRITE_TEST_EVIDENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "67acd15f6a96b4f622d26564211273a4ddf61b86",
+      "source_path": "tools/otbm_atlas/tests/test_tile_inspector_incremental.py",
+      "source_size": 2581,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "13f396ac8dbf05ac66e1f9b1d86a191995e30946",
+          "path": "tools/dyn-atlas-semantic/compiler.py"
+        },
+        {
+          "blob": "6e2fd31367a367189148a642c9e2bf930dcaee9c",
+          "path": "tools/dyn-atlas-semantic/verify.py"
+        },
+        {
+          "blob": "61df75f257812eea13ddaddb7b771ac3c722ad97",
+          "path": "src/browser/semantic.mjs"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "behavioral evidence retained conceptually; monorepo fixtures/runtime assumptions not copied wholesale"
+    },
+    {
+      "final_disposition": "TEST_EVIDENCE_SPLIT_BY_TARGET_OWNER",
+      "ownership_classification": "SPLIT_REWRITE_TEST_EVIDENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "1b63ed83dc9f231f4917d3af05073e49a4972e06",
+      "source_path": "tools/otbm_atlas/tests/test_v3_core.py",
+      "source_size": 2512,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "13f396ac8dbf05ac66e1f9b1d86a191995e30946",
+          "path": "tools/dyn-atlas-semantic/compiler.py"
+        },
+        {
+          "blob": "6e2fd31367a367189148a642c9e2bf930dcaee9c",
+          "path": "tools/dyn-atlas-semantic/verify.py"
+        },
+        {
+          "blob": "61df75f257812eea13ddaddb7b771ac3c722ad97",
+          "path": "src/browser/semantic.mjs"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "behavioral evidence retained conceptually; monorepo fixtures/runtime assumptions not copied wholesale"
+    },
+    {
+      "final_disposition": "TEST_EVIDENCE_SPLIT_BY_TARGET_OWNER",
+      "ownership_classification": "SPLIT_REWRITE_TEST_EVIDENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "1c134b763926b50dcee46640b7443b7ce1d69302",
+      "source_path": "tools/otbm_atlas/tests/test_verify.py",
+      "source_size": 2767,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "13f396ac8dbf05ac66e1f9b1d86a191995e30946",
+          "path": "tools/dyn-atlas-semantic/compiler.py"
+        },
+        {
+          "blob": "6e2fd31367a367189148a642c9e2bf930dcaee9c",
+          "path": "tools/dyn-atlas-semantic/verify.py"
+        },
+        {
+          "blob": "61df75f257812eea13ddaddb7b771ac3c722ad97",
+          "path": "src/browser/semantic.mjs"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "behavioral evidence retained conceptually; monorepo fixtures/runtime assumptions not copied wholesale"
+    },
+    {
+      "final_disposition": "TEST_EVIDENCE_SPLIT_BY_TARGET_OWNER",
+      "ownership_classification": "SPLIT_REWRITE_TEST_EVIDENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "a2bd8a3af8e17f9237af7877d09d593f261b7d78",
+      "source_path": "tools/otbm_atlas/tests/test_viewer.py",
+      "source_size": 2526,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "13f396ac8dbf05ac66e1f9b1d86a191995e30946",
+          "path": "tools/dyn-atlas-semantic/compiler.py"
+        },
+        {
+          "blob": "6e2fd31367a367189148a642c9e2bf930dcaee9c",
+          "path": "tools/dyn-atlas-semantic/verify.py"
+        },
+        {
+          "blob": "61df75f257812eea13ddaddb7b771ac3c722ad97",
+          "path": "src/browser/semantic.mjs"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "behavioral evidence retained conceptually; monorepo fixtures/runtime assumptions not copied wholesale"
+    },
+    {
+      "final_disposition": "TEST_EVIDENCE_SPLIT_BY_TARGET_OWNER",
+      "ownership_classification": "SPLIT_REWRITE_TEST_EVIDENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "6ac566cbc87bb7abbfc5ce2131ff5a5a5c4b2700",
+      "source_path": "tools/otbm_atlas/tests/test_viewer_factual_layers.py",
+      "source_size": 2345,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "13f396ac8dbf05ac66e1f9b1d86a191995e30946",
+          "path": "tools/dyn-atlas-semantic/compiler.py"
+        },
+        {
+          "blob": "6e2fd31367a367189148a642c9e2bf930dcaee9c",
+          "path": "tools/dyn-atlas-semantic/verify.py"
+        },
+        {
+          "blob": "61df75f257812eea13ddaddb7b771ac3c722ad97",
+          "path": "src/browser/semantic.mjs"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "behavioral evidence retained conceptually; monorepo fixtures/runtime assumptions not copied wholesale"
+    },
+    {
+      "final_disposition": "TEST_EVIDENCE_SPLIT_BY_TARGET_OWNER",
+      "ownership_classification": "SPLIT_REWRITE_TEST_EVIDENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "6f68539a9873a8e78a1952d6edbba647d3a99913",
+      "source_path": "tools/otbm_atlas/tests/test_viewer_runtime.py",
+      "source_size": 3214,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "13f396ac8dbf05ac66e1f9b1d86a191995e30946",
+          "path": "tools/dyn-atlas-semantic/compiler.py"
+        },
+        {
+          "blob": "6e2fd31367a367189148a642c9e2bf930dcaee9c",
+          "path": "tools/dyn-atlas-semantic/verify.py"
+        },
+        {
+          "blob": "61df75f257812eea13ddaddb7b771ac3c722ad97",
+          "path": "src/browser/semantic.mjs"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "behavioral evidence retained conceptually; monorepo fixtures/runtime assumptions not copied wholesale"
+    },
+    {
+      "final_disposition": "TEST_EVIDENCE_SPLIT_BY_TARGET_OWNER",
+      "ownership_classification": "SPLIT_REWRITE_TEST_EVIDENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "5b99fe836c3c7e5639867e90977ba5980557c92c",
+      "source_path": "tools/otbm_atlas/tests/test_world_publish.py",
+      "source_size": 11563,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "13f396ac8dbf05ac66e1f9b1d86a191995e30946",
+          "path": "tools/dyn-atlas-semantic/compiler.py"
+        },
+        {
+          "blob": "6e2fd31367a367189148a642c9e2bf930dcaee9c",
+          "path": "tools/dyn-atlas-semantic/verify.py"
+        },
+        {
+          "blob": "61df75f257812eea13ddaddb7b771ac3c722ad97",
+          "path": "src/browser/semantic.mjs"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "behavioral evidence retained conceptually; monorepo fixtures/runtime assumptions not copied wholesale"
+    },
+    {
+      "final_disposition": "TEST_EVIDENCE_SPLIT_BY_TARGET_OWNER",
+      "ownership_classification": "SPLIT_REWRITE_TEST_EVIDENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "8d9e154afa986503e619be749f04beeb527c19bd",
+      "source_path": "tools/otbm_atlas/tests/test_world_shards.py",
+      "source_size": 3418,
+      "target_owner": "Oteryn/Oteryn-Atlas + Oteryn/Oteryn-Game split",
+      "target_paths": [
+        {
+          "blob": "13f396ac8dbf05ac66e1f9b1d86a191995e30946",
+          "path": "tools/dyn-atlas-semantic/compiler.py"
+        },
+        {
+          "blob": "6e2fd31367a367189148a642c9e2bf930dcaee9c",
+          "path": "tools/dyn-atlas-semantic/verify.py"
+        },
+        {
+          "blob": "61df75f257812eea13ddaddb7b771ac3c722ad97",
+          "path": "src/browser/semantic.mjs"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "behavioral evidence retained conceptually; monorepo fixtures/runtime assumptions not copied wholesale"
+    },
+    {
+      "final_disposition": "LEGACY_REFERENCE_ONLY_NOT_COPIED",
+      "ownership_classification": "LEGACY_REFERENCE_REVIEWED",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "a3a850c37bcf42099c2be28e365fd1e5d0819803",
+      "source_path": "tools/otbm_atlas/tile_inspector.py",
+      "source_size": 10842,
+      "target_owner": "Legacy reference",
+      "target_paths": [],
+      "transformation": "none; no durable Atlas dependency"
+    },
+    {
+      "final_disposition": "LEGACY_REFERENCE_ONLY_NOT_COPIED",
+      "ownership_classification": "LEGACY_REFERENCE_REVIEWED",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "a29676af4a65380ce7351f65ef474a314ee8230e",
+      "source_path": "tools/otbm_atlas/tile_inspector_runtime.js",
+      "source_size": 4454,
+      "target_owner": "Legacy reference",
+      "target_paths": [],
+      "transformation": "none; no durable Atlas dependency"
+    },
+    {
+      "final_disposition": "ATLAS_CAPABILITY_REIMPLEMENTED_NO_CONTENT_COPY",
+      "ownership_classification": "ATLAS_REIMPLEMENTED",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "a2eafebab0066df3f9ca5f52b410477557bf0423",
+      "source_path": "tools/otbm_atlas/verify.py",
+      "source_size": 6036,
+      "target_owner": "Oteryn/Oteryn-Atlas",
+      "target_paths": [
+        {
+          "blob": "13f396ac8dbf05ac66e1f9b1d86a191995e30946",
+          "path": "tools/dyn-atlas-semantic/compiler.py"
+        },
+        {
+          "blob": "6e2fd31367a367189148a642c9e2bf930dcaee9c",
+          "path": "tools/dyn-atlas-semantic/verify.py"
+        },
+        {
+          "blob": "61df75f257812eea13ddaddb7b771ac3c722ad97",
+          "path": "src/browser/semantic.mjs"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "reimplemented behind the Game-export/Atlas-projection boundary; legacy source code is not runtime authority"
+    },
+    {
+      "final_disposition": "LEGACY_REFERENCE_ONLY_NOT_COPIED",
+      "ownership_classification": "LEGACY_REFERENCE_REVIEWED",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "5fb9e491ead721d9b5369964d44497bc8092b327",
+      "source_path": "tools/otbm_atlas/verify_world_shard.py",
+      "source_size": 12227,
+      "target_owner": "Legacy reference",
+      "target_paths": [],
+      "transformation": "none; no durable Atlas dependency"
+    },
+    {
+      "final_disposition": "ATLAS_CAPABILITY_REIMPLEMENTED_NO_CONTENT_COPY",
+      "ownership_classification": "ATLAS_REIMPLEMENTED",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "3825b564251fef55a3b5906da8c94c6e10a65b30",
+      "source_path": "tools/otbm_atlas/viewer-runtime.js",
+      "source_size": 210,
+      "target_owner": "Oteryn/Oteryn-Atlas",
+      "target_paths": [
+        {
+          "blob": "2f56433f797b4178e28d7bf1cbf86487ac2832e8",
+          "path": "src/browser/loader.mjs"
+        },
+        {
+          "blob": "61df75f257812eea13ddaddb7b771ac3c722ad97",
+          "path": "src/browser/semantic.mjs"
+        },
+        {
+          "blob": "105ec5c24c3eebc50626ced8456787c38b8a2244",
+          "path": "src/browser/webgl.mjs"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "reimplemented behind the Game-export/Atlas-projection boundary; legacy source code is not runtime authority"
+    },
+    {
+      "final_disposition": "ATLAS_CAPABILITY_REIMPLEMENTED_NO_CONTENT_COPY",
+      "ownership_classification": "ATLAS_REIMPLEMENTED",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "4266397478b30e476c5e54cdfecaa621575a8d13",
+      "source_path": "tools/otbm_atlas/viewer.py",
+      "source_size": 6517,
+      "target_owner": "Oteryn/Oteryn-Atlas",
+      "target_paths": [
+        {
+          "blob": "2f56433f797b4178e28d7bf1cbf86487ac2832e8",
+          "path": "src/browser/loader.mjs"
+        },
+        {
+          "blob": "61df75f257812eea13ddaddb7b771ac3c722ad97",
+          "path": "src/browser/semantic.mjs"
+        },
+        {
+          "blob": "105ec5c24c3eebc50626ced8456787c38b8a2244",
+          "path": "src/browser/webgl.mjs"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "reimplemented behind the Game-export/Atlas-projection boundary; legacy source code is not runtime authority"
+    },
+    {
+      "final_disposition": "ATLAS_CAPABILITY_REIMPLEMENTED_NO_CONTENT_COPY",
+      "ownership_classification": "ATLAS_REIMPLEMENTED",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "a61ca267f2419821e00aabb87f362e55e35fc2c4",
+      "source_path": "tools/otbm_atlas/viewer_app.js",
+      "source_size": 13890,
+      "target_owner": "Oteryn/Oteryn-Atlas",
+      "target_paths": [
+        {
+          "blob": "2f56433f797b4178e28d7bf1cbf86487ac2832e8",
+          "path": "src/browser/loader.mjs"
+        },
+        {
+          "blob": "61df75f257812eea13ddaddb7b771ac3c722ad97",
+          "path": "src/browser/semantic.mjs"
+        },
+        {
+          "blob": "105ec5c24c3eebc50626ced8456787c38b8a2244",
+          "path": "src/browser/webgl.mjs"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "reimplemented behind the Game-export/Atlas-projection boundary; legacy source code is not runtime authority"
+    },
+    {
+      "final_disposition": "ATLAS_CAPABILITY_REIMPLEMENTED_NO_CONTENT_COPY",
+      "ownership_classification": "ATLAS_REIMPLEMENTED",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "a19ff93857dc55c45848151b28dc989514b3772c",
+      "source_path": "tools/otbm_atlas/viewer_runtime.js",
+      "source_size": 9287,
+      "target_owner": "Oteryn/Oteryn-Atlas",
+      "target_paths": [
+        {
+          "blob": "2f56433f797b4178e28d7bf1cbf86487ac2832e8",
+          "path": "src/browser/loader.mjs"
+        },
+        {
+          "blob": "61df75f257812eea13ddaddb7b771ac3c722ad97",
+          "path": "src/browser/semantic.mjs"
+        },
+        {
+          "blob": "105ec5c24c3eebc50626ced8456787c38b8a2244",
+          "path": "src/browser/webgl.mjs"
+        },
+        {
+          "blob": "e1fedbb4e0ac05450c7ae5fb6026223d945ddb08",
+          "path": "web/app.mjs"
+        }
+      ],
+      "transformation": "reimplemented behind the Game-export/Atlas-projection boundary; legacy source code is not runtime authority"
+    },
+    {
+      "final_disposition": "LEGACY_REFERENCE_ONLY_NOT_COPIED",
+      "ownership_classification": "LEGACY_REFERENCE_REVIEWED",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "57d8466840acc0a2f8e0054e7a6c7e9cbfb214b1",
+      "source_path": "tools/otbm_atlas/world_publish.py",
+      "source_size": 26854,
+      "target_owner": "Legacy reference",
+      "target_paths": [],
+      "transformation": "none; no durable Atlas dependency"
+    },
+    {
+      "final_disposition": "LEGACY_REFERENCE_ONLY_NOT_COPIED",
+      "ownership_classification": "LEGACY_REFERENCE_REVIEWED",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "0e428a0bb3aef5d4b17655b6bd003c7180981040",
+      "source_path": "tools/otbm_atlas/world_shards.py",
+      "source_size": 19834,
+      "target_owner": "Legacy reference",
+      "target_paths": [],
+      "transformation": "none; no durable Atlas dependency"
+    },
+    {
+      "final_disposition": "NOT_MIGRATED_TO_ATLAS_GAME_OWNS_TRUTH",
+      "ownership_classification": "GAME_OWNED_LEGACY_REFERENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "8671e7858bc917c074e7f2da7f1902d7fda45ac1",
+      "source_path": "tools/otbm_atlas_facts/__init__.py",
+      "source_size": 82,
+      "target_owner": "Oteryn/Oteryn-Game",
+      "target_paths": [],
+      "transformation": "none; retained only as pinned legacy evidence for Game-side importer/content authority"
+    },
+    {
+      "final_disposition": "NOT_MIGRATED_TO_ATLAS_GAME_OWNS_TRUTH",
+      "ownership_classification": "GAME_OWNED_LEGACY_REFERENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "ebcf344bd7237e50e3b80ee90fa45d8c64b6e4e6",
+      "source_path": "tools/otbm_atlas_facts/build.py",
+      "source_size": 2646,
+      "target_owner": "Oteryn/Oteryn-Game",
+      "target_paths": [],
+      "transformation": "none; retained only as pinned legacy evidence for Game-side importer/content authority"
+    },
+    {
+      "final_disposition": "NOT_MIGRATED_TO_ATLAS_GAME_OWNS_TRUTH",
+      "ownership_classification": "GAME_OWNED_LEGACY_REFERENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "956fae0bda3800445409a8868b549110018cb15a",
+      "source_path": "tools/otbm_atlas_facts/lua_static.py",
+      "source_size": 11196,
+      "target_owner": "Oteryn/Oteryn-Game",
+      "target_paths": [],
+      "transformation": "none; retained only as pinned legacy evidence for Game-side importer/content authority"
+    },
+    {
+      "final_disposition": "NOT_MIGRATED_TO_ATLAS_GAME_OWNS_TRUTH",
+      "ownership_classification": "GAME_OWNED_LEGACY_REFERENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "f996ae949f42ba6dba4d73666a99f2f57970708d",
+      "source_path": "tools/otbm_atlas_facts/mechanics.py",
+      "source_size": 8724,
+      "target_owner": "Oteryn/Oteryn-Game",
+      "target_paths": [],
+      "transformation": "none; retained only as pinned legacy evidence for Game-side importer/content authority"
+    },
+    {
+      "final_disposition": "NOT_MIGRATED_TO_ATLAS_GAME_OWNS_TRUTH",
+      "ownership_classification": "GAME_OWNED_LEGACY_REFERENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "14e5938d3e0ddc2c669fcf50db944516934d97cc",
+      "source_path": "tools/otbm_atlas_facts/monster_metadata.py",
+      "source_size": 2712,
+      "target_owner": "Oteryn/Oteryn-Game",
+      "target_paths": [],
+      "transformation": "none; retained only as pinned legacy evidence for Game-side importer/content authority"
+    },
+    {
+      "final_disposition": "NOT_MIGRATED_TO_ATLAS_GAME_OWNS_TRUTH",
+      "ownership_classification": "GAME_OWNED_LEGACY_REFERENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "6581b98f8e51f902425d7bbd6e2be2e8be5e6943",
+      "source_path": "tools/otbm_atlas_facts/npc_services.py",
+      "source_size": 7348,
+      "target_owner": "Oteryn/Oteryn-Game",
+      "target_paths": [],
+      "transformation": "none; retained only as pinned legacy evidence for Game-side importer/content authority"
+    },
+    {
+      "final_disposition": "NOT_MIGRATED_TO_ATLAS_GAME_OWNS_TRUTH",
+      "ownership_classification": "GAME_OWNED_LEGACY_REFERENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "243b4418420dca33afcf0843f198be72107584ab",
+      "source_path": "tools/otbm_atlas_facts/npclib_semantics.py",
+      "source_size": 1646,
+      "target_owner": "Oteryn/Oteryn-Game",
+      "target_paths": [],
+      "transformation": "none; retained only as pinned legacy evidence for Game-side importer/content authority"
+    },
+    {
+      "final_disposition": "NOT_MIGRATED_TO_ATLAS_GAME_OWNS_TRUTH",
+      "ownership_classification": "GAME_OWNED_LEGACY_REFERENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "0894a767557202de40453436e46cb396523e663b",
+      "source_path": "tools/otbm_atlas_facts/raids.py",
+      "source_size": 13667,
+      "target_owner": "Oteryn/Oteryn-Game",
+      "target_paths": [],
+      "transformation": "none; retained only as pinned legacy evidence for Game-side importer/content authority"
+    },
+    {
+      "final_disposition": "NOT_MIGRATED_TO_ATLAS_GAME_OWNS_TRUTH",
+      "ownership_classification": "GAME_OWNED_LEGACY_REFERENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "source_path": "tools/otbm_atlas_facts/tests/__init__.py",
+      "source_size": 0,
+      "target_owner": "Oteryn/Oteryn-Game",
+      "target_paths": [],
+      "transformation": "none; retained only as pinned legacy evidence for Game-side importer/content authority"
+    },
+    {
+      "final_disposition": "NOT_MIGRATED_TO_ATLAS_GAME_OWNS_TRUTH",
+      "ownership_classification": "GAME_OWNED_LEGACY_REFERENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "69bafe1dc5f741f832584b383df49d0bd6fbe41f",
+      "source_path": "tools/otbm_atlas_facts/tests/test_determinism.py",
+      "source_size": 1445,
+      "target_owner": "Oteryn/Oteryn-Game",
+      "target_paths": [],
+      "transformation": "none; retained only as pinned legacy evidence for Game-side importer/content authority"
+    },
+    {
+      "final_disposition": "NOT_MIGRATED_TO_ATLAS_GAME_OWNS_TRUTH",
+      "ownership_classification": "GAME_OWNED_LEGACY_REFERENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "5eab94c877b22460c32deb0ce986e111631cbfbf",
+      "source_path": "tools/otbm_atlas_facts/tests/test_npc_helper_scope.py",
+      "source_size": 1008,
+      "target_owner": "Oteryn/Oteryn-Game",
+      "target_paths": [],
+      "transformation": "none; retained only as pinned legacy evidence for Game-side importer/content authority"
+    },
+    {
+      "final_disposition": "NOT_MIGRATED_TO_ATLAS_GAME_OWNS_TRUTH",
+      "ownership_classification": "GAME_OWNED_LEGACY_REFERENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "3a5c032c60e6d2751173197075a39e57c2250cbb",
+      "source_path": "tools/otbm_atlas_facts/tests/test_pinned_sources.py",
+      "source_size": 4267,
+      "target_owner": "Oteryn/Oteryn-Game",
+      "target_paths": [],
+      "transformation": "none; retained only as pinned legacy evidence for Game-side importer/content authority"
+    },
+    {
+      "final_disposition": "NOT_MIGRATED_TO_ATLAS_GAME_OWNS_TRUTH",
+      "ownership_classification": "GAME_OWNED_LEGACY_REFERENCE",
+      "rights_provenance": "NO_LEGACY_ASSET_BYTES_COPIED; Atlas publication assets are governed by docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md",
+      "source_blob": "2bb9be2efb2e5234de3049bc352a45a058155b53",
+      "source_path": "tools/otbm_atlas_facts/tests/test_status_contract.py",
+      "source_size": 966,
+      "target_owner": "Oteryn/Oteryn-Game",
+      "target_paths": [],
+      "transformation": "none; retained only as pinned legacy evidence for Game-side importer/content authority"
+    }
+  ],
+  "schema_version": 1,
+  "source": {
+    "repository": "blakinio/Otheryn",
+    "role": "bounded legacy Atlas/migration source only; unrelated Otheryn content out of scope",
+    "selection": [
+      "tools/otbm_atlas/**",
+      "tools/otbm_atlas_facts/**",
+      ".github/workflows/otbm-atlas-*"
+    ],
+    "sha": "e417c5e7c22986bf4acef0495eb47f7b72c97cce"
+  },
+  "source_work": {
+    "disposition": "SUPERSEDE_AFTER_THIS_TARGET_CLOSEOUT_MERGES",
+    "head_sha": "6e27eb01488e2cd7d922d002e39da81637def4eb",
+    "pull_request": 447
+  },
+  "target": {
+    "base_sha": "e87bdd54207ba9a1e412a24315c28e0507a23e5f",
+    "repository": "Oteryn/Oteryn-Atlas"
+  }
+}

@@ -27,6 +27,10 @@ jobs:
           test -s web/proof/semantic/manifest.json
           test -s web/proof/pixels/manifest.json
           test -s web/proof/pixels/pack.rgba
+          test -s SECURITY.md
+          test -s .github/CODEOWNERS
+          test -s docs/migration/legacy-atlas-extraction-provenance.json
+          test -s tools/governance/verify_extraction_provenance.py
           if find . -type f \( -name '*.otbm' -o -name '*.otb' -o -name '*.spr' -o -name '*.dat' \) -print -quit | grep -q .; then
             echo 'Forbidden raw legacy/proprietary runtime input committed to repository.' >&2
             exit 1
@@ -35,6 +39,9 @@ jobs:
             echo 'Browser source must not reference legacy world formats.' >&2
             exit 1
           fi
+
+      - name: Verify selective-extraction provenance
+        run: python tools/governance/verify_extraction_provenance.py
 
   semantic-proof:
     runs-on: ubuntu-24.04
@@ -173,3 +180,28 @@ jobs:
               exit 1
             fi
           fi
+
+  atlas-gate:
+    name: atlas-gate
+    if: ${{ always() }}
+    needs:
+      - repository-contract
+      - semantic-proof
+      - browser-semantic
+      - browser-webgl-proof
+      - project
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Require all Atlas CI components
+        shell: bash
+        env:
+          REPOSITORY_CONTRACT: ${{ needs.repository-contract.result }}
+          SEMANTIC_PROOF: ${{ needs.semantic-proof.result }}
+          BROWSER_SEMANTIC: ${{ needs.browser-semantic.result }}
+          BROWSER_WEBGL_PROOF: ${{ needs.browser-webgl-proof.result }}
+          PROJECT: ${{ needs.project.result }}
+        run: |
+          set -euo pipefail
+          for result in "$REPOSITORY_CONTRACT" "$SEMANTIC_PROOF" "$BROWSER_SEMANTIC" "$BROWSER_WEBGL_PROOF" "$PROJECT"; do
+            test "$result" = success
+          done
