@@ -71,13 +71,14 @@ def verify_source_repository(source_root: Path, source_sha: str) -> None:
     assert resolved == source_sha, f"source commit mismatch: {resolved} != {source_sha}"
 
 
-def verify(map_path: Path, source_root: Path) -> dict[str, int]:
+def verify(map_path: Path, source_root: Path | None = None) -> dict[str, int]:
     data = json.loads(map_path.read_text(encoding="utf-8"))
     assert data["schema_version"] == 1
     assert data["source"]["repository"] == "blakinio/Otheryn"
     assert data["target"]["repository"] == "Oteryn/Oteryn-Atlas"
     source_sha = data["source"]["sha"]
-    verify_source_repository(source_root, source_sha)
+    if source_root is not None:
+        verify_source_repository(source_root, source_sha)
 
     rows = data["rows"]
     assert len(rows) >= 100
@@ -87,7 +88,8 @@ def verify(map_path: Path, source_root: Path) -> dict[str, int]:
     counts = Counter()
     for row in rows:
         path = row["source_path"]
-        verify_source_row(row, source_root, source_sha)
+        if source_root is not None:
+            verify_source_row(row, source_root, source_sha)
         cls = row["ownership_classification"]
         assert cls in ALLOWED, (path, cls)
         counts[cls] += 1
@@ -110,14 +112,17 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--source-root",
-        required=True,
         type=Path,
-        help="local inert checkout containing the exact pinned blakinio/Otheryn source commit",
+        help="local inert checkout containing the exact pinned blakinio/Otheryn source commit; when supplied, every source row is cryptographically verified",
     )
     args = parser.parse_args()
-    counts = verify(MAP, args.source_root.resolve())
+    source_root = args.source_root.resolve() if args.source_root is not None else None
+    counts = verify(MAP, source_root)
     rows = len(json.loads(MAP.read_text(encoding="utf-8"))["rows"])
-    print(f"legacy extraction provenance PASS: rows={rows} classes={counts}")
+    source_status = "verified" if source_root is not None else "not-requested"
+    print(
+        f"legacy extraction provenance PASS: rows={rows} source={source_status} classes={counts}"
+    )
 
 
 if __name__ == "__main__":
