@@ -48,14 +48,14 @@ def run(args: argparse.Namespace) -> dict:
     publication = VERIFY.load_manifest(root / "publication.json")
     semantic = VERIFY.load_manifest(root / publication["semantic"]["path"])
     pixels = VERIFY.load_manifest(root / publication["pixels"]["path"])
-    handoff = PUB.load_handoff(args.handoff, args.expected_handoff_sha256)
+    handoff = VERIFY.load_handoff(args.handoff, args.expected_handoff_sha256)
     results: list[dict[str, str]] = []
 
     forged_publication = copy.deepcopy(publication)
     forged_publication["serializerStatus"] = "FROZEN"
     results.append(expect_failure(
         "forged top-level publication root",
-        lambda: VERIFY.check_root(forged_publication, PUB.PUBLICATION_DOMAIN, "forged publication"),
+        lambda: VERIFY.check_root(forged_publication, VERIFY.PUBLICATION_DOMAIN, "forged publication"),
     ))
 
     first_floor_entry = semantic["floors"][0]
@@ -88,6 +88,28 @@ def run(args: argparse.Namespace) -> dict:
             "forged floor manifest root",
             lambda: VERIFY.verify_semantic(temp_root, semantic_pub),
         ))
+
+    with tempfile.TemporaryDirectory(prefix="atlas-neg-address-") as td:
+        temp_root = Path(td)
+        temp_semantic = temp_root / "semantic"
+        forged_floor = copy.deepcopy(first_floor)
+        forged_floor["chunks"][0]["logicalAddress"]["region_x"] += 1000000
+        floor_core = dict(forged_floor)
+        floor_core.pop("rootContentId", None)
+        forged_floor["rootContentId"] = VERIFY.rooted(VERIFY.FLOOR_DOMAIN, floor_core)
+        forged_world = copy.deepcopy(semantic)
+        forged_world["floors"][0]["rootContentId"] = forged_floor["rootContentId"]
+        world_core = dict(forged_world)
+        world_core.pop("rootContentId", None)
+        forged_world["rootContentId"] = VERIFY.rooted(VERIFY.SEMANTIC_DOMAIN, world_core)
+        write_manifest(temp_semantic / "world.json", forged_world)
+        write_manifest(temp_semantic / first_floor_entry["path"], forged_floor)
+        forged_pub = {"semantic": {"path": "semantic/world.json", "rootContentId": forged_world["rootContentId"]}}
+        results.append(expect_failure(
+            "forged logical address with recomputed roots",
+            lambda: VERIFY.verify_semantic(temp_root, forged_pub, handoff),
+        ))
+
     sprite_ids = {int(key) for key in pixels["spriteIndex"]}
     source_pixel_root = (root / publication["pixels"]["path"]).parent
     pixel_pub = {"pixels": {"path": "pixels/manifest.json", "rootContentId": pixels["rootContentId"]}}
@@ -123,7 +145,7 @@ def run(args: argparse.Namespace) -> dict:
                 mapping["contentId"] = forged_id
         core = dict(forged_pixels)
         core.pop("rootContentId", None)
-        forged_pixels["rootContentId"] = PUB.rooted(PUB.PIXEL_ROOT_DOMAIN, core)
+        forged_pixels["rootContentId"] = VERIFY.rooted(VERIFY.PIXEL_ROOT_DOMAIN, core)
         forged_pixel_pub = {
             "pixels": {"path": "pixels/manifest.json", "rootContentId": forged_pixels["rootContentId"]}
         }

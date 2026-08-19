@@ -8,6 +8,7 @@ import hashlib
 import importlib.util
 import json
 import lzma
+import re
 import sys
 import time
 import zipfile
@@ -19,10 +20,46 @@ SPEC = importlib.util.spec_from_file_location("fullworld_publication", HERE / "p
 PUB = importlib.util.module_from_spec(SPEC)
 assert SPEC.loader is not None
 SPEC.loader.exec_module(PUB)
+MM_SPEC = importlib.util.spec_from_file_location("pixel_measure", HERE.parent / "dyn-atlas-pixels/measure_metadata.py")
+MM = importlib.util.module_from_spec(MM_SPEC)
+assert MM_SPEC.loader is not None
+MM_SPEC.loader.exec_module(MM)
+
+HANDOFF_FORMAT = "oteryn-atlas-fullworld-generation-handoff-v0"
+SEMANTIC_PROFILE = "oteryn-atlas-fullworld-semantic-publication-v0"
+PIXEL_PROFILE = "oteryn-atlas-fullworld-pixel-publication-v0"
+PUBLICATION_PROFILE = "oteryn-atlas-fullworld-publication-v0"
+SEMANTIC_DOMAIN = b"OTERYN-ATLAS-FULLWORLD-SEMANTIC-V0\0"
+FLOOR_DOMAIN = b"OTERYN-ATLAS-FULLWORLD-FLOOR-V0\0"
+PIXEL_ROOT_DOMAIN = b"OTERYN-ATLAS-FULLWORLD-PIXEL-STORE-V0\0"
+PUBLICATION_DOMAIN = b"OTERYN-ATLAS-FULLWORLD-PUBLICATION-V0\0"
+PIXEL_DOMAIN = b"OTERYN-DYN-ATLAS-PIXEL-RGBA-V0\0"
+SPRITE_RE = re.compile(br'"sprite_source_id":([0-9]+)')
 
 
 class VerifyError(RuntimeError):
     pass
+
+
+def canonical(value: Any) -> bytes:
+    return (json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n").encode()
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for block in iter(lambda: handle.read(8 * 1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def rooted(domain: bytes, core: dict[str, Any]) -> str:
+    return "sha256:" + hashlib.sha256(domain + canonical(core)).hexdigest()
+
+
+def pixel_content_id(width: int, height: int, rgba: bytes) -> str:
+    data = PIXEL_DOMAIN + width.to_bytes(2, "big") + height.to_bytes(2, "big") + rgba
+    return "sha256:" + hashlib.sha256(data).hexdigest()
 
 
 def safe_join(root: Path, relative: str) -> Path:
@@ -30,6 +67,32 @@ def safe_join(root: Path, relative: str) -> Path:
     if rel.is_absolute() or ".." in rel.parts:
         raise VerifyError(f"unsafe relative path: {relative}")
     return root / rel
+
+def load_handoff(path: Path, expected_sha256: str) -> dict[str, Any]:
+    if sha256_file(path) != expected_sha256:
+        raise VerifyError("handoff digest mismatch")
+    value = json.loads(path.read_text())
+    if value.get("format") != HANDOFF_FORMAT:
+        raise VerifyError("unsupported handoff format")
+    if value.get("source_authority") != "Oteryn/Oteryn-Game":
+        raise VerifyError("Game authority missing")
+    if value.get("browser_runtime_legacy_fallback") not in (False, "FORBIDDEN"):
+        raise VerifyError("legacy runtime fallback not forbidden")
+    if value.get("census", {}).get("global", {}).get("floors") != 16:
+        raise VerifyError("handoff floor census mismatch")
+    if value.get("generation", {}).get("shard_count") != 1197:
+        raise VerifyError("handoff shard count mismatch")
+    return value
+
+
+def authorize_assets(repo_root: Path, asset_zip: Path, handoff: dict[str, Any]) -> None:
+    expected = handoff["source"]["asset_zip_sha256"]
+    if sha256_file(asset_zip) != expected:
+        raise VerifyError("asset ZIP digest mismatch")
+    attestation = repo_root / "docs/legal/DYN-ATLAS-001-15-32-asset-rights-attestation.md"
+    if not attestation.is_file() or expected not in attestation.read_text():
+        raise VerifyError("exact-source rights attestation missing")
+
 
 def load_manifest(path: Path) -> dict[str, Any]:
     if not path.is_file():
@@ -41,7 +104,7 @@ def load_manifest(path: Path) -> dict[str, Any]:
         raise VerifyError(f"invalid JSON manifest: {path}") from exc
     if not isinstance(value, dict):
         raise VerifyError(f"manifest is not an object: {path}")
-    if raw != PUB.canonical(value):
+    if raw != canonical(value):
         raise VerifyError(f"manifest is not canonical JSON: {path}")
     return value
 
@@ -50,7 +113,7 @@ def check_root(value: dict[str, Any], domain: bytes, label: str) -> None:
     root = value.get("rootContentId")
     core = dict(value)
     core.pop("rootContentId", None)
-    expected = PUB.rooted(domain, core)
+    expected = rooted(domain, core)
     if root != expected:
         raise VerifyError(f"{label} root mismatch: {root!r} != {expected!r}")
 
@@ -60,15 +123,19 @@ def checked_file(path: Path, size: int, digest: str, label: str) -> None:
         raise VerifyError(f"missing {label}: {path}")
     if path.stat().st_size != size:
         raise VerifyError(f"{label} byte-size mismatch: {path}")
-    if PUB.sha256_file(path) != digest:
+    if sha256_file(path) != digest:
         raise VerifyError(f"{label} digest mismatch: {path}")
 
-def verify_semantic(root: Path, publication: dict[str, Any]) -> tuple[dict[str, Any], set[int]]:
+def verify_semantic(
+    root: Path,
+    publication: dict[str, Any],
+    handoff: dict[str, Any] | None = None,
+) -> tuple[dict[str, Any], set[int]]:
     semantic_path = safe_join(root, publication["semantic"]["path"])
     semantic = load_manifest(semantic_path)
-    if semantic.get("profile") != PUB.SEMANTIC_PROFILE:
+    if semantic.get("profile") != SEMANTIC_PROFILE:
         raise VerifyError("unsupported semantic publication profile")
-    check_root(semantic, PUB.SEMANTIC_DOMAIN, "semantic world")
+    check_root(semantic, SEMANTIC_DOMAIN, "semantic world")
     if publication["semantic"].get("rootContentId") != semantic["rootContentId"]:
         raise VerifyError("top-level semantic root linkage mismatch")
 
@@ -79,6 +146,14 @@ def verify_semantic(root: Path, publication: dict[str, Any]) -> tuple[dict[str, 
     floor_numbers: set[int] = set()
     logical_addresses: set[tuple[int, int, int]] = set()
     totals = {"floors": 0, "shards": 0, "tiles": 0, "resolvedPrimitives": 0, "bytes": 0}
+    expected_shards = None
+    if handoff is not None:
+        expected_shards = {
+            (int(item["logical_address"]["floor"]), int(item["logical_address"]["region_x"]), int(item["logical_address"]["region_y"])): item
+            for item in handoff["shards"]
+        }
+        if len(expected_shards) != len(handoff["shards"]):
+            raise VerifyError("handoff contains duplicate logical shard addresses")
 
     semantic_root = semantic_path.parent
     for floor_entry in floors:
@@ -88,13 +163,26 @@ def verify_semantic(root: Path, publication: dict[str, Any]) -> tuple[dict[str, 
         floor_numbers.add(floor)
         floor_path = safe_join(semantic_root, floor_entry["path"])
         floor_manifest = load_manifest(floor_path)
-        check_root(floor_manifest, PUB.FLOOR_DOMAIN, f"floor {floor}")
+        check_root(floor_manifest, FLOOR_DOMAIN, f"floor {floor}")
         if floor_manifest.get("floor") != floor:
             raise VerifyError(f"floor manifest identity mismatch: {floor}")
         if floor_manifest.get("rootContentId") != floor_entry.get("rootContentId"):
             raise VerifyError(f"floor root linkage mismatch: {floor}")
         if floor_manifest.get("sourceFingerprint") != semantic.get("sourceFingerprint"):
             raise VerifyError(f"floor source fingerprint mismatch: {floor}")
+        if handoff is not None:
+            census_floor = handoff["census"]["floors"].get(str(floor))
+            if census_floor is None:
+                raise VerifyError(f"floor absent from source census: {floor}")
+            if floor_manifest.get("bounds") != census_floor["bounds"]:
+                raise VerifyError(f"floor bounds diverge from source census: {floor}")
+            expected_floor_counts = {
+                "tiles": census_floor["tiles"],
+                "resolvedPrimitives": census_floor["resolved_primitives"],
+                "bytes": census_floor["canonical_jsonl_bytes"],
+            }
+            if floor_manifest.get("counts") != expected_floor_counts:
+                raise VerifyError(f"floor counts diverge from source census: {floor}")
 
         floor_counts = {"tiles": 0, "resolvedPrimitives": 0, "bytes": 0}
         chunks = floor_manifest.get("chunks")
@@ -108,6 +196,18 @@ def verify_semantic(root: Path, publication: dict[str, Any]) -> tuple[dict[str, 
             if address in logical_addresses:
                 raise VerifyError(f"duplicate logical chunk address: {address!r}")
             logical_addresses.add(address)
+            if expected_shards is not None:
+                source_shard = expected_shards.pop(address, None)
+                if source_shard is None:
+                    raise VerifyError(f"logical address absent from source handoff: {address!r}")
+                expected_content_id = "sha256:" + source_shard["tiles_jsonl_sha256"]
+                expected_path = f"chunks/{source_shard['shard_id']}.jsonl"
+                if chunk.get("contentId") != expected_content_id:
+                    raise VerifyError(f"logical address/content identity mismatch: {address!r}")
+                if chunk.get("bytes") != source_shard["tiles_jsonl_bytes"] or chunk.get("tiles") != source_shard["tile_count"]:
+                    raise VerifyError(f"logical address/source counts mismatch: {address!r}")
+                if chunk.get("path") != expected_path:
+                    raise VerifyError(f"non-deterministic chunk path for {address!r}")
 
             chunk_path = safe_join(semantic_root, chunk["path"])
             content_id = chunk.get("contentId", "")
@@ -121,7 +221,7 @@ def verify_semantic(root: Path, publication: dict[str, Any]) -> tuple[dict[str, 
                     if not line.endswith(b"\n"):
                         raise VerifyError(f"unterminated semantic record: {address!r}")
                     line_count += 1
-                    ids = [int(value) for value in PUB.SPRITE_RE.findall(line)]
+                    ids = [int(value) for value in SPRITE_RE.findall(line)]
                     primitive_count += len(ids)
                     sprite_ids.update(ids)
             if line_count != chunk.get("tiles"):
@@ -144,18 +244,34 @@ def verify_semantic(root: Path, publication: dict[str, Any]) -> tuple[dict[str, 
     totals["uniqueSpriteRefs"] = len(sprite_ids)
     if totals != semantic.get("counts"):
         raise VerifyError(f"semantic world counts mismatch: {totals!r}")
+    if expected_shards:
+        raise VerifyError(f"source handoff shards missing from publication: {len(expected_shards)}")
+    if handoff is not None:
+        census = handoff["census"]["global"]
+        expected_world_counts = {
+            "floors": census["floors"],
+            "shards": handoff["generation"]["shard_count"],
+            "tiles": census["tiles"],
+            "resolvedPrimitives": census["resolved_primitives"],
+            "uniqueSpriteRefs": census["unique_sprite_source_ids"],
+            "bytes": handoff["generation"]["final_jsonl_bytes"],
+        }
+        if semantic.get("counts") != expected_world_counts:
+            raise VerifyError("semantic world counts diverge from source handoff")
     return semantic, sprite_ids
 
 def verify_pixels(root: Path, publication: dict[str, Any], sprite_ids: set[int]) -> dict[str, Any]:
     pixel_path = safe_join(root, publication["pixels"]["path"])
     pixels = load_manifest(pixel_path)
-    if pixels.get("profile") != PUB.PIXEL_PROFILE:
+    if pixels.get("profile") != PIXEL_PROFILE:
         raise VerifyError("unsupported pixel publication profile")
-    check_root(pixels, PUB.PIXEL_ROOT_DOMAIN, "pixel publication")
+    check_root(pixels, PIXEL_ROOT_DOMAIN, "pixel publication")
     if publication["pixels"].get("rootContentId") != pixels["rootContentId"]:
         raise VerifyError("top-level pixel root linkage mismatch")
     if pixels.get("runtimePlacement", {}).get("identityAuthority") is not False:
         raise VerifyError("runtime/GPU placement claims identity authority")
+    if pixels.get("pixelHashDomain") != PIXEL_DOMAIN[:-1].decode():
+        raise VerifyError("unexpected pixel identity domain")
 
     pixel_root = pixel_path.parent
     packs = pixels.get("packs")
@@ -199,7 +315,7 @@ def verify_pixels(root: Path, publication: dict[str, Any], sprite_ids: set[int])
         if end > len(pack_data[pack_no]):
             raise VerifyError(f"pixel blob exceeds pack: {content_id}")
         rgba = pack_data[pack_no][offset:end]
-        if PUB.pixel_id(width, height, rgba) != content_id:
+        if pixel_content_id(width, height, rgba) != content_id:
             raise VerifyError(f"pixel content identity mismatch: {content_id}")
         cursors[pack_no] = end
         raw_after += byte_count
@@ -246,7 +362,7 @@ def verify_authorized_sprite_mappings(
     pixels: dict[str, Any],
     sprite_ids: set[int],
 ) -> None:
-    PUB.authorize_assets(repo_root, asset_zip, handoff)
+    authorize_assets(repo_root, asset_zip, handoff)
     if pixels.get("assetZipSha256") != handoff["source"]["asset_zip_sha256"]:
         raise VerifyError("pixel manifest asset source mismatch")
 
@@ -269,11 +385,11 @@ def verify_authorized_sprite_mappings(
             by_file.setdefault(entry["file"], []).append((sid, entry))
         checked = 0
         for file_name in sorted(by_file):
-            rgba_sheet = PUB.decode_sheet(archive.read("assets/" + file_name))
+            rgba_sheet = MM.decode_sheet(archive.read("assets/" + file_name))
             for sid, entry in by_file[file_name]:
-                width, height, rgba = PUB.extract_sprite(entry, rgba_sheet, sid)
+                width, height, rgba = MM.extract_sprite(entry, rgba_sheet, sid)
                 mapping = sprite_index[str(sid)]
-                expected_id = PUB.pixel_id(width, height, rgba)
+                expected_id = pixel_content_id(width, height, rgba)
                 if mapping.get("contentId") != expected_id:
                     raise VerifyError(f"forged/incorrect pixel mapping for sprite {sid}")
                 if (mapping.get("width"), mapping.get("height")) != (width, height):
@@ -320,15 +436,12 @@ def verify(
 ) -> dict[str, Any]:
     started = time.perf_counter()
     publication = load_manifest(root / "publication.json")
-    if publication.get("profile") != PUB.PUBLICATION_PROFILE:
+    if publication.get("profile") != PUBLICATION_PROFILE:
         raise VerifyError("unsupported top-level publication profile")
-    check_root(publication, PUB.PUBLICATION_DOMAIN, "top-level publication")
+    check_root(publication, PUBLICATION_DOMAIN, "top-level publication")
 
-    try:
-        handoff = PUB.load_handoff(handoff_path, expected_handoff_sha256)
-    except PUB.PublicationError as exc:
-        raise VerifyError(str(exc)) from exc
-    semantic, sprite_ids = verify_semantic(root, publication)
+    handoff = load_handoff(handoff_path, expected_handoff_sha256)
+    semantic, sprite_ids = verify_semantic(root, publication, handoff)
     verify_source_linkage(publication, semantic, handoff, expected_handoff_sha256)
     pixels = verify_pixels(root, publication, sprite_ids)
     verify_authorized_sprite_mappings(repo_root, asset_zip, handoff, pixels, sprite_ids)
