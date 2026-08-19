@@ -31,6 +31,7 @@ jobs:
           test -s .github/CODEOWNERS
           test -s docs/migration/legacy-atlas-extraction-provenance.json
           test -s tools/governance/verify_extraction_provenance.py
+          test -s tools/governance/test_verify_extraction_provenance.py
           if find . -type f \( -name '*.otbm' -o -name '*.otb' -o -name '*.spr' -o -name '*.dat' \) -print -quit | grep -q .; then
             echo 'Forbidden raw legacy/proprietary runtime input committed to repository.' >&2
             exit 1
@@ -40,8 +41,22 @@ jobs:
             exit 1
           fi
 
-      - name: Verify selective-extraction provenance
-        run: python tools/governance/verify_extraction_provenance.py
+      - name: Check out pinned legacy Atlas source as inert Git data
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: blakinio/Otheryn
+          ref: e417c5e7c22986bf4acef0495eb47f7b72c97cce
+          path: legacy-source
+          fetch-depth: 1
+          persist-credentials: false
+          submodules: false
+          lfs: false
+
+      - name: Run provenance verifier negative tests
+        run: python tools/governance/test_verify_extraction_provenance.py
+
+      - name: Verify selective-extraction source and target provenance
+        run: python tools/governance/verify_extraction_provenance.py --source-root legacy-source
 
   semantic-proof:
     runs-on: ubuntu-24.04
