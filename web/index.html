@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Oteryn Atlas — Semantic Thais Z7</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark">OT</span>
+        <div><strong>OTERYN ATLAS</strong><small>Semantic world debugger · DYN-ATLAS-001</small></div>
+      </div>
+      <div class="coordinate-strip" aria-label="Current view coordinates">
+        <span>X <b id="coord-x">—</b></span><span>Y <b id="coord-y">—</b></span><span>FLOOR <b id="coord-floor">−7</b></span>
+        <button id="copy-link" type="button" title="Copy deterministic deep link">Copy link</button>
+      </div>
+      <form id="search-form" class="search" role="search">
+        <input id="search-input" type="search" autocomplete="off" placeholder="Go to coordinates, e.g. 32360, 32230" aria-label="Coordinate search">
+        <button type="submit">Go</button>
+      </form>
+      <div class="zoom-controls">
+        <button id="zoom-out" type="button" aria-label="Zoom out">−</button>
+        <output id="zoom-value">—</output>
+        <button id="zoom-in" type="button" aria-label="Zoom in">+</button>
+      </div>
+    </header>
+
+    <div class="workspace">
+      <aside class="left-rail panel">
+        <section>
+          <h2>Map</h2>
+          <label class="layer active"><input type="checkbox" checked disabled> Base semantic pixels <span>ON</span></label>
+          <label class="layer disabled"><input type="checkbox" disabled> Minimap <span>DEFERRED</span></label>
+        </section>
+        <section>
+          <h2>Semantic layers</h2>
+          <p class="rail-note">Only factual datasets may be enabled.</p>
+          <label class="layer disabled"><input type="checkbox" disabled> NPCs <span>N/A</span></label>
+          <label class="layer disabled"><input type="checkbox" disabled> Monsters <span>N/A</span></label>
+          <label class="layer disabled"><input type="checkbox" disabled> Teleports <span>N/A</span></label>
+          <label class="layer disabled"><input type="checkbox" disabled> Houses / doors <span>N/A</span></label>
+          <label class="layer disabled"><input type="checkbox" disabled> Action / Unique IDs <span>N/A</span></label>
+          <label class="layer disabled"><input type="checkbox" disabled> Towns / temples <span>N/A</span></label>
+          <label class="layer disabled"><input type="checkbox" disabled> Mechanics / raids / POIs <span>N/A</span></label>
+        </section>
+        <section>
+          <h2>Floor</h2>
+          <div class="floor-control"><button disabled>▲</button><strong>−7</strong><button disabled>▼</button></div>
+          <p class="rail-note">Only exported floor −7 exists in this bounded proof.</p>
+        </section>
+        <section>
+          <h2>Camera anchors</h2>
+          <ol id="itinerary" class="itinerary"></ol>
+        </section>
+      </aside>
+
+      <main class="map-stage">
+        <div class="map-frame">
+          <canvas id="atlas" aria-label="Oteryn semantic Atlas WebGL2 viewport"></canvas>
+          <div id="selection-box" class="selection-box" hidden></div>
+          <div id="cursor-coordinate" class="cursor-coordinate">x — · y — · floor −7</div>
+          <div id="runtime-badge" class="runtime-badge">VERIFYING…</div>
+        </div>
+        <div class="statusbar">
+          <span>Bounded Thais Z7 proof</span>
+          <span>x=[32280,32441) · y=[32155,32306) · floor=−7</span>
+          <span>Drag to pan · wheel to zoom · click to inspect</span>
+        </div>
+        <section class="diagnostics" aria-label="Runtime diagnostics">
+          <div><span>Backend</span><strong id="diag-backend">—</strong></div>
+          <div><span>Chunks</span><strong id="diag-chunks">—</strong></div>
+          <div><span>Visible primitives</span><strong id="diag-visible">—</strong></div>
+          <div><span>Draw calls</span><strong id="diag-draws">—</strong></div>
+          <div><span>Pixel pack</span><strong id="diag-pack">—</strong></div>
+          <div><span>Texture</span><strong id="diag-texture">—</strong></div>
+          <div><span>Verify / upload</span><strong id="diag-verify">—</strong></div>
+          <div><span>Render</span><strong id="diag-render">—</strong></div>
+        </section>
+      </main>
+
+      <aside class="inspector panel">
+        <div class="inspector-heading">
+          <div><span class="eyebrow">CONTEXT</span><h2>Tile inspector</h2></div>
+          <span id="inspector-state" class="pill">NO SELECTION</span>
+        </div>
+        <div class="tabs"><button class="tab active" data-tab="tile" type="button">Tile / Entities</button><button class="tab" data-tab="provenance" type="button">Provenance</button></div>
+        <div id="inspector-content" class="inspector-content"><p class="empty">Click a factual semantic tile in the map.</p></div>
+      </aside>
+    </div>
+  </div>
+  <script type="module" src="./app.mjs"></script>
+</body>
+</html>

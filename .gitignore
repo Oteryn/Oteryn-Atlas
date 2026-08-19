@@ -15,3 +15,9 @@ test-results/
 *.otb
 *.spr
 *.dat
+
+# Local DYN-ATLAS qualification/runtime scratch.
+.work/
+.chrome-*/
+__pycache__/
+*.pyc

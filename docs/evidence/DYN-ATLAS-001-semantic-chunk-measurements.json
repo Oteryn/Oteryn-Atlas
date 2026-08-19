@@ -1,0 +1,87 @@
+{
+  "candidates": [
+    {
+      "chunkCount": 110,
+      "encoding": "debug-source-jsonl-grid-v0",
+      "gzipBytes": 1861527,
+      "maxChunkBytes": 350363,
+      "p95ChunkBytes": 337632,
+      "pointFetch": {"gzipBytes": 20580, "rawBytes": 314336},
+      "rawBytes": 28040344,
+      "span": 16,
+      "viewport": {"chunkCount": 4, "gzipBytes": 77596, "rawBytes": 1182213, "xInclusive": [32348,32372], "yInclusive": [32220,32238]}
+    },
+    {
+      "chunkCount": 110,
+      "encoding": "dyn-atlas-compact-json-v0",
+      "gzipBytes": 1672689,
+      "maxChunkBytes": 72688,
+      "p95ChunkBytes": 70394,
+      "pointFetch": {"gzipBytes": 18287, "rawBytes": 66148},
+      "rawBytes": 5965065,
+      "span": 16,
+      "viewport": {"chunkCount": 4, "gzipBytes": 69804, "rawBytes": 251105, "xInclusive": [32348,32372], "yInclusive": [32220,32238]}
+    },
+    {
+      "chunkCount": 30,
+      "encoding": "debug-source-jsonl-grid-v0",
+      "gzipBytes": 1823252,
+      "maxChunkBytes": 1324465,
+      "p95ChunkBytes": 1282829,
+      "pointFetch": {"gzipBytes": 76246, "rawBytes": 1182213},
+      "rawBytes": 28040344,
+      "span": 32,
+      "viewport": {"chunkCount": 1, "gzipBytes": 76246, "rawBytes": 1182213, "xInclusive": [32348,32372], "yInclusive": [32220,32238]}
+    },
+    {
+      "chunkCount": 30,
+      "encoding": "dyn-atlas-compact-json-v0",
+      "gzipBytes": 1632936,
+      "maxChunkBytes": 276189,
+      "p95ChunkBytes": 268834,
+      "pointFetch": {"gzipBytes": 68307, "rawBytes": 250352},
+      "rawBytes": 5944975,
+      "span": 32,
+      "viewport": {"chunkCount": 1, "gzipBytes": 68307, "rawBytes": 250352, "xInclusive": [32348,32372], "yInclusive": [32220,32238]}
+    },
+    {
+      "chunkCount": 16,
+      "encoding": "debug-source-jsonl-grid-v0",
+      "gzipBytes": 1812588,
+      "maxChunkBytes": 2824695,
+      "p95ChunkBytes": 2824695,
+      "pointFetch": {"gzipBytes": 173385, "rawBytes": 2728538},
+      "rawBytes": 28040344,
+      "span": 48,
+      "viewport": {"chunkCount": 1, "gzipBytes": 173385, "rawBytes": 2728538, "xInclusive": [32348,32372], "yInclusive": [32220,32238]}
+    },
+    {
+      "chunkCount": 16,
+      "encoding": "dyn-atlas-compact-json-v0",
+      "gzipBytes": 1626967,
+      "maxChunkBytes": 592808,
+      "p95ChunkBytes": 592808,
+      "pointFetch": {"gzipBytes": 155963, "rawBytes": 575197},
+      "rawBytes": 5941461,
+      "span": 48,
+      "viewport": {"chunkCount": 1, "gzipBytes": 155963, "rawBytes": 575197, "xInclusive": [32348,32372], "yInclusive": [32220,32238]}
+    }
+  ],
+  "environment": {
+    "platform": "Linux-6.18.35-x86_64-with-glibc2.41",
+    "python": "3.13.5"
+  },
+  "measurementScope": "exact pinned Game semantic artifact; deterministic gzip mtime=0; evidence baseline only, not a production SLO",
+  "selectedProofCandidate": {
+    "encoding": "dyn-atlas-compact-json-v0",
+    "reason": "proof-only balance of bounded file count and representative point/viewport bytes; permanent encoding/chunk size remains deferred",
+    "span": 32
+  },
+  "source": {
+    "semanticArtifactDigest": "sha256:d38a98acaf019b07a05c0bee922505fe4c9852b38e65644e488e92df9031da2e",
+    "tilesJsonlSha256": "ff14efee3fc376d8f18432c628294c64ffe89450a59aaa498a28e6d705815984"
+  },
+  "sourceJsonDecodeMs": 1065.276,
+  "timingNote": "single-machine Python timing is observational and intentionally not treated as a browser or production threshold",
+  "version": 0
+}
