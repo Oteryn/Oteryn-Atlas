@@ -4,9 +4,11 @@ Status: **PASS — complete-world semantic and authorized pixel publication comp
 
 ## Exact basis
 
-- Atlas implementation base: `6a1ca4f4d2517bca40e774a7005d6bfefe448e7b`.
-- Implementation commit: `5d9e084fb19f6953bdc6e5abe610eafd1ab86151`.
-- Source-reconciliation hardening commit: `fe64b0f08211f5aabcef6d38f5866147d8eff319`.
+- Final rebased Atlas base: `9b1e04060af180c8122b214e9f2c5f6089c43913`.
+- Initial local build base before the docs-only upstream rebase: `6a1ca4f4d2517bca40e774a7005d6bfefe448e7b`.
+- Rebased implementation commit: `65027598245b36d5b4b8bca96dc534219964e947`.
+- Rebased source-reconciliation hardening commit: `308de789e02c1a25ddcf0af50d9ef03618f567da`.
+- Post-rebase validation head before final evidence-only update: `f85976dfe60b575c73cd717fd55950a9b239eb1d`.
 - Source authority: `Oteryn/Oteryn-Game`.
 - Game source revision: `f79fd3b5c239fa13810338f1380539c4eac67d7d`.
 - Verified generation hand-off SHA-256: `1d1ab30a59819e41592d701adb188ea619b1122ccf7298255c2afd08d2841659`.
@@ -53,6 +55,13 @@ Measured second complete rebuild:
 - compile: **47.362 s**;
 - peak RSS: **456,328 KiB** (~445.6 MiB);
 - swap: **0 B**.
+
+Post-rebase complete compile from the current code lineage:
+- compile: **47.545 s**;
+- peak RSS: **456,376 KiB** (~445.7 MiB);
+- swap: **0 B**;
+- verifier: **41.604 s**, PASS;
+- byte-for-byte comparison against the initial publication excluding `build-evidence.json`: **PASS**.
 Measured full independent verification of the first publication:
 - verifier: **52.630 s**;
 - peak RSS: **323,236 KiB** (~315.7 MiB);
@@ -80,6 +89,7 @@ No negative test mutates the verified fabric. Temporary semantic fixtures and pi
 ## Determinism proof
 
 A second complete build to `/home/mole/oteryn-fullworld/output/fullworld-publication-v0-rebuild` produced the identical semantic, pixel and top-level publication roots.
+After rebasing onto `9b1e04060af180c8122b214e9f2c5f6089c43913`, a third complete build to `/home/mole/oteryn-fullworld/output/fullworld-publication-v0-final` again produced the same roots.
 The rebuild independently passed `verify_publication.py` and `diff -qr --exclude=build-evidence.json` reported **PASS** for byte-for-byte equality of the publication tree.
 `build-evidence.json` is deliberately excluded because it contains observed elapsed time and the local output path; neither field participates in any publication root.
 ## Validation commands

@@ -1,9 +1,11 @@
 {
   "format": "oteryn-atlas-fullworld-publication-evidence-v0",
   "status": "PASS",
-  "implementation_base": "6a1ca4f4d2517bca40e774a7005d6bfefe448e7b",
-  "implementation_commit": "5d9e084fb19f6953bdc6e5abe610eafd1ab86151",
-  "source_reconciliation_fix_commit": "fe64b0f08211f5aabcef6d38f5866147d8eff319",
+  "implementation_base": "9b1e04060af180c8122b214e9f2c5f6089c43913",
+  "initial_local_build_base": "6a1ca4f4d2517bca40e774a7005d6bfefe448e7b",
+  "implementation_commit": "65027598245b36d5b4b8bca96dc534219964e947",
+  "source_reconciliation_fix_commit": "308de789e02c1a25ddcf0af50d9ef03618f567da",
+  "post_rebase_validation_head": "f85976dfe60b575c73cd717fd55950a9b239eb1d",
   "source": {
     "authority": "Oteryn/Oteryn-Game",
     "handoff_sha256": "1d1ab30a59819e41592d701adb188ea619b1122ccf7298255c2afd08d2841659",
@@ -91,7 +93,10 @@
     "full_verifier_peak_rss_kib": 323236,
     "full_verifier_swap_bytes": 0,
     "rebuild_verification_seconds": 42.40862314900005,
-    "negative_test_wall_seconds": 1.45
+    "negative_test_wall_seconds": 1.45,
+    "post_rebase_compile_seconds": 47.54498345100001,
+    "post_rebase_compile_peak_rss_kib": 456376,
+    "post_rebase_verification_seconds": 41.60369259199979
   },
   "verification": {
     "full_publication_verifier": "PASS",
@@ -100,6 +105,7 @@
     "negative_tests_result": "PASS",
     "deterministic_rebuild_root_equality": true,
     "deterministic_tree_compare_excluding_build_evidence": "PASS",
+    "post_rebase_deterministic_tree_compare": "PASS",
     "unit_tests": "5/5 PASS",
     "py_compile": "PASS",
     "git_diff_check": "PASS"
