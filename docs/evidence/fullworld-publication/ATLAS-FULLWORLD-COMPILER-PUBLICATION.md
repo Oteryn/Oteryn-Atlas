@@ -6,6 +6,7 @@ Status: **PASS — complete-world semantic and authorized pixel publication comp
 
 - Atlas implementation base: `6a1ca4f4d2517bca40e774a7005d6bfefe448e7b`.
 - Implementation commit: `5d9e084fb19f6953bdc6e5abe610eafd1ab86151`.
+- Source-reconciliation hardening commit: `fe64b0f08211f5aabcef6d38f5866147d8eff319`.
 - Source authority: `Oteryn/Oteryn-Game`.
 - Game source revision: `f79fd3b5c239fa13810338f1380539c4eac67d7d`.
 - Verified generation hand-off SHA-256: `1d1ab30a59819e41592d701adb188ea619b1122ccf7298255c2afd08d2841659`.
@@ -43,7 +44,8 @@ Logical chunk addresses remain distinct from content IDs.
 - Pixel manifest: **7,416,538 B**.
 
 Pixel identity binds width + height + exact RGBA bytes. Pack placement is transport/runtime state only; every pack and runtime placement records `identityAuthority=false`.
-The independent verifier re-decodes the exact authorized asset archive and confirms all **27,394** `sprite_source_id -> pixel contentId` mappings.
+The independent verifier re-decodes the exact authorized asset archive through the existing independent pixel-measure decoder and confirms all **27,394** `sprite_source_id -> pixel contentId` mappings.
+It also reconciles every published logical shard address, chunk content ID, byte count, tile count, floor bounds and floor/world count against the exact pinned generation hand-off.
 
 ## Performance
 
@@ -52,8 +54,8 @@ Measured second complete rebuild:
 - peak RSS: **456,328 KiB** (~445.6 MiB);
 - swap: **0 B**.
 Measured full independent verification of the first publication:
-- verifier: **52.650 s**;
-- peak RSS: **323,032 KiB** (~315.5 MiB);
+- verifier: **52.630 s**;
+- peak RSS: **323,236 KiB** (~315.7 MiB);
 - swap: **0 B**;
 - result: **PASS**.
 
@@ -61,16 +63,17 @@ The first compile was **47.332 s**. The output path is `/home/mole/oteryn-fullwo
 
 ## Fail-closed negatives
 
-`tools/fullworld-publication/negative_tests.py` ran **8/8 PASS** by proving rejection of:
+`tools/fullworld-publication/negative_tests.py` ran **9/9 PASS** by proving rejection of:
 
 1. forged top-level publication root;
 2. missing semantic chunk;
 3. corrupt semantic chunk;
 4. forged per-floor manifest root;
-5. missing pixel pack;
-6. corrupt pixel pack;
-7. forged pixel blob identity even after recomputing the enclosing pixel manifest root;
-8. forged `sprite_source_id -> pixel contentId` mapping against the exact authorized asset archive.
+5. forged logical shard address even after recomputing floor/world roots;
+6. missing pixel pack;
+7. corrupt pixel pack;
+8. forged pixel blob identity even after recomputing the enclosing pixel manifest root;
+9. forged `sprite_source_id -> pixel contentId` mapping against the exact authorized asset archive.
 
 No negative test mutates the verified fabric. Temporary semantic fixtures and pixel-pack symlinks isolate all corruption cases.
 
@@ -97,7 +100,7 @@ Results:
 - unit tests: **5/5 PASS**;
 - complete publication verifier: **PASS**;
 - authorized sprite mapping reconciliation: **27,394/27,394 PASS**;
-- negative tests: **8/8 PASS**;
+- negative tests: **9/9 PASS**;
 - deterministic rebuild: **PASS**;
 - deterministic publication-tree comparison: **PASS**;
 - `git diff --check`: **PASS**.

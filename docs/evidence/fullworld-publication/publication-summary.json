@@ -3,6 +3,7 @@
   "status": "PASS",
   "implementation_base": "6a1ca4f4d2517bca40e774a7005d6bfefe448e7b",
   "implementation_commit": "5d9e084fb19f6953bdc6e5abe610eafd1ab86151",
+  "source_reconciliation_fix_commit": "fe64b0f08211f5aabcef6d38f5866147d8eff319",
   "source": {
     "authority": "Oteryn/Oteryn-Game",
     "handoff_sha256": "1d1ab30a59819e41592d701adb188ea619b1122ccf7298255c2afd08d2841659",
@@ -86,16 +87,16 @@
     "measured_rebuild_compile_seconds": 47.36212409400105,
     "measured_rebuild_peak_rss_kib": 456328,
     "measured_rebuild_swap_bytes": 0,
-    "full_verification_seconds": 52.65000434099966,
-    "full_verifier_peak_rss_kib": 323032,
+    "full_verification_seconds": 52.630362673999116,
+    "full_verifier_peak_rss_kib": 323236,
     "full_verifier_swap_bytes": 0,
-    "rebuild_verification_seconds": 41.33930744399913,
+    "rebuild_verification_seconds": 42.40862314900005,
     "negative_test_wall_seconds": 1.45
   },
   "verification": {
     "full_publication_verifier": "PASS",
     "authorized_sprite_mappings_verified": 27394,
-    "negative_tests": 8,
+    "negative_tests": 9,
     "negative_tests_result": "PASS",
     "deterministic_rebuild_root_equality": true,
     "deterministic_tree_compare_excluding_build_evidence": "PASS",
