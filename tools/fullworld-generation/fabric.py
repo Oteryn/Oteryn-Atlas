@@ -24,10 +24,8 @@ import shutil
 import struct
 import subprocess
 import sys
-import threading
 import time
 from collections import defaultdict
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, BinaryIO, Iterable, Iterator
 
@@ -38,16 +36,14 @@ SHARD_FORMAT = "oteryn-atlas-fullworld-generation-shard-v0"
 HANDOFF_FORMAT = "oteryn-atlas-fullworld-generation-handoff-v0"
 CACHE_MAGIC = b"OTERYN-ATLAS-FULLWORLD-PRIVATE-TILE-CACHE-V0\n"
 SHARD_RECORD = struct.Struct("<iiI")
-GAME_EXPORT_REL = Path("tools/game-atlas-thais-fixture/export.py")
+GAME_EXPORT_REL = Path("tools/game-atlas-fullworld-source/producer.py")
 DEFAULT_BENCHMARK_WORKERS = (1, 2, 4, 8, 12, 14)
 DEFAULT_SAMPLE_PER_FLOOR = 1536
 DEFAULT_BATCH_SIZE = 384
 DEFAULT_REGION_SPAN = 256
 
-_GAME_EXPORT: Any = None
-_APPEARANCES: dict[int, Any] | None = None
-_SHEETS: list[Any] | None = None
-_SHEET_FOR_SPRITE: Any = None
+_GAME_PRODUCER: Any = None
+_GAME_RUNTIME: Any = None
 
 
 class FabricError(RuntimeError):
@@ -126,33 +122,25 @@ def _load_game_export(game_root: Path) -> Any:
 
 
 def prepare_runtime(game_root: Path, legacy_root: Path, map_path: Path, asset_zip: Path, assets_dir: Path) -> Any:
-    global _GAME_EXPORT, _APPEARANCES, _SHEETS, _SHEET_FOR_SPRITE
-    if _GAME_EXPORT is not None:
-        return _GAME_EXPORT
+    global _GAME_PRODUCER, _GAME_RUNTIME
+    if _GAME_PRODUCER is not None and _GAME_RUNTIME is not None:
+        return _GAME_PRODUCER
     module = _load_game_export(game_root)
-    appearance_path = module._validate_inputs(map_path, asset_zip, assets_dir)
-    legacy_assets, _legacy_semantic = module._load_legacy_modules(legacy_root)
-    _APPEARANCES = legacy_assets.load_object_appearances(appearance_path)
-    _SHEETS = legacy_assets.load_sprite_catalog(assets_dir)
-    _SHEET_FOR_SPRITE = legacy_assets.sheet_for_sprite
-    _GAME_EXPORT = module
+    runtime = module.load_runtime(
+        legacy_root=legacy_root,
+        map_path=map_path,
+        asset_zip=asset_zip,
+        assets_dir=assets_dir,
+    )
+    _GAME_PRODUCER = module
+    _GAME_RUNTIME = runtime
     return module
 
 
 def transform_tile(tile: Any) -> tuple[bytes, dict[str, Any]]:
-    if _GAME_EXPORT is None or _APPEARANCES is None or _SHEETS is None or _SHEET_FOR_SPRITE is None:
+    if _GAME_PRODUCER is None or _GAME_RUNTIME is None:
         raise FabricError("worker runtime is not initialized")
-    record, stats = _GAME_EXPORT._tile_record(
-        tile,
-        appearances=_APPEARANCES,
-        sheets=_SHEETS,
-        sheet_for_sprite=_SHEET_FOR_SPRITE,
-    )
-    line = _GAME_EXPORT._canonical_json_bytes(record)
-    if len(line) > int(_GAME_EXPORT.MAX_TILE_LINE_BYTES):
-        pos = tile.position
-        raise FabricError(f"canonical tile line exceeds Game proof cap at {pos.x},{pos.y},{pos.z}")
-    return line, stats
+    return _GAME_PRODUCER.project_tile_bytes(_GAME_RUNTIME, tile)
 
 
 def visible_items(tile: Any) -> Iterator[Any]:
@@ -267,7 +255,9 @@ def build_private_cache(
     for candidate in (cache_path, sample_path, manifest_path):
         candidate.unlink(missing_ok=True)
 
-    _legacy_assets, legacy_semantic = game_export._load_legacy_modules(legacy_root)
+    if _GAME_RUNTIME is None:
+        raise FabricError("Game producer runtime is not initialized")
+    legacy_semantic = _GAME_RUNTIME.legacy_semantic
     floor_states: dict[int, dict[str, Any]] = defaultdict(floor_template)
     sample_heaps: dict[int, list[tuple[int, int, int, Any]]] = defaultdict(list)
     map_header: dict[str, Any] | None = None
@@ -975,40 +965,6 @@ def _tree_rss_bytes(root_pid: int) -> int:
     return total
 
 
-@dataclass
-class MonitorResult:
-    peak_tree_rss_bytes: int = 0
-    minimum_mem_available_bytes: int | None = None
-    maximum_swap_used_bytes: int = 0
-
-
-class SystemMonitor:
-    def __init__(self) -> None:
-        self._stop = threading.Event()
-        self._thread: threading.Thread | None = None
-        self.result = MonitorResult()
-
-    def start(self) -> None:
-        def loop() -> None:
-            while not self._stop.wait(0.25):
-                mem = _mem_snapshot()
-                available = mem.get("MemAvailable")
-                swap_used = mem.get("SwapTotal", 0) - mem.get("SwapFree", 0)
-                rss = _tree_rss_bytes(os.getpid())
-                self.result.peak_tree_rss_bytes = max(self.result.peak_tree_rss_bytes, rss)
-                self.result.maximum_swap_used_bytes = max(self.result.maximum_swap_used_bytes, swap_used)
-                if available is not None:
-                    current = self.result.minimum_mem_available_bytes
-                    self.result.minimum_mem_available_bytes = available if current is None else min(current, available)
-        self._thread = threading.Thread(target=loop, name="atlas-fullworld-monitor", daemon=True)
-        self._thread.start()
-
-    def stop(self) -> MonitorResult:
-        self._stop.set()
-        if self._thread is not None:
-            self._thread.join(timeout=2)
-        return self.result
-
 
 def disk_free_bytes(path: Path) -> int:
     usage = shutil.disk_usage(path)
@@ -1147,8 +1103,6 @@ def run(args: argparse.Namespace) -> int:
     disk_start = _disk_snapshot(disk_device)
     cpu_start = _cpu_snapshot()
     free_start = disk_free_bytes(work_root)
-    monitor = SystemMonitor()
-    monitor.start()
 
     timing: dict[str, float] = {}
     cache_started = time.monotonic()
@@ -1221,7 +1175,6 @@ def run(args: argparse.Namespace) -> int:
     )
     timing["determinism_rebuild_proof"] = time.monotonic() - determinism_started
 
-    monitor_result = monitor.stop()
     cpu_end = _cpu_snapshot()
     disk_end = _disk_snapshot(disk_device)
     mem_end = _mem_snapshot()
@@ -1243,10 +1196,11 @@ def run(args: argparse.Namespace) -> int:
         "mem_total_bytes": mem_start.get("MemTotal"),
         "mem_available_start_bytes": mem_start.get("MemAvailable"),
         "mem_available_end_bytes": mem_end.get("MemAvailable"),
-        "minimum_mem_available_bytes": monitor_result.minimum_mem_available_bytes,
-        "peak_process_tree_rss_bytes_observed": monitor_result.peak_tree_rss_bytes,
-        "maximum_swap_used_bytes_observed": monitor_result.maximum_swap_used_bytes,
+        "minimum_mem_available_bytes": None,
+        "peak_process_tree_rss_bytes_observed": None,
+        "maximum_swap_used_bytes_observed": None,
         "wsl_cpu_utilization_fraction_over_run": cpu_util,
+        "peak_memory_measurement": "external process-tree sampler; see committed evidence",
         "disk_free_start_bytes": free_start,
         "disk_free_end_bytes": disk_free_bytes(work_root),
         "disk_io": disk_delta,
