@@ -1,16 +1,16 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "task_id": "ATLAS-SEMANTIC-LAYERS-AND-INDEXES",
-  "status": "AUTHORITY_AUDIT_COMPLETE_IMPLEMENTATION_BLOCKED",
+  "status": "G4_PARTIAL_PROVEN",
   "atlas": {
     "repository": "Oteryn/Oteryn-Atlas",
-    "base_sha": "e87bdd54207ba9a1e412a24315c28e0507a23e5f",
+    "base_sha": "5f649bffb5b82d17679e55ca8c40eb0b0dcb30e4",
     "prompt_path": "docs/agents/prompts/ATLAS-FULLWORLD-AGENT-SUITE.md",
-    "prompt_blob_sha": "028588791be23d23ed0f647970cfa7345c7c7601"
+    "prompt_blob_sha": "4872889f5eacdb56727d0624bfd230f2c3194ea8"
   },
   "game": {
     "repository": "Oteryn/Oteryn-Game",
-    "source_sha": "63a6cb8cb3e69b7c2f792475f24093e90bd7fd81",
+    "source_sha": "f79fd3b5c239fa13810338f1380539c4eac67d7d",
     "export_contract": {
       "path": "docs/contracts/OTERYN_GAME_ATLAS_EXPORT_CONTRACT_V1.md",
       "blob_sha": "355874fec7a3ee888fadd7539b12bc2b575b2e56",
@@ -27,9 +27,9 @@
       "blob_sha": "ee5ca606505e2384e0bf5a47ad60ce8a5580f8a9"
     },
     "audited_producer": {
-      "path": "tools/game-atlas-thais-fixture/export.py",
-      "blob_sha": "0e36ca9e43d78a919eb673f9dc423ed1c178c727",
-      "scope": "bounded-thais-z7-proof",
+      "path": "tools/game-atlas-fullworld-source/producer.py",
+      "blob_sha": "3e5cd427c5d51f3095d87847bedb495b918f9fc1",
+      "scope": "complete-world-spatial-projection",
       "capabilities": [
         "resolved-appearance-primitives-v0",
         "semantic-tiles-v0"
@@ -39,12 +39,26 @@
       "path": "tools/game-atlas-thais-fixture/public_policy.py",
       "blob_sha": "07c183e053d76b113178b69fb60523e4b2a30e91",
       "revision": "dyn-atlas-001-static-public-presentation-v0"
-    }
+    },
+    "current_main_sha": "c3dc8da61a0419706dd94002677fe1896b3b2144"
   },
   "publication_dependency": {
     "required_gate": "G3",
-    "status": "BLOCKED",
-    "reason": "No canonical full-world publication hand-off exists on the audited Atlas base."
+    "status": "PASS",
+    "atlas_main_sha": "5f649bffb5b82d17679e55ca8c40eb0b0dcb30e4",
+    "publication_contract_path": "src/publication/fullworld-v0.md",
+    "publication_contract_blob_sha": "c1a35e71197fc2fa60aee821fba248a9c945c0cf",
+    "evidence_path": "docs/evidence/fullworld-publication/publication-summary.json",
+    "evidence_blob_sha": "766f1fb77dec48dff34889bce4fa091411ffd65c",
+    "publication_root": "sha256:9d0d2f3bb16a5a90f9b51a21366e4ed42963f5cb12366c404a20d9502ec4857f",
+    "semantic_root": "sha256:27d7a83a7d9f498ea614b440ab4216cae5e6d11ea0527482410e40948cade5a9",
+    "source_fingerprint": "sha256:52613c4b755bee1ca32608b1b860413c3a9184870ca61114fad5a7670e80aee9",
+    "counts": {
+      "floors": 16,
+      "shards": 1197,
+      "tiles": 18997668,
+      "resolved_primitives": 24502035
+    }
   },
   "rules": {
     "default_deny_public_projection": true,
@@ -230,14 +244,19 @@
     {
       "id": "minimap-overview",
       "priority": 9,
-      "status": "BLOCKED",
-      "blocker_code": "FULLWORLD_SEMANTIC_PUBLICATION_MISSING",
+      "status": "PROVEN",
+      "blocker_code": null,
       "current_export_presence": false,
       "authority_evidence": [
-        "ATLAS-FULLWORLD-AGENT-SUITE.md#agent-3-atlas-semantic-layers-and-indexes"
+        "src/publication/fullworld-v0.md",
+        "docs/evidence/fullworld-publication/publication-summary.json",
+        "src/layers/overview-v0.md"
       ],
-      "required_upstream": "Verified complete semantic publication for every exported floor; derive overview only from that publication, never from legacy raster authority.",
-      "enabled": false
+      "required_upstream": null,
+      "enabled": true,
+      "derived_from_publication": true,
+      "layer_contract": "src/layers/overview-v0.md",
+      "layer_evidence": "docs/evidence/fullworld-layers/overview-summary.json"
     }
   ]
 }

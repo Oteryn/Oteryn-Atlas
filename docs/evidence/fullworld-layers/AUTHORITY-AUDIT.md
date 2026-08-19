@@ -1,96 +1,164 @@
-# ATLAS-SEMANTIC-LAYERS-AND-INDEXES — authority audit
+# ATLAS-SEMANTIC-LAYERS-AND-INDEXES — G4 authority re-audit
 
-Status: `AUTHORITY_AUDIT_COMPLETE_IMPLEMENTATION_BLOCKED`
+Status: `G4_PARTIAL_PROVEN`
 
-This is the Phase A authority audit required by the full-world agent suite. It does not claim full-world semantic layer implementation.
+This re-audit continues the merged Phase A audit after G3 full-world publication
+became available. It preserves the Game default-deny authority boundary and
+promotes only the one layer that can now be derived without inventing new Game
+facts: `minimap-overview`.
 
-## Exact audit revisions
+## Exact revisions and upstream hand-off
 
-- Atlas: `Oteryn/Oteryn-Atlas@e87bdd54207ba9a1e412a24315c28e0507a23e5f`
-- Game: `Oteryn/Oteryn-Game@63a6cb8cb3e69b7c2f792475f24093e90bd7fd81`
-- Agent prompt blob: `028588791be23d23ed0f647970cfa7345c7c7601`
-- Registry canonical SHA-256: `37d78c6b385d7978a772137834b26e078f346d1c74f32e432881fd1d488ec0c4`
+- Atlas implementation base: `Oteryn/Oteryn-Atlas@5f649bffb5b82d17679e55ca8c40eb0b0dcb30e4`.
+- Agent suite blob at that base: `4872889f5eacdb56727d0624bfd230f2c3194ea8`.
+- G3 publication contract blob: `c1a35e71197fc2fa60aee821fba248a9c945c0cf`.
+- G3 publication evidence blob: `766f1fb77dec48dff34889bce4fa091411ffd65c`.
+- Pinned Game source revision carried by G3: `f79fd3b5c239fa13810338f1380539c4eac67d7d`.
+- Game `main` revalidated during this continuation: `c3dc8da61a0419706dd94002677fe1896b3b2144`.
+- Full-world Game producer blob at both the pinned source and current Game main:
+  `3e5cd427c5d51f3095d87847bedb495b918f9fc1`.
 
-## FACT — Game authority inspected
+Verified G3 identities:
 
-- Export contract: `docs/contracts/OTERYN_GAME_ATLAS_EXPORT_CONTRACT_V1.md`, blob `355874fec7a3ee888fadd7539b12bc2b575b2e56`.
-- Coordinate profile: `docs/contracts/OTERYN_WORLD_SPATIAL_COORDINATE_PROFILE_V1.md`, blob `98390ab1785eeccb3675ebbb72861867009be62e`.
-- World/content architecture: `docs/architecture/ADR-0005-native-world-format-and-oteryn-studio.md`, blob `ee5ca606505e2384e0bf5a47ad60ce8a5580f8a9`.
-- Current executable Atlas producer: `tools/game-atlas-thais-fixture/export.py`, blob `0e36ca9e43d78a919eb673f9dc423ed1c178c727`.
-- Current default-deny policy: `tools/game-atlas-thais-fixture/public_policy.py`, blob `07c183e053d76b113178b69fb60523e4b2a30e91`.
+- publication root: `sha256:9d0d2f3bb16a5a90f9b51a21366e4ed42963f5cb12366c404a20d9502ec4857f`;
+- semantic root: `sha256:27d7a83a7d9f498ea614b440ab4216cae5e6d11ea0527482410e40948cade5a9`;
+- source fingerprint: `sha256:52613c4b755bee1ca32608b1b860413c3a9184870ca61114fad5a7670e80aee9`;
+- floors: `16`;
+- semantic shards: `1,197`;
+- tiles: `18,997,668`;
+- resolved primitives: `24,502,035`.
 
-The audited producer declares only these capabilities:
+## FACT — current Game capability boundary
 
-- `resolved-appearance-primitives-v0`
-- `semantic-tiles-v0`
+The qualified full-world Game adapter broadens spatial selection only. Its
+semantic capability set remains:
 
-The public policy is `dyn-atlas-001-static-public-presentation-v0`. It allowlists the bounded static tile/presentation shape only; it does not expose town, teleport, house, waypoint, NPC, monster, spawn, raid, POI or equivalent factual overlay records.
+- `resolved-appearance-primitives-v0`;
+- `semantic-tiles-v0`.
 
-The Game export contract lists several of those families only as candidate semantic capabilities and is explicitly default-deny. Candidate membership is not evidence that the current producer exports or public-classifies a layer.
+It explicitly does not add or infer towns, NPCs, spawns, raids, quests or other
+factual overlays. The Game export contract remains default-deny: candidate
+record families do not become public merely because the canonical source may
+contain related data.
 
-## FACT — Atlas upstream dependency
+Therefore G3 removes the publication blocker but does **not** remove the
+Game-authority blocker for entity/overlay families.
 
-At the audited Atlas base there is no `tools/fullworld-generation/**`, `tools/fullworld-publication/**`, `src/publication/**` or other full-world publication hand-off. The coordinator therefore permits this agent to perform the authority audit now but keeps implementation dependent on G3/full-world publication.
+## Layer classification after G3
 
-The existing `web/proof/**` content remains the bounded DYN-ATLAS-001 proof and cannot be promoted to full-world evidence.
-
-## Layer status
-
-| Layer | Status | Exact blocker |
+| Layer | Status | Exact disposition |
 | --- | --- | --- |
-| towns | BLOCKED | Game contract has a candidate family, but current public policy/exporter emits no town capability/records. |
-| temples | UNKNOWN | No canonical Game Atlas temple/respawn semantic contract was found; Atlas must not infer temples from labels or map appearance. |
-| teleports / transitions | BLOCKED | Candidate family exists, but endpoint/direction/public-field semantics are not emitted by the current exporter. |
-| houses | BLOCKED | Candidate family exists, but house identity/geometry is not current public exporter output. |
-| house doors | UNKNOWN | House topology exists conceptually, but no Game Atlas contract defines a public house-door relationship. |
-| Action IDs | BLOCKED | Legacy numeric identifiers are not canonical public identity unless Game explicitly promotes/classifies them; current exporter does not. |
-| Unique IDs | BLOCKED | Same identity/public-classification blocker as Action IDs. |
-| waypoints | BLOCKED | Candidate family exists, but current public exporter emits no waypoint records. |
-| mechanics | BLOCKED | Contract permits only deliberately public mechanics evidence; current policy defines none. |
-| raids / encounters | BLOCKED | Candidate family and world-model concepts exist, but current public exporter emits no encounter geometry/identity records. |
-| quest areas | UNKNOWN | World model permits quest-related zones, but no Atlas export contract defines which quest-area facts are public or their record semantics. |
-| factual POIs | BLOCKED | Candidate family exists, but current public exporter emits no POI records. |
-| NPCs | BLOCKED | Candidate definition/placement/spawn family exists, but current public exporter emits none. |
-| monsters / spawns | BLOCKED | Candidate definition/placement/spawn family exists, but current public exporter emits none. |
-| minimap / overview | BLOCKED | May only be derived from verified current semantic publication; the full-world publication hand-off does not yet exist. |
+| towns | BLOCKED | Game still emits no public town capability/records. |
+| temples | UNKNOWN | No canonical public Atlas temple/respawn semantic contract. |
+| teleports / transitions | BLOCKED | No public endpoint/direction capability/records. |
+| houses | BLOCKED | No public house identity/geometry capability/records. |
+| house doors | UNKNOWN | No canonical public house-door relationship contract. |
+| Action IDs | BLOCKED | Legacy numeric identifiers remain non-canonical/public unless Game explicitly promotes them. |
+| Unique IDs | BLOCKED | Same stable-identity/public-classification blocker as Action IDs. |
+| waypoints | BLOCKED | No public waypoint capability/records. |
+| mechanics | BLOCKED | No deliberately public mechanics capability/records. |
+| raids / encounters | BLOCKED | No public encounter identity/geometry capability/records. |
+| quest areas | UNKNOWN | Public quest-area semantics and safe fields remain undefined. |
+| factual POIs | BLOCKED | No public POI capability/records. |
+| NPCs | BLOCKED | No public NPC definition/placement/spawn capability/records. |
+| monsters / spawns | BLOCKED | No public monster definition/placement/spawn capability/records. |
+| minimap / overview | **PROVEN / ENABLED** | Safely derived from verified G3 semantic tile presence only; no sprite/pixel or gameplay inference. |
 
-Result: **0 PROVEN/ENABLED, 12 BLOCKED, 3 UNKNOWN**. Every layer is explicitly disabled in `layer-authority-registry.json`.
+Result: **1 PROVEN/ENABLED, 11 BLOCKED, 3 UNKNOWN**.
 
-## INFERENCE — safe next implementation boundary
+## PROVEN — full-world overview/index publication
 
-No factual entity index should be implemented against the current Game snapshot because doing so would require a secondary legacy source, guessed field semantics or display/pixel inference. The safe next step is an upstream Game export/public-policy change for the desired factual capabilities, followed by the complete Atlas publication hand-off.
+Contract: `src/layers/overview-v0.md`.
 
-`minimap-overview` is different: it does not require a new entity family if it can be deterministically derived from the verified full-world semantic publication. It remains blocked until that publication exists.
+Implementation:
 
-## Required hand-offs before Phase B implementation
+- `tools/fullworld-layers/build_overview.py`;
+- `tools/fullworld-layers/verify_overview.py`;
+- `src/layers/overview.mjs`.
 
-1. A separately governed `Oteryn-Game` task must define and emit each factual layer capability that should become public, including stable identity, geometry/position, public fields, certainty state and producer validation.
-2. `ATLAS-FULLWORLD-LOCAL-GENERATION-FABRIC` and `ATLAS-FULLWORLD-COMPILER-PUBLICATION` must deliver verified complete-world manifests/roots and stable publication contracts.
-3. This agent must re-audit the exact new Game and Atlas heads before changing any layer from `BLOCKED/UNKNOWN` to `PROVEN`.
+The overview is a sparse absolute-coordinate 16x16-tile density index. It
+records only the count of already-published semantic tile records and resolved
+primitive references. It explicitly does not claim walkability, collision,
+terrain classification, quest state, mechanics, path legality or live state.
 
-## Validation performed
+Full-world build on `Molehill-PC` from the exact G3 publication:
 
 ```text
-python -m py_compile tools/fullworld-layers/verify_authority_registry.py
-PASS
-
-python tools/fullworld-layers/verify_authority_registry.py docs/evidence/fullworld-layers/layer-authority-registry.json
-PASS layers=15 proven=0 blocked=12 unknown=3 registry_sha256=37d78c6b385d7978a772137834b26e078f346d1c74f32e432881fd1d488ec0c4
-
-python -m unittest discover -s tests/fullworld-layers -p 'test_*.py' -v
-5 tests, PASS
+PASS root=sha256:17683912d6758796d80a5b1647e2d0031f6849e51c40ae5264da6cfce3f9d6db
+floors=16
+chunks=1197
+cells=100037
+tiles=18997668
+primitives=24502035
 ```
 
-Negative tests prove that the registry rejects duplicate layer identities, enabling a blocked layer, a new un-audited Game capability and a premature `PROVEN` claim.
+- canonical `world.json` SHA-256:
+  `6206eb5702e14d893c4303b592d0ff197a362934d8cbad6623db9927f368846e`;
+- exact output bytes: `7,695,652` across `1,214` files;
+- build with `12` workers: `5.37 s` wall clock, parent max RSS `27,984 KiB`,
+  swap `0`; parent RSS does not aggregate child-process RSS;
+- source-linked full verifier: `0.22 s`, max RSS `23,168 KiB`, swap `0`;
+- deterministic rebuild produced the same root and byte-identical tree.
 
-## Scope discipline
+During the build every one of the 1,197 source semantic chunks was rechecked for
+byte size, SHA-256 content identity, tile count and resolved primitive count
+before its overview data was accepted.
 
-This branch intentionally does not modify:
+The builder and source-linked verifier additionally require the separately trusted
+G3 publication root. The JS world loader requires both the trusted overview root
+and trusted source-publication root; recomputing a root from an untrusted manifest
+is not treated as sufficient authority.
 
-- `Oteryn/Oteryn-Game`;
-- coordinator-owned programme ledger/task paths;
-- `.github/workflows/**` owned by the CI/closeout agent;
-- `src/browser/**` or `web/**` owned by the GUI agent;
-- `src/publication/**` or publication tooling owned by the compiler/publication agent.
+Machine-readable evidence: `docs/evidence/fullworld-layers/overview-summary.json`.
 
-Phase A authority audit is complete. Full task Definition of Done remains blocked on authoritative Game layer exports and G3 full-world publication.
+## Verification
+
+```text
+python tools/fullworld-layers/verify_authority_registry.py \
+  docs/evidence/fullworld-layers/layer-authority-registry.json
+PASS layers=15 proven=1 blocked=11 unknown=3
+
+python -m unittest discover -s tests/fullworld-layers -p 'test_*.py' -v
+13/13 PASS
+
+Windows Node v24.18.0:
+node tests/fullworld-layers/overview-browser.test.mjs
+4/4 PASS
+
+full-world source-linked verifier:
+PASS root=sha256:17683912d6758796d80a5b1647e2d0031f6849e51c40ae5264da6cfce3f9d6db
+floors=16 chunks=1197 cells=100037 tiles=18997668 primitives=24502035
+
+deterministic rebuild tree compare:
+PASS
+```
+
+Negative coverage includes corrupt source chunks, corrupt derived chunks,
+duplicate logical addresses, forged G3 registry roots, unauthorized capability
+changes, attempted enablement of blocked layers and attempted promotion of any
+non-overview layer.
+
+## Remaining authoritative blockers
+
+`minimap-overview` is complete at the Agent 3 data-contract/index boundary.
+The other 14 intended families cannot truthfully be implemented from current
+Game exports. They require separately governed Game export/public-policy
+capabilities with stable identity, public-safe fields, geometry/position
+semantics and deterministic producer output.
+
+This agent does not repair those blockers through OTBM, legacy Atlas files,
+Canary/Crystal data, pixel/sprite inference or browser heuristics.
+
+## Scope discipline / hand-off
+
+Only coordinator-assigned Agent 3 paths are changed:
+
+- `tools/fullworld-layers/**`;
+- `docs/evidence/fullworld-layers/**`;
+- `src/layers/**`;
+- `tests/fullworld-layers/**`.
+
+No Game, GUI/browser-shell, publication/compiler, coordinator-ledger or CI
+workflow path is modified. The GUI agent may consume `src/layers/overview.mjs`
+and the `overview-v0` publication; all other layer toggles must remain disabled
+until their registry status is upgraded from authoritative upstream evidence.
