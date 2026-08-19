@@ -3,14 +3,18 @@
 ```yaml
 task_id: DYN-ATLAS-001
 title: Semantic Thais Z7 Proof + target GUI integration
-status: validation_pending_exact_head_ci_preview
+status: implementation_complete_closeout_pending_merge
 repository: Oteryn/Oteryn-Atlas
 base_branch: main
 branch: feat/DYN-ATLAS-001-semantic-thais-z7-proof
 pr: 4
+implementation_head: 0b4a802cff408f9fc7c53509b9f071b1928c783c
+exact_head_ci_run: 32222917103
+preview_revision: 0b4a802cff408f9fc7c53509b9f071b1928c783c
+preview_url: http://192.168.1.2:8096/web/index.html?x=32377&y=32238&floor=-7&zoom=2
 owner: ChatGPT autonomous execution
 created_at: 2026-08-18T09:24:00+02:00
-updated_at: 2026-08-19T07:50:00+02:00
+updated_at: 2026-08-19T08:20:00+02:00
 owned_paths:
   - .github/workflows/ci.yml
   - .gitignore
@@ -110,12 +114,15 @@ The bounded Thais Z7 publication, authorized pixel store, WebGL2 output, GUI int
 
 Full-world completion, additional floors, NPC/monster/quest indexes, minimap, collision/walkability, path legality, production performance SLOs and public DNS are not provided by DYN-ATLAS-001.
 
-## Remaining lifecycle gates
+## Closeout status
 
-1. clean temporary/generated local junk and remove `__dummy__`;
-2. run full local checks and exact diff review;
-3. integrate any current `main` advance without dropping task changes;
-4. push exact implementation head and require exact-head GitHub CI success;
-5. deploy and verify the isolated new-Atlas Synology preview;
-6. archive this task in the final closeout commit;
-7. require exact-head CI again after closeout, mark PR #4 Ready, squash merge with expected head SHA, and verify final `main`.
+Implementation and delivery acceptance are complete on exact runtime head `0b4a802cff408f9fc7c53509b9f071b1928c783c`:
+
+- exact-head GitHub Actions run `32222917103`: **SUCCESS**;
+- all five workflow jobs, including `browser-webgl-proof`: **SUCCESS**;
+- local Node/browser contract tests: 25/25 PASS after LAN SHA fallback;
+- isolated Synology preview verified from a separate Chrome client over normal LAN HTTP;
+- preview evidence: `docs/evidence/DYN-ATLAS-001-synology-preview.md`;
+- `__dummy__` removed; no legacy raw world files, secrets or precomposed map PNG are browser-runtime inputs.
+
+The remaining repository lifecycle action is mechanical: this archive/evidence closeout commit must itself pass exact-head CI, then PR #4 may be marked Ready and squash-merged with the exact expected head SHA. Final `main` must then be inspected for the intended implementation and absence of temporary artifacts.

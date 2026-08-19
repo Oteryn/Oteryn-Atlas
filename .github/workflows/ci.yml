@@ -58,9 +58,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          grep -q 'sha256:d38a98acaf019b07a05c0bee922505fe4c9852b38e65644e488e92df9031da2e' docs/agents/tasks/active/DYN-ATLAS-001-semantic-thais-z7-proof.md
-          grep -q '9318268404' docs/agents/tasks/active/DYN-ATLAS-001-semantic-thais-z7-proof.md
-          grep -q 'ec05e39be62d6826d27be19ff9c33c6cba7d1c835f79d02b8ad303b073c1ef40' docs/agents/tasks/active/DYN-ATLAS-001-semantic-thais-z7-proof.md
+          grep -q 'sha256:d38a98acaf019b07a05c0bee922505fe4c9852b38e65644e488e92df9031da2e' docs/agents/tasks/archive/DYN-ATLAS-001-semantic-thais-z7-proof.md
+          grep -q '9318268404' docs/agents/tasks/archive/DYN-ATLAS-001-semantic-thais-z7-proof.md
+          grep -q 'ec05e39be62d6826d27be19ff9c33c6cba7d1c835f79d02b8ad303b073c1ef40' docs/agents/tasks/archive/DYN-ATLAS-001-semantic-thais-z7-proof.md
 
       - name: Run deterministic compiler synthetic and negative tests
         run: python tools/dyn-atlas-semantic/self_test.py
