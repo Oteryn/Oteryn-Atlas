@@ -97,28 +97,27 @@ A prior browser test head failed because bounds were compared using object seria
 
 ## Current evidence classification
 
-### PROVEN
+The earlier semantic-only heads correctly recorded that no public pixel bytes were present and that exact 15.32 authorization was still unresolved. Those statements are historical evidence for those heads; they are superseded for the current integrated generation by `DYN-ATLAS-001-15-32-rights-gate-closure.md` and the exact-digest attestation.
 
-- exact Game semantic source identity and counts;
-- Atlas semantic compiler consumes Game projection semantics rather than legacy world input;
-- proof-local chunk/content identities are deterministic;
-- a local semantic edit invalidates one expected chunk plus root identity;
-- browser semantic decoder/inspector/deep-link semantics fail closed and pass exact-head CI;
-- no source pixel bytes are present in this semantic generation;
-- camera itinerary is deterministic and explicitly non-authoritative for movement.
+### PROVEN â€” current integrated generation
 
-### DERIVED
+- exact Game semantic source identity and counts remain unchanged;
+- proof-local semantic root remains `sha256:6d5c452c8bff7c74345f489db8b5ba1d3f52947a68673099bde73052159d6fc1`;
+- the exact 15.32 rights gate is closed only for SHA-256 `1a6bad8b7598cd874f534cd4aae2d249fb3d9b4458b3ccfa75754f91bb27870f`;
+- 990 referenced sprite source IDs map to 987 content-addressed RGBA blobs;
+- pixel root is `sha256:91bbce72598fc3887d8e0d454d03d0aa5cc4d9ef0d30c3848e3ab1b711ede70a`;
+- pixel pack SHA-256 is `4f0b32786dc7601764c8a2596bc1ab49a24881d9778ecb4f54c894b113d84d62`;
+- the browser verifies semantic and pixel identities before use and fails closed;
+- the final proof renderer is real WebGL2, not the former Canvas2D wireframe;
+- real-browser CPU/WebGL parity is byte-exact for all five qualified cases;
+- the integrated dark GUI provides pan, wheel/button zoom, coordinate search, deterministic deep links, selection and factual tile/provenance inspection;
+- unsupported semantic layers and additional floors remain disabled rather than fabricated.
 
-- 32x32 compact JSON is a useful current proof candidate because it balances 30 files with bounded max chunk size and representative locality; permanent serializer/chunk dimensions remain deferred.
-- dependency-free Canvas wireframe is an interim semantic-consumer harness, not the final visual renderer framework decision.
+### DERIVED / intentionally deferred
 
-### UNKNOWN / remaining DYN gates
+- compact JSON span 32 remains a replaceable proof-local candidate, not a permanent serializer/chunk authority;
+- the direct WebGL2 implementation is a proof-local renderer choice, not a permanent framework decision;
+- movement/path legality remains unavailable because the bounded Game export has no walkability/collision capability;
+- full-world indexes, semantic layers and minimap remain later programme work and are not claimed by DYN-ATLAS-001.
 
-- explicit owner/project authorization for public use/publication of the exact `15.32.zip` digest `1a6bad8b7598cd874f534cd4aae2d249fb3d9b4458b3ccfa75754f91bb27870f`;
-- decoded exact-pixel content IDs/deduplication and visual/reference parity evidence for 15.32;
-- PixiJS/WebGL2 visual candidate measurements on real authorized sprite pixels;
-- movement/path navigation semantics: the current Game export has no walkability/collision capability, so no gameplay path is claimed.
-
-## Next action
-
-Keep PR #4 Draft. Once exact 15.32 pixel authorization is explicitly attached to its immutable ZIP digest, build the bounded pixel catalog/content-dedup stage and PixiJS visual renderer on the same semantic consumer boundary, then capture visual/performance/dedup evidence. If authorization remains unresolved, record it as the named final stop condition rather than substitute another asset set or infer rights.
+Current browser/GUI qualification is recorded in `docs/evidence/DYN-ATLAS-001-browser-gui-qualification.json` and `docs/evidence/DYN-ATLAS-001-real-source-renderer.md`.

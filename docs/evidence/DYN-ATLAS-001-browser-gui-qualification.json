@@ -1,0 +1,134 @@
+{
+  "browser": {
+    "angle": "SwiftShader",
+    "deviceScaleFactor": 1,
+    "mode": "headless=new",
+    "name": "Google Chrome",
+    "version": "151.0.7922.140",
+    "webglBackend": "WebGL2"
+  },
+  "capturedAt": "2026-08-19T07:50:27.249075+02:00",
+  "classification": "PROOF MEASUREMENT \u00e2\u20ac\u201d NOT PRODUCTION SLO",
+  "guiQualification": {
+    "measured": {
+      "drawCalls": 1,
+      "loadedChunks": 30,
+      "textureBytes": 8388608,
+      "textureHeight": 1024,
+      "textureWidth": 2048,
+      "totalChunks": 30,
+      "visiblePrimitives": 593
+    },
+    "selectedTile": {
+      "floor": -7,
+      "presentationRecords": 6,
+      "x": 32377,
+      "y": 32238
+    },
+    "timingQualification": "Virtual-time harness used for deterministic completion; timing values are not promoted as performance/SLO evidence.",
+    "view": {
+      "floor": -7,
+      "x": 32377,
+      "y": 32238,
+      "zoom": 2
+    },
+    "viewport": {
+      "height": 1080,
+      "width": 1920
+    }
+  },
+  "identities": {
+    "pixelPackBytes": 7725056,
+    "pixelPackSha256": "4f0b32786dc7601764c8a2596bc1ab49a24881d9778ecb4f54c894b113d84d62",
+    "pixelRoot": "sha256:91bbce72598fc3887d8e0d454d03d0aa5cc4d9ef0d30c3848e3ab1b711ede70a",
+    "semanticRoot": "sha256:6d5c452c8bff7c74345f489db8b5ba1d3f52947a68673099bde73052159d6fc1"
+  },
+  "parity": {
+    "cases": [
+      {
+        "channels": 110592,
+        "channelsOver1": 0,
+        "drawCalls": 1,
+        "maxAbs": 0,
+        "meanAbs": 0,
+        "name": "32x32-pattern-stack",
+        "renderMs": 0,
+        "visiblePrimitives": 23,
+        "x": 32280,
+        "y": 32155
+      },
+      {
+        "channels": 110592,
+        "channelsOver1": 0,
+        "drawCalls": 1,
+        "maxAbs": 0,
+        "meanAbs": 0,
+        "name": "64x64",
+        "renderMs": 0,
+        "visiblePrimitives": 24,
+        "x": 32292,
+        "y": 32155
+      },
+      {
+        "channels": 110592,
+        "channelsOver1": 0,
+        "drawCalls": 1,
+        "maxAbs": 0,
+        "meanAbs": 0,
+        "name": "32x64",
+        "renderMs": 0,
+        "visiblePrimitives": 44,
+        "x": 32329,
+        "y": 32155
+      },
+      {
+        "channels": 110592,
+        "channelsOver1": 0,
+        "drawCalls": 1,
+        "maxAbs": 0,
+        "meanAbs": 0,
+        "name": "64x32",
+        "renderMs": 0,
+        "visiblePrimitives": 51,
+        "x": 32327,
+        "y": 32156
+      },
+      {
+        "channels": 110592,
+        "channelsOver1": 0,
+        "drawCalls": 1,
+        "maxAbs": 0,
+        "meanAbs": 0,
+        "name": "displacement",
+        "renderMs": 0,
+        "visiblePrimitives": 41,
+        "x": 32403,
+        "y": 32155
+      }
+    ],
+    "fixtureChecks": {
+      "nonzeroDisplacement": true,
+      "nonzeroPatternDepth": true,
+      "source32x32": true,
+      "source32x64": true,
+      "source64x32": true,
+      "source64x64": true,
+      "stackedPresentations": true
+    },
+    "primitiveCount": 39282,
+    "status": "PASS",
+    "tolerance": {
+      "channels": "RGB only; alpha excluded because the browser context is opaque",
+      "maxAbs": 2,
+      "meanAbs": 0.1
+    }
+  },
+  "screenshot": {
+    "bytes": 724003,
+    "height": 1080,
+    "path": "docs/evidence/DYN-ATLAS-001-gui-1920x1080.png",
+    "sha256": "19869d8a15c8c4e0a6691bd8b0690e709ff3f9725da0a5aeea73cd6e1cf3ba1b",
+    "width": 1920
+  },
+  "version": 1
+}

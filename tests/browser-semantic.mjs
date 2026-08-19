@@ -162,3 +162,9 @@ test('browser chunk loader rejects bytes that do not match indexed content ident
   const fetcher = async () => new Response(body, { status: 200 });
   await assert.rejects(() => loadChunk('https://atlas.invalid/proof/', value.chunks[0], value, fetcher), LoadError);
 });
+
+test('continuous pan state round-trips deterministically at bounded precision', () => {
+  const state = parseViewState('?x=32360.125&y=32230.5&floor=-7&zoom=1.25');
+  assert.deepEqual(state, { x: 32360.125, y: 32230.5, floor: -7, zoom: 1.25 });
+  assert.equal(serializeViewState(state), '?x=32360.125&y=32230.5&floor=-7&zoom=1.25');
+});

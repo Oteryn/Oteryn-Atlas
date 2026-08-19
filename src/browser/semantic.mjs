@@ -27,6 +27,11 @@ function boundedCoordinate(value, min, maxExclusive, name) {
   return value;
 }
 
+function boundedViewCoordinate(value, min, maxExclusive, name) {
+  if (!Number.isFinite(value) || value < min || value >= maxExclusive) throw new SemanticError(`${name} outside proof bounds`);
+  return Math.round(value * 10000) / 10000;
+}
+
 function exactBounds(bounds) {
   return Boolean(
     bounds && typeof bounds === 'object' && !Array.isArray(bounds) &&
@@ -83,8 +88,8 @@ export function validateChunk(chunk, manifest) {
 export function decodeCompactTile(raw) {
   if (!Array.isArray(raw) || raw.length !== 8) throw new SemanticError('invalid compact tile shape');
   const [x, y, floor, legacyX, legacyY, legacyZ, tileRecordId, presentationsRaw] = raw;
-  boundedCoordinate(x, PROOF_BOUNDS.xMin, PROOF_BOUNDS.xMaxExclusive, 'x');
-  boundedCoordinate(y, PROOF_BOUNDS.yMin, PROOF_BOUNDS.yMaxExclusive, 'y');
+  const parsedX = boundedViewCoordinate(x, PROOF_BOUNDS.xMin, PROOF_BOUNDS.xMaxExclusive, 'x');
+  const parsedY = boundedViewCoordinate(y, PROOF_BOUNDS.yMin, PROOF_BOUNDS.yMaxExclusive, 'y');
   if (floor !== -7 || legacyX !== x || legacyY !== y || legacyZ !== 7) throw new SemanticError('coordinate provenance mismatch');
   if (typeof tileRecordId !== 'string' || !tileRecordId.startsWith('tile:')) throw new SemanticError('invalid tile identity');
   if (!Array.isArray(presentationsRaw) || presentationsRaw.length > 512) throw new SemanticError('invalid presentation list');
@@ -143,11 +148,11 @@ export function parseViewState(input = '') {
   const y = params.has('y') ? Number(params.get('y')) : 32230;
   const floor = params.has('floor') ? Number(params.get('floor')) : -7;
   const zoom = params.has('zoom') ? Number(params.get('zoom')) : 2;
-  boundedCoordinate(x, PROOF_BOUNDS.xMin, PROOF_BOUNDS.xMaxExclusive, 'x');
-  boundedCoordinate(y, PROOF_BOUNDS.yMin, PROOF_BOUNDS.yMaxExclusive, 'y');
+  const parsedX = boundedViewCoordinate(x, PROOF_BOUNDS.xMin, PROOF_BOUNDS.xMaxExclusive, 'x');
+  const parsedY = boundedViewCoordinate(y, PROOF_BOUNDS.yMin, PROOF_BOUNDS.yMaxExclusive, 'y');
   if (floor !== -7) throw new SemanticError('only the exported proof floor is available');
   if (!Number.isFinite(zoom) || zoom < 0.25 || zoom > 16) throw new SemanticError('zoom outside proof range');
-  return Object.freeze({ x, y, floor, zoom });
+  return Object.freeze({ x: parsedX, y: parsedY, floor, zoom });
 }
 
 export function serializeViewState(state) {
