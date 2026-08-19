@@ -501,9 +501,11 @@ def _spool_batch(payload: tuple[int, list[Any], str, str, str, int]) -> int:
             "tiles": 0,
             "presentation_records": 0,
             "resolved_primitives": 0,
+            "unresolved_presentations": 0,
             "canonical_jsonl_bytes": 0,
             "appearance_source_ids": set(),
             "sprite_source_ids": set(),
+            "unresolved_appearance_source_ids": set(),
         }
     )
 
@@ -521,9 +523,11 @@ def _spool_batch(payload: tuple[int, list[Any], str, str, str, int]) -> int:
         fs["tiles"] += 1
         fs["presentation_records"] += int(stats["presentation_count"])
         fs["resolved_primitives"] += int(stats["primitive_count"])
+        fs["unresolved_presentations"] += int(stats.get("unresolved_presentation_count", 0))
         fs["canonical_jsonl_bytes"] += len(line)
         fs["appearance_source_ids"].update(stats["appearance_ids"])
         fs["sprite_source_ids"].update(stats["sprite_ids"])
+        fs["unresolved_appearance_source_ids"].update(stats.get("unresolved_appearance_ids", ()))
 
     outputs: list[dict[str, Any]] = []
     for shard_id in sorted(grouped):
@@ -547,9 +551,11 @@ def _spool_batch(payload: tuple[int, list[Any], str, str, str, int]) -> int:
             "tiles": fs["tiles"],
             "presentation_records": fs["presentation_records"],
             "resolved_primitives": fs["resolved_primitives"],
+            "unresolved_presentations": fs["unresolved_presentations"],
             "canonical_jsonl_bytes": fs["canonical_jsonl_bytes"],
             "appearance_source_ids": sorted(fs["appearance_source_ids"]),
             "sprite_source_ids": sorted(fs["sprite_source_ids"]),
+            "unresolved_appearance_source_ids": sorted(fs["unresolved_appearance_source_ids"]),
         }
     manifest = {
         "format": BATCH_FORMAT,
@@ -635,9 +641,11 @@ def semantic_census_from_batches(
         lambda: {
             "presentation_records": 0,
             "resolved_primitives": 0,
+            "unresolved_presentations": 0,
             "canonical_jsonl_bytes": 0,
             "appearance_source_ids": set(),
             "sprite_source_ids": set(),
+            "unresolved_appearance_source_ids": set(),
         }
     )
     for manifest in batch_manifests:
@@ -646,15 +654,19 @@ def semantic_census_from_batches(
             fs = floor_states[floor]
             fs["presentation_records"] += int(stats["presentation_records"])
             fs["resolved_primitives"] += int(stats["resolved_primitives"])
+            fs["unresolved_presentations"] += int(stats.get("unresolved_presentations", 0))
             fs["canonical_jsonl_bytes"] += int(stats["canonical_jsonl_bytes"])
             fs["appearance_source_ids"].update(stats["appearance_source_ids"])
             fs["sprite_source_ids"].update(stats["sprite_source_ids"])
+            fs["unresolved_appearance_source_ids"].update(stats.get("unresolved_appearance_source_ids", ()))
 
     floors: dict[str, Any] = {}
     global_appearances: set[int] = set()
     global_sprites: set[int] = set()
     total_presentations = 0
     total_primitives = 0
+    total_unresolved_presentations = 0
+    global_unresolved_appearance_ids: set[int] = set()
     total_jsonl_bytes = 0
     for floor_raw, structural_stats in structural["floors"].items():
         floor = int(floor_raw)
@@ -669,6 +681,8 @@ def semantic_census_from_batches(
         global_sprites.update(sprites)
         total_presentations += semantic["presentation_records"]
         total_primitives += semantic["resolved_primitives"]
+        total_unresolved_presentations += semantic["unresolved_presentations"]
+        global_unresolved_appearance_ids.update(semantic["unresolved_appearance_source_ids"])
         total_jsonl_bytes += semantic["canonical_jsonl_bytes"]
         floors[floor_raw] = {
             "legacy_z": -floor,
@@ -684,6 +698,8 @@ def semantic_census_from_batches(
             "source_item_tree_without_ground": structural_stats["source_item_tree_without_ground"],
             "presentation_records": semantic["presentation_records"],
             "resolved_primitives": semantic["resolved_primitives"],
+            "unresolved_presentations": semantic["unresolved_presentations"],
+            "unresolved_appearance_source_ids": sorted(semantic["unresolved_appearance_source_ids"]),
             "unique_appearance_source_ids": len(appearances),
             "unique_sprite_source_ids": len(sprites),
             "canonical_jsonl_bytes": semantic["canonical_jsonl_bytes"],
@@ -695,6 +711,8 @@ def semantic_census_from_batches(
             "tiles": sum(int(item["tiles"]) for item in floors.values()),
             "presentation_records": total_presentations,
             "resolved_primitives": total_primitives,
+            "unresolved_presentations": total_unresolved_presentations,
+            "unresolved_appearance_source_ids": sorted(global_unresolved_appearance_ids),
             "unique_appearance_source_ids": len(global_appearances),
             "unique_sprite_source_ids": len(global_sprites),
             "canonical_jsonl_bytes": total_jsonl_bytes,
