@@ -1,0 +1,229 @@
+{
+  "format": "oteryn-atlas-fullworld-layer-evidence-v0",
+  "task_id": "ATLAS-SEMANTIC-LAYERS-AND-INDEXES",
+  "status": "PASS",
+  "atlas_base_sha": "5f649bffb5b82d17679e55ca8c40eb0b0dcb30e4",
+  "source": {
+    "authority": "Oteryn/Oteryn-Game",
+    "game_sha": "f79fd3b5c239fa13810338f1380539c4eac67d7d",
+    "publication_root": "sha256:9d0d2f3bb16a5a90f9b51a21366e4ed42963f5cb12366c404a20d9502ec4857f",
+    "semantic_root": "sha256:27d7a83a7d9f498ea614b440ab4216cae5e6d11ea0527482410e40948cade5a9",
+    "source_fingerprint": "sha256:52613c4b755bee1ca32608b1b860413c3a9184870ca61114fad5a7670e80aee9"
+  },
+  "overview": {
+    "profile": "oteryn-atlas-overview-world-v0",
+    "cell_size_tiles": 16,
+    "root_content_id": "sha256:17683912d6758796d80a5b1647e2d0031f6849e51c40ae5264da6cfce3f9d6db",
+    "world_manifest_sha256": "6206eb5702e14d893c4303b592d0ff197a362934d8cbad6623db9927f368846e",
+    "output_path": "/home/mole/oteryn-fullworld/output/fullworld-layers-v0/overview",
+    "output_bytes": 7695652,
+    "file_count": 1214,
+    "counts": {
+      "cells": 100037,
+      "chunks": 1197,
+      "floors": 16,
+      "resolvedPrimitives": 24502035,
+      "tiles": 18997668
+    },
+    "semantics": {
+      "collision": "NOT_CLAIMED",
+      "meaning": "semantic tile presence density only",
+      "terrainClassification": "NOT_CLAIMED",
+      "walkability": "NOT_CLAIMED"
+    },
+    "floor_roots": [
+      {
+        "floor": -15,
+        "root": "sha256:4c32a77f5780108dc6d7ee0034d43f79d48b840004013aa9514ae8f9aa6644fc",
+        "counts": {
+          "cells": 4586,
+          "chunks": 66,
+          "resolvedPrimitives": 1111624,
+          "tiles": 867030
+        }
+      },
+      {
+        "floor": -14,
+        "root": "sha256:d2f433cc1009432dc2b78949d4718b75c5d5d1de2b7db7851f55a7ceca4f7c29",
+        "counts": {
+          "cells": 6354,
+          "chunks": 74,
+          "resolvedPrimitives": 1536721,
+          "tiles": 1205615
+        }
+      },
+      {
+        "floor": -13,
+        "root": "sha256:bf7f1551ae7a6f873501d43d1e6f2c3b2aa42a9bb90cc986dba314d9a87190d4",
+        "counts": {
+          "cells": 5959,
+          "chunks": 69,
+          "resolvedPrimitives": 1411771,
+          "tiles": 1134136
+        }
+      },
+      {
+        "floor": -12,
+        "root": "sha256:ac02c767a1faac07f3463380e6bf3faec61fa6140ab8c22c8c8245524c8742f3",
+        "counts": {
+          "cells": 7466,
+          "chunks": 76,
+          "resolvedPrimitives": 1837498,
+          "tiles": 1514397
+        }
+      },
+      {
+        "floor": -11,
+        "root": "sha256:d8d288a909316d8da8e14a7b6f786e3183f52b56f7d464aa4ab74bbc201ca7ee",
+        "counts": {
+          "cells": 8178,
+          "chunks": 73,
+          "resolvedPrimitives": 2091082,
+          "tiles": 1650283
+        }
+      },
+      {
+        "floor": -10,
+        "root": "sha256:937b9e1cd2ddd347e8b8e73d01cdb702afe2739a7b87b6b3a61cfbf419082ae5",
+        "counts": {
+          "cells": 10028,
+          "chunks": 81,
+          "resolvedPrimitives": 2644145,
+          "tiles": 2068919
+        }
+      },
+      {
+        "floor": -9,
+        "root": "sha256:8c776cf8774a353baaf0938b7a4a1611ef7cb3964a25fb739791417327e94d76",
+        "counts": {
+          "cells": 11185,
+          "chunks": 88,
+          "resolvedPrimitives": 2961179,
+          "tiles": 2286726
+        }
+      },
+      {
+        "floor": -8,
+        "root": "sha256:430508c8425f9d4a24a26dea9f4fd54ff4b116fceabb94dac31a4b8a8250df92",
+        "counts": {
+          "cells": 11643,
+          "chunks": 87,
+          "resolvedPrimitives": 3022362,
+          "tiles": 2335774
+        }
+      },
+      {
+        "floor": -7,
+        "root": "sha256:978bfee371c51189db537b7994dd4d9596773e75dd3b3db5fe017e0df3ff87f5",
+        "counts": {
+          "cells": 18033,
+          "chunks": 104,
+          "resolvedPrimitives": 5797203,
+          "tiles": 4535848
+        }
+      },
+      {
+        "floor": -6,
+        "root": "sha256:23b0fd168fd81b6018f1c08de901b1d0deb37cd43f30c443853daed97e31879a",
+        "counts": {
+          "cells": 5769,
+          "chunks": 79,
+          "resolvedPrimitives": 806125,
+          "tiles": 544160
+        }
+      },
+      {
+        "floor": -5,
+        "root": "sha256:3d6e9309ee4b6e0cd0171ff8590688c0260b131f2f096202d2877ed24c7061ec",
+        "counts": {
+          "cells": 4094,
+          "chunks": 76,
+          "resolvedPrimitives": 530900,
+          "tiles": 355035
+        }
+      },
+      {
+        "floor": -4,
+        "root": "sha256:bc6516934d9b1cf57dcb034b23c0230084a8925ae6259b0c7c5c1c4eef2a2831",
+        "counts": {
+          "cells": 2711,
+          "chunks": 72,
+          "resolvedPrimitives": 316147,
+          "tiles": 210291
+        }
+      },
+      {
+        "floor": -3,
+        "root": "sha256:c8d81a07804525c44bd55d507ea6a3e42e0b94b094b556b293ed6c8086ed7e4c",
+        "counts": {
+          "cells": 1761,
+          "chunks": 71,
+          "resolvedPrimitives": 195110,
+          "tiles": 126801
+        }
+      },
+      {
+        "floor": -2,
+        "root": "sha256:3169efd365735e5fa936875e5ad2301cd78d517ffc376377193889aadd274573",
+        "counts": {
+          "cells": 1143,
+          "chunks": 67,
+          "resolvedPrimitives": 129388,
+          "tiles": 84551
+        }
+      },
+      {
+        "floor": -1,
+        "root": "sha256:9957524c01bd982a9fa2b1fbf27306a15ca08a1119a68c7ff25d0c6583533738",
+        "counts": {
+          "cells": 703,
+          "chunks": 64,
+          "resolvedPrimitives": 74309,
+          "tiles": 50053
+        }
+      },
+      {
+        "floor": 0,
+        "root": "sha256:bb81a6641f5795b1fdd50ebd7d01121a66bc2f1de793cc38a45d4891d9b82157",
+        "counts": {
+          "cells": 424,
+          "chunks": 50,
+          "resolvedPrimitives": 36471,
+          "tiles": 28049
+        }
+      }
+    ]
+  },
+  "performance": {
+    "workers": 12,
+    "build_wall_clock": "0:05.37",
+    "build_parent_max_rss_kib": 27984,
+    "build_swap_bytes": 0,
+    "verify_wall_clock": "0:00.22",
+    "verify_max_rss_kib": 23168
+  },
+  "verification": {
+    "source_chunk_digest_and_count_reconciliation_during_build": "PASS",
+    "full_overview_verifier_with_source_publication": "PASS",
+    "deterministic_rebuild_root_equality": true,
+    "deterministic_tree_compare": "PASS",
+    "python_layer_tests": "13/13 PASS",
+    "browser_overview_tests": "4/4 PASS",
+    "registry_status_counts": {
+      "PROVEN": 1,
+      "BLOCKED": 11,
+      "UNKNOWN": 3
+    },
+    "trusted_source_publication_root_pinned": "PASS",
+    "trusted_overview_root_browser_api_pinned": "PASS",
+    "real_fullworld_data_api_smoke": "PASS (Node v24.18.0 data-module execution; trusted roots pinned; 16 floors / 1197 chunks / exact world counts)",
+    "base_browser_semantic_tests": "15/15 PASS",
+    "base_pixel_store_tests": "6/6 PASS",
+    "base_gui_contract_tests": "4/4 PASS"
+  },
+  "limitations": [
+    "Overview encodes semantic tile-presence density only.",
+    "It does not claim walkability, collision, terrain classification, quest state, or gameplay mechanics.",
+    "All non-overview factual overlay families remain disabled until Game explicitly allowlists and emits them."
+  ]
+}

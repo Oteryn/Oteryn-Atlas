@@ -1,0 +1,113 @@
+{
+  "format": "oteryn-atlas-fullworld-publication-evidence-v0",
+  "status": "PASS",
+  "implementation_base": "9b1e04060af180c8122b214e9f2c5f6089c43913",
+  "initial_local_build_base": "6a1ca4f4d2517bca40e774a7005d6bfefe448e7b",
+  "implementation_commit": "65027598245b36d5b4b8bca96dc534219964e947",
+  "source_reconciliation_fix_commit": "308de789e02c1a25ddcf0af50d9ef03618f567da",
+  "post_rebase_validation_head": "f85976dfe60b575c73cd717fd55950a9b239eb1d",
+  "source": {
+    "authority": "Oteryn/Oteryn-Game",
+    "handoff_sha256": "1d1ab30a59819e41592d701adb188ea619b1122ccf7298255c2afd08d2841659",
+    "fabric_root": "sha256:ef72ccea156283eea1efd103577e2933b15b38d1a67aa05c89594cc3a731ea6f",
+    "source_fingerprint": "sha256:52613c4b755bee1ca32608b1b860413c3a9184870ca61114fad5a7670e80aee9",
+    "game_sha": "f79fd3b5c239fa13810338f1380539c4eac67d7d",
+    "asset_zip_sha256": "1a6bad8b7598cd874f534cd4aae2d249fb3d9b4458b3ccfa75754f91bb27870f",
+    "catalog_sha256": "35639e000c4c108665a091cfbdf699d549d995b37670bc08de575ab6cd380d85"
+  },
+  "publication": {
+    "output_path": "/home/mole/oteryn-fullworld/output/fullworld-publication-v0",
+    "output_directory_bytes": 19011164550,
+    "publication_root": "sha256:9d0d2f3bb16a5a90f9b51a21366e4ed42963f5cb12366c404a20d9502ec4857f",
+    "semantic_root": "sha256:27d7a83a7d9f498ea614b440ab4216cae5e6d11ea0527482410e40948cade5a9",
+    "pixel_root": "sha256:8b8228fcc4574903e547cb7d65b96f3d45e5a9e67045091c1bceb6e54d3690ad",
+    "serializer_status": "PROVISIONAL_NOT_FROZEN"
+  },
+  "semantic_counts": {
+    "floors": 16,
+    "shards": 1197,
+    "tiles": 18997668,
+    "resolved_primitives": 24502035,
+    "unique_sprite_refs": 27394,
+    "semantic_bytes": 18750839498
+  },
+  "pixel_counts": {
+    "sprite_refs": 27394,
+    "unique_pixel_blobs": 27302,
+    "raw_rgba_bytes_before_dedupe": 253296640,
+    "raw_rgba_bytes_after_dedupe": 252592128,
+    "dedupe_bytes_saved": 704512,
+    "pixel_manifest_bytes": 7416538,
+    "pack_count": 4
+  },
+  "packs": [
+    {
+      "index": 0,
+      "bytes": 67104768,
+      "sha256": "c0ac44c6f435eef51bb50ebe7e9b03a667f6e7b3a5007483865d5fc7debf5e43",
+      "identity_authority": false
+    },
+    {
+      "index": 1,
+      "bytes": 67100672,
+      "sha256": "a7c54b12dd78c456df464815bcde381c42fefb95f4d15c90feaaa86941e9bbf6",
+      "identity_authority": false
+    },
+    {
+      "index": 2,
+      "bytes": 67096576,
+      "sha256": "266d28c4e0619c5775e19d0fd459ce6e44945d6118c540a2b470ca4e004f226c",
+      "identity_authority": false
+    },
+    {
+      "index": 3,
+      "bytes": 51290112,
+      "sha256": "5aba0f66dfaa98cc7bf4104631476e9926624fff2de737aeb0492b97277a077a",
+      "identity_authority": false
+    }
+  ],
+  "floor_roots": [
+    {"floor": -15, "root": "sha256:6661a898bd5930995d0a99898f3b1c57650e5536efd97040ad8b647cb2f7f724"},
+    {"floor": -14, "root": "sha256:d8d3231038b26f1cc5bebf26636e6d14791af915688a3ddf3c65373fae4b7e7d"},
+    {"floor": -13, "root": "sha256:c33275e89f372eb78f6189b010712b45f910414e2fdedff81f2ddc6b55bb6a52"},
+    {"floor": -12, "root": "sha256:3622e043c9775de411b48c725760d621e6a3991863303c94789493da6fdcb0af"},
+    {"floor": -11, "root": "sha256:d38177f6158a8bd22b53c2a0a9040ed13a4702b8bf515b156a1432d2d249f45b"},
+    {"floor": -10, "root": "sha256:c2538a9c2ced453c6054ccb5327e1bf4335aa875ba291ac4684a08506ec9a417"},
+    {"floor": -9, "root": "sha256:87ade520505d069402a833ae77ccf38c4b23841e8fa8718a04f90f0e39153124"},
+    {"floor": -8, "root": "sha256:81b1ec0867151003d1a04f9638935083cf90ba0ae829a93ff4d8527261aa3a3a"},
+    {"floor": -7, "root": "sha256:8e35396e84ecc624847032a7266f844d356bb724fd8c1e70484d01476f795529"},
+    {"floor": -6, "root": "sha256:49cf11be5c67757d7f0f682aa658b7ad98650b60abfb312baf764a0703887990"},
+    {"floor": -5, "root": "sha256:f8cd38e94e29f8e65cededb27e8286437ae44c55f7b76fde60baa36d08232dfd"},
+    {"floor": -4, "root": "sha256:66eb7c68ab5f4a7ca30703a91b48ed7b393d8afd27536ed661c20a99a993bc4e"},
+    {"floor": -3, "root": "sha256:ce65975ac4d6fa52156b025348de3419ad1881e94636a3cf8fa0720f5bdad91b"},
+    {"floor": -2, "root": "sha256:6fae79a35762b973a48958d1127ddc2a32f78dbd5d6cc7b7089d70432238c173"},
+    {"floor": -1, "root": "sha256:888a79c6e57f6ded3bd2f2dfa683476b6c1e5faa43eda0fb1c5ed13c077759e8"},
+    {"floor": 0, "root": "sha256:ab8d56dd9e48fb05db2844668f8c6f09bb7c2271094fd3b96c59a28a11160a15"}
+  ],
+  "performance": {
+    "initial_compile_seconds": 47.33150906100127,
+    "measured_rebuild_compile_seconds": 47.36212409400105,
+    "measured_rebuild_peak_rss_kib": 456328,
+    "measured_rebuild_swap_bytes": 0,
+    "full_verification_seconds": 52.630362673999116,
+    "full_verifier_peak_rss_kib": 323236,
+    "full_verifier_swap_bytes": 0,
+    "rebuild_verification_seconds": 42.40862314900005,
+    "negative_test_wall_seconds": 1.45,
+    "post_rebase_compile_seconds": 47.54498345100001,
+    "post_rebase_compile_peak_rss_kib": 456376,
+    "post_rebase_verification_seconds": 41.60369259199979
+  },
+  "verification": {
+    "full_publication_verifier": "PASS",
+    "authorized_sprite_mappings_verified": 27394,
+    "negative_tests": 9,
+    "negative_tests_result": "PASS",
+    "deterministic_rebuild_root_equality": true,
+    "deterministic_tree_compare_excluding_build_evidence": "PASS",
+    "post_rebase_deterministic_tree_compare": "PASS",
+    "unit_tests": "5/5 PASS",
+    "py_compile": "PASS",
+    "git_diff_check": "PASS"
+  }
+}
