@@ -3,21 +3,24 @@
 ```yaml
 task_id: ATLAS-FULLWORLD-COORDINATOR
 title: Full-world Atlas programme coordination
-status: active
+lifecycle_authority: GitHub Issue
+lifecycle_issue: 11
 repository: Oteryn/Oteryn-Atlas
 base_branch: main
-branch: coord/ATLAS-FULLWORLD-COORDINATOR
+coordination_origin_branch: coord/ATLAS-FULLWORLD-COORDINATOR
+coordination_origin_branch_state: merged_and_deleted
 base_sha: 610518701ad3709692d55c6dc38a152edd0363f3
 source_repository: Oteryn/Oteryn-Game
 source_main_sha: 63a6cb8cb3e69b7c2f792475f24093e90bd7fd81
 prompt: docs/agents/prompts/ATLAS-FULLWORLD-AGENT-SUITE.md
 prompt_sha: 610518701ad3709692d55c6dc38a152edd0363f3
 created_at: 2026-08-19T09:07:00+02:00
-owner: ChatGPT autonomous execution
 owned_paths:
   - docs/agents/tasks/active/ATLAS-FULLWORLD-COORDINATOR.md
   - docs/evidence/ATLAS-FULLWORLD-PROGRAMME-LEDGER.md
 ```
+
+> Lifecycle state, ownership, dependencies and acceptance are authoritative in GitHub Issue #11. This packet is technical/provenance detail only; do not maintain mutable lifecycle status here.
 
 ## Objective
 
