@@ -4,7 +4,7 @@ Status: EXECUTION PROMPT SUITE
 
 Base architecture: `main` after merged DYN-ATLAS-001 semantic Thais Z7 WebGL2 GUI proof.
 
-This suite coordinates the next programme phase: generation of the complete world on the owner's local workstation, publication of every exported floor, semantic layers/indexes, full-world browser runtime, CI/preview and final closeout.
+This suite coordinates the next programme phase: generation of the complete world on the owner's local workstation, publication of every exported floor, semantic layers/indexes, full-world browser runtime, optional authoritative animation playback, CI/preview and final closeout.
 
 ## Global non-negotiable rules
 
@@ -17,6 +17,7 @@ This suite coordinates the next programme phase: generation of the complete worl
 - Do not blindly force maximum worker count. Measure throughput, RAM pressure and NVMe queue behavior and choose the fastest stable configuration.
 - GitHub Actions are primarily verification/qualification: exact-head integrity, determinism, browser/WebGL smoke, repository contract and selected reproducibility checks.
 - Every factual layer must come from accepted Game/Atlas semantic data. Never infer gameplay facts from pixels or sprite appearance.
+- Animation is an independent runtime/presentation layer. With animation disabled, otherwise-visible environment/NPC/monster appearances remain deterministic and static; enabling animation may play only verified authoritative phases/timing and must never simulate movement, AI or live server state.
 - Unsupported or unavailable layers remain explicitly `UNKNOWN`, `N/A` or `BLOCKED` until authoritative data exists.
 - Every agent must read current `AGENTS.md`, applicable task/governance instructions and current `main` before mutation.
 - Use dedicated task branches/PRs with disjoint path ownership where practical. Require exact-head CI before merge.
@@ -41,16 +42,18 @@ Responsibilities:
    - `ATLAS-FULLWORLD-COMPILER-PUBLICATION`
    - `ATLAS-SEMANTIC-LAYERS-AND-INDEXES`
    - `ATLAS-FULLWORLD-GUI-RUNTIME`
+   - `ATLAS-ANIMATED-WORLD-AND-CREATURE-RUNTIME`
    - `ATLAS-FULLWORLD-CI-PREVIEW-CLOSEOUT`
 4. Assign non-overlapping owned paths and explicit hand-off artifacts.
-5. Maintain a factual programme ledger with exact source revisions, census results, publication roots, layer status, CI runs, preview revision and unresolved blockers.
-6. Do not allow an agent to substitute legacy/raster authority, guessed semantics or stale artifacts.
+5. Maintain a factual programme ledger with exact source revisions, census results, publication roots, layer status, animation capability/status, CI runs, preview revision and unresolved blockers.
+6. Do not allow an agent to substitute legacy/raster authority, guessed semantics, guessed animation timing or stale artifacts.
 7. Re-plan dynamically when census/performance evidence changes the optimal floor/shard strategy.
-8. Before final completion verify that the complete exported world, every exported floor, intended factual layers, browser runtime, CI and preview satisfy their contracts.
+8. Before final completion verify that the complete exported world, every exported floor, intended factual layers, animation layer contract, browser runtime, CI and preview satisfy their contracts.
 
 Definition of done:
 - all subordinate tasks have objective evidence and clean hand-offs;
 - every intended layer has `ENABLED/PROVEN` or a precise authoritative blocker;
+- the animation layer is either `ENABLED/PROVEN` for supported appearances or carries precise per-capability blockers without guessed playback;
 - full-world publication and runtime are merged;
 - final exact-head CI and post-merge `main` inspection pass;
 - final task set is archived and preview points at the intended merged revision.
@@ -142,8 +145,9 @@ Responsibilities:
    - keep texture/GPU placement runtime-only with `identityAuthority=false`.
 5. Add fail-closed verification for manifests, roots, chunks, packs, blobs and sprite mappings.
 6. Verify every resolved primitive maps to exactly one authorized pixel reference.
-7. Add corruption/missing/forged negatives and deterministic rebuild checks.
-8. Record counts and performance:
+7. Publish or hand off verified appearance/animation metadata needed for the animation layer when such metadata is authoritative and available; do not infer phase order/timing from pixel refs.
+8. Add corruption/missing/forged negatives and deterministic rebuild checks.
+9. Record counts and performance:
    - floors;
    - tiles;
    - presentations/primitives;
@@ -154,14 +158,15 @@ Responsibilities:
    - dedupe savings;
    - compile/verify timings;
    - exact roots/checksums.
-9. Do not freeze a permanent serializer/chunk/framework choice merely because the proof implementation scales sufficiently.
+10. Do not freeze a permanent serializer/chunk/framework choice merely because the proof implementation scales sufficiently.
 
 Definition of done:
 - complete world publication for every exported floor exists;
 - all identities verify fail-closed;
 - full-world pixel publication exists and is deterministic;
 - all resolved primitives reconcile;
-- evidence is sufficient for GUI/layer agents to consume without legacy inputs.
+- any animation metadata hand-off is explicit, pinned and non-inferred;
+- evidence is sufficient for GUI/layer/animation agents to consume without legacy inputs.
 
 ---
 
@@ -203,13 +208,13 @@ For every enabled layer implement:
 - tests for duplicate/missing/corrupt identities;
 - full-world reconciliation counts.
 
-Layer toggling must be independent from base map pixel composition.
+Layer toggling must be independent from base map pixel composition. NPC and monster/spawn visibility must also remain independent from the separate animation playback toggle.
 
 Definition of done:
 - every intended layer has a documented authoritative source and exact status;
 - all `PROVEN` layers have full-world datasets/indexes/loaders/tests;
 - unsupported layers are clearly disabled with exact blockers;
-- GUI agent receives stable factual layer contracts.
+- GUI and animation agents receive stable factual NPC/monster layer contracts where proven.
 
 ---
 
@@ -233,30 +238,68 @@ Responsibilities:
    - map overlays/picking;
    - search;
    - inspector.
-6. Preserve coordinate/deep-link round trip. Extend URL state to relevant floor/layer state deterministically.
-7. Complete product UX:
+6. Provide/consume the independent `animation` runtime toggle defined by `ATLAS-ANIMATED-WORLD-AND-CREATURE-RUNTIME`; disabling it must leave otherwise-visible NPCs, monsters and environment appearances static rather than hidden.
+7. Preserve coordinate/deep-link round trip. Extend URL state to relevant floor/layer state deterministically. If animation state is persisted, classify it as presentation/runtime state only.
+8. Complete product UX:
    - floor selector;
    - semantic layer rail;
+   - independent animation toggle;
    - global factual search;
    - inspector/provenance;
    - minimap only if authoritative overview exists;
    - diagnostics using measured runtime values only.
-8. Scale WebGL/runtime performance:
+9. Scale WebGL/runtime performance:
    - spatial culling;
    - chunk cache;
    - texture/pixel pack loading strategy;
    - bounded browser memory;
    - draw batching;
-   - incremental layer loading.
-9. Qualify multiple representative regions/floors in real Chrome, including transitions between sparse/dense locations.
-10. Capture real full-world GUI screenshots and objective browser smoke/performance evidence; do not invent FPS/cache/memory values.
+   - incremental layer loading;
+   - animation batching/culling hooks without per-object timers.
+10. Qualify multiple representative regions/floors in real Chrome, including transitions between sparse/dense locations.
+11. Capture real full-world GUI screenshots and objective browser smoke/performance evidence; do not invent FPS/cache/memory values.
 
 Definition of done:
 - the browser can navigate the complete exported world and every exported floor;
 - enabled layers work from verified data;
 - search/inspector/deep-links work across floors;
+- the animation toggle is independent from factual NPC/monster visibility and preserves static rendering when OFF;
 - runtime does not require legacy/raster fallback;
 - real-browser qualification passes at full-world scale.
+
+---
+
+# Agent 4.5 — ATLAS-ANIMATED-WORLD-AND-CREATURE-RUNTIME
+
+Alias: `ATLAS-ANIMATED-WORLD-AND-CREATURE-RUNTIME`
+
+Role: implement animation as an independent runtime/presentation layer for verified environment appearances and visible factual NPC/monster overlays.
+
+Canonical technical contract:
+- `docs/agents/prompts/ATLAS-ANIMATED-WORLD-AND-CREATURE-RUNTIME.md`
+
+Core behavior:
+
+1. `animation=OFF` keeps otherwise-visible animated environment appearances, NPCs and monsters visible at a deterministic static reference phase.
+2. `animation=ON` plays only verified authoritative appearance/outfit phases and timing.
+3. NPC/monster visibility remains controlled by their own factual semantic layers; the animation toggle controls playback only.
+4. Never synthesize walking, wandering, turning, combat, respawn, AI, pathfinding or live server state.
+5. Missing authoritative animation metadata degrades only animation capability to explicit static/unsupported behavior; never guess frame order/timing and never reopen legacy runtime inputs.
+6. Use a deterministic shared timeline, WebGL batching, viewport culling and hidden-tab pause/throttling rather than per-object timers.
+7. Measure animation OFF versus ON in real Chrome at representative dense/sparse regions and record actual frame/render/resource impact.
+
+Dependencies:
+- stable verified full-world pixel/appearance publication from `ATLAS-FULLWORLD-COMPILER-PUBLICATION`;
+- stable factual NPC and monster/spawn contracts from `ATLAS-SEMANTIC-LAYERS-AND-INDEXES` where creature animation is enabled;
+- `ATLAS-FULLWORLD-GUI-RUNTIME` integration surface.
+
+Definition of done:
+- independent animation toggle exists and is reversible at runtime;
+- static mode remains deterministic and does not hide factual creatures;
+- supported animations use only verified phase/timing contracts;
+- unsupported animation remains explicit/static rather than fabricated;
+- no live movement/state simulation is introduced;
+- deterministic/negative tests and full-world real-browser qualification pass on the exact head.
 
 ---
 
@@ -276,6 +319,8 @@ Responsibilities:
    - selected deterministic shard regeneration/reproducibility;
    - semantic/pixel corruption negatives;
    - layer/index contracts;
+   - animation OFF static determinism and animation ON deterministic authoritative frame selection where the capability is proven;
+   - NPC/monster visibility independence from the animation toggle;
    - real Chrome/WebGL smoke across representative floors/regions;
    - GUI unsupported-layer truthfulness.
 4. If self-hosted workflows are introduced, pin and document the local runner execution contract without making successful hosted CI depend on unavailable private hardware unless explicitly approved.
@@ -289,6 +334,7 @@ Responsibilities:
 
 Definition of done:
 - final exact-head CI is green;
+- animation layer truthfulness/static fallback is included in final qualification when the workstream is enabled;
 - full-world preview is independently verified;
 - all programme tasks are archived with exact evidence;
 - merge is performed safely against the expected head;
@@ -309,9 +355,16 @@ Definition of done:
 - `ATLAS-SEMANTIC-LAYERS-AND-INDEXES` implementation
 - `ATLAS-FULLWORLD-GUI-RUNTIME` full-world runtime adaptation against stable publication contracts
 
+## Phase B.5 — animation integration before final GUI qualification
+- `ATLAS-ANIMATED-WORLD-AND-CREATURE-RUNTIME` starts implementation once stable pixel/appearance animation contracts exist;
+- environment animation may proceed independently when its authoritative appearance/timing contract is proven;
+- NPC/monster animation additionally waits for stable factual NPC/monster layer contracts;
+- `ATLAS-FULLWORLD-GUI-RUNTIME` integrates the independent toggle and static-off behavior;
+- unsupported animation capabilities remain explicit/static and do not block factual static NPC/monster layers unless the programme acceptance criteria explicitly require those capabilities.
+
 ## Phase C — integration
-- coordinator reconciles publication + layers + GUI;
-- full local/browser qualification;
+- coordinator reconciles publication + layers + GUI + animation capability/status;
+- full local/browser qualification covers animation OFF and ON where supported;
 - final CI/preview/closeout agent performs delivery lifecycle.
 
 # Local workstation resource policy
