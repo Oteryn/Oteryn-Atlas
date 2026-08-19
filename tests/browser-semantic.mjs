@@ -18,6 +18,7 @@ import {
   loadChunk,
   loadManifest,
   sha256ContentId,
+  sha256HexPortable,
 } from '../src/browser/loader.mjs';
 
 function primitive(sprite = 200) {
@@ -167,4 +168,21 @@ test('continuous pan state round-trips deterministically at bounded precision', 
   const state = parseViewState('?x=32360.125&y=32230.5&floor=-7&zoom=1.25');
   assert.deepEqual(state, { x: 32360.125, y: 32230.5, floor: -7, zoom: 1.25 });
   assert.equal(serializeViewState(state), '?x=32360.125&y=32230.5&floor=-7&zoom=1.25');
+});
+
+
+test('portable SHA-256 fallback matches standard known vectors', async () => {
+  const encoder = new TextEncoder();
+  assert.equal(sha256HexPortable(new Uint8Array()), 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855');
+  assert.equal(sha256HexPortable(encoder.encode('abc')), 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
+  assert.equal(
+    await sha256ContentId(encoder.encode('abc'), null),
+    'sha256:ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad',
+  );
+});
+
+test('portable SHA-256 fallback matches WebCrypto for proof-sized bytes', async () => {
+  const bytes = new Uint8Array(131071);
+  for (let index = 0; index < bytes.length; index += 1) bytes[index] = (index * 31 + 17) & 0xff;
+  assert.equal(await sha256ContentId(bytes, null), await sha256ContentId(bytes));
 });
