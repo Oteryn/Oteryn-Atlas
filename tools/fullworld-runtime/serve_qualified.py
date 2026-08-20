@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """Range-capable local server for exact full-world browser qualification."""
 from __future__ import annotations
 
@@ -29,10 +29,11 @@ def safe_file(root: Path, relative: str) -> Path | None:
     return candidate if candidate.is_file() else None
 
 
-def handler_factory(repo: Path, publication: Path, overview: Path, runtime_index: Path, pixel_buckets: Path):
+def handler_factory(repo: Path, publication: Path, overview: Path, minimap: Path, runtime_index: Path, pixel_buckets: Path):
     roots = [
         ("/fullworld/publication/", publication),
         ("/fullworld/overview/", overview),
+        ("/fullworld/minimap/", minimap),
         ("/fullworld/runtime-index/", runtime_index),
         ("/fullworld/pixel-buckets/", pixel_buckets),
     ]
@@ -117,6 +118,7 @@ def main() -> int:
     parser.add_argument("--repo", type=Path, required=True)
     parser.add_argument("--publication", type=Path, required=True)
     parser.add_argument("--overview", type=Path, required=True)
+    parser.add_argument("--minimap", type=Path, required=True)
     parser.add_argument("--runtime-index", type=Path, required=True)
     parser.add_argument("--pixel-buckets", type=Path, required=True)
     parser.add_argument("--bind", default="127.0.0.1")
@@ -125,12 +127,13 @@ def main() -> int:
     repo = args.repo.resolve()
     publication = args.publication.resolve()
     overview = args.overview.resolve()
+    minimap = args.minimap.resolve()
     runtime_index = args.runtime_index.resolve()
     pixel_buckets = args.pixel_buckets.resolve()
-    for label, root in [("repo", repo), ("publication", publication), ("overview", overview), ("runtime-index", runtime_index), ("pixel-buckets", pixel_buckets)]:
+    for label, root in [("repo", repo), ("publication", publication), ("overview", overview), ("minimap", minimap), ("runtime-index", runtime_index), ("pixel-buckets", pixel_buckets)]:
         if not root.is_dir():
             raise SystemExit(f"missing {label} directory: {root}")
-    server = ThreadingHTTPServer((args.bind, args.port), handler_factory(repo, publication, overview, runtime_index, pixel_buckets))
+    server = ThreadingHTTPServer((args.bind, args.port), handler_factory(repo, publication, overview, minimap, runtime_index, pixel_buckets))
     print(f"serving http://{args.bind}:{args.port}", flush=True)
     server.serve_forever()
     return 0

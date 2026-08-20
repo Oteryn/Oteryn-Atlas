@@ -42,11 +42,32 @@
           <button type="submit">Go</button>
         </form>
         <section>
+          <h2>View mode</h2>
+          <div class="view-mode-control" id="view-mode-control" role="group" aria-label="Atlas view mode">
+            <button type="button" data-mode="auto" class="active">AUTO</button>
+            <button type="button" data-mode="minimap">MINIMAP</button>
+            <button type="button" data-mode="map">MAP</button>
+          </div>
+          <p class="rail-note" id="lod-policy-note">AUTO uses a bounded visual minimap at world scale and authenticated detail when qualified.</p>
+        </section>
+
+        <section>
           <h2>Published layers</h2>
           <p class="rail-note">Only G4 PROVEN data can be enabled. BLOCKED/UNKNOWN families stay fail-closed.</p>
           <label class="layer active"><input type="checkbox" checked disabled><span class="layer-name">Base semantic pixels</span><span>G3</span></label>
-          <label class="layer active" id="overview-layer"><input id="overview-toggle" type="checkbox" checked><span class="layer-name">Overview / density</span><span>PROVEN</span></label>
+          <label class="layer" id="overview-layer"><input id="overview-toggle" type="checkbox"><span class="layer-name">Technical overview</span><span>DIAGNOSTIC</span></label>
           <div id="semantic-layer-list"></div>
+        </section>
+
+        <section id="region-controls">
+          <h2>Areas & Subareas</h2>
+          <input id="region-search" type="search" placeholder="Search authenticated regions" disabled aria-label="Search Areas and Subareas">
+          <div class="region-filter-row">
+            <select id="region-family" disabled aria-label="Region family"><option>Areas + Subareas</option><option>Areas</option><option>Subareas</option></select>
+            <button id="region-zoom" type="button" disabled>Zoom to area</button>
+          </div>
+          <div id="region-results" class="region-results" aria-live="polite">Unavailable: current Game export publishes no authenticated Area/Subarea records.</div>
+          <p class="rail-note">Consumer supports labels, hierarchy, floor geometry, filtering, highlight and zoom-to-area once Game publishes authenticated records.</p>
         </section>
 
         <section>
@@ -66,7 +87,7 @@
         </section>
 
         <section>
-          <h2>Verified overview</h2>
+          <h2>Technical overview</h2>
           <canvas id="minimap" class="minimap-canvas" width="220" height="132" aria-label="Verified tile-presence overview"></canvas>
           <p class="rail-note">Presence density only. No walkability, collision or terrain meaning is inferred.</p>
         </section>
@@ -75,6 +96,7 @@
       <section class="map-stage fullworld-stage">
         <div class="map-frame" id="map-frame">
           <canvas id="atlas" aria-label="Full-world WebGL2 Atlas"></canvas>
+          <canvas id="minimap-layer" aria-label="Verified visual minimap"></canvas>
           <canvas id="overview-overlay" aria-hidden="true"></canvas>
           <div class="selection-box" id="selection-box" hidden></div>
           <div class="cursor-coordinate" id="cursor-coordinate">X — · Y — · F —</div>
@@ -113,6 +135,7 @@
   </main>
   <pre id="qualification-result" data-status="PENDING" hidden></pre>
   <script type="module" src="./fullworld-app.mjs"></script>
+  <script type="module" src="./fullworld-minimap.mjs"></script>
   <script type="module" src="./fullworld-mobile.mjs"></script>
 </body>
 </html>
