@@ -1,3 +1,4 @@
+import './fullworld-creatures.mjs';
 import { viewportTileBounds } from '../src/browser/fullworld.mjs';
 import { FULLWORLD_PATHS, FULLWORLD_TRUST } from '../src/browser/fullworld-trust.mjs';
 import { lodBlend } from '../src/layers/minimap-lod.mjs';
@@ -111,8 +112,8 @@ async function render(detail) {
     }
     if (firstUsefulPaintMs == null && images.length > 0) firstUsefulPaintMs = performance.now() - started;
     status.textContent = blend.representation === 'transition'
-      ? `Smooth minimap/detail transition Â· ${entries.length} bounded minimap tiles`
-      : `Verified visual minimap Â· ${entries.length} bounded tiles`;
+      ? `Smooth minimap/detail transition · ${entries.length} bounded minimap tiles`
+      : `Verified visual minimap · ${entries.length} bounded tiles`;
     publish({ ready: images.length > 0, representation: blend.representation, visibleChunks: entries.length });
   } catch (error) {
     publish({ error, representation: blend.representation });
