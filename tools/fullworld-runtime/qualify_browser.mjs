@@ -168,9 +168,19 @@ async function waitForQualification(deadline, expectedView = null) {
 
 function assertQualifiedResult(result, label) {
   if (result.status !== 'PASS') return;
-  if (!detailQualificationSatisfied(result)) {
-    throw new Error(`${label} reported PASS without authenticated visible detail`);
+  const minimapRepresentation = result.view?.mode === 'minimap' || Number(result.view?.zoom) < 0.5;
+  if (!minimapRepresentation && !detailQualificationSatisfied(result)) throw new Error(`${label} reported PASS without authenticated visible detail`);
+}
+
+async function waitForMinimap(deadline) {
+  while (performance.now() < deadline) {
+    const evaluation = await cdp.send('Runtime.evaluate', { expression: 'globalThis.__OTERYN_ATLAS_MINIMAP__ ?? null', returnByValue: true });
+    const value = evaluation.result?.value;
+    if (value?.status === 'FAIL') throw new Error(`visual minimap failed: ${value.error ?? 'unknown'}`);
+    if (value?.status === 'PASS' && value.visibleChunks > 0 && value.loadedImages > 0 && Number.isFinite(value.firstUsefulPaintMs)) return value;
+    await sleep(50);
   }
+  throw new Error('visual minimap did not reach painted PASS state');
 }
 
 function metricMap(result) {
@@ -203,7 +213,8 @@ try {
   await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1920, height: 1080, deviceScaleFactor: 1, mobile: false });
   await cdp.send('Performance.enable');
   const initialResult = await waitForQualification(deadline);
-  assertQualifiedResult(initialResult, 'initial detail qualification');
+  assertQualifiedResult(initialResult, 'initial qualification');
+  const initialMinimap = (initialResult.view?.mode === 'minimap' || Number(initialResult.view?.zoom) < 0.5) ? await waitForMinimap(deadline) : null;
   const pageResults = [initialResult];
   if (stepsPath && initialResult.status === 'PASS') {
     const steps = JSON.parse(await readFile(stepsPath, 'utf8'));
@@ -243,6 +254,7 @@ try {
     browserProcessPeakRssBytes: peakBrowserRssBytes,
     browserProcessRssSamples: browserRssSamples,
     page: pageResult,
+    minimap: initialMinimap,
     transitions: pageResults,
     cdp: metricMap(performanceResult),
     chromeStderr: stderr.join('').trim() || null,

@@ -1,4 +1,4 @@
-import {
+﻿import {
   SemanticRangeStore,
   changeFloor,
   filterTilesForBounds,
@@ -23,9 +23,9 @@ import { resolvePerformanceProfile, profileSummary } from '../src/browser/fullwo
 import { createFrameScheduler } from '../src/browser/frame-scheduler.mjs';
 import { VerifiedContentCache } from '../src/browser/verified-content-cache.mjs';
 import { loadOverviewChunk, loadOverviewFloor, loadOverviewWorld } from '../src/layers/overview.mjs';
+import { detailStreamWanted, lodBlend } from '../src/layers/minimap-lod.mjs';
 import { createWorldQueryApi } from '../src/browser/world-query.mjs';
 
-const DETAIL_MIN_ZOOM = 0.5;
 const bootStartedMs = performance.now();
 const performanceProfile = resolvePerformanceProfile(location.search);
 const PREFETCH_TILES = performanceProfile.prefetchTiles;
@@ -71,6 +71,8 @@ let dragging = null;
 let frameScheduler = null;
 let persistentCache = null;
 let worldQuery = null;
+let detailReady = false;
+let detailStreaming = false;
 const floorBundles = new Map();
 const overviewCellsByFloor = new Map();
 const overviewChunksByFloor = new Map();
@@ -208,17 +210,19 @@ function syncViewUi() {
   $('#coord-x').textContent = view.x.toFixed(2).replace(/\.00$/, '');
   $('#coord-y').textContent = view.y.toFixed(2).replace(/\.00$/, '');
   $('#coord-floor').textContent = String(view.floor);
-  $('#zoom-output').textContent = `${view.zoom.toFixed(2).replace(/0+$/, '').replace(/\.$/, '')}×`;
+  $('#zoom-output').textContent = `${view.zoom.toFixed(2).replace(/0+$/, '').replace(/\.$/, '')}Ã—`;
   $('#floor-select').value = String(view.floor);
   $('#overview-toggle').checked = view.overview;
   $('#search-input').value = view.searchQuery ?? '';
+  for (const button of document.querySelectorAll('#view-mode-control [data-mode]')) button.classList.toggle('active', button.dataset.mode === view.mode);
   const bounds = floorEntry(runtimeWorld, view.floor).bounds;
-  $('#floor-bounds').textContent = `Verified bounds: X ${bounds.x_min}…${bounds.x_max_exclusive - 1}, Y ${bounds.y_min}…${bounds.y_max_exclusive - 1}`;
+  $('#floor-bounds').textContent = `Verified bounds: X ${bounds.x_min}â€¦${bounds.x_max_exclusive - 1}, Y ${bounds.y_min}â€¦${bounds.y_max_exclusive - 1}`;
   const floors = [...runtimeWorld.floors].map((entry) => entry.floor).sort((a, b) => b - a);
   const index = floors.indexOf(view.floor);
   $('#floor-up').disabled = index <= 0;
   $('#floor-down').disabled = index < 0 || index >= floors.length - 1;
   history.replaceState(null, '', serializeFullWorldViewState(view, runtimeWorld));
+  window.dispatchEvent(new CustomEvent('oteryn-atlas-view', { detail: { view: { ...view }, detailReady, detailStreaming } }));
 }
 
 function setBadge(text, state = '') {
@@ -271,7 +275,7 @@ function progressiveRender(records, residentBuckets, epoch, floorAtStart, needed
   sceneRecords = readyRecords;
   renderer.setRecords(readyRecords);
   renderStats = renderer.render(view);
-  $('#status-detail').textContent = `${sceneGroups.length} authenticated row ranges · ${sceneTiles.size.toLocaleString()} tiles · ${readyRecords.length.toLocaleString()}/${records.length.toLocaleString()} primitives · ${residentBuckets.size}/${neededBucketCount} pixel buckets`;
+  $('#status-detail').textContent = `${sceneGroups.length} authenticated row ranges Â· ${sceneTiles.size.toLocaleString()} tiles Â· ${readyRecords.length.toLocaleString()}/${records.length.toLocaleString()} primitives Â· ${residentBuckets.size}/${neededBucketCount} pixel buckets`;
   drawOverview().catch(failClosed);
   updateDiagnostics();
   renderInspector();
@@ -298,7 +302,9 @@ async function refreshScene() {
   updateDiagnostics();
   renderInspector();
 
-  if (view.zoom < DETAIL_MIN_ZOOM) {
+  const wantsDetail = detailStreamWanted(view.zoom, detailStreaming, view.mode);
+  detailStreaming = wantsDetail;
+  if (!wantsDetail) {
     sceneTiles = new Map();
     sceneRecords = [];
     sceneGroups = [];
@@ -307,10 +313,11 @@ async function refreshScene() {
     renderStats = renderer.render(view);
     lastSceneLoadMs = performance.now() - started;
     if (initialLoadMs == null) initialLoadMs = performance.now() - bootStartedMs;
-    detailBadge.textContent = `OVERVIEW ONLY < ${DETAIL_MIN_ZOOM}×`;
+    detailReady = false;
+    detailBadge.textContent = 'VISUAL MINIMAP LOD';
     detailBadge.classList.add('overview-only');
-    $('#status-detail').textContent = 'Base semantic detail intentionally paused below the qualified detail zoom; verified overview remains available.';
-    setBadge('VERIFIED FULL-WORLD · WEBGL2', 'ok');
+    $('#status-detail').textContent = 'Authenticated detail is paused by bounded LOD policy; verified visual minimap remains active.';
+    setBadge('VERIFIED FULL-WORLD Â· WEBGL2', 'ok');
     await drawOverview();
     updateDiagnostics();
     renderInspector();
@@ -318,6 +325,7 @@ async function refreshScene() {
     return;
   }
 
+  detailReady = false;
   detailBadge.textContent = 'AUTHENTICATED DETAIL STREAM';
   detailBadge.classList.remove('overview-only');
   setBadge('STREAMING VERIFIED RANGES');
@@ -325,7 +333,7 @@ async function refreshScene() {
   const visibleBounds = viewportBounds(bundle);
   visibleSceneGroups = selectRuntimeGroups(bundle.runtimeFloor, visibleBounds);
   sceneGroups = worldQuery.selectViewportGroups(bundle.runtimeFloor, visibleBounds, retainBounds, performanceProfile);
-  $('#status-detail').textContent = `${sceneGroups.length} authenticated row ranges · loading semantic detail…`;
+  $('#status-detail').textContent = `${sceneGroups.length} authenticated row ranges Â· loading semantic detailâ€¦`;
   updateDiagnostics();
 
   const groupedTiles = await mapLimit(sceneGroups, GROUP_CONCURRENCY, ({ chunk, group }) => semanticStore.loadGroup(floorAtStart, chunk, group, { signal: controller.signal }));
@@ -347,7 +355,7 @@ async function refreshScene() {
     renderer.setRecords([]);
     renderStats = renderer.render(view);
   } else if (performanceProfile.name === 'local-max' && renderer.uploadedBucketIds().length === 0) {
-    $('#status-detail').textContent = `${sceneGroups.length} authenticated row ranges · ${sceneTiles.size.toLocaleString()} tiles · authenticating explicit local-max pixel bundle…`;
+    $('#status-detail').textContent = `${sceneGroups.length} authenticated row ranges Â· ${sceneTiles.size.toLocaleString()} tiles Â· authenticating explicit local-max pixel bundleâ€¦`;
     updateDiagnostics();
     const bytes = await loadVerifiedPixelBundle(runtimePixelCatalog, fetch, {
       persistentCache,
@@ -381,13 +389,15 @@ async function refreshScene() {
 
   sceneRecords = records;
   renderer.setRecords(sceneRecords);
+  detailReady = true;
+  window.dispatchEvent(new CustomEvent('oteryn-atlas-view', { detail: { view: { ...view }, detailReady, detailStreaming } }));
   renderStats = renderer.render(view);
   if (renderStats.gpuTextureBytes > performanceProfile.gpuTextureBudgetBytes) throw new Error('GPU texture allocation exceeds runtime profile budget');
   if (renderStats.drawCalls > performanceProfile.drawCallTarget) throw new Error('draw-call target exceeded');
   lastSceneLoadMs = performance.now() - started;
   if (initialLoadMs == null) initialLoadMs = performance.now() - bootStartedMs;
-  $('#status-detail').textContent = `${sceneGroups.length} authenticated row ranges · ${sceneTiles.size.toLocaleString()} retained tiles · ${sceneRecords.length.toLocaleString()} primitives`;
-  setBadge('VERIFIED FULL-WORLD · WEBGL2', 'ok');
+  $('#status-detail').textContent = `${sceneGroups.length} authenticated row ranges Â· ${sceneTiles.size.toLocaleString()} retained tiles Â· ${sceneRecords.length.toLocaleString()} primitives`;
+  setBadge('VERIFIED FULL-WORLD Â· WEBGL2', 'ok');
   await drawOverview();
   updateDiagnostics();
   renderInspector();
@@ -498,7 +508,7 @@ function renderInspector() {
     for (const presentation of tile.presentations) {
       html += `<article class="stack-entry"><div class="stack-head"><strong>${escapeHtml(presentation.role)}</strong><span>ORDER ${presentation.presentationOrder.order}</span></div><dl class="facts compact">
         <dt>Appearance source</dt><dd>${presentation.appearanceSourceId}</dd>
-        <dt>Entity identity</dt><dd>${presentation.canonicalEntityId == null ? `${escapeHtml(presentation.identityState)} · no canonical ID` : escapeHtml(presentation.canonicalEntityId)}</dd>
+        <dt>Entity identity</dt><dd>${presentation.canonicalEntityId == null ? `${escapeHtml(presentation.identityState)} Â· no canonical ID` : escapeHtml(presentation.canonicalEntityId)}</dd>
         <dt>Sprite refs</dt><dd>${presentation.primitives.length ? presentation.primitives.map((primitive) => `<code>${primitive.spriteSourceId}</code>`).join(', ') : 'none published'}</dd>
         <dt>Presentation ID</dt><dd><code>${escapeHtml(presentation.recordId)}</code></dd>
       </dl></article>`;
@@ -547,18 +557,18 @@ function updateDiagnostics() {
   const visibleChunks = uniqueChunkCount(visibleSceneGroups);
   const retainedChunks = uniqueChunkCount(sceneGroups);
   const ratio = cacheHitRatio(store);
-  $('#diag-backend').textContent = `${renderStats?.backend ?? 'WebGL2'} · ${performanceProfile.name}`;
-  $('#diag-chunks').textContent = `${visibleChunks} visible · ${retainedChunks}/${performanceProfile.maxLoadedChunks} retained`;
-  $('#diag-groups').textContent = `${visibleSceneGroups.length} visible · ${sceneGroups.length}/${performanceProfile.maxLoadedGroups} retained`;
-  $('#diag-cache').textContent = store ? `${store.cachedGroups} · ${formatBytes(store.cacheBytes)} · ${ratio == null ? 'N/A' : `${(ratio * 100).toFixed(1)}%`} hit ratio` : '—';
+  $('#diag-backend').textContent = `${renderStats?.backend ?? 'WebGL2'} Â· ${performanceProfile.name}`;
+  $('#diag-chunks').textContent = `${visibleChunks} visible Â· ${retainedChunks}/${performanceProfile.maxLoadedChunks} retained`;
+  $('#diag-groups').textContent = `${visibleSceneGroups.length} visible Â· ${sceneGroups.length}/${performanceProfile.maxLoadedGroups} retained`;
+  $('#diag-cache').textContent = store ? `${store.cachedGroups} Â· ${formatBytes(store.cacheBytes)} Â· ${ratio == null ? 'N/A' : `${(ratio * 100).toFixed(1)}%`} hit ratio` : 'â€”';
   $('#diag-packs').textContent = renderStats ? `${renderStats.uploadedBuckets} / ${runtimePixelCatalog.buckets.size}` : `0 / ${runtimePixelCatalog?.buckets?.size ?? 0}`;
-  $('#diag-gpu').textContent = renderStats ? `${formatBytes(renderStats.gpuTextureBytes)} / ${formatBytes(performanceProfile.gpuTextureBudgetBytes)} allocated` : '—';
-  $('#diag-primitives').textContent = (renderStats?.visiblePrimitives ?? renderStats?.submittedPrimitives)?.toLocaleString() ?? '—';
-  $('#diag-draws').textContent = renderStats ? `${renderStats.drawCalls} / ${performanceProfile.drawCallTarget}` : '—';
-  $('#diag-render').textContent = renderStats ? `${formatMs(renderStats.renderMs)} CPU${renderStats.gpuRenderMs == null ? '' : ` · ${formatMs(renderStats.gpuRenderMs)} GPU`}` : '—';
-  $('#diag-heap').textContent = heap == null ? 'N/A' : `${formatBytes(heap)} · peak ${formatBytes(peakJsHeapBytes)}`;
-  $('#status-source').textContent = `Publication ${FULLWORLD_TRUST.publicationRoot.slice(0, 19)}… · Game ${FULLWORLD_TRUST.gameSha.slice(0, 10)}…`;
-  $('#status-layer').textContent = view.overview ? `Overview PROVEN · ${overviewCellsByFloor.get(view.floor)?.size?.toLocaleString() ?? '…'} cells` : 'Overview OFF';
+  $('#diag-gpu').textContent = renderStats ? `${formatBytes(renderStats.gpuTextureBytes)} / ${formatBytes(performanceProfile.gpuTextureBudgetBytes)} allocated` : 'â€”';
+  $('#diag-primitives').textContent = (renderStats?.visiblePrimitives ?? renderStats?.submittedPrimitives)?.toLocaleString() ?? 'â€”';
+  $('#diag-draws').textContent = renderStats ? `${renderStats.drawCalls} / ${performanceProfile.drawCallTarget}` : 'â€”';
+  $('#diag-render').textContent = renderStats ? `${formatMs(renderStats.renderMs)} CPU${renderStats.gpuRenderMs == null ? '' : ` Â· ${formatMs(renderStats.gpuRenderMs)} GPU`}` : 'â€”';
+  $('#diag-heap').textContent = heap == null ? 'N/A' : `${formatBytes(heap)} Â· peak ${formatBytes(peakJsHeapBytes)}`;
+  $('#status-source').textContent = `Publication ${FULLWORLD_TRUST.publicationRoot.slice(0, 19)}â€¦ Â· Game ${FULLWORLD_TRUST.gameSha.slice(0, 10)}â€¦`;
+  $('#status-layer').textContent = view.overview ? `Overview PROVEN Â· ${overviewCellsByFloor.get(view.floor)?.size?.toLocaleString() ?? 'â€¦'} cells` : 'Overview OFF';
 }
 
 function publishQualification(status, error = null) {
@@ -681,6 +691,7 @@ function applyView(next, options = {}) {
 }
 
 function wireInteraction() {
+  for (const button of document.querySelectorAll('#view-mode-control [data-mode]')) button.addEventListener('click', () => applyView({ ...view, mode: button.dataset.mode }, { delay: 0 }));
   $('#zoom-in').addEventListener('click', () => applyView({ ...view, zoom: view.zoom * 1.25 }));
   $('#zoom-out').addEventListener('click', () => applyView({ ...view, zoom: view.zoom / 1.25 }));
   $('#overview-toggle').addEventListener('change', (event) => applyView({ ...view, overview: event.target.checked }, { delay: 0 }));
@@ -719,7 +730,7 @@ function wireInteraction() {
   });
   canvas.addEventListener('pointermove', (event) => {
     const point = pointerWorld(event);
-    $('#cursor-coordinate').textContent = `X ${Math.floor(point.x)} · Y ${Math.floor(point.y)} · F ${view.floor}`;
+    $('#cursor-coordinate').textContent = `X ${Math.floor(point.x)} Â· Y ${Math.floor(point.y)} Â· F ${view.floor}`;
     if (!dragging || dragging.pointerId !== event.pointerId) return;
     const dx = event.clientX - dragging.startClientX;
     const dy = event.clientY - dragging.startClientY;
@@ -736,7 +747,9 @@ function wireInteraction() {
     canvas.classList.remove('dragging');
     if (!wasMoved) {
       const point = pointerWorld(event);
-      view = clampView({ ...view, selected: { floor: view.floor, x: Math.floor(point.x), y: Math.floor(point.y) } });
+      const blend = lodBlend(view.zoom, view.mode, detailReady);
+      const target = { floor: view.floor, x: Math.floor(point.x), y: Math.floor(point.y) };
+      view = clampView(blend.minimap >= 0.5 ? { ...view, x: point.x, y: point.y, selected: target } : { ...view, selected: target });
       selected = view.selected ? { x: view.selected.x, y: view.selected.y } : null;
       syncViewUi();
       renderInspector();
@@ -804,7 +817,7 @@ async function boot() {
     gpuTextureBudgetBytes: performanceProfile.gpuTextureBudgetBytes,
   });
   frameScheduler = createFrameScheduler(renderFrame);
-  $('#status-detail').textContent = `Performance profile ${performanceProfile.name} · ${GROUP_CONCURRENCY} semantic / ${PIXEL_BUCKET_CONCURRENCY} pixel fetchers · ${formatBytes(performanceProfile.semanticCacheBytes)} semantic cache`;
+  $('#status-detail').textContent = `Performance profile ${performanceProfile.name} Â· ${GROUP_CONCURRENCY} semantic / ${PIXEL_BUCKET_CONCURRENCY} pixel fetchers Â· ${formatBytes(performanceProfile.semanticCacheBytes)} semantic cache`;
   syncViewUi();
   wireInteraction();
   renderInspector();
@@ -812,3 +825,5 @@ async function boot() {
 }
 
 await boot().catch(failClosed);
+
+\n

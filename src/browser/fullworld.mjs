@@ -15,6 +15,7 @@ const MAX_FLOOR_BYTES = 4 * 1024 * 1024;
 const MAX_SOURCE_CHUNK_BYTES = 96 * 1024 * 1024;
 const MAX_GROUP_BYTES = 8 * 1024 * 1024;
 const APPEARANCE_PROFILE = 'oteryn-atlas-15-32-appearance-spatial-v1';
+const VIEW_MODES = new Set(['auto', 'minimap', 'map']);
 
 export class FullWorldError extends Error {}
 
@@ -521,6 +522,12 @@ function normalizeCoordinate(value, min, maxExclusive, label) {
   return Math.round(value * 10000) / 10000;
 }
 
+function normalizeViewMode(value) {
+  const mode = String(value ?? 'auto').toLowerCase();
+  requireValue(VIEW_MODES.has(mode), 'unsupported Atlas view mode');
+  return mode;
+}
+
 function normalizeSearchQuery(value) {
   const text = String(value ?? '').trim().replace(/\s+/g, ' ');
   requireValue(text.length <= 256 && !/[\u0000-\u001f\u007f]/.test(text), 'search query invalid');
@@ -557,10 +564,11 @@ export function parseFullWorldViewState(input, runtimeWorld) {
   const x = normalizeCoordinate(params.has('x') ? Number(params.get('x')) : defaultX, bounds.x_min, bounds.x_max_exclusive, 'x');
   const y = normalizeCoordinate(params.has('y') ? Number(params.get('y')) : defaultY, bounds.y_min, bounds.y_max_exclusive, 'y');
   const zoom = normalizeZoom(params.has('zoom') ? Number(params.get('zoom')) : 2);
-  const requestedLayers = [...new Set((params.get('layers') ?? 'minimap-overview').split(',').filter(Boolean))].sort();
+  const requestedLayers = [...new Set((params.get('layers') ?? '').split(',').filter(Boolean))].sort();
   requireValue(requestedLayers.every((layer) => layer === 'minimap-overview'), 'requested semantic layer is not enabled by the verified hand-off');
   const animation = params.get('animation') ?? 'off';
   requireValue(animation === 'off', 'animation playback is not yet supported by authoritative metadata');
+  const mode = normalizeViewMode(params.get('mode') ?? 'auto');
   const selected = normalizeSelection(params.get('selected'), floor, floors);
   const searchQuery = normalizeSearchQuery(params.get('q') ?? '');
   const debugFlags = normalizeDebugFlags(params.get('debug') ?? '');
@@ -569,6 +577,7 @@ export function parseFullWorldViewState(input, runtimeWorld) {
     debugFlags,
     floor,
     layers: Object.freeze(requestedLayers),
+    mode,
     overview: requestedLayers.includes('minimap-overview'),
     searchQuery,
     selected,
@@ -588,6 +597,7 @@ export function serializeFullWorldViewState(state, runtimeWorld) {
   raw.set('floor', String(state.floor));
   raw.set('zoom', String(state.zoom));
   raw.set('layers', layerValue);
+  raw.set('mode', state.mode ?? 'auto');
   if (selectedValue) raw.set('selected', selectedValue);
   if (state.searchQuery) raw.set('q', state.searchQuery);
   raw.set('animation', state.animation ?? 'off');
@@ -599,6 +609,7 @@ export function serializeFullWorldViewState(state, runtimeWorld) {
   params.set('floor', String(parsed.floor));
   params.set('zoom', String(parsed.zoom));
   params.set('layers', parsed.layers.join(','));
+  params.set('mode', parsed.mode);
   if (parsed.selected) params.set('selected', `${parsed.selected.floor}:${parsed.selected.x}:${parsed.selected.y}`);
   if (parsed.searchQuery) params.set('q', parsed.searchQuery);
   params.set('animation', parsed.animation);
@@ -617,6 +628,7 @@ export function changeFloor(state, nextFloor, runtimeWorld) {
   params.set('floor', String(entry.floor));
   params.set('zoom', String(state.zoom));
   params.set('layers', Array.isArray(state.layers) ? state.layers.join(',') : (state.overview ? 'minimap-overview' : ''));
+  params.set('mode', state.mode ?? 'auto');
   if (state.searchQuery) params.set('q', state.searchQuery);
   params.set('animation', 'off');
   if (Array.isArray(state.debugFlags) && state.debugFlags.length) params.set('debug', state.debugFlags.join(','));

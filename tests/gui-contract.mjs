@@ -52,7 +52,9 @@ const qualifier = await readFile(new URL('../tools/fullworld-runtime/qualify_bro
 
 test('full-world GUI is a separate verified runtime entry while bounded proof remains regression fixture', () => {
   assert.match(fullworldIndex, /FULL-WORLD VERIFIED RUNTIME/);
-  assert.match(fullworldIndex, /Overview \/ density/);
+  assert.match(fullworldIndex, /Technical overview/);
+  assert.match(fullworldIndex, /id="minimap-layer"/);
+  assert.match(fullworldIndex, /data-mode="auto"/);
   assert.match(fullworldIndex, /id="floor-select"/);
   assert.match(fullworldIndex, /id="animation-toggle"[^>]*disabled/);
   assert.match(fullworldApp, /SemanticRangeStore/);
@@ -69,6 +71,7 @@ test('full-world GUI pins exact G3/G4/runtime roots and keeps blocked semantics 
     'sha256:17683912d6758796d80a5b1647e2d0031f6849e51c40ae5264da6cfce3f9d6db',
     'sha256:fa30ae5fc47f0ca8a6d482ed87b5db2cd74f32f7f523df16187ca719b8e04f08',
     'sha256:99cf23b01a0d652ff670a994a2b80cbef8d17036f514522d47f1aa98352d3116',
+    'sha256:23f4d2c3901673fb38980e2600828145a6d0626c0e44d1d9f5ca23bfbce02268',
   ]) assert.ok(fullworldTrust.includes(root));
   assert.match(fullworldTrust, /id: 'npcs'.*status: 'BLOCKED'.*enabled: false/s);
   assert.match(fullworldTrust, /id: 'monsters-spawns'.*status: 'BLOCKED'.*enabled: false/s);

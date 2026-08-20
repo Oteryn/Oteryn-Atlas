@@ -4,12 +4,14 @@ export const FULLWORLD_TRUST = Object.freeze({
   semanticRoot: 'sha256:27d7a83a7d9f498ea614b440ab4216cae5e6d11ea0527482410e40948cade5a9',
   pixelRoot: 'sha256:8b8228fcc4574903e547cb7d65b96f3d45e5a9e67045091c1bceb6e54d3690ad',
   overviewRoot: 'sha256:17683912d6758796d80a5b1647e2d0031f6849e51c40ae5264da6cfce3f9d6db',
+  minimapRoot: 'sha256:23f4d2c3901673fb38980e2600828145a6d0626c0e44d1d9f5ca23bfbce02268',
   runtimeIndexRoot: 'sha256:fa30ae5fc47f0ca8a6d482ed87b5db2cd74f32f7f523df16187ca719b8e04f08',
   pixelBucketRoot: 'sha256:99cf23b01a0d652ff670a994a2b80cbef8d17036f514522d47f1aa98352d3116',
   sourceFingerprint: 'sha256:52613c4b755bee1ca32608b1b860413c3a9184870ca61114fad5a7670e80aee9',
 });
 
 export const FULLWORLD_PATHS = Object.freeze({
+  minimap: '/fullworld/minimap/',
   overview: '/fullworld/overview/',
   publication: '/fullworld/publication/',
   pixelBuckets: '/fullworld/pixel-buckets/',
@@ -24,6 +26,8 @@ export const FULLWORLD_CAPABILITIES = Object.freeze({
   }),
   layers: Object.freeze([
     Object.freeze({ id: 'minimap-overview', label: 'Overview / density', status: 'PROVEN', enabled: true }),
+    Object.freeze({ id: 'areas', label: 'Areas', status: 'BLOCKED', enabled: false }),
+    Object.freeze({ id: 'subareas', label: 'Subareas', status: 'BLOCKED', enabled: false }),
     Object.freeze({ id: 'towns', label: 'Towns', status: 'BLOCKED', enabled: false }),
     Object.freeze({ id: 'temples', label: 'Temples', status: 'UNKNOWN', enabled: false }),
     Object.freeze({ id: 'teleports-transitions', label: 'Teleports / transitions', status: 'BLOCKED', enabled: false }),

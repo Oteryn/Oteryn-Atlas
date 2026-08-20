@@ -1,0 +1,63 @@
+{
+  "alias": "ATLAS-FULLWORLD-MINIMAP-LOD-AND-SEMANTIC-OVERLAYS",
+  "auditVersion": 1,
+  "classificationVocabulary": [
+    "AVAILABLE_AND_EXPORTED",
+    "AVAILABLE_NOT_EXPORTED",
+    "PARTIAL",
+    "UNKNOWN",
+    "NOT_AVAILABLE"
+  ],
+  "gameMainSha": "84f485089b97cfaba1b5c6628ed8e0ba6655dc51",
+  "gameWritePerformed": false,
+  "observedExporterCapabilities": [
+    "resolved-appearance-primitives-v0",
+    "semantic-tiles-v0"
+  ],
+  "families": {
+    "Town": {
+      "status": "PARTIAL",
+      "exported": false,
+      "evidence": ["tools/game-atlas-fullworld-source/producer.py:is_town", "tools/game-atlas-thais-fixture/export.py:capabilities"],
+      "reason": "The Game/import-side producer recognizes legacy Town records, but the accepted public export advertises no Town capability and contains no Town projector or canonical public Town records."
+    },
+    "Waypoint": {
+      "status": "PARTIAL",
+      "exported": false,
+      "evidence": ["tools/game-atlas-fullworld-source/producer.py:is_waypoint", "tools/game-atlas-thais-fixture/export.py:capabilities"],
+      "reason": "The Game/import-side producer recognizes legacy Waypoint records, but the public export has no Waypoint capability/projector and publishes no canonical public Waypoint records."
+    },
+    "Area": {
+      "status": "PARTIAL",
+      "exported": false,
+      "evidence": ["docs/architecture/ADR-0005-native-world-format-and-oteryn-studio.md:player-facing and semantic geography", "docs/contracts/OTERYN_GAME_ATLAS_EXPORT_CONTRACT_V1.md:entity and overlay records"],
+      "reason": "Area is an accepted canonical geography concept and is permitted by the Game-to-Atlas capability envelope, but no authored Area dataset or public Area exporter is present in current main."
+    },
+    "Subarea": {
+      "status": "PARTIAL",
+      "exported": false,
+      "evidence": ["docs/architecture/ADR-0005-native-world-format-and-oteryn-studio.md:player-facing and semantic geography", "docs/contracts/OTERYN_GAME_ATLAS_EXPORT_CONTRACT_V1.md:entity and overlay records"],
+      "reason": "Subarea is an accepted canonical geography concept with parent Area semantics, but no current authored Subarea dataset or public exporter is present."
+    },
+    "Zone": {
+      "status": "PARTIAL",
+      "exported": false,
+      "evidence": ["docs/architecture/ADR-0005-native-world-format-and-oteryn-studio.md:player-facing and semantic geography", "docs/contracts/OTERYN_GAME_ATLAS_EXPORT_CONTRACT_V1.md:entity and overlay records"],
+      "reason": "Zone is an accepted overlapping rules-boundary concept and public zones are permitted by the capability envelope, but current Atlas source export has no Zone capability or records."
+    },
+    "POI": {
+      "status": "NOT_AVAILABLE",
+      "exported": false,
+      "evidence": ["docs/contracts/OTERYN_GAME_ATLAS_EXPORT_CONTRACT_V1.md:entity and overlay records", "tools/game-atlas-thais-fixture/export.py:capabilities"],
+      "reason": "POI is only a candidate public semantic family in the contract envelope; no current Game-owned POI source model, projector, capability, or records were found."
+    }
+  },
+  "geometry": {
+    "areaBoundsOrPolygons": "NOT_AVAILABLE",
+    "subareaBoundsOrPolygons": "NOT_AVAILABLE",
+    "zoneBoundsOrPolygons": "NOT_AVAILABLE",
+    "floorMembership": "PARTIAL",
+    "parentChildRegionHierarchy": "PARTIAL"
+  },
+  "conclusion": "Atlas may prepare fail-closed consumers and UI for these families, but current FullWorld publication must not display any Town, Waypoint, Area, Subarea, Zone, or POI as authenticated factual data."
+}
