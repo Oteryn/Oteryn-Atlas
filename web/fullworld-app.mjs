@@ -17,6 +17,7 @@ import {
 import { FULLWORLD_CAPABILITIES, FULLWORLD_PATHS, FULLWORLD_TRUST } from '../src/browser/fullworld-trust.mjs';
 import { loadFullWorldPixelCatalog } from '../src/browser/fullworld-pixels.mjs';
 import { loadRuntimePixelBuckets, loadVerifiedPixelBucket, loadVerifiedPixelBundle, requiredRuntimePixelBuckets } from '../src/browser/fullworld-pixel-buckets.mjs';
+import { recordsForResidentBuckets } from '../src/browser/fullworld-progressive.mjs';
 import { createFullWorldWebGLRenderer } from '../src/browser/fullworld-webgl.mjs';
 import { resolvePerformanceProfile, profileSummary } from '../src/browser/fullworld-performance.mjs';
 import { createFrameScheduler } from '../src/browser/frame-scheduler.mjs';
@@ -260,6 +261,23 @@ function scheduleRefresh(delay = 100) {
   }), delay);
 }
 
+function refreshIsCurrent(epoch, floor) {
+  return epoch === refreshEpoch && view.floor === floor;
+}
+
+function progressiveRender(records, residentBuckets, epoch, floorAtStart, neededBucketCount) {
+  if (!refreshIsCurrent(epoch, floorAtStart)) return;
+  const readyRecords = recordsForResidentBuckets(records, pixelCatalog, runtimePixelCatalog, residentBuckets);
+  sceneRecords = readyRecords;
+  renderer.setRecords(readyRecords);
+  renderStats = renderer.render(view);
+  $('#status-detail').textContent = `${sceneGroups.length} authenticated row ranges · ${sceneTiles.size.toLocaleString()} tiles · ${readyRecords.length.toLocaleString()}/${records.length.toLocaleString()} primitives · ${residentBuckets.size}/${neededBucketCount} pixel buckets`;
+  drawOverview().catch(failClosed);
+  updateDiagnostics();
+  renderInspector();
+  updateSelectionBox();
+}
+
 async function refreshScene() {
   refreshAbortController?.abort();
   const controller = new AbortController();
@@ -268,9 +286,17 @@ async function refreshScene() {
   const started = performance.now();
   const floorAtStart = view.floor;
   const bundle = await loadFloorBundle(floorAtStart);
-  if (epoch !== refreshEpoch || view.floor !== floorAtStart) return;
+  if (!refreshIsCurrent(epoch, floorAtStart)) return;
   await ensureOverviewCells(floorAtStart, bundle);
-  if (epoch !== refreshEpoch || view.floor !== floorAtStart) return;
+  if (!refreshIsCurrent(epoch, floorAtStart)) return;
+
+  // Verified overview is intentionally painted before any semantic-range or
+  // pixel-bucket dependency. A slow authenticated detail stream must never
+  // leave the owner with an unexplained black canvas.
+  renderStats = renderer.render(view);
+  await drawOverview();
+  updateDiagnostics();
+  renderInspector();
 
   if (view.zoom < DETAIL_MIN_ZOOM) {
     sceneTiles = new Map();
@@ -299,46 +325,60 @@ async function refreshScene() {
   const visibleBounds = viewportBounds(bundle);
   visibleSceneGroups = selectRuntimeGroups(bundle.runtimeFloor, visibleBounds);
   sceneGroups = worldQuery.selectViewportGroups(bundle.runtimeFloor, visibleBounds, retainBounds, performanceProfile);
+  $('#status-detail').textContent = `${sceneGroups.length} authenticated row ranges · loading semantic detail…`;
+  updateDiagnostics();
+
   const groupedTiles = await mapLimit(sceneGroups, GROUP_CONCURRENCY, ({ chunk, group }) => semanticStore.loadGroup(floorAtStart, chunk, group, { signal: controller.signal }));
-  if (epoch !== refreshEpoch || view.floor !== floorAtStart) return;
+  if (!refreshIsCurrent(epoch, floorAtStart)) return;
   const tileMap = new Map();
   for (const tiles of groupedTiles) for (const tile of filterTilesForBounds(tiles, retainBounds)) {
     const key = `${tile.floor}:${tile.x}:${tile.y}`;
     if (tileMap.has(key)) throw new Error(`duplicate semantic tile in runtime scene: ${key}`);
     tileMap.set(key, tile);
   }
+  sceneTiles = tileMap;
+  renderInspector();
+
   const orderedTiles = [...tileMap.values()].sort((a, b) => a.y - b.y || a.x - b.x);
   const records = flattenRenderRecords(orderedTiles);
   const neededBuckets = requiredRuntimePixelBuckets(records, pixelCatalog, runtimePixelCatalog);
-  if (performanceProfile.name === 'local-max' && renderer.uploadedBucketIds().length === 0) {
+  if (records.length === 0) {
+    sceneRecords = [];
+    renderer.setRecords([]);
+    renderStats = renderer.render(view);
+  } else if (performanceProfile.name === 'local-max' && renderer.uploadedBucketIds().length === 0) {
+    $('#status-detail').textContent = `${sceneGroups.length} authenticated row ranges · ${sceneTiles.size.toLocaleString()} tiles · authenticating explicit local-max pixel bundle…`;
+    updateDiagnostics();
     const bytes = await loadVerifiedPixelBundle(runtimePixelCatalog, fetch, {
       persistentCache,
       signal: controller.signal,
       onLoad: ({ source, bytes: loadedBytes }) => { if (source === 'network') pixelNetworkBytes += loadedBytes; },
     });
-    if (epoch !== refreshEpoch || view.floor !== floorAtStart) return;
+    if (!refreshIsCurrent(epoch, floorAtStart)) return;
     renderer.uploadBundle(bytes);
     loadedPixelBundleBytes = bytes.byteLength;
     pixelTransport = 'local-max-bundle';
   } else {
     const residentBuckets = new Set(renderer.uploadedBucketIds());
     const missingBuckets = neededBuckets.filter((bucketId) => !residentBuckets.has(bucketId));
-    const fetchedBuckets = await mapLimit(missingBuckets, PIXEL_BUCKET_CONCURRENCY, async (bucketId) => ({
-      bucketId,
-      bytes: await loadVerifiedPixelBucket(runtimePixelCatalog, bucketId, fetch, {
+    pixelTransport = 'stable-buckets';
+    progressiveRender(records, residentBuckets, epoch, floorAtStart, neededBuckets.length);
+    await mapLimit(missingBuckets, PIXEL_BUCKET_CONCURRENCY, async (bucketId) => {
+      const bytes = await loadVerifiedPixelBucket(runtimePixelCatalog, bucketId, fetch, {
         persistentCache,
         signal: controller.signal,
         onLoad: ({ source, bytes: loadedBytes }) => { if (source === 'network') pixelNetworkBytes += loadedBytes; },
-      }),
-    }));
-    if (epoch !== refreshEpoch || view.floor !== floorAtStart) return;
-    for (const { bucketId, bytes } of fetchedBuckets) {
+      });
+      if (!refreshIsCurrent(epoch, floorAtStart)) return null;
       loadedBucketBytes.set(bucketId, bytes.byteLength);
       renderer.uploadBucket(bucketId, bytes);
-    }
-    pixelTransport = 'stable-buckets';
+      residentBuckets.add(bucketId);
+      progressiveRender(records, residentBuckets, epoch, floorAtStart, neededBuckets.length);
+      return bucketId;
+    });
+    if (!refreshIsCurrent(epoch, floorAtStart)) return;
   }
-  sceneTiles = tileMap;
+
   sceneRecords = records;
   renderer.setRecords(sceneRecords);
   renderStats = renderer.render(view);
@@ -376,8 +416,8 @@ async function drawOverview() {
     const scale = 32 * view.zoom * overlaySize.dpr;
     const halfW = overlaySize.width / 2;
     const halfH = overlaySize.height / 2;
-    ctx.fillStyle = 'rgba(75, 163, 255, 0.07)';
-    ctx.strokeStyle = 'rgba(75, 163, 255, 0.14)';
+    ctx.fillStyle = 'rgba(75, 163, 255, 0.10)';
+    ctx.strokeStyle = 'rgba(75, 163, 255, 0.22)';
     ctx.lineWidth = 1;
     for (const cell of cells.values()) {
       const x0 = halfW + (cell.cell_x * size - view.x) * scale;
@@ -708,6 +748,25 @@ function wireInteraction() {
   window.addEventListener('resize', () => { scheduleRender('resize'); scheduleRefresh(100); });
 }
 
+async function chooseInitialPublishedView(initialView) {
+  const params = new URLSearchParams(location.search);
+  if (params.has('x') || params.has('y')) return initialView;
+  const bundle = await loadFloorBundle(initialView.floor);
+  const cells = await ensureOverviewCells(initialView.floor, bundle);
+  let best = null;
+  for (const cell of cells.values()) {
+    if (!best || cell.tiles > best.tiles || (cell.tiles === best.tiles && (cell.cell_y < best.cell_y || (cell.cell_y === best.cell_y && cell.cell_x < best.cell_x)))) best = cell;
+  }
+  if (!best) return initialView;
+  const size = overviewWorld.cellSizeTiles;
+  return clampView({
+    ...initialView,
+    x: best.cell_x * size + size / 2,
+    y: best.cell_y * size + size / 2,
+    selected: null,
+  });
+}
+
 async function boot() {
   renderLayerRail();
   $('#animation-note').textContent = FULLWORLD_CAPABILITIES.animation.reason;
@@ -729,6 +788,7 @@ async function boot() {
   worldQuery = createWorldQueryApi(runtimeWorld, FULLWORLD_CAPABILITIES);
   populateFloors();
   view = parseFullWorldViewState(location.search, runtimeWorld);
+  view = await chooseInitialPublishedView(view);
   selected = view.selected ? { x: view.selected.x, y: view.selected.y } : null;
   const semanticBase = new URL('./', new URL(publication.semantic.path, publicationBase));
   persistentCache = new VerifiedContentCache({ enabled: true, maxEntryBytes: 96 * 1024 * 1024 });

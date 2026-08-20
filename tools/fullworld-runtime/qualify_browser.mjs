@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { promisify } from 'node:util';
+import { detailQualificationSatisfied } from '../../src/browser/fullworld-progressive.mjs';
 
 function option(name, fallback = null) {
   const index = process.argv.indexOf(name);
@@ -165,6 +166,13 @@ async function waitForQualification(deadline, expectedView = null) {
   throw new Error('full-world browser qualification did not reach a terminal state');
 }
 
+function assertQualifiedResult(result, label) {
+  if (result.status !== 'PASS') return;
+  if (!detailQualificationSatisfied(result)) {
+    throw new Error(`${label} reported PASS without authenticated visible detail`);
+  }
+}
+
 function metricMap(result) {
   return Object.fromEntries(result.metrics.map((entry) => [entry.name, entry.value]));
 }
@@ -195,6 +203,7 @@ try {
   await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1920, height: 1080, deviceScaleFactor: 1, mobile: false });
   await cdp.send('Performance.enable');
   const initialResult = await waitForQualification(deadline);
+  assertQualifiedResult(initialResult, 'initial detail qualification');
   const pageResults = [initialResult];
   if (stepsPath && initialResult.status === 'PASS') {
     const steps = JSON.parse(await readFile(stepsPath, 'utf8'));
@@ -216,6 +225,7 @@ try {
       });
       if (submitted.exceptionDetails || submitted.result?.value !== true) throw new Error('qualification search submission failed');
       const stepResult = await waitForQualification(deadline, step.expect);
+      assertQualifiedResult(stepResult, `detail qualification after search ${step.search}`);
       pageResults.push(stepResult);
       if (stepResult.status !== 'PASS') break;
     }

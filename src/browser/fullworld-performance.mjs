@@ -20,10 +20,16 @@ export function resolvePerformanceProfile(input = '', capabilities = {}) {
 
   const hardwareConcurrency = integer(capabilities.hardwareConcurrency ?? globalThis.navigator?.hardwareConcurrency, 4);
   const deviceMemoryGiB = Number(capabilities.deviceMemoryGiB ?? globalThis.navigator?.deviceMemory ?? 0) || null;
-  const automaticallyLocal = hardwareConcurrency >= 8 && (deviceMemoryGiB == null || deviceMemoryGiB >= 8);
-  const name = requested === 'auto'
-    ? (automaticallyLocal ? PERFORMANCE_PROFILE_LOCAL_MAX : PERFORMANCE_PROFILE_REFERENCE)
-    : requested;
+
+  // `local-max` authenticates and uploads the complete pixel bundle before the
+  // first detail paint. That mode is valuable for explicit qualification and
+  // high-throughput local work, but it is a poor interactive default: browser
+  // hardware hints say nothing about LAN/storage throughput and can turn a
+  // normal page load into a hundreds-of-megabytes first-paint dependency.
+  // Keep it explicit and make `auto` use the bounded streaming profile.
+  const name = requested === PERFORMANCE_PROFILE_LOCAL_MAX
+    ? PERFORMANCE_PROFILE_LOCAL_MAX
+    : PERFORMANCE_PROFILE_REFERENCE;
 
   const local = name === PERFORMANCE_PROFILE_LOCAL_MAX;
   const groupConcurrency = local ? clamp(Math.floor(hardwareConcurrency * 0.75), 6, 16) : 4;
