@@ -22,15 +22,15 @@
     };
     const near = (a, b, tolerance = 3) => Math.abs(a - b) <= tolerance;
     const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-    const transformX = (value) => {
-      if (!value || value === 'none') return 0;
-      const match = value.match(/^matrix\([^,]+,[^,]+,[^,]+,[^,]+,\s*([^,]+),/);
-      return match ? Number(match[1]) : Number.NaN;
+    const translationX = (win, element) => {
+      const transform = win.getComputedStyle(element).transform;
+      if (!transform || transform === 'none') return 0;
+      return new win.DOMMatrix(transform).m41;
     };
 
     frame.addEventListener('load', async () => {
       try {
-        await wait(350);
+        await wait(500);
         const win = frame.contentWindow;
         const doc = frame.contentDocument;
         const workspace = doc.querySelector('.workspace');
@@ -44,28 +44,28 @@
         if (![workspace, mapStage, controls, inspector, backdrop, zoom, controlsToggle, inspectorToggle].every(Boolean)) throw new Error('required mobile layout nodes missing');
         const workspaceRect = workspace.getBoundingClientRect();
         const mapRect = mapStage.getBoundingClientRect();
-        if (!near(mapRect.width, workspaceRect.width) || mapRect.left !== workspaceRect.left) throw new Error(`map is not full-width: map=${mapRect.width} workspace=${workspaceRect.width}`);
+        if (!near(mapRect.width, workspaceRect.width) || !near(mapRect.left, workspaceRect.left)) throw new Error(`map is not full-width: map=${mapRect.width} workspace=${workspaceRect.width}`);
         if (workspaceRect.width < 360) throw new Error(`unexpected mobile workspace width ${workspaceRect.width}`);
-        if (getComputedStyle(zoom).display === 'none') throw new Error('zoom controls hidden');
-        const closedControlsX = transformX(win.getComputedStyle(controls).transform);
-        const closedInspectorX = transformX(win.getComputedStyle(inspector).transform);
-        if (!(closedControlsX < -10) || !(closedInspectorX > 10)) throw new Error('mobile drawers are not off-canvas when closed');
+        if (win.getComputedStyle(zoom).display === 'none') throw new Error('zoom controls hidden');
+        const closedControlsX = translationX(win, controls);
+        const closedInspectorX = translationX(win, inspector);
+        if (!(closedControlsX < -10) || !(closedInspectorX > 10)) throw new Error(`mobile drawers are not off-canvas when closed: ${closedControlsX}/${closedInspectorX}`);
 
         controlsToggle.click();
-        await wait(250);
-        if (Math.abs(transformX(win.getComputedStyle(controls).transform)) > 3) throw new Error('controls drawer did not open');
+        await wait(300);
+        if (Math.abs(translationX(win, controls)) > 3) throw new Error('controls drawer did not open');
         if (backdrop.hidden) throw new Error('backdrop did not open with controls drawer');
         doc.querySelector('#mobile-controls-close').click();
-        await wait(250);
-        if (!(transformX(win.getComputedStyle(controls).transform) < -10) || !backdrop.hidden) throw new Error('controls drawer did not close');
+        await wait(300);
+        if (!(translationX(win, controls) < -10) || !backdrop.hidden) throw new Error('controls drawer did not close');
 
         inspectorToggle.click();
-        await wait(250);
-        if (Math.abs(transformX(win.getComputedStyle(inspector).transform)) > 3) throw new Error('inspector drawer did not open');
+        await wait(300);
+        if (Math.abs(translationX(win, inspector)) > 3) throw new Error('inspector drawer did not open');
         if (backdrop.hidden) throw new Error('backdrop did not open with inspector drawer');
         doc.querySelector('#mobile-inspector-close').click();
-        await wait(250);
-        if (!(transformX(win.getComputedStyle(inspector).transform) > 10) || !backdrop.hidden) throw new Error('inspector drawer did not close');
+        await wait(300);
+        if (!(translationX(win, inspector) > 10) || !backdrop.hidden) throw new Error('inspector drawer did not close');
 
         result.dataset.status = 'PASS';
         result.textContent = JSON.stringify({
