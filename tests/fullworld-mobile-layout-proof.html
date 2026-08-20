@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Full-world mobile layout proof</title>
+  <style>
+    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #000; }
+    iframe { display: block; width: 100vw; height: 100vh; border: 0; }
+    #result { position: fixed; left: 0; top: 0; z-index: 9999; margin: 0; }
+  </style>
+</head>
+<body>
+  <iframe id="atlas-frame" title="Atlas mobile layout under test"></iframe>
+  <pre id="result" data-status="PENDING" hidden>PENDING</pre>
+  <script type="module">
+    const result = document.querySelector('#result');
+    const frame = document.querySelector('#atlas-frame');
+    const fail = (message) => {
+      result.dataset.status = 'FAIL';
+      result.textContent = `FAIL: ${message}`;
+    };
+    const near = (a, b, tolerance = 3) => Math.abs(a - b) <= tolerance;
+    const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+    const translationX = (win, element) => {
+      const transform = win.getComputedStyle(element).transform;
+      if (!transform || transform === 'none') return 0;
+      return new win.DOMMatrix(transform).m41;
+    };
+
+    frame.addEventListener('load', async () => {
+      try {
+        await wait(500);
+        const win = frame.contentWindow;
+        const doc = frame.contentDocument;
+        const workspace = doc.querySelector('.workspace');
+        const mapStage = doc.querySelector('.fullworld-stage');
+        const controls = doc.querySelector('#mobile-controls-panel');
+        const inspector = doc.querySelector('#mobile-inspector-panel');
+        const backdrop = doc.querySelector('#mobile-drawer-backdrop');
+        const zoom = doc.querySelector('.zoom-controls');
+        const controlsToggle = doc.querySelector('#mobile-controls-toggle');
+        const inspectorToggle = doc.querySelector('#mobile-inspector-toggle');
+        if (![workspace, mapStage, controls, inspector, backdrop, zoom, controlsToggle, inspectorToggle].every(Boolean)) throw new Error('required mobile layout nodes missing');
+        if (doc.documentElement.dataset.mobileUi !== 'ready') throw new Error('mobile interaction module did not initialize');
+
+        const workspaceRect = workspace.getBoundingClientRect();
+        const mapRect = mapStage.getBoundingClientRect();
+        if (!near(mapRect.width, workspaceRect.width) || !near(mapRect.left, workspaceRect.left)) throw new Error(`map is not full-width: map=${mapRect.width} workspace=${workspaceRect.width}`);
+        if (workspaceRect.width < 360) throw new Error(`unexpected mobile workspace width ${workspaceRect.width}`);
+        if (win.getComputedStyle(zoom).display === 'none') throw new Error('zoom controls hidden');
+        const closedControlsX = translationX(win, controls);
+        const closedInspectorX = translationX(win, inspector);
+        if (!(closedControlsX < -10) || !(closedInspectorX > 10)) throw new Error(`mobile drawers are not off-canvas when closed: ${closedControlsX}/${closedInspectorX}`);
+
+        controls.style.transition = 'none';
+        inspector.style.transition = 'none';
+
+        controlsToggle.click();
+        await wait(20);
+        if (!controls.classList.contains('mobile-open')) throw new Error('controls toggle did not set mobile-open');
+        if (Math.abs(translationX(win, controls)) > 3) throw new Error(`controls drawer did not open: ${translationX(win, controls)}`);
+        if (backdrop.hidden) throw new Error('backdrop did not open with controls drawer');
+        doc.querySelector('#mobile-controls-close').click();
+        await wait(20);
+        if (controls.classList.contains('mobile-open')) throw new Error('controls close did not clear mobile-open');
+        if (!(translationX(win, controls) < -10) || !backdrop.hidden) throw new Error('controls drawer did not close');
+
+        inspectorToggle.click();
+        await wait(20);
+        if (!inspector.classList.contains('mobile-open')) throw new Error('inspector toggle did not set mobile-open');
+        if (Math.abs(translationX(win, inspector)) > 3) throw new Error(`inspector drawer did not open: ${translationX(win, inspector)}`);
+        if (backdrop.hidden) throw new Error('backdrop did not open with inspector drawer');
+        doc.querySelector('#mobile-inspector-close').click();
+        await wait(20);
+        if (inspector.classList.contains('mobile-open')) throw new Error('inspector close did not clear mobile-open');
+        if (!(translationX(win, inspector) > 10) || !backdrop.hidden) throw new Error('inspector drawer did not close');
+
+        result.dataset.status = 'PASS';
+        result.textContent = JSON.stringify({
+          status: 'PASS',
+          viewport: { width: win.innerWidth, height: win.innerHeight },
+          workspaceWidth: workspaceRect.width,
+          mapWidth: mapRect.width,
+          controlsDrawerWidth: controls.getBoundingClientRect().width,
+          inspectorDrawerWidth: inspector.getBoundingClientRect().width,
+          mobileModule: doc.documentElement.dataset.mobileUi,
+        });
+      } catch (error) {
+        fail(error instanceof Error ? error.message : String(error));
+      }
+    }, { once: true });
+    frame.src = '/web/fullworld.html?x=32360&y=32230&floor=-7&zoom=2&layers=minimap-overview&animation=off';
+  </script>
+</body>
+</html>

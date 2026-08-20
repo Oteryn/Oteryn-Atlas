@@ -1,0 +1,61 @@
+name: Mobile layout
+
+on:
+  pull_request:
+    paths:
+      - 'web/fullworld.html'
+      - 'web/fullworld.css'
+      - 'web/fullworld-mobile.mjs'
+      - 'tests/fullworld-mobile-layout-proof.html'
+      - '.github/workflows/mobile-layout.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'web/fullworld.html'
+      - 'web/fullworld.css'
+      - 'web/fullworld-mobile.mjs'
+      - 'tests/fullworld-mobile-layout-proof.html'
+      - '.github/workflows/mobile-layout.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  mobile-layout:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out exact repository revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Run real Chrome phone-layout proof
+        shell: bash
+        run: |
+          set -euo pipefail
+          CHROME="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || true)"
+          test -n "$CHROME"
+          python -m http.server 8765 --bind 127.0.0.1 >/tmp/atlas-mobile-http.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
+          for _ in $(seq 1 30); do
+            curl -fsS http://127.0.0.1:8765/tests/fullworld-mobile-layout-proof.html >/dev/null && break
+            sleep 1
+          done
+          rm -rf /tmp/chrome-mobile-layout
+          "$CHROME" \
+            --headless=new \
+            --no-sandbox \
+            --disable-dev-shm-usage \
+            --use-angle=swiftshader \
+            --enable-unsafe-swiftshader \
+            --force-device-scale-factor=1 \
+            --window-size=390,844 \
+            --virtual-time-budget=15000 \
+            --user-data-dir=/tmp/chrome-mobile-layout \
+            --dump-dom \
+            http://127.0.0.1:8765/tests/fullworld-mobile-layout-proof.html \
+            > /tmp/fullworld-mobile-layout.html
+          cat /tmp/fullworld-mobile-layout.html
+          grep -q 'data-status="PASS"' /tmp/fullworld-mobile-layout.html
+          grep -q '"status":"PASS"' /tmp/fullworld-mobile-layout.html

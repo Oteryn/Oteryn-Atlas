@@ -43,6 +43,8 @@ await import('./fullworld-runtime/performance.test.mjs');
 
 const fullworldIndex = await readFile(new URL('../web/fullworld.html', import.meta.url), 'utf8');
 const fullworldApp = await readFile(new URL('../web/fullworld-app.mjs', import.meta.url), 'utf8');
+const fullworldCss = await readFile(new URL('../web/fullworld.css', import.meta.url), 'utf8');
+const fullworldMobile = await readFile(new URL('../web/fullworld-mobile.mjs', import.meta.url), 'utf8');
 const fullworldTrust = await readFile(new URL('../src/browser/fullworld-trust.mjs', import.meta.url), 'utf8');
 const fullworldRenderer = await readFile(new URL('../src/browser/fullworld-webgl.mjs', import.meta.url), 'utf8');
 const worldQuery = await readFile(new URL('../src/browser/world-query.mjs', import.meta.url), 'utf8');
@@ -96,7 +98,6 @@ test('full-world app coalesces interactive rendering and uses stable verified pi
   assert.match(fullworldApp, /VerifiedContentCache/);
 });
 
-
 test('full-world runtime exposes World Query boundary, budgets and measured acceptance telemetry', () => {
   assert.match(worldQuery, /createWorldQueryApi/);
   assert.match(worldQuery, /selectViewportGroups/);
@@ -106,4 +107,24 @@ test('full-world runtime exposes World Query boundary, budgets and measured acce
   assert.match(fullworldApp, /browserRamReason/);
   assert.match(qualifier, /browserProcessPeakRssBytes/);
   assert.match(qualifier, /processTreeRssBytes/);
+});
+
+test('full-world mobile layout keeps the map full-width and moves controls into overlays', () => {
+  for (const id of [
+    'mobile-controls-toggle',
+    'mobile-inspector-toggle',
+    'mobile-controls-panel',
+    'mobile-inspector-panel',
+    'mobile-drawer-backdrop',
+    'mobile-search-form',
+  ]) assert.match(fullworldIndex, new RegExp(`id="${id}"`));
+  assert.match(fullworldIndex, /fullworld-mobile\.mjs/);
+  assert.match(fullworldCss, /@media \(max-width: 760px\)/);
+  assert.match(fullworldCss, /\.fullworld-shell \.workspace \{ grid-template-columns: minmax\(0, 1fr\); position: relative; overflow: hidden; \}/);
+  assert.match(fullworldCss, /\.fullworld-shell \.left-rail, \.fullworld-shell \.inspector \{[\s\S]*position: absolute/);
+  assert.match(fullworldCss, /\.fullworld-diagnostics \{ display: none; \}/);
+  assert.match(fullworldCss, /#atlas \{ touch-action: none; \}/);
+  assert.match(fullworldMobile, /function setMobileDrawer/);
+  assert.match(fullworldMobile, /desktopForm\.requestSubmit\(\)/);
+  assert.doesNotMatch(fullworldMobile, /\.otbm|Legacy IR|world\.otbm/);
 });
