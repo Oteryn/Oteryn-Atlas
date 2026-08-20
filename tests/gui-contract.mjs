@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 
 const index = await readFile(new URL('../web/index.html', import.meta.url), 'utf8');
 const app = await readFile(new URL('../web/app.mjs', import.meta.url), 'utf8');
@@ -50,6 +52,11 @@ const fullworldRenderer = await readFile(new URL('../src/browser/fullworld-webgl
 const worldQuery = await readFile(new URL('../src/browser/world-query.mjs', import.meta.url), 'utf8');
 const qualifier = await readFile(new URL('../tools/fullworld-runtime/qualify_browser.mjs', import.meta.url), 'utf8');
 
+test('full-world browser modules parse as JavaScript', () => {
+  for (const relative of ['../web/fullworld-app.mjs', '../web/fullworld-minimap.mjs', '../web/fullworld-mobile.mjs']) {
+    execFileSync(process.execPath, ['--check', fileURLToPath(new URL(relative, import.meta.url))], { stdio: 'pipe' });
+  }
+});
 test('full-world GUI is a separate verified runtime entry while bounded proof remains regression fixture', () => {
   assert.match(fullworldIndex, /FULL-WORLD VERIFIED RUNTIME/);
   assert.match(fullworldIndex, /Technical overview/);

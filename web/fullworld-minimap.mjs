@@ -1,4 +1,4 @@
-﻿import { viewportTileBounds } from '../src/browser/fullworld.mjs';
+import { viewportTileBounds } from '../src/browser/fullworld.mjs';
 import { FULLWORLD_PATHS, FULLWORLD_TRUST } from '../src/browser/fullworld-trust.mjs';
 import { lodBlend } from '../src/layers/minimap-lod.mjs';
 import { loadMinimapFloor, loadMinimapWorld, loadVerifiedMinimapTile, selectMinimapChunks } from '../src/layers/minimap.mjs';
@@ -133,5 +133,3 @@ async function boot() {
 window.addEventListener('oteryn-atlas-view', (event) => { render(event.detail); });
 window.addEventListener('resize', () => { if (lastDetail) render(lastDetail); });
 boot().catch((error) => { publish({ error }); console.error(error); });
-
-\n

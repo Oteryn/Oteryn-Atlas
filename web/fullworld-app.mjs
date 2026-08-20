@@ -1,4 +1,4 @@
-﻿import {
+import {
   SemanticRangeStore,
   changeFloor,
   filterTilesForBounds,
@@ -825,5 +825,3 @@ async function boot() {
 }
 
 await boot().catch(failClosed);
-
-\n
