@@ -56,5 +56,6 @@ jobs:
             --dump-dom \
             http://127.0.0.1:8765/tests/fullworld-mobile-layout-proof.html \
             > /tmp/fullworld-mobile-layout.html
+          cat /tmp/fullworld-mobile-layout.html
           grep -q 'data-status="PASS"' /tmp/fullworld-mobile-layout.html
           grep -q '"status":"PASS"' /tmp/fullworld-mobile-layout.html
