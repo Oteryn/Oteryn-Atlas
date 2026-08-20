@@ -51,6 +51,14 @@ Raw RGBA blobs are stored in deterministic packs capped at 64 MiB. Pack number a
 
 A verifier must independently recompute every blob content ID from pack bytes and independently re-decode every referenced sprite from the authorized asset archive to confirm `sprite_source_id -> contentId` mappings.
 
+## Derived incremental/runtime products
+
+The canonical publication may be accompanied by derived runtime indexes, overview caches, content-addressed pixel buckets/pages and an incremental dependency graph. These products are not publication or Game authority and must explicitly preserve `identityAuthority=false` for transport/GPU placement.
+
+Reuse is keyed by exact local content identities (for example a semantic chunk `contentId` or pixel blob `contentId`) and by an explicitly trusted previous derived-product root. A change to the global Game/source fingerprint does not by itself require byte-identical sibling chunks to be regenerated; floor/world manifests are rematerialized with current provenance.
+
+Atlas must not invent a changed-tile list from pixels or bypass the Game/import boundary. Avoiding a complete source-map scan requires an authoritative Game-owned source change/region hand-off; downstream incremental reuse does not change that boundary. See `src/publication/incremental-content-graph-v0.md` and `src/browser/fullworld-runtime-v0.md`.
+
 ## Fail-closed verification
 
 `tools/fullworld-publication/verify_publication.py` rejects at minimum:

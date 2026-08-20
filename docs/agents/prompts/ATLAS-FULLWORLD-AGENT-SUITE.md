@@ -317,15 +317,17 @@ Responsibilities:
    - minimap only if authoritative overview exists;
    - diagnostics using measured runtime values only.
 9. Scale WebGL/runtime performance:
-   - spatial culling;
-   - chunk cache;
-   - texture/pixel pack loading strategy;
-   - bounded browser memory;
-   - draw batching;
-   - incremental layer loading;
+   - spatial culling and viewport-driven authenticated range selection;
+   - bounded in-memory and verified persistent content-addressed caches;
+   - stable content-addressed pixel buckets/pages plus an optional non-authoritative local acceleration bundle;
+   - instanced/batched GPU submission and dirty `requestAnimationFrame` scheduling;
+   - capability-driven `reference` and `local-max` profiles that preserve identical semantic/pixel results;
+   - asynchronous measured GPU timing when supported; no unconditional `gl.finish()` or permanent capture buffer in the interactive path;
+   - incremental layer loading and trusted previous-output reuse keyed by local source content identities;
    - animation batching/culling hooks without per-object timers.
-10. Qualify multiple representative regions/floors in real Chrome, including transitions between sparse/dense locations.
-11. Capture real full-world GUI screenshots and objective browser smoke/performance evidence; do not invent FPS/cache/memory values.
+10. Preserve a derived incremental dependency graph from exact tile content identities through cell/region/floor/world roots. Rebuild only affected downstream regions when authoritative changed-source chunks are available; never infer source deltas or weaken Game provenance to obtain them.
+11. Qualify multiple representative regions/floors in real Chrome, including transitions between sparse/dense locations and both `reference` and `local-max` behavior.
+12. Capture real full-world GUI screenshots and objective browser smoke/performance evidence; do not invent FPS/cache/memory values.
 
 Runtime resource budgets and degradation:
 - Runtime MUST define and track a maximum loaded-chunk budget.

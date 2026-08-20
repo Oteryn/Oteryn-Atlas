@@ -175,6 +175,32 @@ class OverviewLayerTests(unittest.TestCase):
             self.assertEqual(checked["semantics"]["terrainClassification"], "NOT_CLAIMED")
             self.assertEqual(checked["semantics"]["collision"], "NOT_CLAIMED")
 
+    def test_trusted_previous_overview_reuses_unchanged_chunks_without_rescan(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            source, first_output, second_output = tmp / "source", tmp / "overview-a", tmp / "overview-b"
+            source.mkdir()
+            make_source(source)
+            first = build.build_overview(source, first_output, expected_publication_root=source_publication_root(source), cell_size=16, workers=1)
+            second = build.build_overview(
+                source, second_output, expected_publication_root=source_publication_root(source), cell_size=16, workers=1,
+                previous_output=first_output, expected_previous_root=first["rootContentId"],
+            )
+            self.assertEqual(second["rootContentId"], first["rootContentId"])
+            self.assertEqual(second["_buildEvidence"], {"reusedChunks": 3, "scannedChunks": 0, "trustedPreviousRootUsed": True})
+            checked = verify.verify_overview(second_output, source, source_publication_root(source))
+            self.assertEqual(checked["rootContentId"], first["rootContentId"])
+
+    def test_previous_overview_reuse_requires_exact_trusted_root(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            source, first_output, second_output = tmp / "source", tmp / "overview-a", tmp / "overview-b"
+            source.mkdir()
+            make_source(source)
+            build.build_overview(source, first_output, expected_publication_root=source_publication_root(source))
+            with self.assertRaisesRegex(build.OverviewError, "trusted root"):
+                build.build_overview(source, second_output, expected_publication_root=source_publication_root(source), previous_output=first_output, expected_previous_root="sha256:" + "00" * 32)
+
     def test_corrupt_source_chunk_is_rejected_during_build(self):
         with tempfile.TemporaryDirectory() as tmp:
             tmp = Path(tmp)
