@@ -42,6 +42,8 @@
         const controlsToggle = doc.querySelector('#mobile-controls-toggle');
         const inspectorToggle = doc.querySelector('#mobile-inspector-toggle');
         if (![workspace, mapStage, controls, inspector, backdrop, zoom, controlsToggle, inspectorToggle].every(Boolean)) throw new Error('required mobile layout nodes missing');
+        if (doc.documentElement.dataset.mobileUi !== 'ready') throw new Error('mobile interaction module did not initialize');
+
         const workspaceRect = workspace.getBoundingClientRect();
         const mapRect = mapStage.getBoundingClientRect();
         if (!near(mapRect.width, workspaceRect.width) || !near(mapRect.left, workspaceRect.left)) throw new Error(`map is not full-width: map=${mapRect.width} workspace=${workspaceRect.width}`);
@@ -51,20 +53,27 @@
         const closedInspectorX = translationX(win, inspector);
         if (!(closedControlsX < -10) || !(closedInspectorX > 10)) throw new Error(`mobile drawers are not off-canvas when closed: ${closedControlsX}/${closedInspectorX}`);
 
+        controls.style.transition = 'none';
+        inspector.style.transition = 'none';
+
         controlsToggle.click();
-        await wait(300);
-        if (Math.abs(translationX(win, controls)) > 3) throw new Error('controls drawer did not open');
+        await wait(20);
+        if (!controls.classList.contains('mobile-open')) throw new Error('controls toggle did not set mobile-open');
+        if (Math.abs(translationX(win, controls)) > 3) throw new Error(`controls drawer did not open: ${translationX(win, controls)}`);
         if (backdrop.hidden) throw new Error('backdrop did not open with controls drawer');
         doc.querySelector('#mobile-controls-close').click();
-        await wait(300);
+        await wait(20);
+        if (controls.classList.contains('mobile-open')) throw new Error('controls close did not clear mobile-open');
         if (!(translationX(win, controls) < -10) || !backdrop.hidden) throw new Error('controls drawer did not close');
 
         inspectorToggle.click();
-        await wait(300);
-        if (Math.abs(translationX(win, inspector)) > 3) throw new Error('inspector drawer did not open');
+        await wait(20);
+        if (!inspector.classList.contains('mobile-open')) throw new Error('inspector toggle did not set mobile-open');
+        if (Math.abs(translationX(win, inspector)) > 3) throw new Error(`inspector drawer did not open: ${translationX(win, inspector)}`);
         if (backdrop.hidden) throw new Error('backdrop did not open with inspector drawer');
         doc.querySelector('#mobile-inspector-close').click();
-        await wait(300);
+        await wait(20);
+        if (inspector.classList.contains('mobile-open')) throw new Error('inspector close did not clear mobile-open');
         if (!(translationX(win, inspector) > 10) || !backdrop.hidden) throw new Error('inspector drawer did not close');
 
         result.dataset.status = 'PASS';
@@ -75,6 +84,7 @@
           mapWidth: mapRect.width,
           controlsDrawerWidth: controls.getBoundingClientRect().width,
           inspectorDrawerWidth: inspector.getBoundingClientRect().width,
+          mobileModule: doc.documentElement.dataset.mobileUi,
         });
       } catch (error) {
         fail(error instanceof Error ? error.message : String(error));
