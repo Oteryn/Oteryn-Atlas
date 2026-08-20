@@ -197,6 +197,7 @@ function clampView(next) {
     debugFlags: Object.freeze([...(next.debugFlags ?? [])].sort()),
     floor,
     layers: Object.freeze(next.overview ? ['minimap-overview'] : []),
+    mode: next.mode ?? 'auto',
     overview: Boolean(next.overview),
     searchQuery: String(next.searchQuery ?? '').trim().replace(/\s+/g, ' '),
     selected: selectedState,

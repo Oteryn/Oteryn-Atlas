@@ -66,6 +66,7 @@ test('full-world GUI is a separate verified runtime entry while bounded proof re
   assert.match(fullworldIndex, /id="animation-toggle"[^>]*disabled/);
   assert.match(fullworldApp, /SemanticRangeStore/);
   assert.match(fullworldApp, /loadOverviewWorld/);
+  assert.match(fullworldApp, /mode: next\.mode \?\? 'auto'/);
   assert.match(fullworldApp, /requiredRuntimePixelBuckets/);
   assert.doesNotMatch(fullworldApp, /\.otbm|Legacy IR|world\.otbm/);
 });
