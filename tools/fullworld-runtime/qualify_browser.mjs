@@ -201,8 +201,20 @@ try {
     if (!Array.isArray(steps)) throw new Error('qualification steps must be a JSON array');
     for (const step of steps) {
       if (!step || typeof step.search !== 'string' || !step.expect || typeof step.expect !== 'object') throw new Error('invalid qualification step');
-      const expression = `(() => { const input = document.querySelector('#search-input'); input.value = ${JSON.stringify(step.search)}; document.querySelector('#search-form').requestSubmit(); return true; })()`;
-      await cdp.send('Runtime.evaluate', { expression, returnByValue: true });
+      if (step.search.length > 256 || /[\u0000-\u001f\u007f]/.test(step.search)) throw new Error('invalid qualification search');
+      const inputEvaluation = await cdp.send('Runtime.evaluate', {
+        expression: "document.querySelector('#search-input')",
+        returnByValue: false,
+      });
+      const inputObjectId = inputEvaluation.result?.objectId;
+      if (!inputObjectId) throw new Error('qualification search input was not available');
+      const submitted = await cdp.send('Runtime.callFunctionOn', {
+        objectId: inputObjectId,
+        functionDeclaration: "function (search) { this.value = search; if (!this.form) throw new Error('search form missing'); this.form.requestSubmit(); return true; }",
+        arguments: [{ value: step.search }],
+        returnByValue: true,
+      });
+      if (submitted.exceptionDetails || submitted.result?.value !== true) throw new Error('qualification search submission failed');
       const stepResult = await waitForQualification(deadline, step.expect);
       pageResults.push(stepResult);
       if (stepResult.status !== 'PASS') break;

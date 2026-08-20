@@ -66,3 +66,34 @@ Validated implementation tree after current-main integration, WorldChunk/World Q
 - `git diff --check`: **PASS**.
 
 GitHub exact-head CI remains the merge authority after the branch is published.
+
+### Final CodeQL-remediation qualification - 2026-08-20
+
+The final candidate removes qualification-step input from dynamically constructed executable JavaScript. `Runtime.evaluate` now uses a static expression only to acquire `#search-input`; `Runtime.callFunctionOn` executes a static function and receives `step.search` as a CDP value argument. Qualification search values are bounded to 256 characters and reject control characters before submission.
+
+Post-remediation local validation on the final code paths:
+- Node browser/pixel/GUI/full-world runtime matrix: **63/63 PASS**;
+- full-world publication Python tests: **5/5 PASS**;
+- full-world layer Python tests: **15/15 PASS**;
+- runtime-index self-test: **PASS**;
+- incremental-content-graph self-test: **PASS**;
+- extraction-provenance negative tests: **5/5 PASS**;
+- extraction-provenance verifier: **PASS**;
+- changed Python `py_compile`: **PASS** (8 files);
+- forbidden raw legacy tracked-file scan: **PASS**;
+- browser legacy-runtime reference scan: **PASS**;
+- `git diff --check`: **PASS**.
+
+Post-remediation real Chrome qualification against the verified full-world publication/runtime:
+- `local-max` detail, floor `-7`, zoom `2`: **PASS**, 1 draw, 2,531.2283 ms wall, 1,246,318,592 B peak browser process-tree RSS;
+- `reference` detail, floor `-7`, zoom `2`: **PASS**, 1 draw, 3,155.5806 ms wall, 1,341,091,840 B peak browser process-tree RSS;
+- `reference` overview-only, floor `-7`, zoom `0.25`: **PASS**, 0 base-map draws, 1,231.0718 ms wall, 512,098,304 B peak browser process-tree RSS;
+- multifloor `-7 -> -15 -> -10 -> -3 -> 0`: **PASS**, one detail draw at every transition, 4,981.624 ms wall, 1,971,798,016 B peak browser process-tree RSS.
+
+Final qualification screenshot identities (kept outside the repository tree):
+- local-max detail: 752,743 bytes, SHA-256 `e40a3e80c858f1b6fe8e8455f33af52ea942aa0ecb1ac2d5b864a1330c5c9482`;
+- reference detail: 752,930 bytes, SHA-256 `efb697537b8ffd476750b02338a5da7ce9a2ed41ef73f33bed95574b8115c404`;
+- overview-only: 129,020 bytes, SHA-256 `e7a6ead5f1594f94398397e49255e35502192161f5db737b07183ae6cdbbb857`;
+- multifloor: 339,667 bytes, SHA-256 `464b3dc1c2f4fab41c97a106e22fe2fb370fe9ef22792d9dbf7f6665a6fe2461`.
+
+These timings are qualification measurements only. They are not production performance SLOs, and unavailable GPU-resident-memory metrics remain unclaimed.
