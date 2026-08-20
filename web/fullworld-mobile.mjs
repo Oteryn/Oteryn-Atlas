@@ -27,7 +27,6 @@ function copySearchToMobile() {
 }
 
 function openDrawer(which) {
-  if (window.innerWidth > MOBILE_BREAKPOINT) return;
   if (which === 'controls') copySearchToMobile();
   setMobileDrawer(which);
 }
@@ -64,3 +63,5 @@ $('#mobile-search-form')?.addEventListener('submit', (event) => {
 window.addEventListener('resize', () => {
   if (window.innerWidth > MOBILE_BREAKPOINT) setMobileDrawer(null);
 });
+
+document.documentElement.dataset.mobileUi = 'ready';
