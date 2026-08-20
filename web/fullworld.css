@@ -27,3 +27,66 @@
   .fullworld-diagnostics { grid-template-columns: repeat(5, minmax(0,1fr)); }
   .fullworld-stage { grid-template-rows: minmax(0,1fr) 29px 132px; }
 }
+
+.mobile-actions, .mobile-drawer-heading, .mobile-search, .mobile-drawer-close, .mobile-drawer-backdrop { display: none; }
+#atlas { touch-action: none; }
+
+@media (max-width: 760px) {
+  html, body { overscroll-behavior: none; }
+  .fullworld-shell { height: 100dvh; grid-template-rows: 56px minmax(0, 1fr); }
+  .fullworld-shell .topbar {
+    min-height: 0; height: 56px; grid-template-columns: minmax(0, 1fr) 100px 72px;
+    gap: 5px; padding: 0 max(8px, env(safe-area-inset-right)) 0 max(8px, env(safe-area-inset-left));
+  }
+  .fullworld-shell .brand { gap: 7px; }
+  .fullworld-shell .brand-mark { width: 30px; height: 30px; border-radius: 7px; font-size: 13px; flex: 0 0 auto; }
+  .fullworld-shell .brand strong { font-size: 10px; letter-spacing: .08em; white-space: nowrap; }
+  .fullworld-shell .brand small { display: none; }
+  .fullworld-shell .coordinate-strip, .fullworld-shell .search { display: none; }
+  .fullworld-shell .zoom-controls { grid-template-columns: 30px 36px 30px; gap: 2px; }
+  .fullworld-shell .zoom-controls button { padding: 6px 3px; }
+  .fullworld-shell .zoom-controls output { font-size: 11px; }
+  .mobile-actions { display: grid; grid-template-columns: 34px 34px; gap: 4px; }
+  .mobile-icon-button { width: 34px; height: 34px; padding: 0; display: grid; place-items: center; font-size: 16px; }
+
+  .fullworld-shell .workspace { grid-template-columns: minmax(0, 1fr); position: relative; overflow: hidden; }
+  .fullworld-shell .left-rail, .fullworld-shell .inspector {
+    display: block; position: absolute; top: 0; bottom: 0; z-index: 30; width: min(88vw, 360px);
+    transition: transform .18s ease; box-shadow: 0 0 30px rgba(0, 0, 0, .55);
+  }
+  .fullworld-shell .left-rail { left: 0; transform: translateX(-105%); padding: 0 12px calc(18px + env(safe-area-inset-bottom)); }
+  .fullworld-shell .inspector { right: 0; transform: translateX(105%); padding: 12px 14px calc(20px + env(safe-area-inset-bottom)); }
+  .fullworld-shell .left-rail.mobile-open, .fullworld-shell .inspector.mobile-open { transform: translateX(0); }
+  .mobile-drawer-backdrop {
+    position: absolute; inset: 0; z-index: 25; display: block; margin: 0; padding: 0;
+    border: 0; border-radius: 0; background: rgba(1, 5, 10, .62); backdrop-filter: blur(2px);
+  }
+  .mobile-drawer-backdrop[hidden] { display: none; }
+  .mobile-drawer-heading {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    position: sticky; top: 0; z-index: 2; min-height: 52px; margin: 0 -12px 10px; padding: 0 12px;
+    border-bottom: 1px solid #172330; background: rgba(11, 17, 26, .98);
+  }
+  .mobile-drawer-heading strong { color: #c9dcec; font-size: 12px; letter-spacing: .04em; }
+  .mobile-drawer-heading button, .mobile-drawer-close { display: grid; place-items: center; width: 34px; height: 34px; padding: 0; font-size: 20px; }
+  .mobile-search { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; margin: 0 0 16px; }
+  .mobile-search input { min-width: 0; width: 100%; border: 1px solid var(--line); background: #081019; color: var(--text); padding: 9px 10px; border-radius: 7px; outline: none; }
+  .mobile-search input:focus { border-color: #3c78ad; box-shadow: 0 0 0 2px rgba(75,163,255,.08); }
+  .fullworld-shell .inspector-heading { display: grid; grid-template-columns: minmax(0,1fr) auto auto; align-items: start; }
+
+  .fullworld-stage { grid-template-rows: minmax(0, 1fr) 28px !important; grid-column: 1; }
+  .fullworld-diagnostics { display: none; }
+  .fullworld-shell .statusbar { grid-template-columns: minmax(0, 1fr); padding: 0 8px; }
+  .fullworld-shell .statusbar span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fullworld-shell .statusbar span:not(:first-child) { display: none; }
+  .cursor-coordinate { left: 8px; bottom: 8px; font-size: 9px; }
+  .runtime-badge { right: 8px; top: 8px; font-size: 8px; padding: 5px 7px; }
+  .detail-badge { right: 8px; top: 39px; font-size: 7px; }
+  .minimap-canvas { height: 116px; }
+}
+
+@media (max-width: 390px) {
+  .fullworld-shell .topbar { grid-template-columns: minmax(0, 1fr) 96px 70px; padding-left: max(6px, env(safe-area-inset-left)); padding-right: max(6px, env(safe-area-inset-right)); }
+  .fullworld-shell .brand strong { font-size: 9px; }
+  .fullworld-shell .zoom-controls { grid-template-columns: 29px 34px 29px; }
+}
