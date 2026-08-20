@@ -39,20 +39,30 @@ The full tile/cell/region graph baseline scan took 140.41 s with max RSS 236,200
 
 `qualification-multifloor.json`: PASS in one Chrome session across floors `-7 -> -15 -> -10 -> -3 -> 0`; each detail transition completed with a WebGL draw from verified data.
 
-PNG captures alongside those JSON files are real 1920x1080 browser screenshots. Timing evidence is measurement for this qualification only, not a production FPS/SLO claim.
+Real 1920x1080 Chrome screenshots were captured during qualification. Their binary payloads are kept outside the repository tree; exact identities are pinned here:
+- `fullworld-detail-1920x1080.png`: 751,392 bytes, SHA-256 `c78ca7ef7c0a0d5d1478629bcf157299b49473c749858f9e8be1cc388e1cf997`.
+- `fullworld-multifloor-1920x1080.png`: 338,967 bytes, SHA-256 `19d292268a272850133b2dd6dbca610fcccf06762748570fc9f1a64c91c4d602`.
+- `fullworld-overview-1920x1080.png`: 127,649 bytes, SHA-256 `7d9b1ed145bcd7d124eda1cb69afa2af3c3066f6a93bfbc9cd4c2ce75bc12cc3`.
+- `fullworld-reference-1920x1080.png`: 751,335 bytes, SHA-256 `c19b4728d4b1ad90f4faf8323eece6646dca74677dfb0c725b7e42545e0df74a`.
+
+Timing evidence is measurement for this qualification only, not a production FPS/SLO claim.
 
 ## Validation
 
-Repository tests cover trusted-root rejection, authenticated range corruption, unsupported Range fallback, performance-profile equivalence, frame coalescing, persistent-cache re-hashing, incremental graph invalidation, stable pixel-bucket verification and WebGL2 instancing. Exact commands/results are re-run on the final rebased head before merge readiness.
+Repository tests cover trusted-root rejection, authenticated range corruption, unsupported Range fallback, performance-profile equivalence, frame coalescing, persistent-cache re-hashing, incremental graph invalidation, stable pixel-bucket verification and WebGL2 instancing.
 
-### Pre-rebase validation snapshot
+### Rebased local validation
 
-- `node --test tests/browser-semantic.mjs tests/pixel-store.mjs tests/gui-contract.mjs`: **44/44 PASS**.
-- `python3 -m unittest discover -s tests/fullworld-publication -p 'test_*.py'`: **5/5 PASS**.
-- `python3 -m unittest discover -s tests/fullworld-layers -p 'test_*.py'`: **15/15 PASS**.
-- `python3 tests/fullworld-runtime/runtime_index_self_test.py`: **PASS**.
-- `python3 tests/fullworld-runtime/incremental_content_graph_self_test.py`: **PASS**.
-- `python3 -m py_compile` for changed Python builders/server: **PASS**.
+Base: `172916e5cdd25580e857eb01c74b77a92954c1d7`.
+Validated implementation tree after rebase and cwd-independent harness fix:
+- browser semantic tests: **15/15 PASS**;
+- pixel-store tests: **6/6 PASS**;
+- GUI/full-world runtime tests: **23/23 PASS**;
+- full-world publication Python tests: **5/5 PASS**;
+- full-world layer Python tests: **15/15 PASS**;
+- runtime-index self-test: **PASS**;
+- incremental-content-graph self-test: **PASS**;
+- changed Python `py_compile`: **PASS**;
 - `git diff --check`: **PASS**.
 
-These are pre-rebase local results. Exact-head CI after rebasing/pushing remains the merge authority.
+GitHub exact-head CI remains the merge authority after the branch is published.
