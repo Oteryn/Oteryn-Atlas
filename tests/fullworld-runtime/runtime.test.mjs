@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import {
   PUBLICATION_DOMAIN,
@@ -32,6 +33,7 @@ import {
   requiredRuntimePixelBuckets,
 } from '../../src/browser/fullworld-pixel-buckets.mjs';
 
+const repoRoot = fileURLToPath(new URL('../../', import.meta.url));
 const sha = (pair) => `sha256:${pair.repeat(32)}`;
 const sourceFingerprint = sha('11');
 const publicationRootPlaceholder = sha('22');
@@ -260,7 +262,7 @@ test('runtime pixel bucket catalog verifies trusted root and selects only requir
 });
 
 test('runtime-index Python builder self-test is part of browser contract CI', () => {
-  execFileSync('python', ['tests/fullworld-runtime/runtime_index_self_test.py'], { cwd: process.cwd(), stdio: 'pipe' });
+  execFileSync('python', ['tests/fullworld-runtime/runtime_index_self_test.py'], { cwd: repoRoot, stdio: 'pipe' });
 });
 
 test('large semantic chunks fail closed when HTTP byte ranges are not supported', async () => {
@@ -288,5 +290,5 @@ test('large semantic chunks fail closed when HTTP byte ranges are not supported'
 });
 
 test('incremental content graph self-test proves selective invalidation', () => {
-  execFileSync('python', ['tests/fullworld-runtime/incremental_content_graph_self_test.py'], { cwd: process.cwd(), stdio: 'pipe' });
+  execFileSync('python', ['tests/fullworld-runtime/incremental_content_graph_self_test.py'], { cwd: repoRoot, stdio: 'pipe' });
 });
