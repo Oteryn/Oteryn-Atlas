@@ -28,9 +28,11 @@ test('reference and local-max profiles preserve deterministic behavior while cha
   assert.equal(local.synchronousEvidence, false);
 });
 
-test('auto profile is capability-driven rather than machine-model hardcoded', () => {
+test('auto profile prioritizes bounded interactive streaming; local-max stays explicit', () => {
   assert.equal(resolvePerformanceProfile('?perf=auto', { hardwareConcurrency: 4, deviceMemoryGiB: 4 }).name, 'reference');
-  assert.equal(resolvePerformanceProfile('?perf=auto', { hardwareConcurrency: 12, deviceMemoryGiB: 16 }).name, 'local-max');
+  assert.equal(resolvePerformanceProfile('?perf=auto', { hardwareConcurrency: 12, deviceMemoryGiB: 16 }).name, 'reference');
+  assert.equal(resolvePerformanceProfile('', { hardwareConcurrency: 32, deviceMemoryGiB: 64 }).name, 'reference');
+  assert.equal(resolvePerformanceProfile('?perf=local-max', { hardwareConcurrency: 12, deviceMemoryGiB: 16 }).name, 'local-max');
   assert.throws(() => resolvePerformanceProfile('?perf=turbo', { hardwareConcurrency: 12 }), /unsupported Atlas performance profile/);
 });
 
