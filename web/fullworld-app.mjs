@@ -22,8 +22,10 @@ import { resolvePerformanceProfile, profileSummary } from '../src/browser/fullwo
 import { createFrameScheduler } from '../src/browser/frame-scheduler.mjs';
 import { VerifiedContentCache } from '../src/browser/verified-content-cache.mjs';
 import { loadOverviewChunk, loadOverviewFloor, loadOverviewWorld } from '../src/layers/overview.mjs';
+import { createWorldQueryApi } from '../src/browser/world-query.mjs';
 
 const DETAIL_MIN_ZOOM = 0.5;
+const bootStartedMs = performance.now();
 const performanceProfile = resolvePerformanceProfile(location.search);
 const PREFETCH_TILES = performanceProfile.prefetchTiles;
 const GROUP_CONCURRENCY = performanceProfile.groupConcurrency;
@@ -52,9 +54,12 @@ let view;
 let sceneTiles = new Map();
 let sceneRecords = [];
 let sceneGroups = [];
+let visibleSceneGroups = [];
 let selected = null;
 let renderStats = null;
 let lastSceneLoadMs = null;
+let initialLoadMs = null;
+let peakJsHeapBytes = 0;
 let pixelNetworkBytes = 0;
 let loadedPixelBundleBytes = 0;
 let pixelTransport = 'stable-buckets';
@@ -64,6 +69,7 @@ let refreshAbortController = null;
 let dragging = null;
 let frameScheduler = null;
 let persistentCache = null;
+let worldQuery = null;
 const floorBundles = new Map();
 const overviewCellsByFloor = new Map();
 const overviewChunksByFloor = new Map();
@@ -179,10 +185,18 @@ function populateFloors() {
 function clampView(next) {
   const entry = floorEntry(runtimeWorld, next.floor);
   const bounds = entry.bounds;
+  const floor = next.floor;
+  const selectedState = next.selected && next.selected.floor === floor
+    ? { floor, x: Math.trunc(next.selected.x), y: Math.trunc(next.selected.y) }
+    : null;
   return Object.freeze({
     animation: 'off',
-    floor: next.floor,
+    debugFlags: Object.freeze([...(next.debugFlags ?? [])].sort()),
+    floor,
+    layers: Object.freeze(next.overview ? ['minimap-overview'] : []),
     overview: Boolean(next.overview),
+    searchQuery: String(next.searchQuery ?? '').trim().replace(/\s+/g, ' '),
+    selected: selectedState,
     x: Math.round(Math.min(bounds.x_max_exclusive - 0.0001, Math.max(bounds.x_min, next.x)) * 10000) / 10000,
     y: Math.round(Math.min(bounds.y_max_exclusive - 0.0001, Math.max(bounds.y_min, next.y)) * 10000) / 10000,
     zoom: Math.round(Math.min(16, Math.max(0.125, next.zoom)) * 10000) / 10000,
@@ -196,6 +210,7 @@ function syncViewUi() {
   $('#zoom-output').textContent = `${view.zoom.toFixed(2).replace(/0+$/, '').replace(/\.$/, '')}×`;
   $('#floor-select').value = String(view.floor);
   $('#overview-toggle').checked = view.overview;
+  $('#search-input').value = view.searchQuery ?? '';
   const bounds = floorEntry(runtimeWorld, view.floor).bounds;
   $('#floor-bounds').textContent = `Verified bounds: X ${bounds.x_min}…${bounds.x_max_exclusive - 1}, Y ${bounds.y_min}…${bounds.y_max_exclusive - 1}`;
   const floors = [...runtimeWorld.floors].map((entry) => entry.floor).sort((a, b) => b - a);
@@ -261,9 +276,11 @@ async function refreshScene() {
     sceneTiles = new Map();
     sceneRecords = [];
     sceneGroups = [];
+    visibleSceneGroups = [];
     renderer.setRecords([]);
     renderStats = renderer.render(view);
     lastSceneLoadMs = performance.now() - started;
+    if (initialLoadMs == null) initialLoadMs = performance.now() - bootStartedMs;
     detailBadge.textContent = `OVERVIEW ONLY < ${DETAIL_MIN_ZOOM}×`;
     detailBadge.classList.add('overview-only');
     $('#status-detail').textContent = 'Base semantic detail intentionally paused below the qualified detail zoom; verified overview remains available.';
@@ -279,7 +296,9 @@ async function refreshScene() {
   detailBadge.classList.remove('overview-only');
   setBadge('STREAMING VERIFIED RANGES');
   const retainBounds = anchorBoundsForScene(bundle);
-  sceneGroups = selectRuntimeGroups(bundle.runtimeFloor, retainBounds);
+  const visibleBounds = viewportBounds(bundle);
+  visibleSceneGroups = selectRuntimeGroups(bundle.runtimeFloor, visibleBounds);
+  sceneGroups = worldQuery.selectViewportGroups(bundle.runtimeFloor, visibleBounds, retainBounds, performanceProfile);
   const groupedTiles = await mapLimit(sceneGroups, GROUP_CONCURRENCY, ({ chunk, group }) => semanticStore.loadGroup(floorAtStart, chunk, group, { signal: controller.signal }));
   if (epoch !== refreshEpoch || view.floor !== floorAtStart) return;
   const tileMap = new Map();
@@ -323,7 +342,10 @@ async function refreshScene() {
   sceneRecords = records;
   renderer.setRecords(sceneRecords);
   renderStats = renderer.render(view);
+  if (renderStats.gpuTextureBytes > performanceProfile.gpuTextureBudgetBytes) throw new Error('GPU texture allocation exceeds runtime profile budget');
+  if (renderStats.drawCalls > performanceProfile.drawCallTarget) throw new Error('draw-call target exceeded');
   lastSceneLoadMs = performance.now() - started;
+  if (initialLoadMs == null) initialLoadMs = performance.now() - bootStartedMs;
   $('#status-detail').textContent = `${sceneGroups.length} authenticated row ranges · ${sceneTiles.size.toLocaleString()} retained tiles · ${sceneRecords.length.toLocaleString()} primitives`;
   setBadge('VERIFIED FULL-WORLD · WEBGL2', 'ok');
   await drawOverview();
@@ -459,27 +481,52 @@ function updateSelectionBox() {
   selectionBox.style.height = `${Math.max(2, scale)}px`;
 }
 
+function uniqueChunkCount(groups) {
+  return new Set(groups.map(({ chunk }) => {
+    const logical = chunk.logicalAddress;
+    return `${logical.floor}:${logical.region_x}:${logical.region_y}`;
+  })).size;
+}
+
+function cacheHitRatio(store) {
+  if (!store) return null;
+  const attempts = store.cacheHits + store.cacheMisses;
+  return attempts > 0 ? store.cacheHits / attempts : null;
+}
+
+function sampleHeap() {
+  const heap = performance.memory?.usedJSHeapSize ?? null;
+  if (Number.isFinite(heap)) peakJsHeapBytes = Math.max(peakJsHeapBytes, heap);
+  return heap;
+}
+
 function updateDiagnostics() {
   if (!runtimeWorld) return;
   const store = semanticStore?.stats();
-  const heap = performance.memory?.usedJSHeapSize ?? null;
+  const heap = sampleHeap();
+  const visibleChunks = uniqueChunkCount(visibleSceneGroups);
+  const retainedChunks = uniqueChunkCount(sceneGroups);
+  const ratio = cacheHitRatio(store);
   $('#diag-backend').textContent = `${renderStats?.backend ?? 'WebGL2'} · ${performanceProfile.name}`;
-  $('#diag-chunks').textContent = floorBundles.has(view.floor) ? String(floorEntry(runtimeWorld, view.floor).counts.chunks) : '—';
-  $('#diag-groups').textContent = sceneGroups.length ? `${sceneGroups.length} / ${floorEntry(runtimeWorld, view.floor).counts.groups}` : `0 / ${floorEntry(runtimeWorld, view.floor).counts.groups}`;
-  $('#diag-cache').textContent = store ? `${store.cachedGroups} · ${formatBytes(store.cacheBytes)} · ${store.cacheHits}/${store.cacheMisses} hits/misses` : '—';
+  $('#diag-chunks').textContent = `${visibleChunks} visible · ${retainedChunks}/${performanceProfile.maxLoadedChunks} retained`;
+  $('#diag-groups').textContent = `${visibleSceneGroups.length} visible · ${sceneGroups.length}/${performanceProfile.maxLoadedGroups} retained`;
+  $('#diag-cache').textContent = store ? `${store.cachedGroups} · ${formatBytes(store.cacheBytes)} · ${ratio == null ? 'N/A' : `${(ratio * 100).toFixed(1)}%`} hit ratio` : '—';
   $('#diag-packs').textContent = renderStats ? `${renderStats.uploadedBuckets} / ${runtimePixelCatalog.buckets.size}` : `0 / ${runtimePixelCatalog?.buckets?.size ?? 0}`;
-  $('#diag-gpu').textContent = formatBytes(renderStats?.gpuTextureBytes ?? 0);
+  $('#diag-gpu').textContent = renderStats ? `${formatBytes(renderStats.gpuTextureBytes)} / ${formatBytes(performanceProfile.gpuTextureBudgetBytes)} allocated` : '—';
   $('#diag-primitives').textContent = (renderStats?.visiblePrimitives ?? renderStats?.submittedPrimitives)?.toLocaleString() ?? '—';
-  $('#diag-draws').textContent = renderStats?.drawCalls?.toString() ?? '—';
+  $('#diag-draws').textContent = renderStats ? `${renderStats.drawCalls} / ${performanceProfile.drawCallTarget}` : '—';
   $('#diag-render').textContent = renderStats ? `${formatMs(renderStats.renderMs)} CPU${renderStats.gpuRenderMs == null ? '' : ` · ${formatMs(renderStats.gpuRenderMs)} GPU`}` : '—';
-  $('#diag-heap').textContent = formatBytes(heap);
+  $('#diag-heap').textContent = heap == null ? 'N/A' : `${formatBytes(heap)} · peak ${formatBytes(peakJsHeapBytes)}`;
   $('#status-source').textContent = `Publication ${FULLWORLD_TRUST.publicationRoot.slice(0, 19)}… · Game ${FULLWORLD_TRUST.gameSha.slice(0, 10)}…`;
   $('#status-layer').textContent = view.overview ? `Overview PROVEN · ${overviewCellsByFloor.get(view.floor)?.size?.toLocaleString() ?? '…'} cells` : 'Overview OFF';
 }
 
 function publishQualification(status, error = null) {
   const store = semanticStore?.stats();
-  const heap = performance.memory?.usedJSHeapSize ?? null;
+  const heap = sampleHeap();
+  const ratio = cacheHitRatio(store);
+  const visibleChunkCount = uniqueChunkCount(visibleSceneGroups);
+  const retainedChunkCount = uniqueChunkCount(sceneGroups);
   const result = {
     status,
     classification: 'G5_BROWSER_QUALIFICATION_NOT_PRODUCTION_SLO',
@@ -498,12 +545,30 @@ function publishQualification(status, error = null) {
     frameScheduler: frameScheduler?.stats?.() ?? null,
     persistentCache: persistentCache?.stats?.() ?? null,
     measured: renderStats ? {
+      initialLoadMs,
+      chunkLoadingLatencyMs: lastSceneLoadMs,
       drawCalls: renderStats.drawCalls,
+      drawCallTarget: performanceProfile.drawCallTarget,
       gpuRenderMs: renderStats.gpuRenderMs,
-      gpuTextureBytes: renderStats.gpuTextureBytes,
+      gpuTimerSupported: renderStats.gpuTimerSupported,
+      gpuMemoryBytes: null,
+      gpuMemoryReason: 'WebGL2 does not expose trustworthy resident GPU memory accounting; allocated texture bytes are reported separately.',
+      gpuTextureAllocatedBytes: renderStats.gpuTextureBytes,
+      gpuTextureBudgetBytes: performanceProfile.gpuTextureBudgetBytes,
       instanceBufferBytes: renderStats.instanceBufferBytes,
       jsHeapBytes: heap,
-      lastSceneLoadMs,
+      peakJsHeapBytes: peakJsHeapBytes || null,
+      browserRamBytes: null,
+      browserRamReason: 'Browser process RSS is not exposed by page APIs; qualification harness may record external process metrics separately.',
+      animationOnOffDeltaMs: null,
+      animationOnOffDeltaReason: FULLWORLD_CAPABILITIES.animation.enabled ? null : FULLWORLD_CAPABILITIES.animation.reason,
+      visibleChunkCount,
+      retainedChunkCount,
+      visibleRangeGroups: visibleSceneGroups.length,
+      retainedRangeGroups: sceneGroups.length,
+      maxLoadedChunks: performanceProfile.maxLoadedChunks,
+      maxLoadedGroups: performanceProfile.maxLoadedGroups,
+      cacheHitRatio: ratio,
       loadedOverviewCells: overviewCellsByFloor.get(view.floor)?.size ?? 0,
       loadedOverviewChunks: overviewChunksByFloor.get(view.floor) ?? 0,
       loadedPixelBucketBytes: [...loadedBucketBytes.values()].reduce((sum, value) => sum + value, 0),
@@ -520,7 +585,6 @@ function publishQualification(status, error = null) {
       rangePersistentHits: store?.persistentHits ?? 0,
       retainedPrimitives: sceneRecords.length,
       retainedTiles: sceneTiles.size,
-      selectedRangeGroups: sceneGroups.length,
       submittedPrimitives: renderStats.submittedPrimitives,
       textureUploadMs: renderStats.textureUploadMs,
       visiblePrimitives: renderStats.visiblePrimitives,
@@ -560,11 +624,13 @@ function pointerWorld(event) {
 function applyView(next, options = {}) {
   const previousFloor = view?.floor;
   view = clampView(next);
+  selected = view.selected ? { x: view.selected.x, y: view.selected.y } : null;
   if (previousFloor != null && previousFloor !== view.floor) {
     semanticStore.clearForFloorChange();
     sceneTiles = new Map();
     sceneRecords = [];
     sceneGroups = [];
+    visibleSceneGroups = [];
     selected = null;
     renderer.setRecords([]);
   }
@@ -589,8 +655,9 @@ function wireInteraction() {
   $('#search-form').addEventListener('submit', (event) => {
     event.preventDefault();
     try {
-      const result = parseCoordinateSearch($('#search-input').value, view.floor, runtimeWorld);
-      applyView({ ...view, ...result }, { delay: 0 });
+      const query = $('#search-input').value;
+      const result = parseCoordinateSearch(query, view.floor, runtimeWorld);
+      applyView({ ...view, ...result, searchQuery: query, selected: { floor: result.floor, x: Math.floor(result.x), y: Math.floor(result.y) } }, { delay: 0 });
     } catch (error) { $('#status-detail').textContent = `Search: ${error.message}`; }
   });
 
@@ -629,7 +696,9 @@ function wireInteraction() {
     canvas.classList.remove('dragging');
     if (!wasMoved) {
       const point = pointerWorld(event);
-      selected = { x: Math.floor(point.x), y: Math.floor(point.y) };
+      view = clampView({ ...view, selected: { floor: view.floor, x: Math.floor(point.x), y: Math.floor(point.y) } });
+      selected = view.selected ? { x: view.selected.x, y: view.selected.y } : null;
+      syncViewUi();
       renderInspector();
       updateSelectionBox();
     }
@@ -657,8 +726,10 @@ async function boot() {
   if (runtimePixelCatalog.manifest.counts.blobs !== pixelCatalog.blobs.size || runtimePixelCatalog.manifest.counts.bytes !== pixelCatalog.manifest.counts.rawBytesAfterDedupe) throw new Error('runtime pixel bucket/canonical pixel census mismatch');
   if (runtimeWorld.counts.floors !== semanticWorld.counts.floors || runtimeWorld.counts.shards !== semanticWorld.counts.shards || runtimeWorld.counts.tiles !== semanticWorld.counts.tiles || runtimeWorld.counts.resolvedPrimitives !== semanticWorld.counts.resolvedPrimitives) throw new Error('runtime index/world publication census mismatch');
   if (overviewWorld.counts.floors !== semanticWorld.counts.floors || overviewWorld.counts.chunks !== semanticWorld.counts.shards || overviewWorld.counts.tiles !== semanticWorld.counts.tiles || overviewWorld.counts.resolvedPrimitives !== semanticWorld.counts.resolvedPrimitives) throw new Error('overview/world publication census mismatch');
+  worldQuery = createWorldQueryApi(runtimeWorld, FULLWORLD_CAPABILITIES);
   populateFloors();
   view = parseFullWorldViewState(location.search, runtimeWorld);
+  selected = view.selected ? { x: view.selected.x, y: view.selected.y } : null;
   const semanticBase = new URL('./', new URL(publication.semantic.path, publicationBase));
   persistentCache = new VerifiedContentCache({ enabled: true, maxEntryBytes: 96 * 1024 * 1024 });
   semanticStore = new SemanticRangeStore(semanticBase, runtimeWorld, {
@@ -670,6 +741,7 @@ async function boot() {
     synchronousEvidence: performanceProfile.synchronousEvidence,
     measureVisibility: performanceProfile.measureVisibility,
     gpuTiming: true,
+    gpuTextureBudgetBytes: performanceProfile.gpuTextureBudgetBytes,
   });
   frameScheduler = createFrameScheduler(renderFrame);
   $('#status-detail').textContent = `Performance profile ${performanceProfile.name} · ${GROUP_CONCURRENCY} semantic / ${PIXEL_BUCKET_CONCURRENCY} pixel fetchers · ${formatBytes(performanceProfile.semanticCacheBytes)} semantic cache`;

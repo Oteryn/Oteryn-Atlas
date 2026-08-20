@@ -12,10 +12,18 @@ test('reference and local-max profiles preserve deterministic behavior while cha
   assert.equal(reference.groupConcurrency, 4);
   assert.equal(reference.prefetchTiles, 4);
   assert.equal(reference.semanticCacheBytes, 24 * 1024 * 1024);
+  assert.equal(reference.maxLoadedChunks, 16);
+  assert.equal(reference.maxLoadedGroups, 96);
+  assert.equal(reference.gpuTextureBudgetBytes, 384 * 1024 * 1024);
+  assert.equal(reference.drawCallTarget, 1);
   assert.equal(local.name, 'local-max');
   assert.equal(local.groupConcurrency, 12);
   assert.equal(local.prefetchTiles, 12);
   assert.equal(local.semanticCacheBytes, 256 * 1024 * 1024);
+  assert.equal(local.maxLoadedChunks, 64);
+  assert.equal(local.maxLoadedGroups, 384);
+  assert.equal(local.gpuTextureBudgetBytes, 768 * 1024 * 1024);
+  assert.equal(local.drawCallTarget, 1);
   assert.equal(local.capture, false);
   assert.equal(local.synchronousEvidence, false);
 });

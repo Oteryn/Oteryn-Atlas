@@ -1,9 +1,10 @@
 #!/usr/bin/env node
-import { spawn } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { performance } from 'node:perf_hooks';
+import { promisify } from 'node:util';
 
 function option(name, fallback = null) {
   const index = process.argv.indexOf(name);
@@ -21,9 +22,74 @@ if (!chrome || !url || !output || !screenshot) {
 }
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const execFileAsync = promisify(execFile);
 const profile = await mkdtemp(join(tmpdir(), 'oteryn-atlas-fullworld-'));
 let child;
 let cdp;
+let peakBrowserRssBytes = null;
+let browserRssSamples = 0;
+let rssTimer = null;
+let rssSampling = false;
+
+async function processTreeRssBytes(rootPid) {
+  if (!Number.isInteger(rootPid) || rootPid <= 0) return null;
+  if (process.platform === 'win32') {
+    const script = '$p=Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,WorkingSetSize; $p | ConvertTo-Json -Compress';
+    const { stdout } = await execFileAsync('powershell.exe', ['-NoProfile', '-Command', script], { maxBuffer: 16 * 1024 * 1024 });
+    const parsed = JSON.parse(stdout || '[]');
+    const rows = Array.isArray(parsed) ? parsed : [parsed];
+    const children = new Map();
+    for (const row of rows) {
+      const parent = Number(row.ParentProcessId);
+      if (!children.has(parent)) children.set(parent, []);
+      children.get(parent).push(row);
+    }
+    let total = 0;
+    const queue = [rootPid];
+    const seen = new Set();
+    while (queue.length) {
+      const pid = queue.shift();
+      if (seen.has(pid)) continue;
+      seen.add(pid);
+      const row = rows.find((item) => Number(item.ProcessId) === pid);
+      if (row) total += Number(row.WorkingSetSize) || 0;
+      for (const childRow of children.get(pid) ?? []) queue.push(Number(childRow.ProcessId));
+    }
+    return total || null;
+  }
+  if (process.platform === 'linux') {
+    let total = 0;
+    const queue = [rootPid];
+    const seen = new Set();
+    while (queue.length) {
+      const pid = queue.shift();
+      if (seen.has(pid)) continue;
+      seen.add(pid);
+      try {
+        const status = await readFile(`/proc/${pid}/status`, 'utf8');
+        const match = status.match(/^VmRSS:\s+(\d+)\s+kB$/m);
+        if (match) total += Number(match[1]) * 1024;
+        const childText = await readFile(`/proc/${pid}/task/${pid}/children`, 'utf8');
+        for (const childPid of childText.trim().split(/\s+/).filter(Boolean).map(Number)) queue.push(childPid);
+      } catch {}
+    }
+    return total || null;
+  }
+  return null;
+}
+
+async function sampleBrowserRss() {
+  if (rssSampling || !child?.pid) return;
+  rssSampling = true;
+  try {
+    const value = await processTreeRssBytes(child.pid);
+    if (Number.isFinite(value)) peakBrowserRssBytes = Math.max(peakBrowserRssBytes ?? 0, value);
+    browserRssSamples += 1;
+  } catch {} finally {
+    rssSampling = false;
+  }
+}
+
 async function waitForDebugPort(deadline) {
   const marker = join(profile, 'DevToolsActivePort');
   while (performance.now() < deadline) {
@@ -118,6 +184,8 @@ try {
     `--user-data-dir=${profile}`,
     url,
   ], { stdio: ['ignore', 'ignore', 'pipe'] });
+  rssTimer = setInterval(() => { sampleBrowserRss(); }, 100);
+  await sampleBrowserRss();
   const stderr = [];
   child.stderr.on('data', (chunk) => stderr.push(String(chunk)));
   const port = await waitForDebugPort(deadline);
@@ -145,10 +213,13 @@ try {
   const performanceResult = await cdp.send('Performance.getMetrics');
   const screenshotResult = await cdp.send('Page.captureScreenshot', { format: 'png', fromSurface: true });
   await writeFile(screenshot, Buffer.from(screenshotResult.data, 'base64'));
+  await sampleBrowserRss();
   const result = {
     status: pageResult.status,
     classification: 'G5_REAL_CHROME_FULLWORLD_QUALIFICATION',
     wallMs,
+    browserProcessPeakRssBytes: peakBrowserRssBytes,
+    browserProcessRssSamples: browserRssSamples,
     page: pageResult,
     transitions: pageResults,
     cdp: metricMap(performanceResult),
@@ -160,6 +231,8 @@ try {
   await writeFile(output, `${JSON.stringify({ status: 'FAIL', error: String(error.stack ?? error) }, null, 2)}\n`);
   process.exitCode = 1;
 } finally {
+  if (rssTimer) clearInterval(rssTimer);
+  try { await sampleBrowserRss(); } catch {}
   try { cdp?.close(); } catch {}
   try { child?.stderr?.destroy(); } catch {}
   try { child?.kill(); } catch {}

@@ -35,3 +35,17 @@ Authenticated semantic ranges and pixel transports can use persistent content-ad
 - named factual layers remain BLOCKED/UNKNOWN exactly as recorded by the G4 authority registry.
 
 Qualification evidence is recorded under `docs/evidence/fullworld-gui/`.
+
+## RuntimeState and World Query boundary
+
+`RuntimeState` is deterministic presentation/navigation state only. The URL round-trip includes floor, camera position, zoom, enabled factual layers, selected tile, search query, animation mode and debug flags. Component state never becomes Game/Atlas world authority.
+
+`src/browser/world-query.mjs` is the browser consumer boundary for region, entity, object, layer and provenance queries. Today, region/provenance queries resolve verified runtime products; entity/object queries fail closed as `BLOCKED` until authoritative indexes are published. Consumers should use this boundary instead of treating generated files as authority.
+
+Each runtime shard exposes a non-authoritative `WorldChunk` descriptor with `chunk_id`, floor, bounds, semantic/pixel roots, dependencies, content hash and estimated memory cost. The descriptor is validated against the authenticated shard and floor/world roots before use. Chunk invalidation is hash/dependency based; a local upstream change must not require a full-world reload when authoritative changed-region identities are available.
+
+## Resource budgets and degradation
+
+Profiles define bounded loaded-chunk/group counts, semantic-cache bytes, GPU texture allocation and a one-draw-call target for base-map submission. The selector always retains every authenticated group intersecting the visible viewport; only prefetch is trimmed to satisfy budgets. If the visible factual set itself exceeds a profile budget the runtime fails closed rather than silently hiding data.
+
+GPU memory is reported only when the platform exposes a trustworthy metric. WebGL2 allocation bytes are tracked separately from actual resident GPU memory, which remains `N/A` when unavailable. Real-browser evidence also records initial load, scene/chunk latency, visible/retained chunks, cache hit ratio, process-tree RSS from the external harness, JS heap, draw calls and animation ON/OFF delta when animation is actually available.

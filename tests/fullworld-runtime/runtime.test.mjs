@@ -13,8 +13,10 @@ import {
   loadSemanticWorld,
   parseFullWorldViewState,
   rootedContentId,
+  selectBudgetedRuntimeGroups,
   selectRuntimeGroups,
   serializeFullWorldViewState,
+  validateWorldChunkDescriptor,
 } from '../../src/browser/fullworld.mjs';
 import {
   PIXEL_HASH_DOMAIN,
@@ -25,6 +27,7 @@ import {
   requiredPixelPacks,
 } from '../../src/browser/fullworld-pixels.mjs';
 import { canonicalJsonBytes, sha256ContentId } from '../../src/browser/loader.mjs';
+import { createWorldQueryApi } from '../../src/browser/world-query.mjs';
 import {
   RUNTIME_PIXEL_BUCKET_DOMAIN,
   loadRuntimePixelBuckets,
@@ -113,12 +116,12 @@ function semanticRecord(x = 32360, y = 32230) {
   };
 }
 
-test('full-world deep link round-trips floor, layer and static animation state', () => {
+test('full-world RuntimeState round-trips deterministically', () => {
   const world = runtimeWorldCore();
-  const state = parseFullWorldViewState('?x=32360.125&y=32230.5&floor=-7&zoom=1.25&layers=minimap-overview&animation=off', world);
-  assert.deepEqual(state, { animation: 'off', floor: -7, overview: true, x: 32360.125, y: 32230.5, zoom: 1.25 });
+  const state = parseFullWorldViewState('?x=32360.125&y=32230.5&floor=-7&zoom=1.25&layers=minimap-overview&selected=-7:32360:32230&q=tile%2032360&animation=off&debug=bounds,cache', world);
+  assert.deepEqual(state, { animation: 'off', debugFlags: ['bounds', 'cache'], floor: -7, layers: ['minimap-overview'], overview: true, searchQuery: 'tile 32360', selected: { floor: -7, x: 32360, y: 32230 }, x: 32360.125, y: 32230.5, zoom: 1.25 });
   const serialized = serializeFullWorldViewState(state, world);
-  assert.equal(serialized, '?x=32360.125&y=32230.5&floor=-7&zoom=1.25&layers=minimap-overview&animation=off');
+  assert.equal(serialized, '?x=32360.125&y=32230.5&floor=-7&zoom=1.25&layers=minimap-overview&selected=-7%3A32360%3A32230&q=tile+32360&animation=off&debug=bounds%2Ccache');
   assert.throws(() => parseFullWorldViewState('?floor=1', world), /not exported/);
   assert.throws(() => parseFullWorldViewState('?floor=-7&x=999&y=32230', world), /outside exported floor bounds/);
   assert.throws(() => parseFullWorldViewState('?floor=-7&layers=npcs', world), /not enabled/);
@@ -136,6 +139,49 @@ test('runtime spatial index selects only intersecting authenticated row groups',
   const selected = selectRuntimeGroups(floor, { x_min: 32260, x_max_exclusive: 32270, y_min: 32003, y_max_exclusive: 32005 });
   assert.equal(selected.length, 2);
   assert.deepEqual(selected.map((entry) => entry.group.yMin), [32000, 32004]);
+});
+
+
+test('runtime budget retains every visible group and trims only prefetch', () => {
+  const floor = {
+    regionSpan: 256,
+    chunks: [
+      { contentId: sha('aa'), logicalAddress: { floor: -7, region_x: 126, region_y: 125 }, groups: [{ offset: 0, bytes: 4, yMin: 32000, yMaxExclusive: 32004 }, { offset: 4, bytes: 4, yMin: 32004, yMaxExclusive: 32008 }] },
+      { contentId: sha('bb'), logicalAddress: { floor: -7, region_x: 127, region_y: 125 }, groups: [{ offset: 0, bytes: 4, yMin: 32000, yMaxExclusive: 32004 }] },
+    ],
+  };
+  const visible = { x_min: 32260, x_max_exclusive: 32270, y_min: 32003, y_max_exclusive: 32005 };
+  const retained = { x_min: 32255, x_max_exclusive: 32520, y_min: 31999, y_max_exclusive: 32009 };
+  const selected = selectBudgetedRuntimeGroups(floor, visible, retained, { maxLoadedGroups: 2, maxLoadedChunks: 1 });
+  assert.equal(selected.length, 2);
+  assert.deepEqual(selected.map((entry) => entry.group.yMin), [32000, 32004]);
+  assert.throws(() => selectBudgetedRuntimeGroups(floor, visible, retained, { maxLoadedGroups: 1, maxLoadedChunks: 1 }), /visible factual data exceeds runtime budget/);
+});
+
+
+test('WorldChunk contract preserves local content identity and query boundary', () => {
+  const world = runtimeWorldCore();
+  const runtimeFloor = { floor: -7, regionSpan: 256, sourceFloorRoot: sha('66'), chunks: [] };
+  const chunk = {
+    bytes: 4096,
+    contentId: sha('aa'),
+    logicalAddress: { floor: -7, region_x: 126, region_y: 125 },
+    worldChunk: {
+      chunk_id: 'world-chunk:f-7:rx126:ry125', floor: -7,
+      bounds: { x_min: 32256, x_max_exclusive: 32512, y_min: 32000, y_max_exclusive: 32256 },
+      semantic_root: world.source.semanticRoot, pixel_root: world.source.pixelRoot,
+      dependencies: [runtimeFloor.sourceFloorRoot, world.source.semanticRoot, world.source.pixelRoot].sort(),
+      content_hash: sha('aa'), estimated_memory_cost: 4096, identityAuthority: false,
+    },
+  };
+  runtimeFloor.chunks.push(chunk);
+  assert.equal(validateWorldChunkDescriptor(chunk, world, runtimeFloor).content_hash, chunk.contentId);
+  const api = createWorldQueryApi(world, { layers: [{ id: 'minimap-overview', status: 'PROVEN', enabled: true }] });
+  assert.equal(api.region(runtimeFloor, { x_min: 32300, x_max_exclusive: 32310, y_min: 32100, y_max_exclusive: 32110 })[0].chunk_id, chunk.worldChunk.chunk_id);
+  assert.equal(api.provenance(runtimeFloor, chunk.worldChunk.chunk_id).content_hash, chunk.contentId);
+  assert.equal(api.layer('minimap-overview').status, 'PROVEN');
+  assert.equal(api.entity('npc:test').status, 'BLOCKED');
+  assert.equal(api.object('object:test').status, 'BLOCKED');
 });
 
 test('authenticated semantic range decodes exact G3 record and rejects corruption', async () => {

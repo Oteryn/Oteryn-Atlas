@@ -142,6 +142,37 @@ export async function loadRuntimeWorld(baseUrl, trust, fetcher = fetch) {
   return world;
 }
 
+export function validateWorldChunkDescriptor(chunk, runtimeWorld, runtimeFloor) {
+  const worldChunk = chunk?.worldChunk;
+  requireValue(worldChunk && typeof worldChunk === 'object' && !Array.isArray(worldChunk), 'WorldChunk descriptor missing');
+  requireValue(worldChunk.identityAuthority === false, 'WorldChunk must be non-authoritative');
+  requireValue(typeof worldChunk.chunk_id === 'string' && worldChunk.chunk_id.length > 0, 'WorldChunk chunk_id invalid');
+  requireValue(worldChunk.floor === runtimeFloor.floor, 'WorldChunk floor mismatch');
+  validateBounds(worldChunk.bounds, 'WorldChunk bounds');
+  const logical = chunk.logicalAddress;
+  const expectedBounds = {
+    x_min: logical.region_x * runtimeFloor.regionSpan,
+    x_max_exclusive: (logical.region_x + 1) * runtimeFloor.regionSpan,
+    y_min: logical.region_y * runtimeFloor.regionSpan,
+    y_max_exclusive: (logical.region_y + 1) * runtimeFloor.regionSpan,
+  };
+  requireValue(
+    worldChunk.bounds.x_min === expectedBounds.x_min
+      && worldChunk.bounds.x_max_exclusive === expectedBounds.x_max_exclusive
+      && worldChunk.bounds.y_min === expectedBounds.y_min
+      && worldChunk.bounds.y_max_exclusive === expectedBounds.y_max_exclusive,
+    'WorldChunk bounds mismatch',
+  );
+  requireValue(worldChunk.semantic_root === runtimeWorld.source.semanticRoot, 'WorldChunk semantic root mismatch');
+  requireValue(worldChunk.pixel_root === runtimeWorld.source.pixelRoot, 'WorldChunk pixel root mismatch');
+  requireValue(worldChunk.content_hash === chunk.contentId, 'WorldChunk content hash mismatch');
+  requireValue(Number.isSafeInteger(worldChunk.estimated_memory_cost) && worldChunk.estimated_memory_cost >= chunk.bytes, 'WorldChunk memory estimate invalid');
+  requireValue(Array.isArray(worldChunk.dependencies) && worldChunk.dependencies.every(isSha256), 'WorldChunk dependencies invalid');
+  const expectedDependencies = [runtimeFloor.sourceFloorRoot, runtimeWorld.source.semanticRoot, runtimeWorld.source.pixelRoot].sort();
+  requireValue(JSON.stringify([...worldChunk.dependencies].sort()) === JSON.stringify(expectedDependencies), 'WorldChunk dependency linkage mismatch');
+  return worldChunk;
+}
+
 export async function loadRuntimeFloor(baseUrl, runtimeWorld, floorEntry, fetcher = fetch) {
   const floor = await fetchCanonical(new URL(safeRelativePath(floorEntry.path), baseUrl), MAX_FLOOR_BYTES, `runtime floor ${floorEntry.floor}`, fetcher);
   requireValue(floor.profile === RUNTIME_FLOOR_PROFILE && floor.floor === floorEntry.floor, 'runtime floor identity mismatch');
@@ -163,6 +194,7 @@ export async function loadRuntimeFloor(baseUrl, runtimeWorld, floorEntry, fetche
     addresses.add(key);
     safeRelativePath(chunk.path);
     requireValue(isSha256(chunk.contentId) && Number.isSafeInteger(chunk.bytes) && chunk.bytes > 0 && chunk.bytes <= MAX_SOURCE_CHUNK_BYTES, 'runtime source chunk identity invalid');
+    validateWorldChunkDescriptor(chunk, runtimeWorld, floor);
     requireValue(Array.isArray(chunk.groups), 'runtime chunk groups missing');
     let previousEnd = -1;
     for (const group of chunk.groups) {
@@ -206,6 +238,41 @@ export function selectRuntimeGroups(runtimeFloor, tileBounds) {
     }
   }
   return matches;
+}
+
+function runtimeGroupKey(entry) {
+  return `${entry.chunk.contentId}:${entry.group.offset}:${entry.group.bytes}`;
+}
+
+function runtimeChunkKey(entry) {
+  const logical = entry.chunk.logicalAddress;
+  return `${logical.floor}:${logical.region_x}:${logical.region_y}`;
+}
+
+export function selectBudgetedRuntimeGroups(runtimeFloor, visibleBounds, retainBounds, budget) {
+  const visible = selectRuntimeGroups(runtimeFloor, visibleBounds);
+  const retained = selectRuntimeGroups(runtimeFloor, retainBounds);
+  const maxLoadedGroups = Number(budget?.maxLoadedGroups);
+  const maxLoadedChunks = Number(budget?.maxLoadedChunks);
+  requireValue(Number.isSafeInteger(maxLoadedGroups) && maxLoadedGroups > 0, 'max loaded group budget invalid');
+  requireValue(Number.isSafeInteger(maxLoadedChunks) && maxLoadedChunks > 0, 'max loaded chunk budget invalid');
+  const visibleKeys = new Set(visible.map(runtimeGroupKey));
+  const visibleChunks = new Set(visible.map(runtimeChunkKey));
+  requireValue(visible.length <= maxLoadedGroups && visibleChunks.size <= maxLoadedChunks, 'visible factual data exceeds runtime budget; increase profile rather than hide it');
+  const selected = [...visible];
+  const selectedKeys = new Set(visibleKeys);
+  const selectedChunks = new Set(visibleChunks);
+  for (const entry of retained) {
+    const groupKey = runtimeGroupKey(entry);
+    if (selectedKeys.has(groupKey)) continue;
+    const chunkKey = runtimeChunkKey(entry);
+    if (selected.length >= maxLoadedGroups) break;
+    if (!selectedChunks.has(chunkKey) && selectedChunks.size >= maxLoadedChunks) continue;
+    selected.push(entry);
+    selectedKeys.add(groupKey);
+    selectedChunks.add(chunkKey);
+  }
+  return Object.freeze(selected);
 }
 
 function validateBoundsLike(bounds, label) {
@@ -454,6 +521,30 @@ function normalizeCoordinate(value, min, maxExclusive, label) {
   return Math.round(value * 10000) / 10000;
 }
 
+function normalizeSearchQuery(value) {
+  const text = String(value ?? '').trim().replace(/\s+/g, ' ');
+  requireValue(text.length <= 256 && !/[\u0000-\u001f\u007f]/.test(text), 'search query invalid');
+  return text;
+}
+
+function normalizeDebugFlags(value) {
+  const flags = Array.isArray(value) ? value : String(value ?? '').split(',');
+  const normalized = [...new Set(flags.map((flag) => String(flag).trim()).filter(Boolean))].sort();
+  requireValue(normalized.length <= 16 && normalized.every((flag) => /^[a-z0-9-]{1,32}$/.test(flag)), 'debug flags invalid');
+  return Object.freeze(normalized);
+}
+
+function normalizeSelection(value, floor, floors) {
+  if (value == null || value === '') return null;
+  const raw = typeof value === 'string' ? value.split(':').map(Number) : [value.floor, value.x, value.y];
+  requireValue(raw.length === 3 && raw.every(Number.isSafeInteger), 'selected tile invalid');
+  const [selectedFloor, x, y] = raw;
+  requireValue(selectedFloor === floor && floors.has(selectedFloor), 'selected tile must be on the active exported floor');
+  const bounds = floors.get(selectedFloor).bounds;
+  requireValue(x >= bounds.x_min && x < bounds.x_max_exclusive && y >= bounds.y_min && y < bounds.y_max_exclusive, 'selected tile outside exported floor bounds');
+  return Object.freeze({ floor: selectedFloor, x, y });
+}
+
 export function parseFullWorldViewState(input, runtimeWorld) {
   const params = new URLSearchParams(String(input ?? '').replace(/^\?/, ''));
   const floors = floorMap(runtimeWorld);
@@ -466,23 +557,52 @@ export function parseFullWorldViewState(input, runtimeWorld) {
   const x = normalizeCoordinate(params.has('x') ? Number(params.get('x')) : defaultX, bounds.x_min, bounds.x_max_exclusive, 'x');
   const y = normalizeCoordinate(params.has('y') ? Number(params.get('y')) : defaultY, bounds.y_min, bounds.y_max_exclusive, 'y');
   const zoom = normalizeZoom(params.has('zoom') ? Number(params.get('zoom')) : 2);
-  const requestedLayers = (params.get('layers') ?? 'minimap-overview').split(',').filter(Boolean);
+  const requestedLayers = [...new Set((params.get('layers') ?? 'minimap-overview').split(',').filter(Boolean))].sort();
   requireValue(requestedLayers.every((layer) => layer === 'minimap-overview'), 'requested semantic layer is not enabled by the verified hand-off');
-  const overview = requestedLayers.includes('minimap-overview');
   const animation = params.get('animation') ?? 'off';
   requireValue(animation === 'off', 'animation playback is not yet supported by authoritative metadata');
-  return Object.freeze({ animation, floor, overview, x, y, zoom });
+  const selected = normalizeSelection(params.get('selected'), floor, floors);
+  const searchQuery = normalizeSearchQuery(params.get('q') ?? '');
+  const debugFlags = normalizeDebugFlags(params.get('debug') ?? '');
+  return Object.freeze({
+    animation,
+    debugFlags,
+    floor,
+    layers: Object.freeze(requestedLayers),
+    overview: requestedLayers.includes('minimap-overview'),
+    searchQuery,
+    selected,
+    x,
+    y,
+    zoom,
+  });
 }
 
 export function serializeFullWorldViewState(state, runtimeWorld) {
-  const parsed = parseFullWorldViewState(`x=${state.x}&y=${state.y}&floor=${state.floor}&zoom=${state.zoom}&layers=${state.overview ? 'minimap-overview' : ''}&animation=${state.animation ?? 'off'}`, runtimeWorld);
+  const layerValue = Array.isArray(state.layers) ? state.layers.join(',') : (state.overview ? 'minimap-overview' : '');
+  const selectedValue = state.selected ? `${state.selected.floor}:${state.selected.x}:${state.selected.y}` : '';
+  const debugValue = Array.isArray(state.debugFlags) ? state.debugFlags.join(',') : '';
+  const raw = new URLSearchParams();
+  raw.set('x', String(state.x));
+  raw.set('y', String(state.y));
+  raw.set('floor', String(state.floor));
+  raw.set('zoom', String(state.zoom));
+  raw.set('layers', layerValue);
+  if (selectedValue) raw.set('selected', selectedValue);
+  if (state.searchQuery) raw.set('q', state.searchQuery);
+  raw.set('animation', state.animation ?? 'off');
+  if (debugValue) raw.set('debug', debugValue);
+  const parsed = parseFullWorldViewState(raw, runtimeWorld);
   const params = new URLSearchParams();
   params.set('x', String(parsed.x));
   params.set('y', String(parsed.y));
   params.set('floor', String(parsed.floor));
   params.set('zoom', String(parsed.zoom));
-  params.set('layers', parsed.overview ? 'minimap-overview' : '');
+  params.set('layers', parsed.layers.join(','));
+  if (parsed.selected) params.set('selected', `${parsed.selected.floor}:${parsed.selected.x}:${parsed.selected.y}`);
+  if (parsed.searchQuery) params.set('q', parsed.searchQuery);
   params.set('animation', parsed.animation);
+  if (parsed.debugFlags.length) params.set('debug', parsed.debugFlags.join(','));
   return `?${params.toString()}`;
 }
 
@@ -491,7 +611,16 @@ export function changeFloor(state, nextFloor, runtimeWorld) {
   requireValue(entry, 'requested floor is not exported');
   const x = Math.min(entry.bounds.x_max_exclusive - 0.0001, Math.max(entry.bounds.x_min, state.x));
   const y = Math.min(entry.bounds.y_max_exclusive - 0.0001, Math.max(entry.bounds.y_min, state.y));
-  return parseFullWorldViewState(`x=${x}&y=${y}&floor=${entry.floor}&zoom=${state.zoom}&layers=${state.overview ? 'minimap-overview' : ''}&animation=off`, runtimeWorld);
+  const params = new URLSearchParams();
+  params.set('x', String(x));
+  params.set('y', String(y));
+  params.set('floor', String(entry.floor));
+  params.set('zoom', String(state.zoom));
+  params.set('layers', Array.isArray(state.layers) ? state.layers.join(',') : (state.overview ? 'minimap-overview' : ''));
+  if (state.searchQuery) params.set('q', state.searchQuery);
+  params.set('animation', 'off');
+  if (Array.isArray(state.debugFlags) && state.debugFlags.length) params.set('debug', state.debugFlags.join(','));
+  return parseFullWorldViewState(params, runtimeWorld);
 }
 
 export function parseCoordinateSearch(text, currentFloor, runtimeWorld) {

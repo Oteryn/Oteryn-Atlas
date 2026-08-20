@@ -102,6 +102,13 @@ def main() -> None:
         assert len(floor["chunks"][0]["groups"]) == 2
         assert sum(group["tiles"] for group in floor["chunks"][0]["groups"]) == 3
         assert floor["chunks"][0]["visualBounds"] == {"maxWidthUnits": 64, "maxHeightUnits": 64, "minDxUnits": -32, "maxDxUnits": 0, "minDyUnits": -24, "maxDyUnits": 0}
+        world_chunk = floor["chunks"][0]["worldChunk"]
+        assert world_chunk["chunk_id"] == "world-chunk:f-7:rx0:ry0"
+        assert world_chunk["bounds"] == {"x_min": 0, "x_max_exclusive": 256, "y_min": 0, "y_max_exclusive": 256}
+        assert world_chunk["content_hash"] == floor["chunks"][0]["contentId"]
+        assert world_chunk["estimated_memory_cost"] == floor["chunks"][0]["bytes"]
+        assert world_chunk["identityAuthority"] is False
+        assert world_chunk["dependencies"] == sorted(world_chunk["dependencies"])
 
         chunk = publication / "semantic/chunks/fm000007_rxp000000_ryp000000.jsonl"
         original = chunk.read_bytes()

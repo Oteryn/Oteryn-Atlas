@@ -1,0 +1,162 @@
+{
+  "format": "oteryn-atlas-fullworld-gui-qualification-summary-v2",
+  "status": "PASS",
+  "classification": "G5_REAL_CHROME_FULLWORLD_QUALIFICATION_SUMMARY",
+  "source": {
+    "gameSha": "f79fd3b5c239fa13810338f1380539c4eac67d7d",
+    "overviewRoot": "sha256:17683912d6758796d80a5b1647e2d0031f6849e51c40ae5264da6cfce3f9d6db",
+    "pixelRoot": "sha256:8b8228fcc4574903e547cb7d65b96f3d45e5a9e67045091c1bceb6e54d3690ad",
+    "pixelBucketRoot": "sha256:99cf23b01a0d652ff670a994a2b80cbef8d17036f514522d47f1aa98352d3116",
+    "publicationRoot": "sha256:9d0d2f3bb16a5a90f9b51a21366e4ed42963f5cb12366c404a20d9502ec4857f",
+    "runtimeIndexRoot": "sha256:fa30ae5fc47f0ca8a6d482ed87b5db2cd74f32f7f523df16187ca719b8e04f08",
+    "semanticRoot": "sha256:27d7a83a7d9f498ea614b440ab4216cae5e6d11ea0527482410e40948cade5a9"
+  },
+  "worldCounts": {
+    "floors": 16,
+    "groups": 44426,
+    "resolvedPrimitives": 24502035,
+    "shards": 1197,
+    "sourceBytes": 18750839498,
+    "tiles": 18997668
+  },
+  "scenarios": {
+    "localMaxDetail": {
+      "status": "PASS",
+      "floor": -7,
+      "zoom": 2,
+      "wallMs": 2192.3037999999997,
+      "browserProcessPeakRssBytes": 1113374720,
+      "initialLoadMs": 1613.5999999940395,
+      "chunkLoadingLatencyMs": 1205.5,
+      "webglRenderMs": 5.299999997019768,
+      "textureUploadMs": 102.59999999403954,
+      "drawCalls": 1,
+      "visibleChunkCount": 1,
+      "retainedChunkCount": 1,
+      "retainedTiles": 2107,
+      "submittedPrimitives": 3464,
+      "cacheHitRatio": 0,
+      "pixelTransport": "local-max-bundle",
+      "pixelNetworkBytes": 252592128,
+      "rangeAuthenticatedBytes": 12578291
+    },
+    "referenceDetail": {
+      "status": "PASS",
+      "floor": -7,
+      "zoom": 2,
+      "wallMs": 2452.7316,
+      "browserProcessPeakRssBytes": 842973184,
+      "initialLoadMs": 1909.2000000029802,
+      "chunkLoadingLatencyMs": 1528.2000000029802,
+      "webglRenderMs": 5,
+      "textureUploadMs": 123.80000001192093,
+      "drawCalls": 1,
+      "visibleChunkCount": 1,
+      "retainedChunkCount": 1,
+      "retainedTiles": 891,
+      "submittedPrimitives": 1453,
+      "cacheHitRatio": 0,
+      "pixelTransport": "stable-buckets",
+      "pixelNetworkBytes": 155975680,
+      "rangeAuthenticatedBytes": 7997917
+    },
+    "referenceOverview": {
+      "status": "PASS",
+      "floor": -7,
+      "zoom": 0.25,
+      "wallMs": 1296.6333,
+      "browserProcessPeakRssBytes": 348442624,
+      "initialLoadMs": 625.4000000059605,
+      "chunkLoadingLatencyMs": 213.79999999701977,
+      "webglRenderMs": 2.7999999970197678,
+      "textureUploadMs": 0,
+      "drawCalls": 0,
+      "visibleChunkCount": 0,
+      "retainedChunkCount": 0,
+      "retainedTiles": 0,
+      "submittedPrimitives": 0,
+      "cacheHitRatio": null,
+      "pixelTransport": "stable-buckets",
+      "pixelNetworkBytes": 0,
+      "rangeAuthenticatedBytes": 0
+    }
+  },
+  "multiFloor": {
+    "status": "PASS",
+    "wallMs": 4156.4439999999995,
+    "browserProcessPeakRssBytes": 1778880512,
+    "transitions": [
+      {
+        "floor": -7,
+        "x": 32360,
+        "y": 32230,
+        "chunkLoadingLatencyMs": 1232.1000000089407,
+        "drawCalls": 1
+      },
+      {
+        "floor": -15,
+        "x": 33288,
+        "y": 31800,
+        "chunkLoadingLatencyMs": 502.59999999403954,
+        "drawCalls": 1
+      },
+      {
+        "floor": -10,
+        "x": 33032,
+        "y": 32536,
+        "chunkLoadingLatencyMs": 579.8999999910593,
+        "drawCalls": 1
+      },
+      {
+        "floor": -3,
+        "x": 32056,
+        "y": 31192,
+        "chunkLoadingLatencyMs": 418.40000000596046,
+        "drawCalls": 1
+      },
+      {
+        "floor": 0,
+        "x": 32584,
+        "y": 31960,
+        "chunkLoadingLatencyMs": 266.59999999403954,
+        "drawCalls": 1
+      }
+    ]
+  },
+  "rawArtifactIdentities": {
+    "qualification-navigation.json": {
+      "bytes": 10252,
+      "sha256": "11dc6d298f1cb5f6f0657465072ffc45f48363c49893e67973c9a152f0a6fd0d"
+    },
+    "qualification-reference.json": {
+      "bytes": 10206,
+      "sha256": "0612cbcc0b01f2c837d6e809ac361de303557b5890ac6ee8430fe25ece860986"
+    },
+    "qualification-overview.json": {
+      "bytes": 10100,
+      "sha256": "8ea568a44534d23e4aa1c833d4e53245701bbbb2cc64c1da85a5109b46458979"
+    },
+    "qualification-multifloor.json": {
+      "bytes": 29043,
+      "sha256": "17fb87bce72e106c3b76f34c9ad5f1550bc2074e82780a013c6f248aa8092851"
+    }
+  },
+  "externalScreenshotIdentities": {
+    "fullworld-detail-1920x1080.png": {
+      "bytes": 752704,
+      "sha256": "88fbbdca22fd53c6d401be5a9c3471a9731b9062494fd906e59c91627d33c2b2"
+    },
+    "fullworld-multifloor-1920x1080.png": {
+      "bytes": 339645,
+      "sha256": "55ce7b824a1b89e35b23c6b5b999c688ac5b54d88e43143ed4ce18086bd451f6"
+    },
+    "fullworld-overview-1920x1080.png": {
+      "bytes": 128981,
+      "sha256": "ad36c9676e730801f475ebcfce918dc29a562f0cd1e008009b7d629bdbacdec9"
+    },
+    "fullworld-reference-1920x1080.png": {
+      "bytes": 752778,
+      "sha256": "68a7069007736e17f3f19ad76616158703b61753675d2f4c46b7952040f2947b"
+    }
+  }
+}

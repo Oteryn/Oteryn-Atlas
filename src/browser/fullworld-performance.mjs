@@ -28,6 +28,9 @@ export function resolvePerformanceProfile(input = '', capabilities = {}) {
   const local = name === PERFORMANCE_PROFILE_LOCAL_MAX;
   const groupConcurrency = local ? clamp(Math.floor(hardwareConcurrency * 0.75), 6, 16) : 4;
   const semanticCacheBytes = local ? 256 * 1024 * 1024 : 24 * 1024 * 1024;
+  const maxLoadedChunks = local ? 64 : 16;
+  const maxLoadedGroups = local ? 384 : 96;
+  const gpuTextureBudgetBytes = local ? 768 * 1024 * 1024 : 384 * 1024 * 1024;
 
   return Object.freeze({
     name,
@@ -39,6 +42,10 @@ export function resolvePerformanceProfile(input = '', capabilities = {}) {
     pixelBucketConcurrency: local ? clamp(Math.floor(hardwareConcurrency * 1.5), 12, 24) : 8,
     prefetchTiles: local ? 12 : 4,
     semanticCacheBytes,
+    maxLoadedChunks,
+    maxLoadedGroups,
+    gpuTextureBudgetBytes,
+    drawCallTarget: 1,
     capture: params.get('capture') === '1',
     synchronousEvidence: params.get('sync-evidence') === '1',
     measureVisibility: !local || params.get('measure-visibility') === '1',
@@ -56,6 +63,10 @@ export function profileSummary(profile) {
     pixelBucketConcurrency: profile.pixelBucketConcurrency,
     prefetchTiles: profile.prefetchTiles,
     semanticCacheBytes: profile.semanticCacheBytes,
+    maxLoadedChunks: profile.maxLoadedChunks,
+    maxLoadedGroups: profile.maxLoadedGroups,
+    gpuTextureBudgetBytes: profile.gpuTextureBudgetBytes,
+    drawCallTarget: profile.drawCallTarget,
     capture: profile.capture,
     synchronousEvidence: profile.synchronousEvidence,
     measureVisibility: profile.measureVisibility,

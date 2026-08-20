@@ -259,6 +259,23 @@ def build(publication_root: Path, output_root: Path, expected_publication_root: 
                 scanned_chunks += 1
             merge_visual(visual, chunk_visual)
             floor_groups += len(groups)
+            chunk_bounds = {
+                "x_min": logical["region_x"] * REGION_SPAN,
+                "x_max_exclusive": (logical["region_x"] + 1) * REGION_SPAN,
+                "y_min": logical["region_y"] * REGION_SPAN,
+                "y_max_exclusive": (logical["region_y"] + 1) * REGION_SPAN,
+            }
+            world_chunk = {
+                "chunk_id": f"world-chunk:f{floor}:rx{logical['region_x']}:ry{logical['region_y']}",
+                "floor": floor,
+                "bounds": chunk_bounds,
+                "semantic_root": semantic["rootContentId"],
+                "pixel_root": publication["pixels"]["rootContentId"],
+                "dependencies": sorted([floor_entry["rootContentId"], semantic["rootContentId"], publication["pixels"]["rootContentId"]]),
+                "content_hash": chunk["contentId"],
+                "estimated_memory_cost": chunk["bytes"],
+                "identityAuthority": False,
+            }
             indexed_chunks.append({
                 "bytes": chunk["bytes"],
                 "contentId": chunk["contentId"],
@@ -268,6 +285,7 @@ def build(publication_root: Path, output_root: Path, expected_publication_root: 
                 "resolvedPrimitives": chunk["resolvedPrimitives"],
                 "tiles": chunk["tiles"],
                 "visualBounds": chunk_visual,
+                "worldChunk": world_chunk,
             })
         counts = {
             "chunks": len(indexed_chunks),

@@ -45,6 +45,8 @@ const fullworldIndex = await readFile(new URL('../web/fullworld.html', import.me
 const fullworldApp = await readFile(new URL('../web/fullworld-app.mjs', import.meta.url), 'utf8');
 const fullworldTrust = await readFile(new URL('../src/browser/fullworld-trust.mjs', import.meta.url), 'utf8');
 const fullworldRenderer = await readFile(new URL('../src/browser/fullworld-webgl.mjs', import.meta.url), 'utf8');
+const worldQuery = await readFile(new URL('../src/browser/world-query.mjs', import.meta.url), 'utf8');
+const qualifier = await readFile(new URL('../tools/fullworld-runtime/qualify_browser.mjs', import.meta.url), 'utf8');
 
 test('full-world GUI is a separate verified runtime entry while bounded proof remains regression fixture', () => {
   assert.match(fullworldIndex, /FULL-WORLD VERIFIED RUNTIME/);
@@ -63,7 +65,7 @@ test('full-world GUI pins exact G3/G4/runtime roots and keeps blocked semantics 
     'sha256:27d7a83a7d9f498ea614b440ab4216cae5e6d11ea0527482410e40948cade5a9',
     'sha256:8b8228fcc4574903e547cb7d65b96f3d45e5a9e67045091c1bceb6e54d3690ad',
     'sha256:17683912d6758796d80a5b1647e2d0031f6849e51c40ae5264da6cfce3f9d6db',
-    'sha256:98fa66118d49e3d440d8b14643d020542fadeff522ada69d6fb342d1f82547ed',
+    'sha256:fa30ae5fc47f0ca8a6d482ed87b5db2cd74f32f7f523df16187ca719b8e04f08',
     'sha256:99cf23b01a0d652ff670a994a2b80cbef8d17036f514522d47f1aa98352d3116',
   ]) assert.ok(fullworldTrust.includes(root));
   assert.match(fullworldTrust, /id: 'npcs'.*status: 'BLOCKED'.*enabled: false/s);
@@ -92,4 +94,16 @@ test('full-world app coalesces interactive rendering and uses stable verified pi
   assert.match(fullworldApp, /loadRuntimePixelBuckets/);
   assert.match(fullworldApp, /loadVerifiedPixelBucket/);
   assert.match(fullworldApp, /VerifiedContentCache/);
+});
+
+
+test('full-world runtime exposes World Query boundary, budgets and measured acceptance telemetry', () => {
+  assert.match(worldQuery, /createWorldQueryApi/);
+  assert.match(worldQuery, /selectViewportGroups/);
+  assert.match(fullworldApp, /worldQuery\.selectViewportGroups/);
+  assert.match(fullworldApp, /maxLoadedChunks/);
+  assert.match(fullworldApp, /cacheHitRatio/);
+  assert.match(fullworldApp, /browserRamReason/);
+  assert.match(qualifier, /browserProcessPeakRssBytes/);
+  assert.match(qualifier, /processTreeRssBytes/);
 });
