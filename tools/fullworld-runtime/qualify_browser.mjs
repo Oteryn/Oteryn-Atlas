@@ -18,6 +18,10 @@ const output = option('--output');
 const screenshot = option('--screenshot');
 const stepsPath = option('--steps');
 const timeoutMs = Number(option('--timeout-ms', '120000'));
+const viewportWidth = Number(option('--viewport-width', '1920'));
+const viewportHeight = Number(option('--viewport-height', '1080'));
+const mobile = process.argv.includes('--mobile');
+const lodCycle = process.argv.includes('--lod-cycle');
 if (!chrome || !url || !output || !screenshot) {
   throw new Error('usage: qualify_browser.mjs --chrome PATH --url URL --output JSON --screenshot PNG [--timeout-ms N]');
 }
@@ -187,6 +191,25 @@ function metricMap(result) {
   return Object.fromEntries(result.metrics.map((entry) => [entry.name, entry.value]));
 }
 
+async function clickBySelector(selector, count = 1) {
+  const evaluation = await cdp.send('Runtime.evaluate', { expression: `document.querySelector(${JSON.stringify(selector)})`, returnByValue: false });
+  const objectId = evaluation.result?.objectId;
+  if (!objectId) throw new Error(`missing control ${selector}`);
+  const result = await cdp.send('Runtime.callFunctionOn', { objectId, functionDeclaration: 'function (count) { for (let i=0;i<count;i+=1) this.click(); return true; }', arguments: [{ value: count }], returnByValue: true });
+  if (result.exceptionDetails || result.result?.value !== true) throw new Error(`control click failed ${selector}`);
+}
+
+async function waitForView(deadline, predicate) {
+  while (performance.now() < deadline) {
+    const evaluation = await cdp.send('Runtime.evaluate', { expression: 'globalThis.__OTERYN_ATLAS_FULLWORLD__ ?? null', returnByValue: true });
+    const value = evaluation.result?.value;
+    if (value?.status === 'FAIL') throw new Error(value.error ?? 'Atlas runtime failed');
+    if (value?.status === 'PASS' && predicate(value)) return value;
+    await sleep(50);
+  }
+  throw new Error('Atlas view transition did not reach expected state');
+}
+
 const started = performance.now();
 const deadline = started + timeoutMs;
 try {
@@ -197,7 +220,7 @@ try {
     '--no-default-browser-check',
     '--enable-precise-memory-info',
     '--force-device-scale-factor=1',
-    '--window-size=1920,1080',
+    `--window-size=${viewportWidth},${viewportHeight}`, 
     '--remote-debugging-port=0',
     `--user-data-dir=${profile}`,
     url,
@@ -210,12 +233,23 @@ try {
   const target = await waitForTarget(port, deadline);
   cdp = new CdpSession(target.webSocketDebuggerUrl);
   await cdp.open();
-  await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1920, height: 1080, deviceScaleFactor: 1, mobile: false });
+  await cdp.send('Emulation.setDeviceMetricsOverride', { width: viewportWidth, height: viewportHeight, deviceScaleFactor: 1, mobile });
   await cdp.send('Performance.enable');
   const initialResult = await waitForQualification(deadline);
   assertQualifiedResult(initialResult, 'initial qualification');
   const initialMinimap = (initialResult.view?.mode === 'minimap' || Number(initialResult.view?.zoom) < 0.5) ? await waitForMinimap(deadline) : null;
   const pageResults = [initialResult];
+  let lodCycleResult = null;
+  if (lodCycle && initialResult.status === 'PASS') {
+    const anchor = { x: initialResult.view.x, y: initialResult.view.y, floor: initialResult.view.floor };
+    await clickBySelector('#zoom-in', 4);
+    const detailResult = await waitForView(deadline, (value) => value.view?.zoom >= 0.5 && value.view?.x === anchor.x && value.view?.y === anchor.y && value.view?.floor === anchor.floor);
+    assertQualifiedResult(detailResult, 'LOD cycle detail');
+    await clickBySelector('#zoom-out', 4);
+    const minimapResult = await waitForView(deadline, (value) => value.view?.zoom <= 0.38 && value.view?.x === anchor.x && value.view?.y === anchor.y && value.view?.floor === anchor.floor);
+    const paintedMinimap = await waitForMinimap(deadline);
+    lodCycleResult = { anchor, detail: detailResult.view, minimap: minimapResult.view, paintedMinimap };
+  }
   if (stepsPath && initialResult.status === 'PASS') {
     const steps = JSON.parse(await readFile(stepsPath, 'utf8'));
     if (!Array.isArray(steps)) throw new Error('qualification steps must be a JSON array');
@@ -255,6 +289,8 @@ try {
     browserProcessRssSamples: browserRssSamples,
     page: pageResult,
     minimap: initialMinimap,
+    lodCycle: lodCycleResult,
+    viewport: { width: viewportWidth, height: viewportHeight, mobile },
     transitions: pageResults,
     cdp: metricMap(performanceResult),
     chromeStderr: stderr.join('').trim() || null,
