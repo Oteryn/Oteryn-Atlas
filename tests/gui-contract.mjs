@@ -37,3 +37,59 @@ test('GUI source does not advertise fabricated performance claims', () => {
     assert.ok(!app.includes(fabricated));
   }
 });
+
+await import('./fullworld-runtime/runtime.test.mjs');
+await import('./fullworld-runtime/performance.test.mjs');
+
+const fullworldIndex = await readFile(new URL('../web/fullworld.html', import.meta.url), 'utf8');
+const fullworldApp = await readFile(new URL('../web/fullworld-app.mjs', import.meta.url), 'utf8');
+const fullworldTrust = await readFile(new URL('../src/browser/fullworld-trust.mjs', import.meta.url), 'utf8');
+const fullworldRenderer = await readFile(new URL('../src/browser/fullworld-webgl.mjs', import.meta.url), 'utf8');
+
+test('full-world GUI is a separate verified runtime entry while bounded proof remains regression fixture', () => {
+  assert.match(fullworldIndex, /FULL-WORLD VERIFIED RUNTIME/);
+  assert.match(fullworldIndex, /Overview \/ density/);
+  assert.match(fullworldIndex, /id="floor-select"/);
+  assert.match(fullworldIndex, /id="animation-toggle"[^>]*disabled/);
+  assert.match(fullworldApp, /SemanticRangeStore/);
+  assert.match(fullworldApp, /loadOverviewWorld/);
+  assert.match(fullworldApp, /requiredRuntimePixelBuckets/);
+  assert.doesNotMatch(fullworldApp, /\.otbm|Legacy IR|world\.otbm/);
+});
+
+test('full-world GUI pins exact G3/G4/runtime roots and keeps blocked semantics disabled', () => {
+  for (const root of [
+    'sha256:9d0d2f3bb16a5a90f9b51a21366e4ed42963f5cb12366c404a20d9502ec4857f',
+    'sha256:27d7a83a7d9f498ea614b440ab4216cae5e6d11ea0527482410e40948cade5a9',
+    'sha256:8b8228fcc4574903e547cb7d65b96f3d45e5a9e67045091c1bceb6e54d3690ad',
+    'sha256:17683912d6758796d80a5b1647e2d0031f6849e51c40ae5264da6cfce3f9d6db',
+    'sha256:98fa66118d49e3d440d8b14643d020542fadeff522ada69d6fb342d1f82547ed',
+    'sha256:99cf23b01a0d652ff670a994a2b80cbef8d17036f514522d47f1aa98352d3116',
+  ]) assert.ok(fullworldTrust.includes(root));
+  assert.match(fullworldTrust, /id: 'npcs'.*status: 'BLOCKED'.*enabled: false/s);
+  assert.match(fullworldTrust, /id: 'monsters-spawns'.*status: 'BLOCKED'.*enabled: false/s);
+  assert.match(fullworldTrust, /animation: Object\.freeze\([\s\S]*enabled: false/);
+});
+
+test('full-world WebGL renderer preserves semantic order in one batched draw', () => {
+  assert.match(fullworldRenderer, /sampler2DArray u_pixels/);
+  assert.match(fullworldRenderer, /a_geometry/);
+  assert.match(fullworldRenderer, /a_pixel/);
+  assert.match(fullworldRenderer, /record\.x\*32-\(p\.widthUnits-32\)\+p\.displacement\.dxUnits/);
+  assert.match(fullworldRenderer, /gl\.drawArraysInstanced\(gl\.TRIANGLES/);
+  assert.match(fullworldRenderer, /const drawCalls=instanceCount>0\?1:0/);
+});
+
+test('full-world renderer keeps evidence synchronization and capture opt-in only', () => {
+  assert.match(fullworldRenderer, /preserveDrawingBuffer:options\.capture===true/);
+  assert.match(fullworldRenderer, /if\(options\.synchronousEvidence===true\)gl\.finish\(\)/);
+  assert.doesNotMatch(fullworldRenderer, /preserveDrawingBuffer:true/);
+});
+
+test('full-world app coalesces interactive rendering and uses stable verified pixel buckets', () => {
+  assert.match(fullworldApp, /createFrameScheduler/);
+  assert.match(fullworldApp, /scheduleRender\('drag'\)/);
+  assert.match(fullworldApp, /loadRuntimePixelBuckets/);
+  assert.match(fullworldApp, /loadVerifiedPixelBucket/);
+  assert.match(fullworldApp, /VerifiedContentCache/);
+});

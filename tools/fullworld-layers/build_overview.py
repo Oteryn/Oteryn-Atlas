@@ -155,7 +155,74 @@ def _scan_chunk(task: tuple[str, dict[str, Any], int, str, str]) -> tuple[dict[s
     return index_entry, raw
 
 
-def build_overview(publication_root: Path, output_root: Path, *, expected_publication_root: str, cell_size: int = 16, workers: int = 1) -> dict[str, Any]:
+
+def load_previous_chunks(previous_output: Path | None, expected_root: str | None, cell_size: int) -> dict[tuple[int, int, int], dict[str, Any]]:
+    if previous_output is None or expected_root is None:
+        return {}
+    world_path = previous_output / "world.json"
+    if not world_path.is_file():
+        raise OverviewError("trusted previous overview world is missing")
+    world = load_canonical_manifest(world_path)
+    if world.get("profile") != OVERVIEW_WORLD_PROFILE:
+        raise OverviewError("unsupported previous overview world profile")
+    check_root(world, OVERVIEW_WORLD_DOMAIN, "previous overview world")
+    if world.get("rootContentId") != expected_root:
+        raise OverviewError("previous overview root does not match trusted root")
+    if world.get("cellSizeTiles") != cell_size:
+        raise OverviewError("previous overview cell size mismatch")
+    result: dict[tuple[int, int, int], dict[str, Any]] = {}
+    for floor_entry in world.get("floors", []):
+        floor_manifest = load_canonical_manifest(safe_join(previous_output, floor_entry["path"]))
+        check_root(floor_manifest, OVERVIEW_FLOOR_DOMAIN, f"previous overview floor {floor_entry.get('floor')}")
+        if floor_manifest.get("rootContentId") != floor_entry.get("rootContentId"):
+            raise OverviewError("previous overview floor root linkage mismatch")
+        for entry in floor_manifest.get("chunks", []):
+            logical = entry.get("logicalAddress", {})
+            address = (logical.get("floor"), logical.get("region_x"), logical.get("region_y"))
+            if not all(isinstance(v, int) for v in address) or address in result:
+                raise OverviewError("invalid/duplicate previous overview logical address")
+            raw = safe_join(previous_output, entry["path"]).read_bytes()
+            if len(raw) != entry.get("bytes") or "sha256:" + hashlib.sha256(raw).hexdigest() != entry.get("contentId"):
+                raise OverviewError("previous overview chunk content identity mismatch")
+            try:
+                chunk = json.loads(raw)
+            except json.JSONDecodeError as exc:
+                raise OverviewError("previous overview chunk JSON invalid") from exc
+            if raw != canonical(chunk) or chunk.get("profile") != OVERVIEW_CHUNK_PROFILE:
+                raise OverviewError("previous overview chunk is non-canonical/unsupported")
+            if chunk.get("logicalAddress") != logical or chunk.get("sourceContentId") != entry.get("sourceContentId") or chunk.get("cellSizeTiles") != cell_size:
+                raise OverviewError("previous overview chunk linkage mismatch")
+            result[address] = chunk
+    return result
+
+
+def reuse_previous_chunk(previous: dict[str, Any], entry: dict[str, Any], cell_size: int, source_fingerprint: str, output_name: str) -> tuple[dict[str, Any], bytes]:
+    logical = entry["logicalAddress"]
+    chunk = {
+        "cellSizeTiles": cell_size,
+        "cells": previous["cells"],
+        "counts": previous["counts"],
+        "logicalAddress": logical,
+        "profile": OVERVIEW_CHUNK_PROFILE,
+        "sourceContentId": entry["contentId"],
+        "sourceFingerprint": source_fingerprint,
+    }
+    if chunk["counts"].get("tiles") != entry.get("tiles") or chunk["counts"].get("resolvedPrimitives") != entry.get("resolvedPrimitives"):
+        raise OverviewError("previous overview/source chunk count mismatch")
+    raw = canonical(chunk)
+    cells = chunk["cells"]
+    cell_bounds = None if not cells else {
+        "cell_x_min": min(item["cell_x"] for item in cells),
+        "cell_x_max_exclusive": max(item["cell_x"] for item in cells) + 1,
+        "cell_y_min": min(item["cell_y"] for item in cells),
+        "cell_y_max_exclusive": max(item["cell_y"] for item in cells) + 1,
+    }
+    return ({
+        "bytes": len(raw), "cellBounds": cell_bounds, "contentId": "sha256:" + hashlib.sha256(raw).hexdigest(),
+        "counts": chunk["counts"], "logicalAddress": logical, "path": f"chunks/{output_name}", "sourceContentId": entry["contentId"],
+    }, raw)
+
+def build_overview(publication_root: Path, output_root: Path, *, expected_publication_root: str, cell_size: int = 16, workers: int = 1, previous_output: Path | None = None, expected_previous_root: str | None = None) -> dict[str, Any]:
     if cell_size <= 0:
         raise OverviewError("cell size must be positive")
     publication = load_canonical_manifest(publication_root / "publication.json")
@@ -178,6 +245,9 @@ def build_overview(publication_root: Path, output_root: Path, *, expected_public
     if source_fingerprint != publication.get("source", {}).get("sourceFingerprint"):
         raise OverviewError("source fingerprint linkage mismatch")
 
+    previous_chunks = load_previous_chunks(previous_output, expected_previous_root, cell_size)
+    reused_chunks = 0
+    scanned_chunks = 0
     if output_root.exists():
         shutil.rmtree(output_root)
     (output_root / "chunks").mkdir(parents=True)
@@ -213,17 +283,36 @@ def build_overview(publication_root: Path, output_root: Path, *, expected_public
             if output_rel in seen_output_paths:
                 raise OverviewError(f"duplicate overview output path: {output_rel}")
             seen_output_paths.add(output_rel)
-            tasks.append((str(source_chunk), entry, cell_size, source_fingerprint, output_name))
+            address_key = (int(address[0]), int(address[1]), int(address[2]))
+            previous = previous_chunks.get(address_key)
+            if previous is not None and previous.get("sourceContentId") == entry.get("contentId"):
+                tasks.append(("reuse", (previous, entry, cell_size, source_fingerprint, output_name)))
+            else:
+                tasks.append(("scan", (str(source_chunk), entry, cell_size, source_fingerprint, output_name)))
 
+        results: list[tuple[dict[str, Any], bytes] | None] = [None] * len(tasks)
+        scan_positions = [index for index, (kind, _) in enumerate(tasks) if kind == "scan"]
+        scan_tasks = [tasks[index][1] for index in scan_positions]
         if workers == 1:
-            results = [_scan_chunk(task) for task in tasks]
+            scan_results = [_scan_chunk(task) for task in scan_tasks]
         else:
             with ProcessPoolExecutor(max_workers=workers) as pool:
-                results = list(pool.map(_scan_chunk, tasks, chunksize=1))
+                scan_results = list(pool.map(_scan_chunk, scan_tasks, chunksize=1))
+        for index, result in zip(scan_positions, scan_results):
+            results[index] = result
+            scanned_chunks += 1
+        for index, (kind, payload) in enumerate(tasks):
+            if kind == "reuse":
+                results[index] = reuse_previous_chunk(*payload)
+                reused_chunks += 1
+        if any(result is None for result in results):
+            raise OverviewError("overview incremental task result missing")
 
         indexed: list[dict[str, Any]] = []
         floor_counts = {"cells": 0, "chunks": 0, "resolvedPrimitives": 0, "tiles": 0}
-        for index_entry, raw in results:
+        for result in results:
+            assert result is not None
+            index_entry, raw = result
             target = output_root / index_entry["path"]
             target.write_bytes(raw)
             indexed.append(index_entry)
@@ -288,7 +377,9 @@ def build_overview(publication_root: Path, output_root: Path, *, expected_public
     }
     world["rootContentId"] = rooted(OVERVIEW_WORLD_DOMAIN, world)
     write_canonical(output_root / "world.json", world)
-    return world
+    result = dict(world)
+    result["_buildEvidence"] = {"reusedChunks": reused_chunks, "scannedChunks": scanned_chunks, "trustedPreviousRootUsed": bool(previous_chunks)}
+    return result
 
 
 def main() -> int:
@@ -298,16 +389,19 @@ def main() -> int:
     parser.add_argument("--expected-publication-root", required=True)
     parser.add_argument("--cell-size", type=int, default=16)
     parser.add_argument("--workers", type=int, default=1)
+    parser.add_argument("--previous-output", type=Path)
+    parser.add_argument("--expected-previous-root")
     args = parser.parse_args()
     try:
-        world = build_overview(args.publication_root, args.output_root, expected_publication_root=args.expected_publication_root, cell_size=args.cell_size, workers=max(1, args.workers))
+        world = build_overview(args.publication_root, args.output_root, expected_publication_root=args.expected_publication_root, cell_size=args.cell_size, workers=max(1, args.workers), previous_output=args.previous_output, expected_previous_root=args.expected_previous_root)
     except OverviewError as exc:
         print(f"ERROR: {exc}")
         return 1
     print(
         "PASS "
         f"root={world['rootContentId']} floors={world['counts']['floors']} chunks={world['counts']['chunks']} "
-        f"cells={world['counts']['cells']} tiles={world['counts']['tiles']} primitives={world['counts']['resolvedPrimitives']}"
+        f"cells={world['counts']['cells']} tiles={world['counts']['tiles']} primitives={world['counts']['resolvedPrimitives']} "
+        f"reused={world['_buildEvidence']['reusedChunks']} scanned={world['_buildEvidence']['scannedChunks']}"
     )
     return 0
 

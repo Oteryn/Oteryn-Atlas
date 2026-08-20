@@ -1,0 +1,646 @@
+{
+  "status": "PASS",
+  "classification": "G5_REAL_CHROME_FULLWORLD_QUALIFICATION",
+  "wallMs": 8533.1557,
+  "page": {
+    "status": "PASS",
+    "classification": "G5_BROWSER_QUALIFICATION_NOT_PRODUCTION_SLO",
+    "identities": {
+      "gameSha": "f79fd3b5c239fa13810338f1380539c4eac67d7d",
+      "overviewRoot": "sha256:17683912d6758796d80a5b1647e2d0031f6849e51c40ae5264da6cfce3f9d6db",
+      "pixelRoot": "sha256:8b8228fcc4574903e547cb7d65b96f3d45e5a9e67045091c1bceb6e54d3690ad",
+      "pixelBucketRoot": "sha256:99cf23b01a0d652ff670a994a2b80cbef8d17036f514522d47f1aa98352d3116",
+      "publicationRoot": "sha256:9d0d2f3bb16a5a90f9b51a21366e4ed42963f5cb12366c404a20d9502ec4857f",
+      "runtimeIndexRoot": "sha256:98fa66118d49e3d440d8b14643d020542fadeff522ada69d6fb342d1f82547ed",
+      "semanticRoot": "sha256:27d7a83a7d9f498ea614b440ab4216cae5e6d11ea0527482410e40948cade5a9"
+    },
+    "view": {
+      "animation": "off",
+      "floor": 0,
+      "overview": true,
+      "x": 32584,
+      "y": 31960,
+      "zoom": 2
+    },
+    "worldCounts": {
+      "floors": 16,
+      "groups": 44426,
+      "resolvedPrimitives": 24502035,
+      "shards": 1197,
+      "sourceBytes": 18750839498,
+      "tiles": 18997668
+    },
+    "performanceProfile": {
+      "name": "local-max",
+      "requested": "local-max",
+      "hardwareConcurrency": 16,
+      "deviceMemoryGiB": 32,
+      "groupConcurrency": 12,
+      "overviewConcurrency": 12,
+      "pixelBucketConcurrency": 24,
+      "prefetchTiles": 12,
+      "semanticCacheBytes": 268435456,
+      "capture": false,
+      "synchronousEvidence": false,
+      "measureVisibility": false
+    },
+    "frameScheduler": {
+      "requested": 4,
+      "rendered": 4,
+      "coalesced": 0,
+      "pending": false,
+      "dirty": false
+    },
+    "persistentCache": {
+      "enabled": true,
+      "hits": 0,
+      "misses": 84,
+      "writes": 83,
+      "rejected": 0
+    },
+    "measured": {
+      "drawCalls": 1,
+      "gpuRenderMs": 0,
+      "gpuTextureBytes": 255852544,
+      "instanceBufferBytes": 62624,
+      "jsHeapBytes": 75292154,
+      "lastSceneLoadMs": 281.59999999403954,
+      "loadedOverviewCells": 424,
+      "loadedOverviewChunks": 50,
+      "loadedPixelBucketBytes": 0,
+      "loadedPixelBundleBytes": 252592128,
+      "pixelTransport": "stable-buckets",
+      "loadedPixelBuckets": 256,
+      "residentPixelBytes": 252592128,
+      "pixelNetworkBytes": 252592128,
+      "rangeAuthenticatedBytes": 59315451,
+      "rangeCacheBytes": 2111615,
+      "rangeRequests": 83,
+      "rangeCacheHits": 0,
+      "rangeCacheMisses": 83,
+      "rangePersistentHits": 0,
+      "retainedPrimitives": 1957,
+      "retainedTiles": 1732,
+      "selectedRangeGroups": 12,
+      "submittedPrimitives": 1957,
+      "textureUploadMs": 1442.6999999955297,
+      "visiblePrimitives": null,
+      "webglMaxArrayLayers": 2048,
+      "webglMaxTextureSize": 16384,
+      "webglRenderMs": 0.09999999403953552
+    },
+    "capabilities": {
+      "animation": {
+        "enabled": false,
+        "status": "BLOCKED",
+        "reason": "Authoritative animation phase/timing publication is not available yet; static verified phases remain visible."
+      },
+      "enabledLayers": [
+        "minimap-overview"
+      ],
+      "blockedOrUnknownEnabled": false
+    },
+    "error": null
+  },
+  "transitions": [
+    {
+      "status": "PASS",
+      "classification": "G5_BROWSER_QUALIFICATION_NOT_PRODUCTION_SLO",
+      "identities": {
+        "gameSha": "f79fd3b5c239fa13810338f1380539c4eac67d7d",
+        "overviewRoot": "sha256:17683912d6758796d80a5b1647e2d0031f6849e51c40ae5264da6cfce3f9d6db",
+        "pixelRoot": "sha256:8b8228fcc4574903e547cb7d65b96f3d45e5a9e67045091c1bceb6e54d3690ad",
+        "pixelBucketRoot": "sha256:99cf23b01a0d652ff670a994a2b80cbef8d17036f514522d47f1aa98352d3116",
+        "publicationRoot": "sha256:9d0d2f3bb16a5a90f9b51a21366e4ed42963f5cb12366c404a20d9502ec4857f",
+        "runtimeIndexRoot": "sha256:98fa66118d49e3d440d8b14643d020542fadeff522ada69d6fb342d1f82547ed",
+        "semanticRoot": "sha256:27d7a83a7d9f498ea614b440ab4216cae5e6d11ea0527482410e40948cade5a9"
+      },
+      "view": {
+        "animation": "off",
+        "floor": -7,
+        "overview": true,
+        "x": 32360,
+        "y": 32230,
+        "zoom": 2
+      },
+      "worldCounts": {
+        "floors": 16,
+        "groups": 44426,
+        "resolvedPrimitives": 24502035,
+        "shards": 1197,
+        "sourceBytes": 18750839498,
+        "tiles": 18997668
+      },
+      "performanceProfile": {
+        "name": "local-max",
+        "requested": "local-max",
+        "hardwareConcurrency": 16,
+        "deviceMemoryGiB": 32,
+        "groupConcurrency": 12,
+        "overviewConcurrency": 12,
+        "pixelBucketConcurrency": 24,
+        "prefetchTiles": 12,
+        "semanticCacheBytes": 268435456,
+        "capture": false,
+        "synchronousEvidence": false,
+        "measureVisibility": false
+      },
+      "frameScheduler": {
+        "requested": 0,
+        "rendered": 0,
+        "coalesced": 0,
+        "pending": false,
+        "dirty": false
+      },
+      "persistentCache": {
+        "enabled": true,
+        "hits": 0,
+        "misses": 12,
+        "writes": 11,
+        "rejected": 0
+      },
+      "measured": {
+        "drawCalls": 1,
+        "gpuRenderMs": null,
+        "gpuTextureBytes": 255852544,
+        "instanceBufferBytes": 110848,
+        "jsHeapBytes": 279043115,
+        "lastSceneLoadMs": 4596.80000000447,
+        "loadedOverviewCells": 18033,
+        "loadedOverviewChunks": 104,
+        "loadedPixelBucketBytes": 0,
+        "loadedPixelBundleBytes": 252592128,
+        "pixelTransport": "local-max-bundle",
+        "loadedPixelBuckets": 256,
+        "residentPixelBytes": 252592128,
+        "pixelNetworkBytes": 252592128,
+        "rangeAuthenticatedBytes": 12578291,
+        "rangeCacheBytes": 12578291,
+        "rangeRequests": 11,
+        "rangeCacheHits": 0,
+        "rangeCacheMisses": 11,
+        "rangePersistentHits": 0,
+        "retainedPrimitives": 3464,
+        "retainedTiles": 2107,
+        "selectedRangeGroups": 11,
+        "submittedPrimitives": 3464,
+        "textureUploadMs": 1442.6999999955297,
+        "visiblePrimitives": null,
+        "webglMaxArrayLayers": 2048,
+        "webglMaxTextureSize": 16384,
+        "webglRenderMs": 10.200000002980232
+      },
+      "capabilities": {
+        "animation": {
+          "enabled": false,
+          "status": "BLOCKED",
+          "reason": "Authoritative animation phase/timing publication is not available yet; static verified phases remain visible."
+        },
+        "enabledLayers": [
+          "minimap-overview"
+        ],
+        "blockedOrUnknownEnabled": false
+      },
+      "error": null
+    },
+    {
+      "status": "PASS",
+      "classification": "G5_BROWSER_QUALIFICATION_NOT_PRODUCTION_SLO",
+      "identities": {
+        "gameSha": "f79fd3b5c239fa13810338f1380539c4eac67d7d",
+        "overviewRoot": "sha256:17683912d6758796d80a5b1647e2d0031f6849e51c40ae5264da6cfce3f9d6db",
+        "pixelRoot": "sha256:8b8228fcc4574903e547cb7d65b96f3d45e5a9e67045091c1bceb6e54d3690ad",
+        "pixelBucketRoot": "sha256:99cf23b01a0d652ff670a994a2b80cbef8d17036f514522d47f1aa98352d3116",
+        "publicationRoot": "sha256:9d0d2f3bb16a5a90f9b51a21366e4ed42963f5cb12366c404a20d9502ec4857f",
+        "runtimeIndexRoot": "sha256:98fa66118d49e3d440d8b14643d020542fadeff522ada69d6fb342d1f82547ed",
+        "semanticRoot": "sha256:27d7a83a7d9f498ea614b440ab4216cae5e6d11ea0527482410e40948cade5a9"
+      },
+      "view": {
+        "animation": "off",
+        "floor": -15,
+        "overview": true,
+        "x": 33288,
+        "y": 31800,
+        "zoom": 2
+      },
+      "worldCounts": {
+        "floors": 16,
+        "groups": 44426,
+        "resolvedPrimitives": 24502035,
+        "shards": 1197,
+        "sourceBytes": 18750839498,
+        "tiles": 18997668
+      },
+      "performanceProfile": {
+        "name": "local-max",
+        "requested": "local-max",
+        "hardwareConcurrency": 16,
+        "deviceMemoryGiB": 32,
+        "groupConcurrency": 12,
+        "overviewConcurrency": 12,
+        "pixelBucketConcurrency": 24,
+        "prefetchTiles": 12,
+        "semanticCacheBytes": 268435456,
+        "capture": false,
+        "synchronousEvidence": false,
+        "measureVisibility": false
+      },
+      "frameScheduler": {
+        "requested": 1,
+        "rendered": 1,
+        "coalesced": 0,
+        "pending": false,
+        "dirty": false
+      },
+      "persistentCache": {
+        "enabled": true,
+        "hits": 0,
+        "misses": 36,
+        "writes": 35,
+        "rejected": 0
+      },
+      "measured": {
+        "drawCalls": 1,
+        "gpuRenderMs": 0,
+        "gpuTextureBytes": 255852544,
+        "instanceBufferBytes": 92032,
+        "jsHeapBytes": 351111634,
+        "lastSceneLoadMs": 559,
+        "loadedOverviewCells": 4586,
+        "loadedOverviewChunks": 66,
+        "loadedPixelBucketBytes": 0,
+        "loadedPixelBundleBytes": 252592128,
+        "pixelTransport": "stable-buckets",
+        "loadedPixelBuckets": 256,
+        "residentPixelBytes": 252592128,
+        "pixelNetworkBytes": 252592128,
+        "rangeAuthenticatedBytes": 30413594,
+        "rangeCacheBytes": 17835303,
+        "rangeRequests": 35,
+        "rangeCacheHits": 0,
+        "rangeCacheMisses": 35,
+        "rangePersistentHits": 0,
+        "retainedPrimitives": 2876,
+        "retainedTiles": 1898,
+        "selectedRangeGroups": 24,
+        "submittedPrimitives": 2876,
+        "textureUploadMs": 1442.6999999955297,
+        "visiblePrimitives": null,
+        "webglMaxArrayLayers": 2048,
+        "webglMaxTextureSize": 16384,
+        "webglRenderMs": 0.19999999552965164
+      },
+      "capabilities": {
+        "animation": {
+          "enabled": false,
+          "status": "BLOCKED",
+          "reason": "Authoritative animation phase/timing publication is not available yet; static verified phases remain visible."
+        },
+        "enabledLayers": [
+          "minimap-overview"
+        ],
+        "blockedOrUnknownEnabled": false
+      },
+      "error": null
+    },
+    {
+      "status": "PASS",
+      "classification": "G5_BROWSER_QUALIFICATION_NOT_PRODUCTION_SLO",
+      "identities": {
+        "gameSha": "f79fd3b5c239fa13810338f1380539c4eac67d7d",
+        "overviewRoot": "sha256:17683912d6758796d80a5b1647e2d0031f6849e51c40ae5264da6cfce3f9d6db",
+        "pixelRoot": "sha256:8b8228fcc4574903e547cb7d65b96f3d45e5a9e67045091c1bceb6e54d3690ad",
+        "pixelBucketRoot": "sha256:99cf23b01a0d652ff670a994a2b80cbef8d17036f514522d47f1aa98352d3116",
+        "publicationRoot": "sha256:9d0d2f3bb16a5a90f9b51a21366e4ed42963f5cb12366c404a20d9502ec4857f",
+        "runtimeIndexRoot": "sha256:98fa66118d49e3d440d8b14643d020542fadeff522ada69d6fb342d1f82547ed",
+        "semanticRoot": "sha256:27d7a83a7d9f498ea614b440ab4216cae5e6d11ea0527482410e40948cade5a9"
+      },
+      "view": {
+        "animation": "off",
+        "floor": -10,
+        "overview": true,
+        "x": 33032,
+        "y": 32536,
+        "zoom": 2
+      },
+      "worldCounts": {
+        "floors": 16,
+        "groups": 44426,
+        "resolvedPrimitives": 24502035,
+        "shards": 1197,
+        "sourceBytes": 18750839498,
+        "tiles": 18997668
+      },
+      "performanceProfile": {
+        "name": "local-max",
+        "requested": "local-max",
+        "hardwareConcurrency": 16,
+        "deviceMemoryGiB": 32,
+        "groupConcurrency": 12,
+        "overviewConcurrency": 12,
+        "pixelBucketConcurrency": 24,
+        "prefetchTiles": 12,
+        "semanticCacheBytes": 268435456,
+        "capture": false,
+        "synchronousEvidence": false,
+        "measureVisibility": false
+      },
+      "frameScheduler": {
+        "requested": 2,
+        "rendered": 2,
+        "coalesced": 0,
+        "pending": false,
+        "dirty": false
+      },
+      "persistentCache": {
+        "enabled": true,
+        "hits": 0,
+        "misses": 60,
+        "writes": 59,
+        "rejected": 0
+      },
+      "measured": {
+        "drawCalls": 1,
+        "gpuRenderMs": 0.00004,
+        "gpuTextureBytes": 255852544,
+        "instanceBufferBytes": 97184,
+        "jsHeapBytes": 35235867,
+        "lastSceneLoadMs": 791.7999999970198,
+        "loadedOverviewCells": 10028,
+        "loadedOverviewChunks": 81,
+        "loadedPixelBucketBytes": 0,
+        "loadedPixelBundleBytes": 252592128,
+        "pixelTransport": "stable-buckets",
+        "loadedPixelBuckets": 256,
+        "residentPixelBytes": 252592128,
+        "pixelNetworkBytes": 252592128,
+        "rangeAuthenticatedBytes": 50614179,
+        "rangeCacheBytes": 20200585,
+        "rangeRequests": 59,
+        "rangeCacheHits": 0,
+        "rangeCacheMisses": 59,
+        "rangePersistentHits": 0,
+        "retainedPrimitives": 3037,
+        "retainedTiles": 2097,
+        "selectedRangeGroups": 24,
+        "submittedPrimitives": 3037,
+        "textureUploadMs": 1442.6999999955297,
+        "visiblePrimitives": null,
+        "webglMaxArrayLayers": 2048,
+        "webglMaxTextureSize": 16384,
+        "webglRenderMs": 0.20000000298023224
+      },
+      "capabilities": {
+        "animation": {
+          "enabled": false,
+          "status": "BLOCKED",
+          "reason": "Authoritative animation phase/timing publication is not available yet; static verified phases remain visible."
+        },
+        "enabledLayers": [
+          "minimap-overview"
+        ],
+        "blockedOrUnknownEnabled": false
+      },
+      "error": null
+    },
+    {
+      "status": "PASS",
+      "classification": "G5_BROWSER_QUALIFICATION_NOT_PRODUCTION_SLO",
+      "identities": {
+        "gameSha": "f79fd3b5c239fa13810338f1380539c4eac67d7d",
+        "overviewRoot": "sha256:17683912d6758796d80a5b1647e2d0031f6849e51c40ae5264da6cfce3f9d6db",
+        "pixelRoot": "sha256:8b8228fcc4574903e547cb7d65b96f3d45e5a9e67045091c1bceb6e54d3690ad",
+        "pixelBucketRoot": "sha256:99cf23b01a0d652ff670a994a2b80cbef8d17036f514522d47f1aa98352d3116",
+        "publicationRoot": "sha256:9d0d2f3bb16a5a90f9b51a21366e4ed42963f5cb12366c404a20d9502ec4857f",
+        "runtimeIndexRoot": "sha256:98fa66118d49e3d440d8b14643d020542fadeff522ada69d6fb342d1f82547ed",
+        "semanticRoot": "sha256:27d7a83a7d9f498ea614b440ab4216cae5e6d11ea0527482410e40948cade5a9"
+      },
+      "view": {
+        "animation": "off",
+        "floor": -3,
+        "overview": true,
+        "x": 32056,
+        "y": 31192,
+        "zoom": 2
+      },
+      "worldCounts": {
+        "floors": 16,
+        "groups": 44426,
+        "resolvedPrimitives": 24502035,
+        "shards": 1197,
+        "sourceBytes": 18750839498,
+        "tiles": 18997668
+      },
+      "performanceProfile": {
+        "name": "local-max",
+        "requested": "local-max",
+        "hardwareConcurrency": 16,
+        "deviceMemoryGiB": 32,
+        "groupConcurrency": 12,
+        "overviewConcurrency": 12,
+        "pixelBucketConcurrency": 24,
+        "prefetchTiles": 12,
+        "semanticCacheBytes": 268435456,
+        "capture": false,
+        "synchronousEvidence": false,
+        "measureVisibility": false
+      },
+      "frameScheduler": {
+        "requested": 3,
+        "rendered": 3,
+        "coalesced": 0,
+        "pending": false,
+        "dirty": false
+      },
+      "persistentCache": {
+        "enabled": true,
+        "hits": 0,
+        "misses": 72,
+        "writes": 71,
+        "rejected": 0
+      },
+      "measured": {
+        "drawCalls": 1,
+        "gpuRenderMs": 0,
+        "gpuTextureBytes": 255852544,
+        "instanceBufferBytes": 97600,
+        "jsHeapBytes": 64483756,
+        "lastSceneLoadMs": 628.5,
+        "loadedOverviewCells": 1761,
+        "loadedOverviewChunks": 71,
+        "loadedPixelBucketBytes": 0,
+        "loadedPixelBundleBytes": 252592128,
+        "pixelTransport": "stable-buckets",
+        "loadedPixelBuckets": 256,
+        "residentPixelBytes": 252592128,
+        "pixelNetworkBytes": 252592128,
+        "rangeAuthenticatedBytes": 57203836,
+        "rangeCacheBytes": 6589657,
+        "rangeRequests": 71,
+        "rangeCacheHits": 0,
+        "rangeCacheMisses": 71,
+        "rangePersistentHits": 0,
+        "retainedPrimitives": 3050,
+        "retainedTiles": 1475,
+        "selectedRangeGroups": 12,
+        "submittedPrimitives": 3050,
+        "textureUploadMs": 1442.6999999955297,
+        "visiblePrimitives": null,
+        "webglMaxArrayLayers": 2048,
+        "webglMaxTextureSize": 16384,
+        "webglRenderMs": 0.10000000149011612
+      },
+      "capabilities": {
+        "animation": {
+          "enabled": false,
+          "status": "BLOCKED",
+          "reason": "Authoritative animation phase/timing publication is not available yet; static verified phases remain visible."
+        },
+        "enabledLayers": [
+          "minimap-overview"
+        ],
+        "blockedOrUnknownEnabled": false
+      },
+      "error": null
+    },
+    {
+      "status": "PASS",
+      "classification": "G5_BROWSER_QUALIFICATION_NOT_PRODUCTION_SLO",
+      "identities": {
+        "gameSha": "f79fd3b5c239fa13810338f1380539c4eac67d7d",
+        "overviewRoot": "sha256:17683912d6758796d80a5b1647e2d0031f6849e51c40ae5264da6cfce3f9d6db",
+        "pixelRoot": "sha256:8b8228fcc4574903e547cb7d65b96f3d45e5a9e67045091c1bceb6e54d3690ad",
+        "pixelBucketRoot": "sha256:99cf23b01a0d652ff670a994a2b80cbef8d17036f514522d47f1aa98352d3116",
+        "publicationRoot": "sha256:9d0d2f3bb16a5a90f9b51a21366e4ed42963f5cb12366c404a20d9502ec4857f",
+        "runtimeIndexRoot": "sha256:98fa66118d49e3d440d8b14643d020542fadeff522ada69d6fb342d1f82547ed",
+        "semanticRoot": "sha256:27d7a83a7d9f498ea614b440ab4216cae5e6d11ea0527482410e40948cade5a9"
+      },
+      "view": {
+        "animation": "off",
+        "floor": 0,
+        "overview": true,
+        "x": 32584,
+        "y": 31960,
+        "zoom": 2
+      },
+      "worldCounts": {
+        "floors": 16,
+        "groups": 44426,
+        "resolvedPrimitives": 24502035,
+        "shards": 1197,
+        "sourceBytes": 18750839498,
+        "tiles": 18997668
+      },
+      "performanceProfile": {
+        "name": "local-max",
+        "requested": "local-max",
+        "hardwareConcurrency": 16,
+        "deviceMemoryGiB": 32,
+        "groupConcurrency": 12,
+        "overviewConcurrency": 12,
+        "pixelBucketConcurrency": 24,
+        "prefetchTiles": 12,
+        "semanticCacheBytes": 268435456,
+        "capture": false,
+        "synchronousEvidence": false,
+        "measureVisibility": false
+      },
+      "frameScheduler": {
+        "requested": 4,
+        "rendered": 4,
+        "coalesced": 0,
+        "pending": false,
+        "dirty": false
+      },
+      "persistentCache": {
+        "enabled": true,
+        "hits": 0,
+        "misses": 84,
+        "writes": 83,
+        "rejected": 0
+      },
+      "measured": {
+        "drawCalls": 1,
+        "gpuRenderMs": 0,
+        "gpuTextureBytes": 255852544,
+        "instanceBufferBytes": 62624,
+        "jsHeapBytes": 75292154,
+        "lastSceneLoadMs": 281.59999999403954,
+        "loadedOverviewCells": 424,
+        "loadedOverviewChunks": 50,
+        "loadedPixelBucketBytes": 0,
+        "loadedPixelBundleBytes": 252592128,
+        "pixelTransport": "stable-buckets",
+        "loadedPixelBuckets": 256,
+        "residentPixelBytes": 252592128,
+        "pixelNetworkBytes": 252592128,
+        "rangeAuthenticatedBytes": 59315451,
+        "rangeCacheBytes": 2111615,
+        "rangeRequests": 83,
+        "rangeCacheHits": 0,
+        "rangeCacheMisses": 83,
+        "rangePersistentHits": 0,
+        "retainedPrimitives": 1957,
+        "retainedTiles": 1732,
+        "selectedRangeGroups": 12,
+        "submittedPrimitives": 1957,
+        "textureUploadMs": 1442.6999999955297,
+        "visiblePrimitives": null,
+        "webglMaxArrayLayers": 2048,
+        "webglMaxTextureSize": 16384,
+        "webglRenderMs": 0.09999999403953552
+      },
+      "capabilities": {
+        "animation": {
+          "enabled": false,
+          "status": "BLOCKED",
+          "reason": "Authoritative animation phase/timing publication is not available yet; static verified phases remain visible."
+        },
+        "enabledLayers": [
+          "minimap-overview"
+        ],
+        "blockedOrUnknownEnabled": false
+      },
+      "error": null
+    }
+  ],
+  "cdp": {
+    "Timestamp": 59957.283332,
+    "AudioHandlers": 0,
+    "AudioWorkletProcessors": 0,
+    "Documents": 1,
+    "Frames": 1,
+    "JSEventListeners": 13,
+    "LayoutObjects": 581,
+    "MediaKeySessions": 0,
+    "MediaKeys": 0,
+    "Nodes": 906,
+    "Resources": 274,
+    "ContextLifecycleStateObservers": 6,
+    "V8PerContextDatas": 1,
+    "WorkerGlobalScopes": 0,
+    "UACSSResources": 0,
+    "RTCPeerConnections": 0,
+    "ResourceFetchers": 1,
+    "AdSubframes": 0,
+    "DetachedScriptStates": 0,
+    "ArrayBufferContents": 843,
+    "LayoutCount": 32,
+    "RecalcStyleCount": 36,
+    "LayoutDuration": 0.077356,
+    "RecalcStyleDuration": 0.011784,
+    "DevToolsCommandDuration": 0.024018,
+    "ScriptDuration": 0.012141,
+    "V8CompileDuration": 0,
+    "TaskDuration": 3.965689,
+    "TaskOtherDuration": 3.84039,
+    "ThreadTime": 2.316545,
+    "ProcessTime": 3.267931,
+    "JSHeapUsedSize": 50592052,
+    "JSHeapTotalSize": 103833600,
+    "FirstMeaningfulPaint": 59949.742238,
+    "DomContentLoaded": 59949.62357,
+    "NavigationStart": 59949.254278
+  },
+  "chromeStderr": null
+}

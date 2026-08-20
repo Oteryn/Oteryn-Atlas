@@ -1,0 +1,29 @@
+.fullworld-shell .topbar { grid-template-columns: 300px minmax(310px, auto) minmax(340px, 1fr) 150px; }
+.fullworld-shell .workspace { grid-template-columns: 252px minmax(0, 1fr) 360px; }
+.fullworld-stage { grid-template-rows: minmax(0, 1fr) 29px 88px; }
+.floor-select-row { display: grid; grid-template-columns: 36px 1fr 36px; gap: 6px; }
+.floor-select-row select {
+  min-width: 0; width: 100%; border: 1px solid var(--line); border-radius: 7px; padding: 7px 8px;
+  background: #081019; color: #cfe6fb; outline: none; text-align: center;
+}
+.layer-name { font-size: 11px !important; letter-spacing: 0 !important; color: inherit !important; }
+.layer.blocked span:last-child { color: #9a7350; }
+.layer.unknown span:last-child { color: #8a769e; }
+.minimap-canvas { width: 100%; height: 132px; display: block; background: #050a10; border: 1px solid #1b2b3c; border-radius: 7px; image-rendering: pixelated; }
+#overview-overlay { position: absolute; inset: 0; display: block; width: 100%; height: 100%; pointer-events: none; z-index: 1; image-rendering: pixelated; }
+.detail-badge {
+  position: absolute; z-index: 3; right: 12px; top: 44px; padding: 5px 8px; border-radius: 6px;
+  border: 1px solid rgba(77,103,130,.6); background: rgba(5,10,17,.82); color: #7691aa;
+  font-size: 8px; letter-spacing: .08em; pointer-events: none;
+}
+.detail-badge.overview-only { color: var(--warn); }
+.fullworld-diagnostics { grid-template-columns: repeat(10, minmax(0, 1fr)); }
+.inspector .limitation { color: #d0a86a; }
+.provenance-root { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 8px; word-break: break-all; }
+.overview-fact { margin-top: 10px; border-top: 1px solid #172330; padding-top: 10px; }
+@media (max-width: 1450px) {
+  .fullworld-shell .workspace { grid-template-columns: 220px minmax(0,1fr) 320px; }
+  .fullworld-shell .topbar { grid-template-columns: 260px minmax(280px,auto) minmax(260px,1fr) 140px; }
+  .fullworld-diagnostics { grid-template-columns: repeat(5, minmax(0,1fr)); }
+  .fullworld-stage { grid-template-rows: minmax(0,1fr) 29px 132px; }
+}

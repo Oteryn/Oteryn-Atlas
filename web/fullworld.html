@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Oteryn Atlas — Full-world verified runtime</title>
+  <link rel="stylesheet" href="./style.css">
+  <link rel="stylesheet" href="./fullworld.css">
+</head>
+<body>
+  <main class="app-shell fullworld-shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark">OA</div>
+        <div><strong>OTERYN ATLAS</strong><small>FULL-WORLD VERIFIED RUNTIME · G5</small></div>
+      </div>
+      <div class="coordinate-strip" aria-label="Current world coordinates">
+        <span>X <b id="coord-x">—</b></span><span>Y <b id="coord-y">—</b></span><span>FLOOR <b id="coord-floor">—</b></span>
+      </div>
+      <form class="search" id="search-form">
+        <input id="search-input" autocomplete="off" aria-label="Global factual coordinate search" placeholder="Search coordinates: X Y [floor]">
+        <button type="submit">Go</button>
+      </form>
+      <div class="zoom-controls">
+        <button id="zoom-out" aria-label="Zoom out">−</button><output id="zoom-output">—</output><button id="zoom-in" aria-label="Zoom in">+</button>
+      </div>
+    </header>
+
+    <div class="workspace">
+      <aside class="panel left-rail">
+        <section>
+          <h2>Published layers</h2>
+          <p class="rail-note">Only G4 PROVEN data can be enabled. BLOCKED/UNKNOWN families stay fail-closed.</p>
+          <label class="layer active"><input type="checkbox" checked disabled><span class="layer-name">Base semantic pixels</span><span>G3</span></label>
+          <label class="layer active" id="overview-layer"><input id="overview-toggle" type="checkbox" checked><span class="layer-name">Overview / density</span><span>PROVEN</span></label>
+          <div id="semantic-layer-list"></div>
+        </section>
+
+        <section>
+          <h2>Animation</h2>
+          <label class="layer disabled"><input id="animation-toggle" type="checkbox" disabled><span class="layer-name">Playback</span><span>STATIC</span></label>
+          <p class="rail-note" id="animation-note">Authoritative timing metadata is not published; visible verified phases remain static.</p>
+        </section>
+
+        <section>
+          <h2>Floor</h2>
+          <div class="floor-select-row">
+            <button id="floor-up" aria-label="Higher floor">↑</button>
+            <select id="floor-select" aria-label="Exported floor"></select>
+            <button id="floor-down" aria-label="Lower floor">↓</button>
+          </div>
+          <p class="rail-note" id="floor-bounds">Loading verified floor bounds…</p>
+        </section>
+
+        <section>
+          <h2>Verified overview</h2>
+          <canvas id="minimap" class="minimap-canvas" width="220" height="132" aria-label="Verified tile-presence overview"></canvas>
+          <p class="rail-note">Presence density only. No walkability, collision or terrain meaning is inferred.</p>
+        </section>
+      </aside>
+
+      <section class="map-stage fullworld-stage">
+        <div class="map-frame" id="map-frame">
+          <canvas id="atlas" aria-label="Full-world WebGL2 Atlas"></canvas>
+          <canvas id="overview-overlay" aria-hidden="true"></canvas>
+          <div class="selection-box" id="selection-box" hidden></div>
+          <div class="cursor-coordinate" id="cursor-coordinate">X — · Y — · F —</div>
+          <div class="runtime-badge" id="runtime-badge">VERIFYING ROOTS</div>
+          <div class="detail-badge" id="detail-badge">DETAIL STREAM</div>
+        </div>
+        <div class="statusbar">
+          <span id="status-source">Publication: verifying…</span>
+          <span id="status-detail">Viewport ranges not loaded yet</span>
+          <span id="status-layer">Overview: verifying…</span>
+        </div>
+        <div class="diagnostics fullworld-diagnostics">
+          <div><span>Backend</span><strong id="diag-backend">—</strong></div>
+          <div><span>Floor chunks</span><strong id="diag-chunks">—</strong></div>
+          <div><span>Range groups</span><strong id="diag-groups">—</strong></div>
+          <div><span>Range cache</span><strong id="diag-cache">—</strong></div>
+          <div><span>Pixel buckets</span><strong id="diag-packs">—</strong></div>
+          <div><span>GPU pixels</span><strong id="diag-gpu">—</strong></div>
+          <div><span>Visible</span><strong id="diag-primitives">—</strong></div>
+          <div><span>Draw calls</span><strong id="diag-draws">—</strong></div>
+          <div><span>Render</span><strong id="diag-render">—</strong></div>
+          <div><span>JS heap</span><strong id="diag-heap">—</strong></div>
+        </div>
+      </section>
+
+      <aside class="panel inspector">
+        <div class="inspector-heading"><div><span class="eyebrow">VERIFIED FACTS</span><h2>Inspector & provenance</h2></div><span class="pill" id="inspector-pill">ROOTS</span></div>
+        <div class="tabs"><button class="tab active" type="button">Semantic</button><button class="tab" type="button" disabled>Live state</button></div>
+        <div class="inspector-content" id="inspector-content"><p class="empty">Verifying full-world publication…</p></div>
+      </aside>
+    </div>
+  </main>
+  <pre id="qualification-result" data-status="PENDING" hidden></pre>
+  <script type="module" src="./fullworld-app.mjs"></script>
+</body>
+</html>
