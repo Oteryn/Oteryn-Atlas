@@ -102,6 +102,13 @@ Required workflow:
     - resume/checkpoint proof;
     - identified bottlenecks.
 
+Generated artifact and incremental rebuild contract:
+- Every generated artifact MUST record its input hashes, dependency nodes, output hashes and generation metadata sufficient to reproduce and verify the artifact deterministically.
+- Unchanged artifacts MUST be reused when their verified inputs, dependencies and output identity remain unchanged.
+- A changed dependency MUST rebuild only the affected downstream outputs identified by the dependency graph.
+- Local world changes MUST NOT force unrelated world shards/artifacts to rebuild; a full-world rebuild is permitted only when the dependency graph proves global impact.
+- Incremental generation MUST remain deterministic and fail closed when dependency or hash evidence is missing, inconsistent or corrupt.
+
 Do not own:
 - final browser GUI;
 - semantic layer UX;
@@ -113,6 +120,7 @@ Definition of done:
 - complete all-floor source/fabric output exists;
 - every shard validates against the pinned Game source;
 - generation is deterministic and resumable;
+- generated artifacts carry verified input/dependency/output identities and support deterministic affected-output-only rebuilds;
 - local machine utilization is evidence-driven and near optimal without thrashing;
 - downstream agents receive exact paths/manifests/digests.
 
@@ -160,11 +168,37 @@ Responsibilities:
    - exact roots/checksums.
 10. Do not freeze a permanent serializer/chunk/framework choice merely because the proof implementation scales sufficiently.
 
+Shared publication/runtime chunk contract with `ATLAS-FULLWORLD-GUI-RUNTIME`:
+
+`WorldChunk` MUST expose:
+- `chunk_id`;
+- `floor`;
+- `bounds`;
+- `semantic_root`;
+- `pixel_root`;
+- `dependencies`;
+- `content_hash`;
+- `estimated_memory_cost`.
+
+Runtime chunk lifecycle states are:
+- `LOAD`;
+- `VISIBLE`;
+- `CACHED`;
+- `EVICTED`;
+- `INVALIDATED`.
+
+Chunk rules:
+- Chunk invalidation MUST be content/dependency-hash based and fail closed on inconsistent identity evidence.
+- Local world changes MUST invalidate only affected chunks and dependent indexes/publication artifacts.
+- The runtime MUST never require a full-world reload solely because a local set of world chunks changed.
+- Publication identities remain authoritative for Atlas-derived data; lifecycle/cache state is runtime-only and never world authority.
+
 Definition of done:
 - complete world publication for every exported floor exists;
 - all identities verify fail-closed;
 - full-world pixel publication exists and is deterministic;
 - all resolved primitives reconcile;
+- `WorldChunk` publication hand-off is complete, deterministic and sufficient for hash-based local invalidation;
 - any animation metadata hand-off is explicit, pinned and non-inferred;
 - evidence is sufficient for GUI/layer/animation agents to consume without legacy inputs.
 
@@ -227,6 +261,40 @@ Role: scale the DYN-ATLAS-001 WebGL2 GUI from bounded Thais Z7 to the complete w
 Starting point:
 - current merged WebGL2 Atlas GUI/runtime on `main`.
 
+Runtime state architecture:
+
+`RuntimeState` MUST be serializable and deterministic. It MUST include:
+- floor;
+- camera position;
+- zoom;
+- visible semantic layers;
+- selected entity/object;
+- search query;
+- animation mode;
+- debug/diagnostic flags.
+
+Runtime state rules:
+- Runtime state is presentation/navigation state and is not authoritative world data.
+- UI components are projections of `RuntimeState`; they MUST NOT become a second store of world truth.
+- Equivalent `RuntimeState` MUST serialize deterministically for URL deep links and restore deterministically.
+- The contract MUST remain suitable for future replay/export, debugging and AI tooling integration without promoting runtime state to Game/Atlas authority.
+
+UI framework authority rule:
+- Forbidden as component/framework authority: selected NPC identity as a world fact, map/world data, entity/object facts or any other Game/Atlas-owned truth.
+- Allowed as local component state: temporary visual state, animation presentation state and input handling state that does not redefine world facts.
+- World truth belongs to Game authority, verified Atlas publication and runtime contracts; framework/component state is never world authority.
+
+Shared `WorldChunk` consumption contract:
+- Agent 4 MUST consume the `WorldChunk` contract published by `ATLAS-FULLWORLD-COMPILER-PUBLICATION` with `chunk_id`, `floor`, `bounds`, `semantic_root`, `pixel_root`, `dependencies`, `content_hash` and `estimated_memory_cost`.
+- Runtime lifecycle is `LOAD` → `VISIBLE`/`CACHED` → `EVICTED`, with `INVALIDATED` entered when verified content/dependency hashes change.
+- Invalidation MUST be hash based; local world changes invalidate/reload only affected chunks and dependencies.
+- The runtime MUST never require a full-world reload for local world changes.
+
+Future-safe World Query API boundary:
+- Atlas consumers SHOULD NOT read generated files directly; publication/file loaders are implementation adapters behind a stable consumer boundary, not a source of world authority.
+- The future `World Query API` boundary MUST support region queries, entity queries, object queries, semantic layer queries and provenance queries.
+- The boundary exists for AI agents, analytics, developer tools and future editors while preserving Game authority, Atlas projection provenance and fail-closed semantics.
+
 Responsibilities:
 
 1. Replace proof-bounded assumptions with verified full-world manifests/bounds/floors.
@@ -239,7 +307,7 @@ Responsibilities:
    - search;
    - inspector.
 6. Provide/consume the independent `animation` runtime toggle defined by `ATLAS-ANIMATED-WORLD-AND-CREATURE-RUNTIME`; disabling it must leave otherwise-visible NPCs, monsters and environment appearances static rather than hidden.
-7. Preserve coordinate/deep-link round trip. Extend URL state to relevant floor/layer state deterministically. If animation state is persisted, classify it as presentation/runtime state only.
+7. Preserve coordinate/deep-link round trip. Extend URL state to relevant floor/layer state deterministically through `RuntimeState`. If animation state is persisted, classify it as presentation/runtime state only.
 8. Complete product UX:
    - floor selector;
    - semantic layer rail;
@@ -261,12 +329,36 @@ Responsibilities:
 11. Qualify multiple representative regions/floors in real Chrome, including transitions between sparse/dense locations and both `reference` and `local-max` behavior.
 12. Capture real full-world GUI screenshots and objective browser smoke/performance evidence; do not invent FPS/cache/memory values.
 
+Runtime resource budgets and degradation:
+- Runtime MUST define and track a maximum loaded-chunk budget.
+- Runtime MUST define and track a browser memory budget.
+- Runtime MUST track GPU/texture memory budget/usage where the browser/platform exposes a trustworthy measurement; otherwise record the metric as `UNKNOWN`/unavailable rather than invent it.
+- Runtime MUST define draw-batch limits/targets and a deterministic cache eviction policy.
+- Under resource pressure it MAY reduce prefetch, unload distant chunks and reduce optional layers.
+- Under resource pressure it MUST NOT hide factual data that is required to be visible, change world semantics or silently fall back to legacy/raster data.
+
+Real-browser acceptance evidence MUST include measured:
+- initial load time;
+- chunk loading latency;
+- peak browser RAM;
+- GPU memory when trustworthy measurement is available;
+- draw call count;
+- visible chunk count;
+- cache hit ratio;
+- animation ON versus OFF performance delta.
+
+Measurements MUST come from real browser execution. FPS, memory, cache or other performance values MUST NOT be invented; unavailable measurements remain explicit `UNKNOWN`/`N/A` with the reason recorded.
+
 Definition of done:
 - the browser can navigate the complete exported world and every exported floor;
 - enabled layers work from verified data;
-- search/inspector/deep-links work across floors;
+- search/inspector/deep-links work across floors from deterministic `RuntimeState`;
+- chunk loading/invalidation follows the shared `WorldChunk` contract without full-world reload for local changes;
+- runtime budgets, cache policy and real-browser acceptance measurements are recorded with actual evidence;
 - the animation toggle is independent from factual NPC/monster visibility and preserves static rendering when OFF;
+- semantic/pixel separation remains intact;
 - runtime does not require legacy/raster fallback;
+- UI framework/component state never becomes world authority;
 - real-browser qualification passes at full-world scale.
 
 ---
