@@ -1,0 +1,73 @@
+name: Semantic search
+
+on:
+  pull_request:
+    paths:
+      - 'src/browser/semantic-search.mjs'
+      - 'tools/build-semantic-search-index.py'
+      - 'tests/semantic-search*'
+      - 'tests/fixtures/game-semantic-search-source.json'
+      - 'web/fullworld-search.mjs'
+      - 'web/fullworld.html'
+      - 'web/semantic-search/**'
+      - '.github/workflows/semantic-search.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'src/browser/semantic-search.mjs'
+      - 'tools/build-semantic-search-index.py'
+      - 'tests/semantic-search*'
+      - 'tests/fixtures/game-semantic-search-source.json'
+      - 'web/fullworld-search.mjs'
+      - 'web/fullworld.html'
+      - 'web/semantic-search/**'
+      - '.github/workflows/semantic-search.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  semantic-search:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out exact revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Compile deterministic builder
+        run: python -m py_compile tools/build-semantic-search-index.py
+
+      - name: Run search engine unit tests
+        run: node --test tests/semantic-search.mjs
+
+      - name: Rebuild published search index exactly
+        shell: bash
+        run: |
+          set -euo pipefail
+          GAME_REVISION="$(python - <<'PY'
+          import json
+          print(json.load(open('web/semantic-search/index.json', encoding='utf-8'))['source']['game_revision'])
+          PY
+          )"
+          python tools/build-semantic-search-index.py \
+            tests/fixtures/game-semantic-search-source.json \
+            /tmp/semantic-search-index.json \
+            --game-revision "$GAME_REVISION"
+          diff -u web/semantic-search/index.json /tmp/semantic-search-index.json
+
+      - name: Run real Chrome dropdown and navigation proof
+        shell: bash
+        run: |
+          set -euo pipefail
+          CHROME="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || true)"
+          test -n "$CHROME"
+          python -m http.server 8768 --bind 127.0.0.1 >/tmp/semantic-search-http.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
+          for _ in $(seq 1 30); do curl -fsS http://127.0.0.1:8768/tests/semantic-search-browser.html >/dev/null && break; sleep 1; done
+          rm -rf /tmp/semantic-search-chrome
+          "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage --virtual-time-budget=10000 \
+            --user-data-dir=/tmp/semantic-search-chrome --dump-dom \
+            'http://127.0.0.1:8768/tests/semantic-search-browser.html?floor=-7' > /tmp/semantic-search-proof.html
+          grep -q 'data-status="PASS"' /tmp/semantic-search-proof.html
