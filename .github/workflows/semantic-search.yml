@@ -4,7 +4,9 @@ on:
   pull_request:
     paths:
       - 'src/browser/semantic-search.mjs'
+      - 'src/browser/creature-search.mjs'
       - 'tools/build-semantic-search-index.py'
+      - 'tools/build-creature-index.py'
       - 'tests/semantic-search*'
       - 'tests/fixtures/game-semantic-search-source.json'
       - 'web/fullworld-search.mjs'
@@ -15,7 +17,9 @@ on:
     branches: [main]
     paths:
       - 'src/browser/semantic-search.mjs'
+      - 'src/browser/creature-search.mjs'
       - 'tools/build-semantic-search-index.py'
+      - 'tools/build-creature-index.py'
       - 'tests/semantic-search*'
       - 'tests/fixtures/game-semantic-search-source.json'
       - 'web/fullworld-search.mjs'
@@ -29,39 +33,122 @@ permissions:
 jobs:
   semantic-search:
     runs-on: ubuntu-24.04
+    env:
+      GAME_REVISION: 25d628d6f7ebf4976ebd6d2a7dee9df21f19e3e3
+      LEGACY_REVISION: e417c5e7c22986bf4acef0495eb47f7b72c97cce
+      NAVIGATION_KINDS: town,waypoint,poi,teleport,house,quest_area,mechanic
     steps:
-      - name: Check out exact revision
+      - name: Check out exact Atlas revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
 
-      - name: Verify exact checked-out revision
+      - name: Verify exact checked-out Atlas revision
         shell: bash
         env:
           EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
 
-      - name: Compile deterministic builder
-        run: python -m py_compile tools/build-semantic-search-index.py
+      - name: Compile deterministic builders
+        run: python -m py_compile tools/build-semantic-search-index.py tools/build-creature-index.py
 
       - name: Run search engine unit tests
-        run: node --test tests/semantic-search.mjs
+        run: node --test tests/semantic-search.mjs tests/semantic-search-creatures.mjs
 
-      - name: Rebuild published search index exactly
+      - name: Check out exact merged Game producer
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: Oteryn/Oteryn-Game
+          ref: ${{ env.GAME_REVISION }}
+          path: .deps/game
+          persist-credentials: false
+
+      - name: Check out exact pinned migration evidence
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: blakinio/Otheryn
+          ref: ${{ env.LEGACY_REVISION }}
+          path: .deps/legacy
+          persist-credentials: false
+
+      - name: Build real full Game semantic and creature sources
         shell: bash
         run: |
           set -euo pipefail
-          GAME_REVISION="$(python - <<'PY'
-          import json
-          print(json.load(open('web/semantic-search/index.json', encoding='utf-8'))['source']['game_revision'])
-          PY
-          )"
+          python .deps/game/tools/game-atlas-creatures/export.py \
+            .deps/legacy/vendor/map-analysis/crystalserver/data-global/world \
+            .deps/legacy/vendor/map-analysis/crystalserver/data-global/npc \
+            .deps/legacy/vendor/map-analysis/crystalserver/data-global/monster \
+            /tmp/static-creatures.json
+          python .deps/game/tools/game-atlas-semantic-search/export.py \
+            --creatures /tmp/static-creatures.json \
+            --npc-root .deps/legacy/vendor/map-analysis/crystalserver/data-global/npc \
+            --legacy-root .deps/legacy \
+            --map-path .deps/legacy/vendor/map-analysis/crystalserver/data-global/world/world.otbm \
+            --output /tmp/semantic-search-source.json
+          rm -rf /tmp/creature-index
+          mkdir -p /tmp/creature-index
+          python tools/build-creature-index.py /tmp/static-creatures.json /tmp/creature-index
           python tools/build-semantic-search-index.py \
-            tests/fixtures/game-semantic-search-source.json \
+            /tmp/semantic-search-source.json \
             /tmp/semantic-search-index.json \
-            --game-revision "$GAME_REVISION"
-          diff -u web/semantic-search/index.json /tmp/semantic-search-index.json
+            --game-revision "$GAME_REVISION" \
+            --kinds "$NAVIGATION_KINDS"
+
+      - name: Verify complete real-source catalog coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          semantic = json.load(open('/tmp/semantic-search-source.json', encoding='utf-8'))
+          index = json.load(open('/tmp/semantic-search-index.json', encoding='utf-8'))
+          static = json.load(open('/tmp/static-creatures.json', encoding='utf-8'))
+          creature = json.load(open('/tmp/creature-index/search.json', encoding='utf-8'))
+
+          navigation_kinds = {'town','waypoint','poi','teleport','house','quest_area','mechanic'}
+          expected_navigation = {r['id'] for r in semantic['records'] if r['kind'] in navigation_kinds}
+          actual_navigation = {r['id'] for r in index['records']}
+          assert actual_navigation == expected_navigation, (len(actual_navigation), len(expected_navigation))
+          counts = {kind: sum(r['kind'] == kind for r in index['records']) for kind in navigation_kinds}
+          assert counts['town'] == 33, counts
+          assert counts['waypoint'] == 18, counts
+          assert index['source']['records'] == semantic['counts']['records'] == 88684
+
+          expected_creatures = {
+              (record['kind'], record['name'].casefold())
+              for family in ('npcs', 'monster_spawns')
+              for record in static[family]
+          }
+          actual_creatures = {(record['kind'], record['label'].casefold()) for record in creature['records']}
+          assert actual_creatures == expected_creatures, (len(actual_creatures), len(expected_creatures))
+          assert len(actual_creatures) >= 1900
+          assert all(record.get('record_id') for record in creature['records'])
+          resolved_with_entity = sum(1 for record in creature['records'] if record.get('entity_id'))
+          assert resolved_with_entity >= 1400, resolved_with_entity
+          assert any(record['kind'] == 'npc' and record['label'].casefold() == 'sam' for record in creature['records'])
+          assert any(record['kind'] == 'monster' and record['label'].casefold() == 'dragon' for record in creature['records'])
+          print(json.dumps({
+              'semantic_source_records': semantic['counts']['records'],
+              'navigation_records': len(actual_navigation),
+              'towns': counts['town'],
+              'waypoints': counts['waypoint'],
+              'creature_search_records': len(actual_creatures),
+              'creature_entity_ids': resolved_with_entity,
+          }, sort_keys=True))
+          PY
+
+      - name: Verify committed full navigation index exactly
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! diff -u web/semantic-search/index.json /tmp/semantic-search-index.json; then
+            echo 'BEGIN_GENERATED_SEMANTIC_INDEX'
+            cat /tmp/semantic-search-index.json
+            echo 'END_GENERATED_SEMANTIC_INDEX'
+            exit 1
+          fi
 
       - name: Run real Chrome dropdown and navigation proof
         shell: bash
@@ -78,3 +165,14 @@ jobs:
             --user-data-dir=/tmp/semantic-search-chrome --dump-dom \
             'http://127.0.0.1:8768/tests/semantic-search-browser.html?floor=-7' > /tmp/semantic-search-proof.html
           grep -q 'data-status="PASS"' /tmp/semantic-search-proof.html
+
+      - name: Verify browser authority boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'static-creatures-v1' web/fullworld-search.mjs
+          grep -q 'semantic-search-source-v1' web/semantic-search/index.json
+          if grep -E '(\.otbm|world\.otbm|crystalserver|data-otservbr-global|Canary)' web/fullworld-search.mjs src/browser/creature-search.mjs; then
+            echo 'Browser global search must not reference legacy world inputs.' >&2
+            exit 1
+          fi
