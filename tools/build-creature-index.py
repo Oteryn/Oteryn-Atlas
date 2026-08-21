@@ -49,6 +49,9 @@ def validate(source: dict[str, object]) -> list[dict[str, object]]:
             record_id = record.get("record_id")
             if not isinstance(record_id, str) or len(record_id) > 96 or not record_id.startswith(f"{expected_kind}:"):
                 raise ValueError("invalid creature record id")
+            entity_id = record.get("entity_id")
+            if entity_id is not None and (not isinstance(entity_id, str) or len(entity_id) > 96 or not entity_id.startswith(f"{expected_kind}-entity:")):
+                raise ValueError("invalid creature entity id")
             name = record.get("name")
             if not isinstance(name, str) or not name.strip() or len(name) > 256:
                 raise ValueError("invalid creature name")
@@ -75,16 +78,16 @@ def build(source: dict[str, object], output: Path) -> dict[str, object]:
         }
         shards.setdefault(key, []).append(public)
         label = str(record["name"])
-        search.setdefault(
-            (kind, label.casefold()),
-            {
-                "kind": kind,
-                "label": label,
-                "position": position,
-                "record_id": record["record_id"],
-                "resolution_state": record["resolution_state"],
-            },
-        )
+        search_record = {
+            "kind": kind,
+            "label": label,
+            "position": position,
+            "record_id": record["record_id"],
+            "resolution_state": record["resolution_state"],
+        }
+        if "entity_id" in record:
+            search_record["entity_id"] = record["entity_id"]
+        search.setdefault((kind, label.casefold()), search_record)
 
     entries: list[dict[str, object]] = []
     for (floor, chunk_x, chunk_y), values in sorted(shards.items()):
