@@ -2,8 +2,8 @@ FROM mcr.microsoft.com/playwright:v1.62.0-noble@sha256:baed2032d533817f3dbe6425d
 
 WORKDIR /workspace/e2e
 
-COPY e2e/package.json ./package.json
-RUN npm install --ignore-scripts --no-audit --no-fund \
+COPY e2e/package.json e2e/package-lock.json ./
+RUN npm ci --ignore-scripts --no-audit --no-fund \
     && npm cache clean --force
 
 COPY e2e/playwright.config.mjs ./playwright.config.mjs

@@ -11,6 +11,11 @@ if [[ -z "${ATLAS_BASE_URL:-}" && -z "${ATLAS_PUBLICATION_ORIGIN:-}" ]]; then
   exit 2
 fi
 
+if [[ -n "${ATLAS_PUBLICATION_ORIGIN:-}" && ! "$ATLAS_PUBLICATION_ORIGIN" =~ ^https?://[A-Za-z0-9.-]+(:[0-9]{1,5})?$ ]]; then
+  echo "ATLAS_PUBLICATION_ORIGIN must be a plain http(s) origin without a path, query or credentials." >&2
+  exit 2
+fi
+
 if [[ -z "${ATLAS_CODE_REVISION:-}" ]]; then
   if command -v git >/dev/null 2>&1 && git rev-parse --verify HEAD >/dev/null 2>&1; then
     ATLAS_CODE_REVISION="$(git rev-parse HEAD)"
