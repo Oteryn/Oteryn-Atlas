@@ -9,6 +9,24 @@
   <span id="inspector-pill"></span>
   <div id="inspector-content"></div>
   <pre id="qualification-result" data-status="PENDING">PENDING</pre>
+  <script>
+    const realFetch = window.fetch.bind(window);
+    const creatureRecords = [
+      {kind:'npc',label:'Sam',record_id:'npc:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',entity_id:'npc-entity:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',position:{x:32361,y:32198,floor:-7},resolution_state:'RESOLVED'},
+      {kind:'monster',label:'Dragon',record_id:'monster:cccccccccccccccccccccccccccccccc',entity_id:'monster-entity:dddddddddddddddddddddddddddddddd',position:{x:32780,y:31590,floor:-7},resolution_state:'RESOLVED'}
+    ];
+    window.__CREATURE_BROWSER_FIXTURE__ = creatureRecords;
+    window.fetch = (input, init) => {
+      const url = new URL(input instanceof Request ? input.url : input, location.href);
+      if (url.pathname.endsWith('/data/creatures/index.json')) {
+        return Promise.resolve(new Response(JSON.stringify({schema_version:1,source:{contract_id:'oteryn-game-atlas-export-v1',capability:'static-creatures-v1'},search_path:'search.json'}), {status:200,headers:{'content-type':'application/json'}}));
+      }
+      if (url.pathname.endsWith('/data/creatures/search.json')) {
+        return Promise.resolve(new Response(JSON.stringify({schema_version:1,records:creatureRecords}), {status:200,headers:{'content-type':'application/json'}}));
+      }
+      return realFetch(input, init);
+    };
+  </script>
   <script type="module" src="../web/fullworld-search.mjs"></script>
   <script type="module" src="./semantic-search-browser-proof.mjs"></script>
 </body>
