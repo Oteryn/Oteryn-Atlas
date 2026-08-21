@@ -66,8 +66,8 @@ jobs:
               'monster_spawns': [{
                   'kind': 'monster', 'name': 'Rat', 'record_id': 'monster:' + 'c' * 32,
                   'entity_id': 'monster-entity:' + 'd' * 32,
-                  'position': {'x': 130, 'y': 201, 'floor': -7},
-                  'spawn_area': {'center': {'x': 128, 'y': 200, 'floor': -7}, 'radius': 3},
+                  'position': {'x': 110, 'y': 201, 'floor': -7},
+                  'spawn_area': {'center': {'x': 108, 'y': 200, 'floor': -7}, 'radius': 3},
                   'origin': 'base-map', 'resolution_state': 'RESOLVED',
                   'appearance': {'outfit_key': '21-0-0-0-0-0', 'look_type': 21},
               }],
