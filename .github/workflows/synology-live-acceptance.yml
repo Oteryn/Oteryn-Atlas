@@ -1,0 +1,440 @@
+name: Synology Live Acceptance
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/synology-live-acceptance.yml'
+      - 'e2e/Dockerfile'
+      - 'e2e/package.json'
+      - 'e2e/package-lock.json'
+      - 'e2e/tests/live-creature-preview.cjs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: atlas-synology-live-acceptance
+  cancel-in-progress: false
+
+jobs:
+  live-atlas:
+    name: Publish and qualify Atlas on Synology
+    if: github.ref == 'refs/heads/main'
+    runs-on:
+      group: atlas-runners
+      labels: oteryn-atlas
+    timeout-minutes: 45
+    env:
+      ATLAS_REV: 71e2aca1ac49692751f5d6c59a7126835fe1896a
+      GAME_REV: 1ce7c60714dbd5d87da16d2eb0b8eac0c30c2282
+      LEGACY_REV: e417c5e7c22986bf4acef0495eb47f7b72c97cce
+      PREVIEW_CONTAINER: oteryn-atlas-fullworld-preview
+      PREVIEW_URL: http://192.168.1.2:8097
+      CREATURE_SEMANTIC_DIGEST: sha256:01921968a6cb4f6ecea237820a053fc5052aaa1da556851f2c2a60d99890b5e1
+      PUBLICATION_ROOT: sha256:9d0d2f3bb16a5a90f9b51a21366e4ed42963f5cb12366c404a20d9502ec4857f
+      SEMANTIC_ROOT: sha256:27d7a83a7d9f498ea614b440ab4216cae5e6d11ea0527482410e40948cade5a9
+      PIXEL_ROOT: sha256:8b8228fcc4574903e547cb7d65b96f3d45e5a9e67045091c1bceb6e54d3690ad
+      OVERVIEW_ROOT: sha256:17683912d6758796d80a5b1647e2d0031f6849e51c40ae5264da6cfce3f9d6db
+      RUNTIME_ROOT: sha256:fa30ae5fc47f0ca8a6d482ed87b5db2cd74f32f7f523df16187ca719b8e04f08
+      PIXEL_BUCKET_ROOT: sha256:99cf23b01a0d652ff670a994a2b80cbef8d17036f514522d47f1aa98352d3116
+      MINIMAP_ROOT: sha256:23f4d2c3901673fb38980e2600828145a6d0626c0e44d1d9f5ca23bfbce02268
+
+    steps:
+      - name: Verify Atlas organization runner boundary
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test "${RUNNER_SCOPE:-}" = organization
+          test "${RUNNER_GROUP:-}" = atlas-runners
+          test "${RUNNER_NAME:-}" = oteryn-synology-atlas
+          test "${RUNNER_LABELS:-}" = oteryn-atlas
+          test -S /var/run/docker.sock
+          test ! -e /var/lib/oteryn-staging-state
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          path = Path('/runner/.runner')
+          data = json.loads(path.read_text(encoding='utf-8-sig'))
+          assert data['agentName'] == 'oteryn-synology-atlas'
+          assert data['poolName'] == 'atlas-runners'
+          assert data['gitHubUrl'] == 'https://github.com/Oteryn'
+          assert data['workFolder'] == '/work'
+          print('atlas-runner-identity=PASS')
+          PY
+          docker version --format 'docker-client={{.Client.Version}} docker-server={{.Server.Version}}'
+
+      - name: Check out exact Atlas workflow revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Build exact Game creature product
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          rm -rf -- atlas-source game-source legacy-source creature-export.json creature-index-a creature-index-b e2e-targets.json e2e-evidence
+
+          fetch_exact() {
+            local directory="$1"
+            local repository="$2"
+            local revision="$3"
+            git init "$directory" >/dev/null
+            git -C "$directory" remote add origin "$repository"
+            git -C "$directory" fetch --depth=1 origin "$revision"
+            git -C "$directory" checkout --detach --quiet FETCH_HEAD
+            test "$(git -C "$directory" rev-parse HEAD)" = "$revision"
+          }
+
+          fetch_exact atlas-source https://github.com/Oteryn/Oteryn-Atlas.git "$ATLAS_REV"
+          fetch_exact game-source https://github.com/Oteryn/Oteryn-Game.git "$GAME_REV"
+
+          git init legacy-source >/dev/null
+          git -C legacy-source remote add origin https://github.com/blakinio/Otheryn.git
+          git -C legacy-source sparse-checkout init --cone
+          git -C legacy-source fetch --depth=1 --filter=blob:none origin "$LEGACY_REV"
+          git -C legacy-source checkout --detach --quiet FETCH_HEAD
+          git -C legacy-source sparse-checkout set \
+            vendor/map-analysis/crystalserver/data-global/world \
+            vendor/map-analysis/crystalserver/data-global/npc \
+            vendor/map-analysis/crystalserver/data-global/monster
+          test "$(git -C legacy-source rev-parse HEAD)" = "$LEGACY_REV"
+
+          if find atlas-source -type f \( -name '*.otbm' -o -name '*.otb' -o -name '*.spr' -o -name '*.dat' \) -print -quit | grep -q .; then
+            echo 'Forbidden raw legacy/proprietary runtime input found in Atlas checkout.' >&2
+            exit 1
+          fi
+
+          DATA_ROOT="legacy-source/vendor/map-analysis/crystalserver/data-global"
+          python3 game-source/tools/game-atlas-creatures/export.py \
+            "$DATA_ROOT/world" "$DATA_ROOT/npc" "$DATA_ROOT/monster" \
+            creature-export.json
+
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          data = json.loads(Path('creature-export.json').read_text(encoding='utf-8'))
+          assert data['contract_id'] == 'oteryn-game-atlas-export-v1'
+          assert data['capability'] == 'static-creatures-v1'
+          assert data['coordinate_profile'] == 'oteryn-native-floor-v1'
+          assert data['legacy_evidence']['repository'] == 'blakinio/Otheryn'
+          assert data['legacy_evidence']['sha'] == 'e417c5e7c22986bf4acef0495eb47f7b72c97cce'
+          assert data['semantic_digest'] == 'sha256:01921968a6cb4f6ecea237820a053fc5052aaa1da556851f2c2a60d99890b5e1'
+          assert data['statistics'] == {
+              'ambiguous': 5,
+              'monster_spawns': 87565,
+              'npcs': 1068,
+              'unresolved': 461,
+          }
+          assert len(data['npcs']) + len(data['monster_spawns']) == 88633
+          print('game-creature-export=PASS')
+          PY
+
+          rm -rf -- legacy-source
+          python3 atlas-source/tools/build-creature-index.py creature-export.json creature-index-a
+          python3 atlas-source/tools/build-creature-index.py creature-export.json creature-index-b
+          diff -qr creature-index-a creature-index-b
+
+          python3 - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+          root = Path('creature-index-a')
+          index = json.loads((root / 'index.json').read_text(encoding='utf-8'))
+          search_raw = (root / 'search.json').read_bytes()
+          search = json.loads(search_raw)
+          assert index['counts'] == {'records': 88633, 'chunks': 5746, 'search_records': 1945}
+          assert index['source']['contract_id'] == 'oteryn-game-atlas-export-v1'
+          assert index['source']['capability'] == 'static-creatures-v1'
+          assert index['source']['semantic_digest'] == 'sha256:01921968a6cb4f6ecea237820a053fc5052aaa1da556851f2c2a60d99890b5e1'
+          assert index['search_bytes'] == len(search_raw)
+          assert index['search_digest'] == 'sha256:' + hashlib.sha256(search_raw).hexdigest()
+          assert len(search['records']) == 1945
+          by_id = {record['record_id']: record for record in search['records']}
+          wanted = {
+              'npc': 'npc:473280040fcebbf2bc1bad9e3717d7a9',
+              'monster': 'monster:83f049b79b2988bccdfb22f9a46a739d',
+          }
+          targets = {}
+          for kind, record_id in wanted.items():
+              item = by_id[record_id]
+              assert item['kind'] == kind
+              assert item['resolution_state'] == 'RESOLVED'
+              targets[kind] = {
+                  'kind': kind,
+                  'label': item['label'],
+                  'record_id': item['record_id'],
+                  'position': item['position'],
+              }
+          Path('e2e-targets.json').write_text(json.dumps(targets, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+          print('deterministic-creature-product=PASS')
+          PY
+          rm -rf -- creature-index-b
+
+      - name: Atomically publish creature product and verify live contract
+        id: product
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          C="$PREVIEW_CONTAINER"
+          PUBLISHED=0
+          PARENT_CREATED=0
+          REPO_ROOT=''
+          SHARED_DATA_ROOT=''
+          HELPER_IMAGE=''
+          TMP_NAME=".creatures-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          rollback_product() {
+            rc=$?
+            set +e
+            if [[ -n "$REPO_ROOT" && -n "$HELPER_IMAGE" ]]; then
+              docker run --rm --user 0:0 --entrypoint sh \
+                -e TMP="$TMP_NAME" -e PUBLISHED="$PUBLISHED" -e PARENT_CREATED="$PARENT_CREATED" \
+                -v "$REPO_ROOT:/repo" "$HELPER_IMAGE" -c '
+                  rm -rf "/repo/data/$TMP"
+                  if test "$PUBLISHED" = 1; then rm -rf /repo/data/creatures; fi
+                  if test "$PARENT_CREATED" = 1; then rmdir /repo/data 2>/dev/null || true; fi
+                ' >/dev/null 2>&1 || true
+            fi
+            exit "$rc"
+          }
+          trap rollback_product ERR INT TERM
+
+          running="$(docker inspect --format '{{.State.Running}}' "$C")"
+          revision="$(docker inspect --format '{{ index .Config.Labels "org.oteryn.revision" }}' "$C")"
+          port="$(docker port "$C" 8080/tcp)"
+          REPO_ROOT="$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/srv/atlas/repo"}}{{.Source}}{{end}}{{end}}' "$C")"
+          SHARED_DATA_ROOT="$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/srv/atlas/data"}}{{.Source}}{{end}}{{end}}' "$C")"
+          HELPER_IMAGE="$(docker inspect --format '{{.Image}}' "$C")"
+          mounts="$(docker inspect --format '{{range .Mounts}}{{printf "%s=>%s " .Source .Destination}}{{end}}' "$C")"
+          echo "live-running=$running"
+          echo "live-revision=$revision"
+          echo "live-port=$port"
+          echo "live-repo-root=$REPO_ROOT"
+          echo "live-shared-data-root=$SHARED_DATA_ROOT"
+          echo "live-mounts=$mounts"
+          test "$running" = true
+          test "$revision" = "$ATLAS_REV"
+          test "$port" = '192.168.1.2:8097'
+          test -n "$REPO_ROOT"
+          test -n "$SHARED_DATA_ROOT"
+          test -n "$HELPER_IMAGE"
+          test "$REPO_ROOT" != "$SHARED_DATA_ROOT"
+
+          root_shape="$(docker run --rm --user 0:0 --entrypoint sh -v "$REPO_ROOT:/repo:ro" "$HELPER_IMAGE" -c '
+            if test -s /repo/web/fullworld.html; then printf repo-root; else printf invalid; fi
+          ')"
+          data_parent="$(docker run --rm --user 0:0 --entrypoint sh -v "$REPO_ROOT:/repo:ro" "$HELPER_IMAGE" -c '
+            if test -d /repo/data; then printf present; else printf absent; fi
+          ')"
+          shared_shape="$(docker run --rm --user 0:0 --entrypoint sh -v "$SHARED_DATA_ROOT:/shared:ro" "$HELPER_IMAGE" -c '
+            if test -s /shared/fullworld-publication-v0-final/publication.json; then printf fullworld-data; else printf invalid; fi
+          ')"
+          echo "live-root-shape=$root_shape"
+          echo "creature-data-parent=$data_parent"
+          echo "shared-data-shape=$shared_shape"
+          test "$root_shape" = repo-root
+          test "$shared_shape" = fullworld-data
+          {
+            echo "repo_root=$REPO_ROOT"
+            echo "helper_image=$HELPER_IMAGE"
+            echo "published=false"
+            echo "parent_created=false"
+          } >> "$GITHUB_OUTPUT"
+
+          fetch_code() {
+            local url="$1"
+            local out="$2"
+            curl -sS -w '%{http_code}' "$url" -o "$out" || true
+          }
+
+          code="$(curl -sS -w '%{http_code}' -D /tmp/atlas-current.headers "$PREVIEW_URL/web/fullworld.html" -o /tmp/atlas-current.html || true)"
+          echo "fullworld-html-http=$code"
+          test "$code" = 200
+          grep -qi "^X-Oteryn-Atlas-Revision: $ATLAS_REV" /tmp/atlas-current.headers
+          cmp atlas-source/web/fullworld.html /tmp/atlas-current.html
+
+          for file in fullworld-creatures.mjs fullworld-search.mjs; do
+            code="$(fetch_code "$PREVIEW_URL/web/$file" "/tmp/$file")"
+            echo "${file}-http=$code"
+            test "$code" = 200
+            cmp "atlas-source/web/$file" "/tmp/$file"
+          done
+
+          index_code="$(fetch_code "$PREVIEW_URL/data/creatures/index.json" /tmp/atlas-live-index.json)"
+          search_code="$(fetch_code "$PREVIEW_URL/data/creatures/search.json" /tmp/atlas-live-search.json)"
+          echo "creature-index-prepublish-http=$index_code"
+          echo "creature-search-prepublish-http=$search_code"
+
+          if [[ "$index_code" = 404 && "$search_code" = 404 ]]; then
+            if [[ "$data_parent" = absent ]]; then
+              docker run --rm --user 0:0 --entrypoint sh \
+                -v "$REPO_ROOT:/repo" "$HELPER_IMAGE" \
+                -c 'test ! -e /repo/data; mkdir /repo/data'
+              PARENT_CREATED=1
+              echo "parent_created=true" >> "$GITHUB_OUTPUT"
+              echo 'creature-data-parent-create=PASS'
+            else
+              docker run --rm --user 0:0 --entrypoint sh \
+                -v "$REPO_ROOT:/repo:ro" "$HELPER_IMAGE" \
+                -c 'test -d /repo/data; test ! -e /repo/data/creatures'
+            fi
+
+            tar -C creature-index-a -cf - . | docker run --rm -i --user 0:0 --entrypoint sh \
+              -e TMP="$TMP_NAME" -v "$REPO_ROOT:/repo" "$HELPER_IMAGE" -c '
+                set -eu
+                test -d /repo/data
+                test ! -e /repo/data/creatures
+                rm -rf "/repo/data/$TMP"
+                mkdir "/repo/data/$TMP"
+                tar -xf - -C "/repo/data/$TMP"
+                test -s "/repo/data/$TMP/index.json"
+                test -s "/repo/data/$TMP/search.json"
+                mv "/repo/data/$TMP" /repo/data/creatures
+              '
+            PUBLISHED=1
+            echo "published=true" >> "$GITHUB_OUTPUT"
+            echo 'creature-product-publish=ATOMIC_PASS'
+          elif [[ "$index_code" = 200 && "$search_code" = 200 ]]; then
+            cmp creature-index-a/index.json /tmp/atlas-live-index.json
+            cmp creature-index-a/search.json /tmp/atlas-live-search.json
+            echo 'creature-product-publish=NOT_NEEDED_EXACT_ALREADY_PRESENT'
+          else
+            echo "Unexpected partial creature product state index=$index_code search=$search_code" >&2
+            exit 1
+          fi
+
+          curl -fsS "$PREVIEW_URL/data/creatures/index.json" -o /tmp/atlas-live-index.json
+          curl -fsS "$PREVIEW_URL/data/creatures/search.json" -o /tmp/atlas-live-search.json
+          cmp creature-index-a/index.json /tmp/atlas-live-index.json
+          cmp creature-index-a/search.json /tmp/atlas-live-search.json
+          first_chunk="$(python3 -c 'import json; print(json.load(open("creature-index-a/index.json"))["chunks"][0]["path"])')"
+          curl -fsS "$PREVIEW_URL/data/creatures/$first_chunk" -o /tmp/atlas-live-first-chunk.json
+          cmp "creature-index-a/$first_chunk" /tmp/atlas-live-first-chunk.json
+
+          range_url="$PREVIEW_URL/fullworld/publication/semantic/chunks/fm000007_rxp000126_ryp000125.jsonl"
+          range_code="$(curl -sS -w '%{http_code}' -D /tmp/atlas-range.headers -H 'Range: bytes=100-199' "$range_url" -o /tmp/atlas-range.bin || true)"
+          echo "semantic-range-http=$range_code"
+          test "$range_code" = 206
+          grep -qi '^Content-Range: bytes 100-199/72681462' /tmp/atlas-range.headers
+          test "$(wc -c < /tmp/atlas-range.bin)" -eq 100
+
+          curl -fsS "$PREVIEW_URL/fullworld/publication/publication.json" -o /tmp/atlas-publication.json
+          curl -fsS "$PREVIEW_URL/fullworld/publication/semantic/world.json" -o /tmp/atlas-semantic-world.json
+          curl -fsS "$PREVIEW_URL/fullworld/publication/pixels/manifest.json" -o /tmp/atlas-pixels.json
+          curl -fsS "$PREVIEW_URL/fullworld/overview/world.json" -o /tmp/atlas-overview.json
+          curl -fsS "$PREVIEW_URL/fullworld/runtime-index/world.json" -o /tmp/atlas-runtime.json
+          curl -fsS "$PREVIEW_URL/fullworld/pixel-buckets/manifest.json" -o /tmp/atlas-buckets.json
+          curl -fsS "$PREVIEW_URL/fullworld/minimap/world.json" -o /tmp/atlas-minimap.json
+          grep -F "$PUBLICATION_ROOT" /tmp/atlas-publication.json >/dev/null
+          grep -F "$SEMANTIC_ROOT" /tmp/atlas-semantic-world.json >/dev/null
+          grep -F "$PIXEL_ROOT" /tmp/atlas-pixels.json >/dev/null
+          grep -F "$OVERVIEW_ROOT" /tmp/atlas-overview.json >/dev/null
+          grep -F "$RUNTIME_ROOT" /tmp/atlas-runtime.json >/dev/null
+          grep -F "$PIXEL_BUCKET_ROOT" /tmp/atlas-buckets.json >/dev/null
+          grep -F "$MINIMAP_ROOT" /tmp/atlas-minimap.json >/dev/null
+
+          trap - ERR INT TERM
+          echo 'live-creature-product-and-roots=PASS'
+
+      - name: Build bounded Chromium acceptance image
+        id: browser
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          image="oteryn-atlas-live-e2e:${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          docker build --pull -t "$image" -f e2e/Dockerfile .
+          docker run --rm --ipc host --shm-size 1g --entrypoint node "$image" -e '
+            const { chromium } = require("@playwright/test");
+            (async () => {
+              const browser = await chromium.launch({headless:true,args:["--no-sandbox","--disable-dev-shm-usage"]});
+              console.log(`chromium-runtime=${browser.version()}`);
+              await browser.close();
+            })().catch((error) => { console.error(error); process.exit(1); });
+          '
+          printf 'image=%s\n' "$image" >> "$GITHUB_OUTPUT"
+
+      - name: Run live desktop and mobile Chromium E2E
+        id: e2e
+        shell: bash
+        env:
+          BROWSER_IMAGE: ${{ steps.browser.outputs.image }}
+        run: |
+          set -Eeuo pipefail
+          rm -rf -- e2e-evidence
+          mkdir -p e2e-evidence
+          container="oteryn-atlas-live-e2e-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          docker create \
+            --name "$container" \
+            --network host \
+            --ipc host \
+            --shm-size 1g \
+            --entrypoint node \
+            -e "PREVIEW_URL=$PREVIEW_URL" \
+            -e "ATLAS_REV=$ATLAS_REV" \
+            -e "CREATURE_SEMANTIC_DIGEST=$CREATURE_SEMANTIC_DIGEST" \
+            "$BROWSER_IMAGE" tests/live-creature-preview.cjs >/dev/null
+          docker cp e2e-targets.json "$container:/targets.json"
+
+          set +e
+          docker start -a "$container" 2>&1 | tee e2e-evidence/browser.log
+          rc="${PIPESTATUS[0]}"
+          set -e
+          docker cp "$container:/evidence/." e2e-evidence/ 2>/dev/null || true
+          if [[ "$rc" -ne 0 ]]; then
+            exit "$rc"
+          fi
+
+          grep -Fx 'desktop=PASS' e2e-evidence/browser.log
+          grep -Fx 'mobile=PASS' e2e-evidence/browser.log
+          test -s e2e-evidence/result.json
+          grep -F '"status": "PASS"' e2e-evidence/result.json
+          grep -F "$ATLAS_REV" e2e-evidence/result.json
+          grep -F "$CREATURE_SEMANTIC_DIGEST" e2e-evidence/result.json
+          echo 'live-e2e=PASS'
+
+      - name: Publish bounded browser evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: atlas-synology-live-e2e-${{ github.run_id }}-${{ github.run_attempt }}
+          path: e2e-evidence/
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Cleanup task-owned resources and rollback failed publication
+        if: always()
+        shell: bash
+        env:
+          BROWSER_IMAGE: ${{ steps.browser.outputs.image }}
+          PRODUCT_PUBLISHED: ${{ steps.product.outputs.published }}
+          PRODUCT_PARENT_CREATED: ${{ steps.product.outputs.parent_created }}
+          PRODUCT_REPO_ROOT: ${{ steps.product.outputs.repo_root }}
+          HELPER_IMAGE: ${{ steps.product.outputs.helper_image }}
+          E2E_OUTCOME: ${{ steps.e2e.outcome }}
+        run: |
+          set -Eeuo pipefail
+          container="oteryn-atlas-live-e2e-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          docker rm -f "$container" >/dev/null 2>&1 || true
+
+          if [[ "$PRODUCT_PUBLISHED" = true && "$E2E_OUTCOME" != success ]]; then
+            test -n "$PRODUCT_REPO_ROOT"
+            test -n "$HELPER_IMAGE"
+            docker run --rm --user 0:0 --entrypoint sh \
+              -e PARENT_CREATED="$PRODUCT_PARENT_CREATED" \
+              -v "$PRODUCT_REPO_ROOT:/repo" "$HELPER_IMAGE" -c '
+                test -s /repo/data/creatures/index.json
+                rm -rf /repo/data/creatures
+                if test "$PARENT_CREATED" = true; then rmdir /repo/data; fi
+              '
+            code="$(curl -sS -w '%{http_code}' "$PREVIEW_URL/data/creatures/index.json" -o /tmp/atlas-after-rollback.json || true)"
+            test "$code" = 404
+            echo 'creature-product-rollback=PASS'
+          fi
+
+          if [[ -n "$BROWSER_IMAGE" ]]; then
+            docker image rm -f "$BROWSER_IMAGE" >/dev/null 2>&1 || true
+          fi
+          rm -rf -- atlas-source game-source legacy-source creature-export.json creature-index-a creature-index-b e2e-targets.json e2e-evidence
+          echo 'task-owned-cleanup=PASS'
