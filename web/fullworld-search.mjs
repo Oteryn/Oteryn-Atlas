@@ -67,8 +67,10 @@ function resultHost(form, suffix) {
 
 function currentFloor() {
   const params = new URLSearchParams(location.search);
-  const fromUrl = Number(params.get('floor'));
-  if (Number.isSafeInteger(fromUrl)) return fromUrl;
+  if (params.has('floor')) {
+    const fromUrl = Number(params.get('floor'));
+    if (Number.isSafeInteger(fromUrl)) return fromUrl;
+  }
   const fromUi = Number(document.querySelector('#coord-floor')?.textContent);
   return Number.isSafeInteger(fromUi) ? fromUi : null;
 }
