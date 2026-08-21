@@ -37,12 +37,19 @@ jobs:
           docker compose -f e2e/compose.yml config >/tmp/atlas-e2e-compose.yml
           docker compose -f e2e/compose.yml up -d atlas-web
           trap 'docker compose -f e2e/compose.yml down --remove-orphans' EXIT
+          ready=0
           for _ in $(seq 1 30); do
             if docker compose -f e2e/compose.yml exec -T atlas-web wget -q -O /dev/null http://127.0.0.1:8080/web/fullworld.html; then
+              ready=1
               break
             fi
             sleep 1
           done
+          if [ "$ready" -ne 1 ]; then
+            docker compose -f e2e/compose.yml ps -a || true
+            docker compose -f e2e/compose.yml logs --no-color atlas-web || true
+            exit 1
+          fi
           docker compose -f e2e/compose.yml exec -T atlas-web \
             wget -S -O /dev/null http://127.0.0.1:8080/web/fullworld-app.mjs 2>/tmp/atlas-e2e-module-headers
           cat /tmp/atlas-e2e-module-headers
