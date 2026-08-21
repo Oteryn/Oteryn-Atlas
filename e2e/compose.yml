@@ -1,0 +1,33 @@
+name: oteryn-atlas-e2e
+
+services:
+  atlas-web:
+    image: ghcr.io/nginx/nginx-unprivileged:1.31.3-alpine3.24-slim
+    read_only: true
+    volumes:
+      - ../:/usr/share/nginx/html:ro
+    tmpfs:
+      - /tmp
+      - /var/cache/nginx
+      - /var/run
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/web/fullworld.html || exit 1"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  e2e:
+    build:
+      context: ..
+      dockerfile: e2e/Dockerfile
+    init: true
+    ipc: host
+    depends_on:
+      atlas-web:
+        condition: service_healthy
+    environment:
+      ATLAS_BASE_URL: ${ATLAS_BASE_URL:-http://atlas-web:8080}
+      ATLAS_EXPECTED_REVISION: ${ATLAS_EXPECTED_REVISION:-}
+      ATLAS_E2E_WORKERS: ${ATLAS_E2E_WORKERS:-2}
+    volumes:
+      - ../artifacts/e2e:/artifacts
