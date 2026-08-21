@@ -18,7 +18,7 @@
         <span>X <b id="coord-x">—</b></span><span>Y <b id="coord-y">—</b></span><span>FLOOR <b id="coord-floor">—</b></span>
       </div>
       <form class="search" id="search-form">
-        <input id="search-input" autocomplete="off" aria-label="Global factual coordinate search" placeholder="Search coordinates: X Y [floor]">
+        <input id="search-input" autocomplete="off" aria-label="Global semantic Atlas search" placeholder="Search NPC, town, coordinates or type:query">
         <button type="submit">Go</button>
       </form>
       <div class="zoom-controls">
@@ -38,7 +38,7 @@
           <button id="mobile-controls-close" type="button" aria-label="Close Atlas controls">×</button>
         </div>
         <form class="mobile-search" id="mobile-search-form">
-          <input id="mobile-search-input" autocomplete="off" aria-label="Mobile factual coordinate search" placeholder="Coordinates: X Y [floor]">
+          <input id="mobile-search-input" autocomplete="off" aria-label="Global semantic Atlas search" placeholder="Search NPC, town or coordinates">
           <button type="submit">Go</button>
         </form>
         <section>
@@ -137,5 +137,6 @@
   <script type="module" src="./fullworld-app.mjs"></script>
   <script type="module" src="./fullworld-minimap.mjs"></script>
   <script type="module" src="./fullworld-mobile.mjs"></script>
+  <script type="module" src="./fullworld-search.mjs"></script>
 </body>
 </html>
