@@ -34,7 +34,10 @@ def canonical(value: Any) -> bytes:
 
 
 def normalize(value: str) -> str:
-    return " ".join(value.casefold().strip().split())
+    # Match browser String.toLocaleLowerCase('en-US') for the public labels we
+    # index. Python casefold() is intentionally avoided because it expands
+    # some Unicode code points (for example ß -> ss) that JS lowercasing does not.
+    return " ".join(value.lower().strip().split())
 
 
 def validate_source(source: dict[str, Any]) -> list[dict[str, Any]]:
