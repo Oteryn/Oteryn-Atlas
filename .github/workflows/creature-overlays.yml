@@ -1,0 +1,122 @@
+name: Creature overlays
+
+on:
+  pull_request:
+    paths:
+      - tools/build-creature-index.py
+      - web/fullworld-creatures.mjs
+      - web/fullworld-minimap.mjs
+      - .github/workflows/creature-overlays.yml
+  push:
+    branches: [main]
+    paths:
+      - tools/build-creature-index.py
+      - web/fullworld-creatures.mjs
+      - web/fullworld-minimap.mjs
+      - .github/workflows/creature-overlays.yml
+
+permissions:
+  contents: read
+
+jobs:
+  creature-overlays:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out exact repository revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Compile producer consumer tooling
+        run: |
+          python -m py_compile tools/build-creature-index.py
+          node --check web/fullworld-creatures.mjs
+
+      - name: Run deterministic creature-index fixture
+        shell: bash
+        run: |
+          python - <<'PY'
+          import hashlib
+          import importlib.util
+          import json
+          from pathlib import Path
+          import tempfile
+
+          path = Path('tools/build-creature-index.py')
+          spec = importlib.util.spec_from_file_location('creature_index', path)
+          module = importlib.util.module_from_spec(spec)
+          assert spec and spec.loader
+          spec.loader.exec_module(module)
+
+          source = {
+              'contract_id': 'oteryn-game-atlas-export-v1',
+              'capability': 'static-creatures-v1',
+              'semantic_revision': 1,
+              'semantic_digest': 'sha256:' + '1' * 64,
+              'coordinate_profile': 'oteryn-native-floor-v1',
+              'legacy_evidence': {'repository': 'fixture', 'sha': '2' * 40},
+              'npcs': [{
+                  'kind': 'npc', 'name': 'Alice', 'record_id': 'npc:' + 'a' * 32,
+                  'entity_id': 'npc-entity:' + 'b' * 32,
+                  'position': {'x': 100, 'y': 200, 'floor': -7},
+                  'spawn_area': {'center': {'x': 100, 'y': 200, 'floor': -7}, 'radius': 1},
+                  'origin': 'base-map', 'resolution_state': 'RESOLVED',
+                  'appearance': {'outfit_key': '128-1-2-3-4-0', 'look_type': 128},
+              }],
+              'monster_spawns': [{
+                  'kind': 'monster', 'name': 'Rat', 'record_id': 'monster:' + 'c' * 32,
+                  'entity_id': 'monster-entity:' + 'd' * 32,
+                  'position': {'x': 110, 'y': 201, 'floor': -7},
+                  'spawn_area': {'center': {'x': 108, 'y': 200, 'floor': -7}, 'radius': 3},
+                  'origin': 'base-map', 'resolution_state': 'RESOLVED',
+                  'appearance': {'outfit_key': '21-0-0-0-0-0', 'look_type': 21},
+              }],
+          }
+
+          def tree(root):
+              return {
+                  file.relative_to(root).as_posix(): file.read_bytes()
+                  for file in sorted(root.rglob('*')) if file.is_file()
+              }
+
+          with tempfile.TemporaryDirectory() as tmp:
+              first = Path(tmp) / 'first'
+              second = Path(tmp) / 'second'
+              first.mkdir(); second.mkdir()
+              index = module.build(source, first)
+              module.build(source, second)
+              assert tree(first) == tree(second)
+              assert index['counts'] == {'records': 2, 'chunks': 1, 'search_records': 2}
+              search = json.loads((first / 'search.json').read_text())
+              assert search['records'][0]['record_id'] == 'npc:' + 'a' * 32
+              assert search['records'][1]['record_id'] == 'monster:' + 'c' * 32
+              search_bytes = (first / 'search.json').read_bytes()
+              assert index['search_bytes'] == len(search_bytes)
+              assert index['search_digest'] == 'sha256:' + hashlib.sha256(search_bytes).hexdigest()
+              chunk = index['chunks'][0]
+              chunk_bytes = (first / chunk['path']).read_bytes()
+              assert chunk['digest'] == 'sha256:' + hashlib.sha256(chunk_bytes).hexdigest()
+              bad = dict(source)
+              bad['npcs'] = [dict(source['npcs'][0], kind='monster')]
+              try:
+                  module.validate(bad)
+              except ValueError as error:
+                  assert 'record kind' in str(error)
+              else:
+                  raise AssertionError('mismatched record kind must fail closed')
+          print('creature overlay fixture: PASS')
+          PY
+
+      - name: Verify browser trust and deep-link boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q "EXPECTED_SEMANTIC_DIGEST = 'sha256:01921968a6cb4f6ecea237820a053fc5052aaa1da556851f2c2a60d99890b5e1'" web/fullworld-creatures.mjs
+          grep -q '__OTERYN_ATLAS_CREATURES__' web/fullworld-creatures.mjs
+          grep -q "panel.id = 'creature-inspector'" web/fullworld-creatures.mjs
+          grep -q "params.set('creature', item.record_id)" web/fullworld-creatures.mjs
+          grep -q 'MAX_CACHE_CHUNKS' web/fullworld-creatures.mjs
+          if grep -E '(\.otbm|Legacy IR|world\.otbm|crystalserver|data-otservbr-global)' web/fullworld-creatures.mjs; then
+            echo 'Browser creature consumer must not reference legacy world inputs.' >&2
+            exit 1
+          fi
