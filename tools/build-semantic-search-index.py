@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the bounded Atlas search index from Game semantic-search-source-v1."""
+"""Build a bounded Atlas search index from Game semantic-search-source-v1."""
 from __future__ import annotations
 
 import argparse
@@ -34,9 +34,7 @@ def canonical(value: Any) -> bytes:
 
 
 def normalize(value: str) -> str:
-    # Match browser String.toLocaleLowerCase('en-US') for the public labels we
-    # index. Python casefold() is intentionally avoided because it expands
-    # some Unicode code points (for example ß -> ss) that JS lowercasing does not.
+    # Match browser String.toLocaleLowerCase('en-US') for public labels.
     return " ".join(value.lower().strip().split())
 
 
@@ -95,10 +93,20 @@ def validate_source(source: dict[str, Any]) -> list[dict[str, Any]]:
     return records
 
 
-def build(source: dict[str, Any], game_revision: str) -> dict[str, Any]:
+def parse_kinds(raw: str | None) -> set[str] | None:
+    if raw is None:
+        return None
+    kinds = {value.strip() for value in raw.split(",") if value.strip()}
+    if not kinds or not kinds <= ALLOWED_KINDS:
+        raise ValueError("invalid semantic kind scope")
+    return kinds
+
+
+def build(source: dict[str, Any], game_revision: str, kinds: set[str] | None = None) -> dict[str, Any]:
     if SHA.fullmatch(game_revision) is None:
         raise ValueError("game revision must be an exact 40-character SHA")
-    records = validate_source(source)
+    source_records = validate_source(source)
+    records = [record for record in source_records if kinds is None or record["kind"] in kinds]
     indexed: list[dict[str, Any]] = []
     by_kind: dict[str, list[str]] = {}
     for record in records:
@@ -122,7 +130,9 @@ def build(source: dict[str, Any], game_revision: str) -> dict[str, Any]:
             "capability": source["capability"],
             "profile_id": source["profile_id"],
             "semantic_digest": source["semantic_digest"],
+            "records": len(source_records),
         },
+        "catalog_scope": sorted(kinds if kinds is not None else ALLOWED_KINDS),
         "input_floor_aliases": source["input_floor_aliases"],
         "ranking": RANKING,
         "kind_filters": sorted(by_kind),
@@ -139,12 +149,13 @@ def main() -> int:
     parser.add_argument("source", type=Path)
     parser.add_argument("output", type=Path)
     parser.add_argument("--game-revision", required=True)
+    parser.add_argument("--kinds", help="comma-separated published kind scope; validates the full Game source before filtering")
     args = parser.parse_args()
     source = json.loads(args.source.read_text(encoding="utf-8"))
-    result = build(source, args.game_revision)
+    result = build(source, args.game_revision, parse_kinds(args.kinds))
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    print(json.dumps({"index_digest": result["index_digest"], **result["counts"]}, sort_keys=True))
+    print(json.dumps({"index_digest": result["index_digest"], **result["counts"], "source_records": result["source"]["records"]}, sort_keys=True))
     return 0
 
 
