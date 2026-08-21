@@ -89,7 +89,9 @@ jobs:
               assert index['counts'] == {'records': 2, 'chunks': 1, 'search_records': 2}
               search = json.loads((first / 'search.json').read_text())
               assert search['records'][0]['record_id'] == 'npc:' + 'a' * 32
+              assert search['records'][0]['entity_id'] == 'npc-entity:' + 'b' * 32
               assert search['records'][1]['record_id'] == 'monster:' + 'c' * 32
+              assert search['records'][1]['entity_id'] == 'monster-entity:' + 'd' * 32
               search_bytes = (first / 'search.json').read_bytes()
               assert index['search_bytes'] == len(search_bytes)
               assert index['search_digest'] == 'sha256:' + hashlib.sha256(search_bytes).hexdigest()
