@@ -1,0 +1,266 @@
+'use strict';
+
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const { chromium } = require('@playwright/test');
+
+const preview = process.env.PREVIEW_URL;
+const expectedRevision = process.env.ATLAS_REV;
+const expectedDigest = process.env.CREATURE_SEMANTIC_DIGEST;
+const targets = JSON.parse(fs.readFileSync('/targets.json', 'utf8'));
+const evidenceDir = '/evidence';
+fs.mkdirSync(evidenceDir, { recursive: true });
+
+assert.match(preview ?? '', /^http:\/\/192\.168\.1\.2:8097$/);
+assert.match(expectedRevision ?? '', /^[0-9a-f]{40}$/);
+assert.match(expectedDigest ?? '', /^sha256:[0-9a-f]{64}$/);
+assert.equal(targets.npc.kind, 'npc');
+assert.equal(targets.monster.kind, 'monster');
+
+function escapeRegex(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function watchRelevantErrors(page) {
+  const errors = [];
+  page.on('pageerror', (error) => errors.push(`pageerror: ${error.message}`));
+  page.on('console', (message) => {
+    if (message.type() === 'error' && /creature|semantic|fullworld-search|fullworld-creatures/i.test(message.text())) {
+      errors.push(`console.error: ${message.text()}`);
+    }
+  });
+  return errors;
+}
+
+async function diagnostic(page) {
+  return page.evaluate(() => globalThis.__OTERYN_ATLAS_CREATURES__ ?? null);
+}
+
+async function semanticDiagnostic(page) {
+  return page.evaluate(() => globalThis.__OTERYN_ATLAS_SEMANTIC_SEARCH__ ?? null);
+}
+
+async function waitSemanticReady(page) {
+  await page.waitForFunction(() => {
+    const value = globalThis.__OTERYN_ATLAS_SEMANTIC_SEARCH__;
+    return value?.status === 'PASS' && value.creatureSearchRecords === 1945;
+  }, null, { timeout: 120_000 });
+  const value = await semanticDiagnostic(page);
+  assert.equal(value.status, 'PASS');
+  assert.equal(value.creatureSearchRecords, 1945);
+  return value;
+}
+
+async function waitReady(page, { selectedId = null, npc = true, monster = true } = {}) {
+  await page.waitForFunction(
+    ({ digest, selected, wantNpc, wantMonster }) => {
+      const value = globalThis.__OTERYN_ATLAS_CREATURES__;
+      if (!value || value.status !== 'PASS') return false;
+      if (value.sourceSemanticDigest !== digest) return false;
+      if (value.cacheChunks > 96 || value.drawnRecords < 1) return false;
+      if (value.enabled?.npc !== wantNpc || value.enabled?.monster !== wantMonster) return false;
+      if (selected && (value.selectedRecordId !== selected || value.selectedVisible !== true)) return false;
+      return true;
+    },
+    { digest: expectedDigest, selected: selectedId, wantNpc: npc, wantMonster: monster },
+    { timeout: 120_000 },
+  );
+  const value = await diagnostic(page);
+  assert.equal(value.status, 'PASS');
+  assert.equal(value.sourceSemanticDigest, expectedDigest);
+  assert.equal(value.totalRecords, 88633);
+  assert.equal(value.totalChunks, 5746);
+  assert.equal(value.searchRecords, 1945);
+  assert.ok(value.drawnRecords > 0);
+  assert.ok(value.cacheChunks <= 96);
+  return value;
+}
+
+async function assertVisibleCreatureOverlay(page) {
+  const overlay = page.locator('#creature-overlay');
+  await overlay.waitFor({ state: 'visible', timeout: 30_000 });
+  const box = await overlay.boundingBox();
+  assert.ok(box && box.width > 0 && box.height > 0, 'creature overlay has no visible surface');
+}
+
+function targetUrl(target, creatures = 'npc,monster') {
+  const params = new URLSearchParams({
+    x: String(target.position.x),
+    y: String(target.position.y),
+    floor: String(target.position.floor),
+    zoom: '2',
+    mode: 'minimap',
+    perf: 'reference',
+    creatures,
+    animation: 'off',
+  });
+  return `${preview}/web/fullworld.html?${params}`;
+}
+
+async function assertRevisionResponse(page) {
+  const response = await page.request.get(`${preview}/web/fullworld.html`);
+  assert.equal(response.status(), 200);
+  assert.equal(response.headers()['x-oteryn-atlas-revision'], expectedRevision);
+}
+
+async function searchAndSelect(page, target, kindText, { inputSelector, hostSelector }) {
+  const input = page.locator(inputSelector);
+  await input.waitFor({ state: 'visible', timeout: 30_000 });
+  await input.fill(target.label);
+  await page.waitForFunction(
+    (query) => {
+      const value = globalThis.__OTERYN_ATLAS_SEMANTIC_SEARCH__;
+      return value?.status === 'PASS' && value.lastQuery === query && value.lastResults > 0;
+    },
+    target.label,
+    { timeout: 30_000 },
+  );
+
+  const host = page.locator(hostSelector);
+  await host.waitFor({ state: 'visible', timeout: 30_000 });
+  const result = host.locator('.semantic-search-result')
+    .filter({ hasText: new RegExp(escapeRegex(target.label), 'i') })
+    .filter({ hasText: new RegExp(escapeRegex(kindText), 'i') })
+    .first();
+  await result.waitFor({ state: 'visible', timeout: 30_000 });
+  const factualResult = await result.innerText();
+  assert.match(factualResult, new RegExp(escapeRegex(target.label), 'i'));
+  assert.match(factualResult, new RegExp(escapeRegex(kindText), 'i'));
+  assert.ok(factualResult.includes(String(target.position.x)));
+  assert.ok(factualResult.includes(String(target.position.y)));
+
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 60_000 }),
+    result.click(),
+  ]);
+}
+
+function assertDeepLink(page, target, expectedCreatures) {
+  const params = new URL(page.url()).searchParams;
+  assert.equal(params.get('x'), String(target.position.x));
+  assert.equal(params.get('y'), String(target.position.y));
+  assert.equal(params.get('floor'), String(target.position.floor));
+  assert.equal(params.get('selected'), `${target.position.floor}:${target.position.x}:${target.position.y}`);
+  assert.equal(params.get('q'), target.label);
+  assert.equal(params.get('creature'), target.record_id);
+  assert.equal(params.get('creatures'), expectedCreatures);
+  assert.ok(params.get('semantic'));
+}
+
+function assertCreatureInspector(text, target, kindText) {
+  assert.match(text, new RegExp(escapeRegex(target.label), 'i'));
+  assert.ok(text.includes(target.record_id));
+  assert.ok(text.includes(expectedDigest));
+  assert.match(text, new RegExp(escapeRegex(kindText), 'i'));
+  assert.ok(text.includes(`X ${target.position.x} · Y ${target.position.y} · F ${target.position.floor}`));
+  assert.match(text, /Static marker fallback/i);
+}
+
+async function runDesktop(browser) {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const page = await context.newPage();
+  const errors = watchRelevantErrors(page);
+  await page.goto(targetUrl(targets.npc), { waitUntil: 'domcontentloaded', timeout: 60_000 });
+  await assertRevisionResponse(page);
+  await waitSemanticReady(page);
+  const initial = await waitReady(page);
+  assert.ok(initial.visibleRecords > 0);
+  await assertVisibleCreatureOverlay(page);
+
+  const npcToggle = page.locator('input[data-creature-kind="npc"]');
+  const monsterToggle = page.locator('input[data-creature-kind="monster"]');
+  await npcToggle.waitFor({ state: 'visible', timeout: 30_000 });
+  await monsterToggle.waitFor({ state: 'visible', timeout: 30_000 });
+  assert.equal(await npcToggle.isChecked(), true);
+  assert.equal(await monsterToggle.isChecked(), true);
+  await page.screenshot({ path: `${evidenceDir}/desktop-initial.png`, fullPage: true });
+
+  await searchAndSelect(page, targets.npc, 'NPC', {
+    inputSelector: '#search-input',
+    hostSelector: '#semantic-search-results-desktop',
+  });
+  await waitSemanticReady(page);
+  await waitReady(page, { selectedId: targets.npc.record_id });
+  assertDeepLink(page, targets.npc, 'monster,npc');
+  const inspector = await page.locator('#creature-inspector').innerText();
+  assertCreatureInspector(inspector, targets.npc, 'NPC');
+
+  await monsterToggle.uncheck();
+  await waitReady(page, { selectedId: targets.npc.record_id, npc: true, monster: false });
+  assert.equal(new URL(page.url()).searchParams.get('creatures'), 'npc');
+  await page.screenshot({ path: `${evidenceDir}/desktop-npc-only.png`, fullPage: true });
+  assert.deepEqual(errors, []);
+  await context.close();
+  return { initialVisibleRecords: initial.visibleRecords, selected: targets.npc.record_id };
+}
+
+async function runMobile(browser) {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  const page = await context.newPage();
+  const errors = watchRelevantErrors(page);
+  await page.goto(targetUrl(targets.monster), { waitUntil: 'domcontentloaded', timeout: 60_000 });
+  await assertRevisionResponse(page);
+  await waitSemanticReady(page);
+  const initial = await waitReady(page);
+  assert.ok(initial.visibleRecords > 0);
+  await assertVisibleCreatureOverlay(page);
+
+  await page.locator('#mobile-controls-toggle').click();
+  const npcToggle = page.locator('input[data-creature-kind="npc"]');
+  const monsterToggle = page.locator('input[data-creature-kind="monster"]');
+  await npcToggle.waitFor({ state: 'visible', timeout: 30_000 });
+  await monsterToggle.waitFor({ state: 'visible', timeout: 30_000 });
+  assert.equal(await npcToggle.isChecked(), true);
+  assert.equal(await monsterToggle.isChecked(), true);
+  await npcToggle.uncheck();
+  await waitReady(page, { npc: false, monster: true });
+  assert.equal(new URL(page.url()).searchParams.get('creatures'), 'monster');
+
+  await searchAndSelect(page, targets.monster, 'Monster / Spawn', {
+    inputSelector: '#mobile-search-input',
+    hostSelector: '#semantic-search-results-mobile',
+  });
+  await waitSemanticReady(page);
+  await waitReady(page, { selectedId: targets.monster.record_id, npc: false, monster: true });
+  assertDeepLink(page, targets.monster, 'monster');
+  await page.locator('#mobile-inspector-toggle').click();
+  const inspector = page.locator('#creature-inspector');
+  await inspector.waitFor({ state: 'visible', timeout: 30_000 });
+  const text = await inspector.innerText();
+  assertCreatureInspector(text, targets.monster, 'Monster / Spawn');
+  await page.screenshot({ path: `${evidenceDir}/mobile-monster-only.png`, fullPage: true });
+  assert.deepEqual(errors, []);
+  await context.close();
+  return { initialVisibleRecords: initial.visibleRecords, selected: targets.monster.record_id };
+}
+
+(async () => {
+  const browser = await chromium.launch({
+    headless: true,
+    args: [
+      '--no-sandbox',
+      '--disable-dev-shm-usage',
+      '--use-angle=swiftshader',
+      '--enable-unsafe-swiftshader',
+    ],
+  });
+  try {
+    const desktop = await runDesktop(browser);
+    process.stdout.write('desktop=PASS\n');
+    const mobile = await runMobile(browser);
+    process.stdout.write('mobile=PASS\n');
+    const result = {
+      status: 'PASS',
+      atlasRevision: expectedRevision,
+      gameSemanticDigest: expectedDigest,
+      desktop,
+      mobile,
+    };
+    fs.writeFileSync(`${evidenceDir}/result.json`, `${JSON.stringify(result, null, 2)}\n`);
+  } finally {
+    await browser.close();
+  }
+})().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});
