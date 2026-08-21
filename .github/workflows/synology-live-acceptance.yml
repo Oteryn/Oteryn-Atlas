@@ -32,6 +32,7 @@ jobs:
       LEGACY_REV: e417c5e7c22986bf4acef0495eb47f7b72c97cce
       PREVIEW_CONTAINER: oteryn-atlas-fullworld-preview
       PREVIEW_URL: http://192.168.1.2:8097
+      PYTHON_IMAGE: docker.io/library/python@sha256:2c941e860699f878900b0edc2403613c234d4b32eda3cc9fa7036991a2a63c4a
       CREATURE_SEMANTIC_DIGEST: sha256:01921968a6cb4f6ecea237820a053fc5052aaa1da556851f2c2a60d99890b5e1
       PUBLICATION_ROOT: sha256:9d0d2f3bb16a5a90f9b51a21366e4ed42963f5cb12366c404a20d9502ec4857f
       SEMANTIC_ROOT: sha256:27d7a83a7d9f498ea614b440ab4216cae5e6d11ea0527482410e40948cade5a9
@@ -52,17 +53,11 @@ jobs:
           test "${RUNNER_LABELS:-}" = oteryn-atlas
           test -S /var/run/docker.sock
           test ! -e /var/lib/oteryn-staging-state
-          python3 - <<'PY'
-          import json
-          from pathlib import Path
-          path = Path('/runner/.runner')
-          data = json.loads(path.read_text(encoding='utf-8-sig'))
-          assert data['agentName'] == 'oteryn-synology-atlas'
-          assert data['poolName'] == 'atlas-runners'
-          assert data['gitHubUrl'] == 'https://github.com/Oteryn'
-          assert data['workFolder'] == '/work'
-          print('atlas-runner-identity=PASS')
-          PY
+          grep -F '"agentName": "oteryn-synology-atlas"' /runner/.runner
+          grep -F '"poolName": "atlas-runners"' /runner/.runner
+          grep -F '"gitHubUrl": "https://github.com/Oteryn"' /runner/.runner
+          grep -F '"workFolder": "/work"' /runner/.runner
+          echo 'atlas-runner-identity=PASS'
           docker version --format 'docker-client={{.Client.Version}} docker-server={{.Server.Version}}'
 
       - name: Check out exact Atlas workflow revision
@@ -75,7 +70,12 @@ jobs:
         shell: bash
         run: |
           set -Eeuo pipefail
-          rm -rf -- atlas-source game-source legacy-source creature-export.json creature-index-a creature-index-b e2e-targets.json e2e-evidence
+          rm -rf -- atlas-source game-source legacy-source creature-export.json creature-index-a creature-index-b e2e-targets.json first-chunk.txt e2e-evidence
+          python_container="oteryn-atlas-python-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          cleanup_python() {
+            docker rm -f "$python_container" >/dev/null 2>&1 || true
+          }
+          trap cleanup_python EXIT
 
           fetch_exact() {
             local directory="$1"
@@ -107,15 +107,29 @@ jobs:
             exit 1
           fi
 
-          DATA_ROOT="legacy-source/vendor/map-analysis/crystalserver/data-global"
-          python3 game-source/tools/game-atlas-creatures/export.py \
-            "$DATA_ROOT/world" "$DATA_ROOT/npc" "$DATA_ROOT/monster" \
-            creature-export.json
+          rm -rf -- atlas-source/.git game-source/.git legacy-source/.git
+          docker create \
+            --name "$python_container" \
+            --network none \
+            --entrypoint python3 \
+            "$PYTHON_IMAGE" \
+            -c 'import time; time.sleep(2700)' >/dev/null
+          docker cp atlas-source "$python_container:/atlas-source"
+          docker cp game-source "$python_container:/game-source"
+          docker cp legacy-source "$python_container:/legacy-source"
+          docker start "$python_container" >/dev/null
+          docker exec "$python_container" python3 --version
 
-          python3 - <<'PY'
+          docker exec "$python_container" python3 /game-source/tools/game-atlas-creatures/export.py \
+            /legacy-source/vendor/map-analysis/crystalserver/data-global/world \
+            /legacy-source/vendor/map-analysis/crystalserver/data-global/npc \
+            /legacy-source/vendor/map-analysis/crystalserver/data-global/monster \
+            /creature-export.json
+
+          docker exec -i "$python_container" python3 - <<'PY'
           import json
           from pathlib import Path
-          data = json.loads(Path('creature-export.json').read_text(encoding='utf-8'))
+          data = json.loads(Path('/creature-export.json').read_text(encoding='utf-8'))
           assert data['contract_id'] == 'oteryn-game-atlas-export-v1'
           assert data['capability'] == 'static-creatures-v1'
           assert data['coordinate_profile'] == 'oteryn-native-floor-v1'
@@ -132,16 +146,16 @@ jobs:
           print('game-creature-export=PASS')
           PY
 
-          rm -rf -- legacy-source
-          python3 atlas-source/tools/build-creature-index.py creature-export.json creature-index-a
-          python3 atlas-source/tools/build-creature-index.py creature-export.json creature-index-b
-          diff -qr creature-index-a creature-index-b
+          docker exec "$python_container" python3 /atlas-source/tools/build-creature-index.py \
+            /creature-export.json /creature-index-a
+          docker exec "$python_container" python3 /atlas-source/tools/build-creature-index.py \
+            /creature-export.json /creature-index-b
 
-          python3 - <<'PY'
+          docker exec -i "$python_container" python3 - <<'PY'
           import hashlib
           import json
           from pathlib import Path
-          root = Path('creature-index-a')
+          root = Path('/creature-index-a')
           index = json.loads((root / 'index.json').read_text(encoding='utf-8'))
           search_raw = (root / 'search.json').read_bytes()
           search = json.loads(search_raw)
@@ -168,10 +182,21 @@ jobs:
                   'record_id': item['record_id'],
                   'position': item['position'],
               }
-          Path('e2e-targets.json').write_text(json.dumps(targets, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+          Path('/e2e-targets.json').write_text(json.dumps(targets, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+          Path('/first-chunk.txt').write_text(index['chunks'][0]['path'] + '\n', encoding='utf-8')
           print('deterministic-creature-product=PASS')
           PY
-          rm -rf -- creature-index-b
+
+          mkdir -p creature-index-a creature-index-b
+          docker cp "$python_container:/creature-export.json" creature-export.json
+          docker cp "$python_container:/creature-index-a/." creature-index-a/
+          docker cp "$python_container:/creature-index-b/." creature-index-b/
+          docker cp "$python_container:/e2e-targets.json" e2e-targets.json
+          docker cp "$python_container:/first-chunk.txt" first-chunk.txt
+          diff -qr creature-index-a creature-index-b
+          rm -rf -- legacy-source creature-index-b
+          cleanup_python
+          trap - EXIT
 
       - name: Atomically publish creature product and verify live contract
         id: product
@@ -309,7 +334,8 @@ jobs:
           curl -fsS "$PREVIEW_URL/data/creatures/search.json" -o /tmp/atlas-live-search.json
           cmp creature-index-a/index.json /tmp/atlas-live-index.json
           cmp creature-index-a/search.json /tmp/atlas-live-search.json
-          first_chunk="$(python3 -c 'import json; print(json.load(open("creature-index-a/index.json"))["chunks"][0]["path"])')"
+          first_chunk="$(cat first-chunk.txt)"
+          test -n "$first_chunk"
           curl -fsS "$PREVIEW_URL/data/creatures/$first_chunk" -o /tmp/atlas-live-first-chunk.json
           cmp "creature-index-a/$first_chunk" /tmp/atlas-live-first-chunk.json
 
@@ -436,5 +462,5 @@ jobs:
           if [[ -n "$BROWSER_IMAGE" ]]; then
             docker image rm -f "$BROWSER_IMAGE" >/dev/null 2>&1 || true
           fi
-          rm -rf -- atlas-source game-source legacy-source creature-export.json creature-index-a creature-index-b e2e-targets.json e2e-evidence
+          rm -rf -- atlas-source game-source legacy-source creature-export.json creature-index-a creature-index-b e2e-targets.json first-chunk.txt e2e-evidence
           echo 'task-owned-cleanup=PASS'
