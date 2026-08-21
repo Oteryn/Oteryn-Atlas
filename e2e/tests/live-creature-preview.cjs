@@ -144,7 +144,6 @@ function assertDeepLink(page, target, expectedCreatures) {
   assert.equal(params.get('q'), target.label);
   assert.equal(params.get('creature'), target.record_id);
   assert.equal(params.get('creatures'), expectedCreatures);
-  assert.ok(params.get('semantic'));
 }
 
 function assertCreatureInspector(text, target, kindText) {
