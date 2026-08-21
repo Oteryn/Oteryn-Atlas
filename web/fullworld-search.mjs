@@ -164,9 +164,16 @@ function wireForm(formId, inputId, suffix) {
   input.addEventListener('input', () => renderResults(host, input.value));
   input.addEventListener('focus', () => { if (input.value.trim()) renderResults(host, input.value); });
   form.addEventListener('submit', (event) => {
+    const query = input.value;
+    if (state.index) {
+      try {
+        const primary = searchSemanticIndex(state.index, query, { limit: MAX_RESULTS, currentFloor: currentFloor() });
+        if (primary.mode === 'coordinate') return;
+      } catch {}
+    }
     event.preventDefault();
     event.stopImmediatePropagation();
-    renderResults(host, input.value);
+    renderResults(host, query);
   }, true);
 }
 
