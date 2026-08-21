@@ -116,20 +116,21 @@ def build(source: dict[str, object], output: Path) -> dict[str, object]:
             "digest": sha256(data),
         })
 
+    source_metadata = {
+        "contract_id": source["contract_id"],
+        "capability": source["capability"],
+        "semantic_revision": source.get("semantic_revision"),
+        "semantic_digest": source["semantic_digest"],
+        "coordinate_profile": source["coordinate_profile"],
+        "legacy_evidence": source.get("legacy_evidence"),
+    }
     search_records = sorted(search.values(), key=lambda record: (str(record["label"]).casefold(), str(record["kind"])))
-    search_data = canonical({"schema_version": 1, "records": search_records}) + b"\n"
+    search_data = canonical({"schema_version": 1, "source": source_metadata, "records": search_records}) + b"\n"
     (output / "search.json").write_bytes(search_data)
 
     index = {
         "schema_version": 1,
-        "source": {
-            "contract_id": source["contract_id"],
-            "capability": source["capability"],
-            "semantic_revision": source.get("semantic_revision"),
-            "semantic_digest": source["semantic_digest"],
-            "coordinate_profile": source["coordinate_profile"],
-            "legacy_evidence": source.get("legacy_evidence"),
-        },
+        "source": source_metadata,
         "chunk_size": CHUNK_SIZE,
         "counts": {"records": len(records), "chunks": len(entries), "search_records": len(search_records)},
         "chunks": entries,
