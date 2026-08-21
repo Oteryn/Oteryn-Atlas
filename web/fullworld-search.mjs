@@ -11,9 +11,9 @@ import {
 } from '../src/browser/creature-search.mjs';
 
 const INDEX_URL = new URL('./semantic-search/index.json', import.meta.url);
-const CREATURE_ROOT = new URL('../data/creatures/', import.meta.url);
+const CREATURE_SEARCH_URL = new URL('./semantic-search/creatures.json', import.meta.url);
 const MAX_INDEX_BYTES = 2 * 1024 * 1024;
-const MAX_CREATURE_INDEX_BYTES = 4 * 1024 * 1024;
+const EXPECTED_CREATURE_SEMANTIC_DIGEST = 'sha256:01921968a6cb4f6ecea237820a053fc5052aaa1da556851f2c2a60d99890b5e1';
 const MAX_CREATURE_SEARCH_BYTES = 2 * 1024 * 1024;
 const MAX_RESULTS = 12;
 const state = { index: null, creatureSearch: [], active: null, lastQuery: '', lastResults: 0, status: 'LOADING' };
@@ -212,15 +212,12 @@ function renderActiveInspector() {
 }
 
 async function loadCreatureSearch() {
-  try {
-    const index = await boundedJson(new URL('index.json', CREATURE_ROOT), MAX_CREATURE_INDEX_BYTES);
-    requireValue(index.source?.contract_id === 'oteryn-game-atlas-export-v1' && index.source?.capability === 'static-creatures-v1', 'creature search source unsupported');
-    const search = await boundedJson(new URL(index.search_path, CREATURE_ROOT), MAX_CREATURE_SEARCH_BYTES);
-    return validateCreatureSearchRecords(search.records);
-  } catch (error) {
-    console.info(`Optional creature search extension unavailable: ${error.message ?? error}`);
-    return [];
-  }
+  const catalog = await boundedJson(CREATURE_SEARCH_URL, MAX_CREATURE_SEARCH_BYTES);
+  requireValue(catalog.schema_version === 1, 'unsupported creature search catalog schema');
+  requireValue(catalog.source?.contract_id === 'oteryn-game-atlas-export-v1' && catalog.source?.capability === 'static-creatures-v1', 'creature search source unsupported');
+  requireValue(catalog.source?.semantic_digest === EXPECTED_CREATURE_SEMANTIC_DIGEST, 'untrusted creature search semantic digest');
+  requireValue(catalog.source?.coordinate_profile === 'oteryn-native-floor-v1', 'creature search coordinate profile unsupported');
+  return validateCreatureSearchRecords(catalog.records);
 }
 
 async function boot() {
