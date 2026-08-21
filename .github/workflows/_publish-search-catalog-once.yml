@@ -1,0 +1,95 @@
+name: Publish search catalogs once
+
+on:
+  push:
+    branches:
+      - agent/full-global-search-catalog-v1
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    env:
+      GAME_REVISION: 25d628d6f7ebf4976ebd6d2a7dee9df21f19e3e3
+      LEGACY_REVISION: e417c5e7c22986bf4acef0495eb47f7b72c97cce
+      NAVIGATION_KINDS: town,waypoint,poi,teleport,house,quest_area,mechanic
+    steps:
+      - name: Check out task branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: agent/full-global-search-catalog-v1
+
+      - name: Check out exact merged Game producer
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: Oteryn/Oteryn-Game
+          ref: ${{ env.GAME_REVISION }}
+          path: .deps/game
+          persist-credentials: false
+
+      - name: Check out exact pinned migration evidence
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: blakinio/Otheryn
+          ref: ${{ env.LEGACY_REVISION }}
+          path: .deps/legacy
+          persist-credentials: false
+
+      - name: Generate canonical search publications
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .deps/game/tools/game-atlas-creatures/export.py \
+            .deps/legacy/vendor/map-analysis/crystalserver/data-global/world \
+            .deps/legacy/vendor/map-analysis/crystalserver/data-global/npc \
+            .deps/legacy/vendor/map-analysis/crystalserver/data-global/monster \
+            /tmp/static-creatures.json
+          python .deps/game/tools/game-atlas-semantic-search/export.py \
+            --creatures /tmp/static-creatures.json \
+            --npc-root .deps/legacy/vendor/map-analysis/crystalserver/data-global/npc \
+            --legacy-root .deps/legacy \
+            --map-path .deps/legacy/vendor/map-analysis/crystalserver/data-global/world/world.otbm \
+            --output /tmp/semantic-search-source.json
+          rm -rf /tmp/creature-index
+          mkdir -p /tmp/creature-index
+          python tools/build-creature-index.py /tmp/static-creatures.json /tmp/creature-index
+          python tools/build-semantic-search-index.py \
+            /tmp/semantic-search-source.json \
+            /tmp/semantic-search-index.json \
+            --game-revision "$GAME_REVISION" \
+            --kinds "$NAVIGATION_KINDS"
+          cp /tmp/semantic-search-index.json web/semantic-search/index.json
+          cp /tmp/creature-index/search.json web/semantic-search/creatures.json
+
+      - name: Verify publication counts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          index = json.load(open('web/semantic-search/index.json', encoding='utf-8'))
+          creatures = json.load(open('web/semantic-search/creatures.json', encoding='utf-8'))
+          assert len(index['records']) == 51
+          assert sum(record['kind'] == 'town' for record in index['records']) == 33
+          assert sum(record['kind'] == 'waypoint' for record in index['records']) == 18
+          assert len(creatures['records']) == 1945
+          assert sum(bool(record.get('entity_id')) for record in creatures['records']) == 1823
+          assert creatures['source']['semantic_digest'] == 'sha256:01921968a6cb4f6ecea237820a053fc5052aaa1da556851f2c2a60d99890b5e1'
+          print('canonical search publications verified')
+          PY
+
+      - name: Commit generated publications if changed
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add web/semantic-search/index.json web/semantic-search/creatures.json
+          if git diff --cached --quiet; then
+            echo 'Generated publications already canonical.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'fix(atlas): publish canonical search catalogs'
+          git push origin HEAD:agent/full-global-search-catalog-v1
