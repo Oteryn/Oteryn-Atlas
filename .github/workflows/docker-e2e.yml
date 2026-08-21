@@ -1,0 +1,38 @@
+name: Docker E2E Harness
+
+on:
+  pull_request:
+    paths:
+      - '.dockerignore'
+      - 'e2e/**'
+      - '.github/workflows/docker-e2e.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: atlas-docker-e2e-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  docker-e2e:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Check out exact repository revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Run Dockerized desktop and mobile E2E
+        shell: bash
+        run: ./e2e/run.sh
+
+      - name: Report retained artifact paths
+        if: always()
+        shell: bash
+        run: |
+          if [ -d artifacts/e2e ]; then
+            find artifacts/e2e -maxdepth 3 -type f -print | sort
+          fi
