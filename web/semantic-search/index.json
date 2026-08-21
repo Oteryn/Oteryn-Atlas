@@ -1,7 +1,7 @@
 {
   "by_kind": {
     "npc": [
-      "semantic-record:f03375caff0c58d744881f0c72aa3cd9"
+      "npc:726487438c8308abf291622a52d91b24"
     ],
     "town": [
       "semantic-record:23716a35099a04179f7b9e3e6c9198ee"
@@ -11,7 +11,7 @@
     "kinds": 2,
     "records": 2
   },
-  "index_digest": "sha256:8a818a28260ca9b4a04f0c30ef16ea5adb10e02f71d557165efb84dbe25e6284",
+  "index_digest": "sha256:c642535e5dba83e5437cf218311ea9da28110d298d2887d125da5280e155ebee",
   "input_floor_aliases": {
     "0": 0,
     "1": -1,
@@ -52,7 +52,7 @@
         "shop",
         "static-placement"
       ],
-      "id": "semantic-record:f03375caff0c58d744881f0c72aa3cd9",
+      "id": "npc:726487438c8308abf291622a52d91b24",
       "kind": "npc",
       "label": "Sam",
       "position": {
@@ -114,9 +114,9 @@
     "authority": "Oteryn/Oteryn-Game",
     "capability": "semantic-search-source-v1",
     "contract_id": "oteryn-game-atlas-export-v1",
-    "game_revision": "6da71f120f79b57537af4073c36413c6847edc7a",
+    "game_revision": "1a2a866152a7b790c12fb7fbfabbd1320b0b6655",
     "profile_id": "oteryn-game-atlas-semantic-search-v1",
     "repository": "Oteryn/Oteryn-Game",
-    "semantic_digest": "sha256:753303678a9fb90336040f5741c72edefa45502d2621c54dc70dfa5d16ae7663"
+    "semantic_digest": "sha256:a4a4703962bd6984d31ef1dafcd27bad475d6b61f570d013560c16a704989bf8"
   }
 }
