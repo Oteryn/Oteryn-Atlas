@@ -49,6 +49,9 @@ def validate(source: dict[str, object]) -> list[dict[str, object]]:
             record_id = record.get("record_id")
             if not isinstance(record_id, str) or len(record_id) > 96 or not record_id.startswith(f"{expected_kind}:"):
                 raise ValueError("invalid creature record id")
+            entity_id = record.get("entity_id")
+            if entity_id is not None and (not isinstance(entity_id, str) or len(entity_id) > 96 or not entity_id.startswith(f"{expected_kind}-entity:")):
+                raise ValueError("invalid creature entity id")
             name = record.get("name")
             if not isinstance(name, str) or not name.strip() or len(name) > 256:
                 raise ValueError("invalid creature name")
@@ -75,16 +78,19 @@ def build(source: dict[str, object], output: Path) -> dict[str, object]:
         }
         shards.setdefault(key, []).append(public)
         label = str(record["name"])
-        search.setdefault(
-            (kind, label.casefold()),
-            {
-                "kind": kind,
-                "label": label,
-                "position": position,
-                "record_id": record["record_id"],
-                "resolution_state": record["resolution_state"],
-            },
-        )
+        search_record = {
+            "kind": kind,
+            "label": label,
+            "position": position,
+            "record_id": record["record_id"],
+            "resolution_state": record["resolution_state"],
+        }
+        if "entity_id" in record:
+            search_record["entity_id"] = record["entity_id"]
+        search_key = (kind, label.casefold())
+        current = search.get(search_key)
+        if current is None or ("entity_id" not in current and "entity_id" in search_record):
+            search[search_key] = search_record
 
     entries: list[dict[str, object]] = []
     for (floor, chunk_x, chunk_y), values in sorted(shards.items()):
@@ -110,20 +116,21 @@ def build(source: dict[str, object], output: Path) -> dict[str, object]:
             "digest": sha256(data),
         })
 
+    source_metadata = {
+        "contract_id": source["contract_id"],
+        "capability": source["capability"],
+        "semantic_revision": source.get("semantic_revision"),
+        "semantic_digest": source["semantic_digest"],
+        "coordinate_profile": source["coordinate_profile"],
+        "legacy_evidence": source.get("legacy_evidence"),
+    }
     search_records = sorted(search.values(), key=lambda record: (str(record["label"]).casefold(), str(record["kind"])))
-    search_data = canonical({"schema_version": 1, "records": search_records}) + b"\n"
+    search_data = canonical({"schema_version": 1, "source": source_metadata, "records": search_records}) + b"\n"
     (output / "search.json").write_bytes(search_data)
 
     index = {
         "schema_version": 1,
-        "source": {
-            "contract_id": source["contract_id"],
-            "capability": source["capability"],
-            "semantic_revision": source.get("semantic_revision"),
-            "semantic_digest": source["semantic_digest"],
-            "coordinate_profile": source["coordinate_profile"],
-            "legacy_evidence": source.get("legacy_evidence"),
-        },
+        "source": source_metadata,
         "chunk_size": CHUNK_SIZE,
         "counts": {"records": len(records), "chunks": len(entries), "search_records": len(search_records)},
         "chunks": entries,

@@ -1,17 +1,75 @@
 {
   "by_kind": {
-    "npc": [
-      "npc:726487438c8308abf291622a52d91b24"
-    ],
     "town": [
-      "semantic-record:23716a35099a04179f7b9e3e6c9198ee"
+      "semantic-record:127643ed72a85f97900a8840c0d3f180",
+      "semantic-record:1ad922d7b53caff5b0e138e043534089",
+      "semantic-record:1d6f40386a7b5253c79839aa9bae8c32",
+      "semantic-record:1e48aca6d2e13d604674c61059cf150d",
+      "semantic-record:23716a35099a04179f7b9e3e6c9198ee",
+      "semantic-record:24d7e94486a1dc448a6035a0576b8a7a",
+      "semantic-record:332ec7d67b42a8233d0a8d7e62504591",
+      "semantic-record:3507f7cbaa275c8fac4246db9449e0c3",
+      "semantic-record:3a6d2a5cfd599439efccce35017e12b8",
+      "semantic-record:477554946100076a8fa25561b9b7883e",
+      "semantic-record:482bbc9851c40eeb2fe4911c24654a8d",
+      "semantic-record:4fb09cc9185cb30abbd4e2c702dfc6fc",
+      "semantic-record:554ffc5d2017640aee2749c9be1eafee",
+      "semantic-record:57d9ef64607b0360d0c01d338f7c70ba",
+      "semantic-record:642c7ec466a8b51c669be50f6316c5a4",
+      "semantic-record:69c4f1611b0e8fb91a0caae5752a2c9e",
+      "semantic-record:6ce924ed0a0410df966d46d76683f6c9",
+      "semantic-record:81c283ea8af74f9ec905cc33c5b41c0d",
+      "semantic-record:9246a18b6f74b250c6c4c90b9e0e6911",
+      "semantic-record:a2263fc41be1780206a300176bab39f0",
+      "semantic-record:a55680541c346def3f0e664d7e5869fa",
+      "semantic-record:a9fe678be55834176bc4c56e6b717862",
+      "semantic-record:aa9b85c56636c53f6f07606c7c221182",
+      "semantic-record:b77c7c2b76ad5ac1cc1e9ab4376edf18",
+      "semantic-record:b98eef3f9757147dc520af7f9fc66714",
+      "semantic-record:bf081625cb198688936fd39012311971",
+      "semantic-record:bfc67112a36ac3e580a0a55a9aedcb82",
+      "semantic-record:c3e92abfd90489dcbaa4d733262128c6",
+      "semantic-record:de3d8605f2607e687ba29553ea981720",
+      "semantic-record:e267bf6c1fbe761348aee9ecd60ce690",
+      "semantic-record:eda479526d740dac426317a3ee068c73",
+      "semantic-record:eeef2951a9b11531c874f54a82ce26bb",
+      "semantic-record:fbcba773088060f57a5e20f7fe3d018e"
+    ],
+    "waypoint": [
+      "semantic-record:0ca507ca5d80edeed91161ff463b8f96",
+      "semantic-record:13d53faad6cb6d4a8a4722eb7a3e4f1a",
+      "semantic-record:2da07b739818ea04e1c297f21423274c",
+      "semantic-record:36bd13c418958bae248d60ae8f6040cc",
+      "semantic-record:4a3ceae27a9cd83b11d5538ecfbddf4d",
+      "semantic-record:5284e165ca49f58260ecc68548b901d6",
+      "semantic-record:530d3173538998f9119da36cc979779d",
+      "semantic-record:61f6947c360415ea17ce8687c3689cfe",
+      "semantic-record:991b201fed1d4f2706ab20e605f442e9",
+      "semantic-record:9f2406322193ef8e35655e68884f85c5",
+      "semantic-record:b18c50e1f674bedcaa9a75cf617a2ffe",
+      "semantic-record:c320b2e2b06bc5220fac809722c74623",
+      "semantic-record:cd2df9a9de68c7161477047f50fb57d9",
+      "semantic-record:d6a4c78cf7a3ac98f64bce6e553df76d",
+      "semantic-record:df1301cda727ceaf7470b568e1bd52e2",
+      "semantic-record:e2eefba83095efdf255d3a00701c6a5d",
+      "semantic-record:e6c533554b6f63ec9e878ca8e37725f6",
+      "semantic-record:eff4f78b00bb55e07deab346e8528e6d"
     ]
   },
+  "catalog_scope": [
+    "house",
+    "mechanic",
+    "poi",
+    "quest_area",
+    "teleport",
+    "town",
+    "waypoint"
+  ],
   "counts": {
     "kinds": 2,
-    "records": 2
+    "records": 51
   },
-  "index_digest": "sha256:5237df2a6b474e57f6175e2a83e51b6963a3f6ace969073bf5dfedca96f46cba",
+  "index_digest": "sha256:0c4344da796753f02fb7377df01fcbbccbde936db3f207a2631fdf0b383d1f9c",
   "input_floor_aliases": {
     "0": 0,
     "1": -1,
@@ -31,8 +89,8 @@
     "9": -9
   },
   "kind_filters": [
-    "npc",
-    "town"
+    "town",
+    "waypoint"
   ],
   "ranking": {
     "contains_alias": 500,
@@ -49,30 +107,1584 @@
       "aliases": [],
       "bounds": null,
       "capabilities": [
-        "shop",
-        "static-placement"
+        "navigation",
+        "overlay-point"
       ],
-      "id": "npc:726487438c8308abf291622a52d91b24",
-      "kind": "npc",
-      "label": "Sam",
+      "id": "semantic-record:d6a4c78cf7a3ac98f64bce6e553df76d",
+      "kind": "waypoint",
+      "label": "1 - NPC",
       "position": {
         "floor": -7,
-        "x": 32361,
-        "y": 32198
+        "x": 32704,
+        "y": 31594
       },
       "provenance": {
         "authority": "Oteryn/Oteryn-Game",
+        "identity_state": "UNRESOLVED",
+        "legacy_parser_blobs": {
+          "tools/otbm_atlas/assets.py": "25ed2400813bb3ccdc54482967ed05197eb1a850",
+          "tools/otbm_atlas/nodefile.py": "bed6f7a803d9de485c1f03cbdca4be0cb1521d30",
+          "tools/otbm_atlas/semantic.py": "a11343a472145aee4d9cf65c6ce28b3e4a71a2b3"
+        },
         "legacy_repository": "blakinio/Otheryn",
         "legacy_repository_sha": "e417c5e7c22986bf4acef0495eb47f7b72c97cce",
-        "origin": "base-map",
-        "resolution_state": "RESOLVED",
-        "service_resolution_state": "RESOLVED",
-        "source_capability": "static-creatures-v1",
-        "source_semantic_digest": "sha256:01921968a6cb4f6ecea237820a053fc5052aaa1da556851f2c2a60d99890b5e1"
+        "source_family": "waypoint",
+        "world_otbm_sha256": "3bd40d14fefec41f24c4b3ae879e420be1a831ef55b95dcbec721e587a09b034"
       },
       "search_terms": {
         "aliases": [],
-        "label": "sam"
+        "label": "1 - npc"
+      }
+    },
+    {
+      "aliases": [],
+      "bounds": null,
+      "capabilities": [
+        "navigation",
+        "overlay-point"
+      ],
+      "id": "semantic-record:36bd13c418958bae248d60ae8f6040cc",
+      "kind": "waypoint",
+      "label": "2 - SALA ENTRADAS",
+      "position": {
+        "floor": -10,
+        "x": 32813,
+        "y": 31547
+      },
+      "provenance": {
+        "authority": "Oteryn/Oteryn-Game",
+        "identity_state": "UNRESOLVED",
+        "legacy_parser_blobs": {
+          "tools/otbm_atlas/assets.py": "25ed2400813bb3ccdc54482967ed05197eb1a850",
+          "tools/otbm_atlas/nodefile.py": "bed6f7a803d9de485c1f03cbdca4be0cb1521d30",
+          "tools/otbm_atlas/semantic.py": "a11343a472145aee4d9cf65c6ce28b3e4a71a2b3"
+        },
+        "legacy_repository": "blakinio/Otheryn",
+        "legacy_repository_sha": "e417c5e7c22986bf4acef0495eb47f7b72c97cce",
+        "source_family": "waypoint",
+        "world_otbm_sha256": "3bd40d14fefec41f24c4b3ae879e420be1a831ef55b95dcbec721e587a09b034"
+      },
+      "search_terms": {
+        "aliases": [],
+        "label": "2 - sala entradas"
+      }
+    },
+    {
+      "aliases": [],
+      "bounds": null,
+      "capabilities": [
+        "navigation",
+        "overlay-point"
+      ],
+      "id": "semantic-record:0ca507ca5d80edeed91161ff463b8f96",
+      "kind": "waypoint",
+      "label": "3 - HUNT 1",
+      "position": {
+        "floor": -11,
+        "x": 32882,
+        "y": 31597
+      },
+      "provenance": {
+        "authority": "Oteryn/Oteryn-Game",
+        "identity_state": "UNRESOLVED",
+        "legacy_parser_blobs": {
+          "tools/otbm_atlas/assets.py": "25ed2400813bb3ccdc54482967ed05197eb1a850",
+          "tools/otbm_atlas/nodefile.py": "bed6f7a803d9de485c1f03cbdca4be0cb1521d30",
+          "tools/otbm_atlas/semantic.py": "a11343a472145aee4d9cf65c6ce28b3e4a71a2b3"
+        },
+        "legacy_repository": "blakinio/Otheryn",
+        "legacy_repository_sha": "e417c5e7c22986bf4acef0495eb47f7b72c97cce",
+        "source_family": "waypoint",
+        "world_otbm_sha256": "3bd40d14fefec41f24c4b3ae879e420be1a831ef55b95dcbec721e587a09b034"
+      },
+      "search_terms": {
+        "aliases": [],
+        "label": "3 - hunt 1"
+      }
+    },
+    {
+      "aliases": [],
+      "bounds": null,
+      "capabilities": [
+        "navigation",
+        "overlay-point"
+      ],
+      "id": "semantic-record:b18c50e1f674bedcaa9a75cf617a2ffe",
+      "kind": "waypoint",
+      "label": "4 - HUNT 2",
+      "position": {
+        "floor": -11,
+        "x": 32874,
+        "y": 31632
+      },
+      "provenance": {
+        "authority": "Oteryn/Oteryn-Game",
+        "identity_state": "UNRESOLVED",
+        "legacy_parser_blobs": {
+          "tools/otbm_atlas/assets.py": "25ed2400813bb3ccdc54482967ed05197eb1a850",
+          "tools/otbm_atlas/nodefile.py": "bed6f7a803d9de485c1f03cbdca4be0cb1521d30",
+          "tools/otbm_atlas/semantic.py": "a11343a472145aee4d9cf65c6ce28b3e4a71a2b3"
+        },
+        "legacy_repository": "blakinio/Otheryn",
+        "legacy_repository_sha": "e417c5e7c22986bf4acef0495eb47f7b72c97cce",
+        "source_family": "waypoint",
+        "world_otbm_sha256": "3bd40d14fefec41f24c4b3ae879e420be1a831ef55b95dcbec721e587a09b034"
+      },
+      "search_terms": {
+        "aliases": [],
+        "label": "4 - hunt 2"
+      }
+    },
+    {
+      "aliases": [],
+      "bounds": null,
+      "capabilities": [
+        "navigation",
+        "overlay-point"
+      ],
+      "id": "semantic-record:9f2406322193ef8e35655e68884f85c5",
+      "kind": "waypoint",
+      "label": "5 - Isle of Ada",
+      "position": {
+        "floor": -6,
+        "x": 33884,
+        "y": 32189
+      },
+      "provenance": {
+        "authority": "Oteryn/Oteryn-Game",
+        "identity_state": "UNRESOLVED",
+        "legacy_parser_blobs": {
+          "tools/otbm_atlas/assets.py": "25ed2400813bb3ccdc54482967ed05197eb1a850",
+          "tools/otbm_atlas/nodefile.py": "bed6f7a803d9de485c1f03cbdca4be0cb1521d30",
+          "tools/otbm_atlas/semantic.py": "a11343a472145aee4d9cf65c6ce28b3e4a71a2b3"
+        },
+        "legacy_repository": "blakinio/Otheryn",
+        "legacy_repository_sha": "e417c5e7c22986bf4acef0495eb47f7b72c97cce",
+        "source_family": "waypoint",
+        "world_otbm_sha256": "3bd40d14fefec41f24c4b3ae879e420be1a831ef55b95dcbec721e587a09b034"
+      },
+      "search_terms": {
+        "aliases": [],
+        "label": "5 - isle of ada"
+      }
+    },
+    {
+      "aliases": [],
+      "bounds": null,
+      "capabilities": [
+        "navigation",
+        "overlay-point"
+      ],
+      "id": "semantic-record:5284e165ca49f58260ecc68548b901d6",
+      "kind": "waypoint",
+      "label": "6 - HUNT 3",
+      "position": {
+        "floor": -13,
+        "x": 32937,
+        "y": 31545
+      },
+      "provenance": {
+        "authority": "Oteryn/Oteryn-Game",
+        "identity_state": "UNRESOLVED",
+        "legacy_parser_blobs": {
+          "tools/otbm_atlas/assets.py": "25ed2400813bb3ccdc54482967ed05197eb1a850",
+          "tools/otbm_atlas/nodefile.py": "bed6f7a803d9de485c1f03cbdca4be0cb1521d30",
+          "tools/otbm_atlas/semantic.py": "a11343a472145aee4d9cf65c6ce28b3e4a71a2b3"
+        },
+        "legacy_repository": "blakinio/Otheryn",
+        "legacy_repository_sha": "e417c5e7c22986bf4acef0495eb47f7b72c97cce",
+        "source_family": "waypoint",
+        "world_otbm_sha256": "3bd40d14fefec41f24c4b3ae879e420be1a831ef55b95dcbec721e587a09b034"
+      },
+      "search_terms": {
+        "aliases": [],
+        "label": "6 - hunt 3"
+      }
+    },
+    {
+      "aliases": [],
+      "bounds": null,
+      "capabilities": [
+        "navigation",
+        "overlay-point"
+      ],
+      "id": "semantic-record:e2eefba83095efdf255d3a00701c6a5d",
+      "kind": "waypoint",
+      "label": "?",
+      "position": {
+        "floor": -7,
+        "x": 32405,
+        "y": 32511
+      },
+      "provenance": {
+        "authority": "Oteryn/Oteryn-Game",
+        "identity_state": "UNRESOLVED",
+        "legacy_parser_blobs": {
+          "tools/otbm_atlas/assets.py": "25ed2400813bb3ccdc54482967ed05197eb1a850",
+          "tools/otbm_atlas/nodefile.py": "bed6f7a803d9de485c1f03cbdca4be0cb1521d30",
+          "tools/otbm_atlas/semantic.py": "a11343a472145aee4d9cf65c6ce28b3e4a71a2b3"
+        },
+        "legacy_repository": "blakinio/Otheryn",
+        "legacy_repository_sha": "e417c5e7c22986bf4acef0495eb47f7b72c97cce",
+        "source_family": "waypoint",
+        "world_otbm_sha256": "3bd40d14fefec41f24c4b3ae879e420be1a831ef55b95dcbec721e587a09b034"
+      },
+      "search_terms": {
+        "aliases": [],
+        "label": "?"
+      }
+    },
+    {
+      "aliases": [],
+      "bounds": null,
+      "capabilities": [
+        "navigation",
+        "overlay-point"
+      ],
+      "id": "semantic-record:de3d8605f2607e687ba29553ea981720",
+      "kind": "town",
+      "label": "Ab'Dendriel",
+      "position": {
+        "floor": -7,
+        "x": 32732,
+        "y": 31634
+      },
+      "provenance": {
+        "authority": "Oteryn/Oteryn-Game",
+        "identity_state": "UNRESOLVED",
+        "legacy_parser_blobs": {
+          "tools/otbm_atlas/assets.py": "25ed2400813bb3ccdc54482967ed05197eb1a850",
+          "tools/otbm_atlas/nodefile.py": "bed6f7a803d9de485c1f03cbdca4be0cb1521d30",
+          "tools/otbm_atlas/semantic.py": "a11343a472145aee4d9cf65c6ce28b3e4a71a2b3"
+        },
+        "legacy_repository": "blakinio/Otheryn",
+        "legacy_repository_sha": "e417c5e7c22986bf4acef0495eb47f7b72c97cce",
+        "source_family": "town",
+        "world_otbm_sha256": "3bd40d14fefec41f24c4b3ae879e420be1a831ef55b95dcbec721e587a09b034"
+      },
+      "search_terms": {
+        "aliases": [],
+        "label": "ab'dendriel"
+      }
+    },
+    {
+      "aliases": [],
+      "bounds": null,
+      "capabilities": [
+        "navigation",
+        "overlay-point"
+      ],
+      "id": "semantic-record:61f6947c360415ea17ce8687c3689cfe",
+      "kind": "waypoint",
+      "label": "ALAVANCA BOSS 1",
+      "position": {
+        "floor": -15,
+        "x": 32744,
+        "y": 31533
+      },
+      "provenance": {
+        "authority": "Oteryn/Oteryn-Game",
+        "identity_state": "UNRESOLVED",
+        "legacy_parser_blobs": {
+          "tools/otbm_atlas/assets.py": "25ed2400813bb3ccdc54482967ed05197eb1a850",
+          "tools/otbm_atlas/nodefile.py": "bed6f7a803d9de485c1f03cbdca4be0cb1521d30",
+          "tools/otbm_atlas/semantic.py": "a11343a472145aee4d9cf65c6ce28b3e4a71a2b3"
+        },
+        "legacy_repository": "blakinio/Otheryn",
+        "legacy_repository_sha": "e417c5e7c22986bf4acef0495eb47f7b72c97cce",
+        "source_family": "waypoint",
+        "world_otbm_sha256": "3bd40d14fefec41f24c4b3ae879e420be1a831ef55b95dcbec721e587a09b034"
+      },
+      "search_terms": {
+        "aliases": [],
+        "label": "alavanca boss 1"
+      }
+    },
+    {
+      "aliases": [],
+      "bounds": null,
+      "capabilities": [
+        "navigation",
+        "overlay-point"
+      ],
+      "id": "semantic-record:cd2df9a9de68c7161477047f50fb57d9",
+      "kind": "waypoint",
+      "label": "ALAVANCA BOSS 2",
+      "position": {
+        "floor": -15,
+        "x": 32810,
+        "y": 31600
+      },
+      "provenance": {
+        "authority": "Oteryn/Oteryn-Game",
+        "identity_state": "UNRESOLVED",
+        "legacy_parser_blobs": {
+          "tools/otbm_atlas/assets.py": "25ed2400813bb3ccdc54482967ed05197eb1a850",
+          "tools/otbm_atlas/nodefile.py": "bed6f7a803d9de485c1f03cbdca4be0cb1521d30",
+          "tools/otbm_atlas/semantic.py": "a11343a472145aee4d9cf65c6ce28b3e4a71a2b3"
+        },
+        "legacy_repository": "blakinio/Otheryn",
+        "legacy_repository_sha": "e417c5e7c22986bf4acef0495eb47f7b72c97cce",
+        "source_family": "waypoint",
+        "world_otbm_sha256": "3bd40d14fefec41f24c4b3ae879e420be1a831ef55b95dcbec721e587a09b034"
+      },
+      "search_terms": {
+        "aliases": [],
+        "label": "alavanca boss 2"
+      }
+    },
+    {
+      "aliases": [],
+      "bounds": null,
+      "capabilities": [
+        "navigation",
+        "overlay-point"
+      ],
+      "id": "semantic-record:df1301cda727ceaf7470b568e1bd52e2",
+      "kind": "waypoint",
+      "label": "ALAVANCA BOSS 3",
+      "position": {
+        "floor": -15,
+        "x": 32845,
+        "y": 31532
+      },
+      "provenance": {
+        "authority": "Oteryn/Oteryn-Game",
+        "identity_state": "UNRESOLVED",
+        "legacy_parser_blobs": {
+          "tools/otbm_atlas/assets.py": "25ed2400813bb3ccdc54482967ed05197eb1a850",
+          "tools/otbm_atlas/nodefile.py": "bed6f7a803d9de485c1f03cbdca4be0cb1521d30",
+          "tools/otbm_atlas/semantic.py": "a11343a472145aee4d9cf65c6ce28b3e4a71a2b3"
+        },
+        "legacy_repository": "blakinio/Otheryn",
+        "legacy_repository_sha": "e417c5e7c22986bf4acef0495eb47f7b72c97cce",
+        "source_family": "waypoint",
+        "world_otbm_sha256": "3bd40d14fefec41f24c4b3ae879e420be1a831ef55b95dcbec721e587a09b034"
+      },
+      "search_terms": {
+        "aliases": [],
+        "label": "alavanca boss 3"
+      }
+    },
+    {
+      "aliases": [],
+      "bounds": null,
+      "capabilities": [
+        "navigation",
+        "overlay-point"
+      ],
+      "id": "semantic-record:c320b2e2b06bc5220fac809722c74623",
+      "kind": "waypoint",
+      "label": "ALAVANCA BOSS 4",
+      "position": {
+        "floor": -15,
+        "x": 32790,
+        "y": 31534
+      },
+      "provenance": {
+        "authority": "Oteryn/Oteryn-Game",
+        "identity_state": "UNRESOLVED",
+        "legacy_parser_blobs": {
+          "tools/otbm_atlas/assets.py": "25ed2400813bb3ccdc54482967ed05197eb1a850",
+          "tools/otbm_atlas/nodefile.py": "bed6f7a803d9de485c1f03cbdca4be0cb1521d30",
+          "tools/otbm_atlas/semantic.py": "a11343a472145aee4d9cf65c6ce28b3e4a71a2b3"
+        },
+        "legacy_repository": "blakinio/Otheryn",
+        "legacy_repository_sha": "e417c5e7c22986bf4acef0495eb47f7b72c97cce",
+        "source_family": "waypoint",
+        "world_otbm_sha256": "3bd40d14fefec41f24c4b3ae879e420be1a831ef55b95dcbec721e587a09b034"
+      },
+      "search_terms": {
+        "aliases": [],
+        "label": "alavanca boss 4"
+      }
+    },
+    {
+      "aliases": [],
+      "bounds": null,
+      "capabilities": [
+        "navigation",
+        "overlay-point"
+      ],
+      "id": "semantic-record:e6c533554b6f63ec9e878ca8e37725f6",
+      "kind": "waypoint",
+      "label": "ALAVANCA BOSS FINAL",
+      "position": {
+        "floor": -15,
+        "x": 32865,
+        "y": 31573
+      },
+      "provenance": {
+        "authority": "Oteryn/Oteryn-Game",
+        "identity_state": "UNRESOLVED",
+        "legacy_parser_blobs": {
+          "tools/otbm_atlas/assets.py": "25ed2400813bb3ccdc54482967ed05197eb1a850",
+          "tools/otbm_atlas/nodefile.py": "bed6f7a803d9de485c1f03cbdca4be0cb1521d30",
+          "tools/otbm_atlas/semantic.py": "a11343a472145aee4d9cf65c6ce28b3e4a71a2b3"
+        },
+        "legacy_repository": "blakinio/Otheryn",
+        "legacy_repository_sha": "e417c5e7c22986bf4acef0495eb47f7b72c97cce",
+        "source_family": "waypoint",
+        "world_otbm_sha256": "3bd40d14fefec41f24c4b3ae879e420be1a831ef55b95dcbec721e587a09b034"
+      },
+      "search_terms": {
+        "aliases": [],
+        "label": "alavanca boss final"
+      }
+    },
+    {
+      "aliases": [],
+      "bounds": null,
+      "capabilities": [
+        "navigation",
+        "overlay-point"
+      ],
+      "id": "semantic-record:aa9b85c56636c53f6f07606c7c221182",
+      "kind": "town",
+      "label": "Ankrahmun",
+      "position": {
+        "floor": -8,
+        "x": 33194,
+        "y": 32853
+      },
+      "provenance": {
+        "authority": "Oteryn/Oteryn-Game",
+        "identity_state": "UNRESOLVED",
+        "legacy_parser_blobs": {
+          "tools/otbm_atlas/assets.py": "25ed2400813bb3ccdc54482967ed05197eb1a850",
+          "tools/otbm_atlas/nodefile.py": "bed6f7a803d9de485c1f03cbdca4be0cb1521d30",
+          "tools/otbm_atlas/semantic.py": "a11343a472145aee4d9cf65c6ce28b3e4a71a2b3"
+        },
+        "legacy_repository": "blakinio/Otheryn",
+        "legacy_repository_sha": "e417c5e7c22986bf4acef0495eb47f7b72c97cce",
+        "source_family": "town",
+        "world_otbm_sha256": "3bd40d14fefec41f24c4b3ae879e420be1a831ef55b95dcbec721e587a09b034"
+      },
+      "search_terms": {
+        "aliases": [],
+        "label": "ankrahmun"
+      }
+    },
+    {
+      "aliases": [],
+      "bounds": null,
+      "capabilities": [
+        "navigation",
+        "overlay-point"
+      ],
+      "id": "semantic-record:127643ed72a85f97900a8840c0d3f180",
+      "kind": "town",
+      "label": "Blue Valley",
+      "position": {
+        "floor": -7,
+        "x": 33614,
+        "y": 31494
+      },
+      "provenance": {
+        "authority": "Oteryn/Oteryn-Game",
+        "identity_state": "UNRESOLVED",
+        "legacy_parser_blobs": {
+          "tools/otbm_atlas/assets.py": "25ed2400813bb3ccdc54482967ed05197eb1a850",
+          "tools/otbm_atlas/nodefile.py": "bed6f7a803d9de485c1f03cbdca4be0cb1521d30",
+          "tools/otbm_atlas/semantic.py": "a11343a472145aee4d9cf65c6ce28b3e4a71a2b3"
+        },
+        "legacy_repository": "blakinio/Otheryn",
+        "legacy_repository_sha": "e417c5e7c22986bf4acef0495eb47f7b72c97cce",
+        "source_family": "town",
+        "world_otbm_sha256": "3bd40d14fefec41f24c4b3ae879e420be1a831ef55b95dcbec721e587a09b034"
+      },
+      "search_terms": {
+        "aliases": [],
+        "label": "blue valley"
+      }
+    },
+    {
+      "aliases": [],
+      "bounds": null,
+      "capabilities": [
+        "navigation",
+        "overlay-point"
+      ],
+      "id": "semantic-record:3507f7cbaa275c8fac4246db9449e0c3",
+      "kind": "town",
+      "label": "Bounac",
+      "position": {
+        "floor": -7,
+        "x": 32424,
+        "y": 32445
+      },
+      "provenance": {
+        "authority": "Oteryn/Oteryn-Game",
+        "identity_state": "UNRESOLVED",
+        "legacy_parser_blobs": {
+          "tools/otbm_atlas/assets.py": "25ed2400813bb3ccdc54482967ed05197eb1a850",
+          "tools/otbm_atlas/nodefile.py": "bed6f7a803d9de485c1f03cbdca4be0cb1521d30",
+          "tools/otbm_atlas/semantic.py": "a11343a472145aee4d9cf65c6ce28b3e4a71a2b3"
+        },
+        "legacy_repository": "blakinio/Otheryn",
+        "legacy_repository_sha": "e417c5e7c22986bf4acef0495eb47f7b72c97cce",
+        "source_family": "town",
+        "world_otbm_sha256": "3bd40d14fefec41f24c4b3ae879e420be1a831ef55b95dcbec721e587a09b034"
+      },
+      "search_terms": {
+        "aliases": [],
+        "label": "bounac"
+      }
+    },
+    {
+      "aliases": [],
+      "bounds": null,
+      "capabilities": [
+        "navigation",
+        "overlay-point"
+      ],
+      "id": "semantic-record:69c4f1611b0e8fb91a0caae5752a2c9e",
+      "kind": "town",
+      "label": "Candia",
+      "position": {
+        "floor": -7,
+        "x": 33338,
+        "y": 32125
+      },
+      "provenance": {
+        "authority": "Oteryn/Oteryn-Game",
+        "identity_state": "UNRESOLVED",
+        "legacy_parser_blobs": {
+          "tools/otbm_atlas/assets.py": "25ed2400813bb3ccdc54482967ed05197eb1a850",
+          "tools/otbm_atlas/nodefile.py": "bed6f7a803d9de485c1f03cbdca4be0cb1521d30",
+          "tools/otbm_atlas/semantic.py": "a11343a472145aee4d9cf65c6ce28b3e4a71a2b3"
+        },
+        "legacy_repository": "blakinio/Otheryn",
+        "legacy_repository_sha": "e417c5e7c22986bf4acef0495eb47f7b72c97cce",
+        "source_family": "town",
+        "world_otbm_sha256": "3bd40d14fefec41f24c4b3ae879e420be1a831ef55b95dcbec721e587a09b034"
+      },
+      "search_terms": {
+        "aliases": [],
+        "label": "candia"
+      }
+    },
+    {
+      "aliases": [],
+      "bounds": null,
+      "capabilities": [
+        "navigation",
+        "overlay-point"
+      ],
+      "id": "semantic-record:642c7ec466a8b51c669be50f6316c5a4",
+      "kind": "town",
+      "label": "Carlin",
+      "position": {
+        "floor": -7,
+        "x": 32360,
+        "y": 31782
+      },
+      "provenance": {
+        "authority": "Oteryn/Oteryn-Game",
+        "identity_state": "UNRESOLVED",
+        "legacy_parser_blobs": {
+          "tools/otbm_atlas/assets.py": "25ed2400813bb3ccdc54482967ed05197eb1a850",
+          "tools/otbm_atlas/nodefile.py": "bed6f7a803d9de485c1f03cbdca4be0cb1521d30",
+          "tools/otbm_atlas/semantic.py": "a11343a472145aee4d9cf65c6ce28b3e4a71a2b3"
+        },
+        "legacy_repository": "blakinio/Otheryn",
+        "legacy_repository_sha": "e417c5e7c22986bf4acef0495eb47f7b72c97cce",
+        "source_family": "town",
+        "world_otbm_sha256": "3bd40d14fefec41f24c4b3ae879e420be1a831ef55b95dcbec721e587a09b034"
+      },
+      "search_terms": {
+        "aliases": [],
+        "label": "carlin"
+      }
+    },
+    {
+      "aliases": [],
+      "bounds": null,
+      "capabilities": [
+        "navigation",
+        "overlay-point"
+      ],
+      "id": "semantic-record:1d6f40386a7b5253c79839aa9bae8c32",
+      "kind": "town",
+      "label": "Cobra Bastion",
+      "position": {
+        "floor": -7,
+        "x": 33397,
+        "y": 32651
+      },
+      "provenance": {
+        "authority": "Oteryn/Oteryn-Game",
+        "identity_state": "UNRESOLVED",
+        "legacy_parser_blobs": {
+          "tools/otbm_atlas/assets.py": "25ed2400813bb3ccdc54482967ed05197eb1a850",
+          "tools/otbm_atlas/nodefile.py": "bed6f7a803d9de485c1f03cbdca4be0cb1521d30",
+          "tools/otbm_atlas/semantic.py": "a11343a472145aee4d9cf65c6ce28b3e4a71a2b3"
+        },
+        "legacy_repository": "blakinio/Otheryn",
+        "legacy_repository_sha": "e417c5e7c22986bf4acef0495eb47f7b72c97cce",
+        "source_family": "town",
+        "world_otbm_sha256": "3bd40d14fefec41f24c4b3ae879e420be1a831ef55b95dcbec721e587a09b034"
+      },
+      "search_terms": {
+        "aliases": [],
+        "label": "cobra bastion"
+      }
+    },
+    {
+      "aliases": [],
+      "bounds": null,
+      "capabilities": [
+        "navigation",
+        "overlay-point"
+      ],
+      "id": "semantic-record:eeef2951a9b11531c874f54a82ce26bb",
+      "kind": "town",
+      "label": "Darashia",
+      "position": {
+        "floor": -1,
+        "x": 33213,
+        "y": 32454
+      },
+      "provenance": {
+        "authority": "Oteryn/Oteryn-Game",
+        "identity_state": "UNRESOLVED",
+        "legacy_parser_blobs": {
+          "tools/otbm_atlas/assets.py": "25ed2400813bb3ccdc54482967ed05197eb1a850",
+          "tools/otbm_atlas/nodefile.py": "bed6f7a803d9de485c1f03cbdca4be0cb1521d30",
+          "tools/otbm_atlas/semantic.py": "a11343a472145aee4d9cf65c6ce28b3e4a71a2b3"
+        },
+        "legacy_repository": "blakinio/Otheryn",
+        "legacy_repository_sha": "e417c5e7c22986bf4acef0495eb47f7b72c97cce",
+        "source_family": "town",
+        "world_otbm_sha256": "3bd40d14fefec41f24c4b3ae879e420be1a831ef55b95dcbec721e587a09b034"
+      },
+      "search_terms": {
+        "aliases": [],
+        "label": "darashia"
+      }
+    },
+    {
+      "aliases": [],
+      "bounds": null,
+      "capabilities": [
+        "navigation",
+        "overlay-point"
+      ],
+      "id": "semantic-record:81c283ea8af74f9ec905cc33c5b41c0d",
+      "kind": "town",
+      "label": "Dawnport",
+      "position": {
+        "floor": -6,
+        "x": 32064,
+        "y": 31894
+      },
+      "provenance": {
+        "authority": "Oteryn/Oteryn-Game",
+        "identity_state": "UNRESOLVED",
+        "legacy_parser_blobs": {
+          "tools/otbm_atlas/assets.py": "25ed2400813bb3ccdc54482967ed05197eb1a850",
+          "tools/otbm_atlas/nodefile.py": "bed6f7a803d9de485c1f03cbdca4be0cb1521d30",
+          "tools/otbm_atlas/semantic.py": "a11343a472145aee4d9cf65c6ce28b3e4a71a2b3"
+        },
+        "legacy_repository": "blakinio/Otheryn",
+        "legacy_repository_sha": "e417c5e7c22986bf4acef0495eb47f7b72c97cce",
+        "source_family": "town",
+        "world_otbm_sha256": "3bd40d14fefec41f24c4b3ae879e420be1a831ef55b95dcbec721e587a09b034"
+      },
+      "search_terms": {
+        "aliases": [],
+        "label": "dawnport"
+      }
+    },
+    {
+      "aliases": [],
+      "bounds": null,
+      "capabilities": [
+        "navigation",
+        "overlay-point"
+      ],
+      "id": "semantic-record:24d7e94486a1dc448a6035a0576b8a7a",
+      "kind": "town",
+      "label": "Dawnport Tutorial",
+      "position": {
+        "floor": -7,
+        "x": 31934,
+        "y": 31925
+      },
+      "provenance": {
+        "authority": "Oteryn/Oteryn-Game",
+        "identity_state": "UNRESOLVED",
+        "legacy_parser_blobs": {
+          "tools/otbm_atlas/assets.py": "25ed2400813bb3ccdc54482967ed05197eb1a850",
+          "tools/otbm_atlas/nodefile.py": "bed6f7a803d9de485c1f03cbdca4be0cb1521d30",
+          "tools/otbm_atlas/semantic.py": "a11343a472145aee4d9cf65c6ce28b3e4a71a2b3"
+        },
+        "legacy_repository": "blakinio/Otheryn",
+        "legacy_repository_sha": "e417c5e7c22986bf4acef0495eb47f7b72c97cce",
+        "source_family": "town",
+        "world_otbm_sha256": "3bd40d14fefec41f24c4b3ae879e420be1a831ef55b95dcbec721e587a09b034"
+      },
+      "search_terms": {
+        "aliases": [],
+        "label": "dawnport tutorial"
+      }
+    },
+    {
+      "aliases": [],
+      "bounds": null,
+      "capabilities": [
+        "navigation",
+        "overlay-point"
+      ],
+      "id": "semantic-record:e267bf6c1fbe761348aee9ecd60ce690",
+      "kind": "town",
+      "label": "Edron",
+      "position": {
+        "floor": -8,
+        "x": 33217,
+        "y": 31814
+      },
+      "provenance": {
+        "authority": "Oteryn/Oteryn-Game",
+        "identity_state": "UNRESOLVED",
+        "legacy_parser_blobs": {
+          "tools/otbm_atlas/assets.py": "25ed2400813bb3ccdc54482967ed05197eb1a850",
+          "tools/otbm_atlas/nodefile.py": "bed6f7a803d9de485c1f03cbdca4be0cb1521d30",
+          "tools/otbm_atlas/semantic.py": "a11343a472145aee4d9cf65c6ce28b3e4a71a2b3"
+        },
+        "legacy_repository": "blakinio/Otheryn",
+        "legacy_repository_sha": "e417c5e7c22986bf4acef0495eb47f7b72c97cce",
+        "source_family": "town",
+        "world_otbm_sha256": "3bd40d14fefec41f24c4b3ae879e420be1a831ef55b95dcbec721e587a09b034"
+      },
+      "search_terms": {
+        "aliases": [],
+        "label": "edron"
+      }
+    },
+    {
+      "aliases": [],
+      "bounds": null,
+      "capabilities": [
+        "navigation",
+        "overlay-point"
+      ],
+      "id": "semantic-record:13d53faad6cb6d4a8a4722eb7a3e4f1a",
+      "kind": "waypoint",
+      "label": "ENTRADA BOSS 1",
+      "position": {
+        "floor": -9,
+        "x": 32271,
+        "y": 32124
+      },
+      "provenance": {
+        "authority": "Oteryn/Oteryn-Game",
+        "identity_state": "UNRESOLVED",
+        "legacy_parser_blobs": {
+          "tools/otbm_atlas/assets.py": "25ed2400813bb3ccdc54482967ed05197eb1a850",
+          "tools/otbm_atlas/nodefile.py": "bed6f7a803d9de485c1f03cbdca4be0cb1521d30",
+          "tools/otbm_atlas/semantic.py": "a11343a472145aee4d9cf65c6ce28b3e4a71a2b3"
+        },
+        "legacy_repository": "blakinio/Otheryn",
+        "legacy_repository_sha": "e417c5e7c22986bf4acef0495eb47f7b72c97cce",
+        "source_family": "waypoint",
+        "world_otbm_sha256": "3bd40d14fefec41f24c4b3ae879e420be1a831ef55b95dcbec721e587a09b034"
+      },
+      "search_terms": {
+        "aliases": [],
+        "label": "entrada boss 1"
+      }
+    },
+    {
+      "aliases": [],
+      "bounds": null,
+      "capabilities": [
+        "navigation",
+        "overlay-point"
+      ],
+      "id": "semantic-record:eff4f78b00bb55e07deab346e8528e6d",
+      "kind": "waypoint",
+      "label": "ENTRADA BOSS 2",
+      "position": {
+        "floor": -12,
+        "x": 32756,
+        "y": 32308
+      },
+      "provenance": {
+        "authority": "Oteryn/Oteryn-Game",
+        "identity_state": "UNRESOLVED",
+        "legacy_parser_blobs": {
+          "tools/otbm_atlas/assets.py": "25ed2400813bb3ccdc54482967ed05197eb1a850",
+          "tools/otbm_atlas/nodefile.py": "bed6f7a803d9de485c1f03cbdca4be0cb1521d30",
+          "tools/otbm_atlas/semantic.py": "a11343a472145aee4d9cf65c6ce28b3e4a71a2b3"
+        },
+        "legacy_repository": "blakinio/Otheryn",
+        "legacy_repository_sha": "e417c5e7c22986bf4acef0495eb47f7b72c97cce",
+        "source_family": "waypoint",
+        "world_otbm_sha256": "3bd40d14fefec41f24c4b3ae879e420be1a831ef55b95dcbec721e587a09b034"
+      },
+      "search_terms": {
+        "aliases": [],
+        "label": "entrada boss 2"
+      }
+    },
+    {
+      "aliases": [],
+      "bounds": null,
+      "capabilities": [
+        "navigation",
+        "overlay-point"
+      ],
+      "id": "semantic-record:2da07b739818ea04e1c297f21423274c",
+      "kind": "waypoint",
+      "label": "ENTRADA BOSS 3",
+      "position": {
+        "floor": -7,
+        "x": 32152,
+        "y": 31449
+      },
+      "provenance": {
+        "authority": "Oteryn/Oteryn-Game",
+        "identity_state": "UNRESOLVED",
+        "legacy_parser_blobs": {
+          "tools/otbm_atlas/assets.py": "25ed2400813bb3ccdc54482967ed05197eb1a850",
+          "tools/otbm_atlas/nodefile.py": "bed6f7a803d9de485c1f03cbdca4be0cb1521d30",
+          "tools/otbm_atlas/semantic.py": "a11343a472145aee4d9cf65c6ce28b3e4a71a2b3"
+        },
+        "legacy_repository": "blakinio/Otheryn",
+        "legacy_repository_sha": "e417c5e7c22986bf4acef0495eb47f7b72c97cce",
+        "source_family": "waypoint",
+        "world_otbm_sha256": "3bd40d14fefec41f24c4b3ae879e420be1a831ef55b95dcbec721e587a09b034"
+      },
+      "search_terms": {
+        "aliases": [],
+        "label": "entrada boss 3"
+      }
+    },
+    {
+      "aliases": [],
+      "bounds": null,
+      "capabilities": [
+        "navigation",
+        "overlay-point"
+      ],
+      "id": "semantic-record:530d3173538998f9119da36cc979779d",
+      "kind": "waypoint",
+      "label": "ENTRADA BOSS 4",
+      "position": {
+        "floor": -4,
+        "x": 33049,
+        "y": 32682
+      },
+      "provenance": {
+        "authority": "Oteryn/Oteryn-Game",
+        "identity_state": "UNRESOLVED",
+        "legacy_parser_blobs": {
+          "tools/otbm_atlas/assets.py": "25ed2400813bb3ccdc54482967ed05197eb1a850",
+          "tools/otbm_atlas/nodefile.py": "bed6f7a803d9de485c1f03cbdca4be0cb1521d30",
+          "tools/otbm_atlas/semantic.py": "a11343a472145aee4d9cf65c6ce28b3e4a71a2b3"
+        },
+        "legacy_repository": "blakinio/Otheryn",
+        "legacy_repository_sha": "e417c5e7c22986bf4acef0495eb47f7b72c97cce",
+        "source_family": "waypoint",
+        "world_otbm_sha256": "3bd40d14fefec41f24c4b3ae879e420be1a831ef55b95dcbec721e587a09b034"
+      },
+      "search_terms": {
+        "aliases": [],
+        "label": "entrada boss 4"
+      }
+    },
+    {
+      "aliases": [],
+      "bounds": null,
+      "capabilities": [
+        "navigation",
+        "overlay-point"
+      ],
+      "id": "semantic-record:4a3ceae27a9cd83b11d5538ecfbddf4d",
+      "kind": "waypoint",
+      "label": "ENTRADA BOSS FINAL",
+      "position": {
+        "floor": -11,
+        "x": 32925,
+        "y": 31779
+      },
+      "provenance": {
+        "authority": "Oteryn/Oteryn-Game",
+        "identity_state": "UNRESOLVED",
+        "legacy_parser_blobs": {
+          "tools/otbm_atlas/assets.py": "25ed2400813bb3ccdc54482967ed05197eb1a850",
+          "tools/otbm_atlas/nodefile.py": "bed6f7a803d9de485c1f03cbdca4be0cb1521d30",
+          "tools/otbm_atlas/semantic.py": "a11343a472145aee4d9cf65c6ce28b3e4a71a2b3"
+        },
+        "legacy_repository": "blakinio/Otheryn",
+        "legacy_repository_sha": "e417c5e7c22986bf4acef0495eb47f7b72c97cce",
+        "source_family": "waypoint",
+        "world_otbm_sha256": "3bd40d14fefec41f24c4b3ae879e420be1a831ef55b95dcbec721e587a09b034"
+      },
+      "search_terms": {
+        "aliases": [],
+        "label": "entrada boss final"
+      }
+    },
+    {
+      "aliases": [],
+      "bounds": null,
+      "capabilities": [
+        "navigation",
+        "overlay-point"
+      ],
+      "id": "semantic-record:bf081625cb198688936fd39012311971",
+      "kind": "town",
+      "label": "Farmine",
+      "position": {
+        "floor": -11,
+        "x": 33023,
+        "y": 31521
+      },
+      "provenance": {
+        "authority": "Oteryn/Oteryn-Game",
+        "identity_state": "UNRESOLVED",
+        "legacy_parser_blobs": {
+          "tools/otbm_atlas/assets.py": "25ed2400813bb3ccdc54482967ed05197eb1a850",
+          "tools/otbm_atlas/nodefile.py": "bed6f7a803d9de485c1f03cbdca4be0cb1521d30",
+          "tools/otbm_atlas/semantic.py": "a11343a472145aee4d9cf65c6ce28b3e4a71a2b3"
+        },
+        "legacy_repository": "blakinio/Otheryn",
+        "legacy_repository_sha": "e417c5e7c22986bf4acef0495eb47f7b72c97cce",
+        "source_family": "town",
+        "world_otbm_sha256": "3bd40d14fefec41f24c4b3ae879e420be1a831ef55b95dcbec721e587a09b034"
+      },
+      "search_terms": {
+        "aliases": [],
+        "label": "farmine"
+      }
+    },
+    {
+      "aliases": [],
+      "bounds": null,
+      "capabilities": [
+        "navigation",
+        "overlay-point"
+      ],
+      "id": "semantic-record:b98eef3f9757147dc520af7f9fc66714",
+      "kind": "town",
+      "label": "Feyrist",
+      "position": {
+        "floor": -7,
+        "x": 33490,
+        "y": 32221
+      },
+      "provenance": {
+        "authority": "Oteryn/Oteryn-Game",
+        "identity_state": "UNRESOLVED",
+        "legacy_parser_blobs": {
+          "tools/otbm_atlas/assets.py": "25ed2400813bb3ccdc54482967ed05197eb1a850",
+          "tools/otbm_atlas/nodefile.py": "bed6f7a803d9de485c1f03cbdca4be0cb1521d30",
+          "tools/otbm_atlas/semantic.py": "a11343a472145aee4d9cf65c6ce28b3e4a71a2b3"
+        },
+        "legacy_repository": "blakinio/Otheryn",
+        "legacy_repository_sha": "e417c5e7c22986bf4acef0495eb47f7b72c97cce",
+        "source_family": "town",
+        "world_otbm_sha256": "3bd40d14fefec41f24c4b3ae879e420be1a831ef55b95dcbec721e587a09b034"
+      },
+      "search_terms": {
+        "aliases": [],
+        "label": "feyrist"
+      }
+    },
+    {
+      "aliases": [],
+      "bounds": null,
+      "capabilities": [
+        "navigation",
+        "overlay-point"
+      ],
+      "id": "semantic-record:c3e92abfd90489dcbaa4d733262128c6",
+      "kind": "town",
+      "label": "Gnomprona",
+      "position": {
+        "floor": -14,
+        "x": 33517,
+        "y": 32856
+      },
+      "provenance": {
+        "authority": "Oteryn/Oteryn-Game",
+        "identity_state": "UNRESOLVED",
+        "legacy_parser_blobs": {
+          "tools/otbm_atlas/assets.py": "25ed2400813bb3ccdc54482967ed05197eb1a850",
+          "tools/otbm_atlas/nodefile.py": "bed6f7a803d9de485c1f03cbdca4be0cb1521d30",
+          "tools/otbm_atlas/semantic.py": "a11343a472145aee4d9cf65c6ce28b3e4a71a2b3"
+        },
+        "legacy_repository": "blakinio/Otheryn",
+        "legacy_repository_sha": "e417c5e7c22986bf4acef0495eb47f7b72c97cce",
+        "source_family": "town",
+        "world_otbm_sha256": "3bd40d14fefec41f24c4b3ae879e420be1a831ef55b95dcbec721e587a09b034"
+      },
+      "search_terms": {
+        "aliases": [],
+        "label": "gnomprona"
+      }
+    },
+    {
+      "aliases": [],
+      "bounds": null,
+      "capabilities": [
+        "navigation",
+        "overlay-point"
+      ],
+      "id": "semantic-record:a2263fc41be1780206a300176bab39f0",
+      "kind": "town",
+      "label": "Gray Beach",
+      "position": {
+        "floor": -9,
+        "x": 33447,
+        "y": 31323
+      },
+      "provenance": {
+        "authority": "Oteryn/Oteryn-Game",
+        "identity_state": "UNRESOLVED",
+        "legacy_parser_blobs": {
+          "tools/otbm_atlas/assets.py": "25ed2400813bb3ccdc54482967ed05197eb1a850",
+          "tools/otbm_atlas/nodefile.py": "bed6f7a803d9de485c1f03cbdca4be0cb1521d30",
+          "tools/otbm_atlas/semantic.py": "a11343a472145aee4d9cf65c6ce28b3e4a71a2b3"
+        },
+        "legacy_repository": "blakinio/Otheryn",
+        "legacy_repository_sha": "e417c5e7c22986bf4acef0495eb47f7b72c97cce",
+        "source_family": "town",
+        "world_otbm_sha256": "3bd40d14fefec41f24c4b3ae879e420be1a831ef55b95dcbec721e587a09b034"
+      },
+      "search_terms": {
+        "aliases": [],
+        "label": "gray beach"
+      }
+    },
+    {
+      "aliases": [],
+      "bounds": null,
+      "capabilities": [
+        "navigation",
+        "overlay-point"
+      ],
+      "id": "semantic-record:332ec7d67b42a8233d0a8d7e62504591",
+      "kind": "town",
+      "label": "Island of Destiny",
+      "position": {
+        "floor": -7,
+        "x": 32091,
+        "y": 32027
+      },
+      "provenance": {
+        "authority": "Oteryn/Oteryn-Game",
+        "identity_state": "UNRESOLVED",
+        "legacy_parser_blobs": {
+          "tools/otbm_atlas/assets.py": "25ed2400813bb3ccdc54482967ed05197eb1a850",
+          "tools/otbm_atlas/nodefile.py": "bed6f7a803d9de485c1f03cbdca4be0cb1521d30",
+          "tools/otbm_atlas/semantic.py": "a11343a472145aee4d9cf65c6ce28b3e4a71a2b3"
+        },
+        "legacy_repository": "blakinio/Otheryn",
+        "legacy_repository_sha": "e417c5e7c22986bf4acef0495eb47f7b72c97cce",
+        "source_family": "town",
+        "world_otbm_sha256": "3bd40d14fefec41f24c4b3ae879e420be1a831ef55b95dcbec721e587a09b034"
+      },
+      "search_terms": {
+        "aliases": [],
+        "label": "island of destiny"
+      }
+    },
+    {
+      "aliases": [],
+      "bounds": null,
+      "capabilities": [
+        "navigation",
+        "overlay-point"
+      ],
+      "id": "semantic-record:a55680541c346def3f0e664d7e5869fa",
+      "kind": "town",
+      "label": "Issavi",
+      "position": {
+        "floor": -5,
+        "x": 33921,
+        "y": 31477
+      },
+      "provenance": {
+        "authority": "Oteryn/Oteryn-Game",
+        "identity_state": "UNRESOLVED",
+        "legacy_parser_blobs": {
+          "tools/otbm_atlas/assets.py": "25ed2400813bb3ccdc54482967ed05197eb1a850",
+          "tools/otbm_atlas/nodefile.py": "bed6f7a803d9de485c1f03cbdca4be0cb1521d30",
+          "tools/otbm_atlas/semantic.py": "a11343a472145aee4d9cf65c6ce28b3e4a71a2b3"
+        },
+        "legacy_repository": "blakinio/Otheryn",
+        "legacy_repository_sha": "e417c5e7c22986bf4acef0495eb47f7b72c97cce",
+        "source_family": "town",
+        "world_otbm_sha256": "3bd40d14fefec41f24c4b3ae879e420be1a831ef55b95dcbec721e587a09b034"
+      },
+      "search_terms": {
+        "aliases": [],
+        "label": "issavi"
+      }
+    },
+    {
+      "aliases": [],
+      "bounds": null,
+      "capabilities": [
+        "navigation",
+        "overlay-point"
+      ],
+      "id": "semantic-record:4fb09cc9185cb30abbd4e2c702dfc6fc",
+      "kind": "town",
+      "label": "Kazordoon",
+      "position": {
+        "floor": -11,
+        "x": 32649,
+        "y": 31925
+      },
+      "provenance": {
+        "authority": "Oteryn/Oteryn-Game",
+        "identity_state": "UNRESOLVED",
+        "legacy_parser_blobs": {
+          "tools/otbm_atlas/assets.py": "25ed2400813bb3ccdc54482967ed05197eb1a850",
+          "tools/otbm_atlas/nodefile.py": "bed6f7a803d9de485c1f03cbdca4be0cb1521d30",
+          "tools/otbm_atlas/semantic.py": "a11343a472145aee4d9cf65c6ce28b3e4a71a2b3"
+        },
+        "legacy_repository": "blakinio/Otheryn",
+        "legacy_repository_sha": "e417c5e7c22986bf4acef0495eb47f7b72c97cce",
+        "source_family": "town",
+        "world_otbm_sha256": "3bd40d14fefec41f24c4b3ae879e420be1a831ef55b95dcbec721e587a09b034"
+      },
+      "search_terms": {
+        "aliases": [],
+        "label": "kazordoon"
+      }
+    },
+    {
+      "aliases": [],
+      "bounds": null,
+      "capabilities": [
+        "navigation",
+        "overlay-point"
+      ],
+      "id": "semantic-record:554ffc5d2017640aee2749c9be1eafee",
+      "kind": "town",
+      "label": "Krailos",
+      "position": {
+        "floor": -8,
+        "x": 33657,
+        "y": 31665
+      },
+      "provenance": {
+        "authority": "Oteryn/Oteryn-Game",
+        "identity_state": "UNRESOLVED",
+        "legacy_parser_blobs": {
+          "tools/otbm_atlas/assets.py": "25ed2400813bb3ccdc54482967ed05197eb1a850",
+          "tools/otbm_atlas/nodefile.py": "bed6f7a803d9de485c1f03cbdca4be0cb1521d30",
+          "tools/otbm_atlas/semantic.py": "a11343a472145aee4d9cf65c6ce28b3e4a71a2b3"
+        },
+        "legacy_repository": "blakinio/Otheryn",
+        "legacy_repository_sha": "e417c5e7c22986bf4acef0495eb47f7b72c97cce",
+        "source_family": "town",
+        "world_otbm_sha256": "3bd40d14fefec41f24c4b3ae879e420be1a831ef55b95dcbec721e587a09b034"
+      },
+      "search_terms": {
+        "aliases": [],
+        "label": "krailos"
+      }
+    },
+    {
+      "aliases": [],
+      "bounds": null,
+      "capabilities": [
+        "navigation",
+        "overlay-point"
+      ],
+      "id": "semantic-record:1ad922d7b53caff5b0e138e043534089",
+      "kind": "town",
+      "label": "Liberty Bay",
+      "position": {
+        "floor": -7,
+        "x": 32317,
+        "y": 32826
+      },
+      "provenance": {
+        "authority": "Oteryn/Oteryn-Game",
+        "identity_state": "UNRESOLVED",
+        "legacy_parser_blobs": {
+          "tools/otbm_atlas/assets.py": "25ed2400813bb3ccdc54482967ed05197eb1a850",
+          "tools/otbm_atlas/nodefile.py": "bed6f7a803d9de485c1f03cbdca4be0cb1521d30",
+          "tools/otbm_atlas/semantic.py": "a11343a472145aee4d9cf65c6ce28b3e4a71a2b3"
+        },
+        "legacy_repository": "blakinio/Otheryn",
+        "legacy_repository_sha": "e417c5e7c22986bf4acef0495eb47f7b72c97cce",
+        "source_family": "town",
+        "world_otbm_sha256": "3bd40d14fefec41f24c4b3ae879e420be1a831ef55b95dcbec721e587a09b034"
+      },
+      "search_terms": {
+        "aliases": [],
+        "label": "liberty bay"
+      }
+    },
+    {
+      "aliases": [],
+      "bounds": null,
+      "capabilities": [
+        "navigation",
+        "overlay-point"
+      ],
+      "id": "semantic-record:a9fe678be55834176bc4c56e6b717862",
+      "kind": "town",
+      "label": "Marapur",
+      "position": {
+        "floor": -7,
+        "x": 33842,
+        "y": 32853
+      },
+      "provenance": {
+        "authority": "Oteryn/Oteryn-Game",
+        "identity_state": "UNRESOLVED",
+        "legacy_parser_blobs": {
+          "tools/otbm_atlas/assets.py": "25ed2400813bb3ccdc54482967ed05197eb1a850",
+          "tools/otbm_atlas/nodefile.py": "bed6f7a803d9de485c1f03cbdca4be0cb1521d30",
+          "tools/otbm_atlas/semantic.py": "a11343a472145aee4d9cf65c6ce28b3e4a71a2b3"
+        },
+        "legacy_repository": "blakinio/Otheryn",
+        "legacy_repository_sha": "e417c5e7c22986bf4acef0495eb47f7b72c97cce",
+        "source_family": "town",
+        "world_otbm_sha256": "3bd40d14fefec41f24c4b3ae879e420be1a831ef55b95dcbec721e587a09b034"
+      },
+      "search_terms": {
+        "aliases": [],
+        "label": "marapur"
+      }
+    },
+    {
+      "aliases": [],
+      "bounds": null,
+      "capabilities": [
+        "navigation",
+        "overlay-point"
+      ],
+      "id": "semantic-record:eda479526d740dac426317a3ee068c73",
+      "kind": "town",
+      "label": "Moonfall",
+      "position": {
+        "floor": -5,
+        "x": 33797,
+        "y": 32755
+      },
+      "provenance": {
+        "authority": "Oteryn/Oteryn-Game",
+        "identity_state": "UNRESOLVED",
+        "legacy_parser_blobs": {
+          "tools/otbm_atlas/assets.py": "25ed2400813bb3ccdc54482967ed05197eb1a850",
+          "tools/otbm_atlas/nodefile.py": "bed6f7a803d9de485c1f03cbdca4be0cb1521d30",
+          "tools/otbm_atlas/semantic.py": "a11343a472145aee4d9cf65c6ce28b3e4a71a2b3"
+        },
+        "legacy_repository": "blakinio/Otheryn",
+        "legacy_repository_sha": "e417c5e7c22986bf4acef0495eb47f7b72c97cce",
+        "source_family": "town",
+        "world_otbm_sha256": "3bd40d14fefec41f24c4b3ae879e420be1a831ef55b95dcbec721e587a09b034"
+      },
+      "search_terms": {
+        "aliases": [],
+        "label": "moonfall"
+      }
+    },
+    {
+      "aliases": [],
+      "bounds": null,
+      "capabilities": [
+        "navigation",
+        "overlay-point"
+      ],
+      "id": "semantic-record:3a6d2a5cfd599439efccce35017e12b8",
+      "kind": "town",
+      "label": "Newhaven",
+      "position": {
+        "floor": -7,
+        "x": 32536,
+        "y": 32514
+      },
+      "provenance": {
+        "authority": "Oteryn/Oteryn-Game",
+        "identity_state": "UNRESOLVED",
+        "legacy_parser_blobs": {
+          "tools/otbm_atlas/assets.py": "25ed2400813bb3ccdc54482967ed05197eb1a850",
+          "tools/otbm_atlas/nodefile.py": "bed6f7a803d9de485c1f03cbdca4be0cb1521d30",
+          "tools/otbm_atlas/semantic.py": "a11343a472145aee4d9cf65c6ce28b3e4a71a2b3"
+        },
+        "legacy_repository": "blakinio/Otheryn",
+        "legacy_repository_sha": "e417c5e7c22986bf4acef0495eb47f7b72c97cce",
+        "source_family": "town",
+        "world_otbm_sha256": "3bd40d14fefec41f24c4b3ae879e420be1a831ef55b95dcbec721e587a09b034"
+      },
+      "search_terms": {
+        "aliases": [],
+        "label": "newhaven"
+      }
+    },
+    {
+      "aliases": [],
+      "bounds": null,
+      "capabilities": [
+        "navigation",
+        "overlay-point"
+      ],
+      "id": "semantic-record:991b201fed1d4f2706ab20e605f442e9",
+      "kind": "waypoint",
+      "label": "newhaven",
+      "position": {
+        "floor": -7,
+        "x": 32534,
+        "y": 32513
+      },
+      "provenance": {
+        "authority": "Oteryn/Oteryn-Game",
+        "identity_state": "UNRESOLVED",
+        "legacy_parser_blobs": {
+          "tools/otbm_atlas/assets.py": "25ed2400813bb3ccdc54482967ed05197eb1a850",
+          "tools/otbm_atlas/nodefile.py": "bed6f7a803d9de485c1f03cbdca4be0cb1521d30",
+          "tools/otbm_atlas/semantic.py": "a11343a472145aee4d9cf65c6ce28b3e4a71a2b3"
+        },
+        "legacy_repository": "blakinio/Otheryn",
+        "legacy_repository_sha": "e417c5e7c22986bf4acef0495eb47f7b72c97cce",
+        "source_family": "waypoint",
+        "world_otbm_sha256": "3bd40d14fefec41f24c4b3ae879e420be1a831ef55b95dcbec721e587a09b034"
+      },
+      "search_terms": {
+        "aliases": [],
+        "label": "newhaven"
+      }
+    },
+    {
+      "aliases": [],
+      "bounds": null,
+      "capabilities": [
+        "navigation",
+        "overlay-point"
+      ],
+      "id": "semantic-record:9246a18b6f74b250c6c4c90b9e0e6911",
+      "kind": "town",
+      "label": "Port Hope",
+      "position": {
+        "floor": -7,
+        "x": 32594,
+        "y": 32745
+      },
+      "provenance": {
+        "authority": "Oteryn/Oteryn-Game",
+        "identity_state": "UNRESOLVED",
+        "legacy_parser_blobs": {
+          "tools/otbm_atlas/assets.py": "25ed2400813bb3ccdc54482967ed05197eb1a850",
+          "tools/otbm_atlas/nodefile.py": "bed6f7a803d9de485c1f03cbdca4be0cb1521d30",
+          "tools/otbm_atlas/semantic.py": "a11343a472145aee4d9cf65c6ce28b3e4a71a2b3"
+        },
+        "legacy_repository": "blakinio/Otheryn",
+        "legacy_repository_sha": "e417c5e7c22986bf4acef0495eb47f7b72c97cce",
+        "source_family": "town",
+        "world_otbm_sha256": "3bd40d14fefec41f24c4b3ae879e420be1a831ef55b95dcbec721e587a09b034"
+      },
+      "search_terms": {
+        "aliases": [],
+        "label": "port hope"
+      }
+    },
+    {
+      "aliases": [],
+      "bounds": null,
+      "capabilities": [
+        "navigation",
+        "overlay-point"
+      ],
+      "id": "semantic-record:1e48aca6d2e13d604674c61059cf150d",
+      "kind": "town",
+      "label": "Rathleton",
+      "position": {
+        "floor": -6,
+        "x": 33594,
+        "y": 31899
+      },
+      "provenance": {
+        "authority": "Oteryn/Oteryn-Game",
+        "identity_state": "UNRESOLVED",
+        "legacy_parser_blobs": {
+          "tools/otbm_atlas/assets.py": "25ed2400813bb3ccdc54482967ed05197eb1a850",
+          "tools/otbm_atlas/nodefile.py": "bed6f7a803d9de485c1f03cbdca4be0cb1521d30",
+          "tools/otbm_atlas/semantic.py": "a11343a472145aee4d9cf65c6ce28b3e4a71a2b3"
+        },
+        "legacy_repository": "blakinio/Otheryn",
+        "legacy_repository_sha": "e417c5e7c22986bf4acef0495eb47f7b72c97cce",
+        "source_family": "town",
+        "world_otbm_sha256": "3bd40d14fefec41f24c4b3ae879e420be1a831ef55b95dcbec721e587a09b034"
+      },
+      "search_terms": {
+        "aliases": [],
+        "label": "rathleton"
+      }
+    },
+    {
+      "aliases": [],
+      "bounds": null,
+      "capabilities": [
+        "navigation",
+        "overlay-point"
+      ],
+      "id": "semantic-record:fbcba773088060f57a5e20f7fe3d018e",
+      "kind": "town",
+      "label": "Rookgaard",
+      "position": {
+        "floor": -7,
+        "x": 32097,
+        "y": 32219
+      },
+      "provenance": {
+        "authority": "Oteryn/Oteryn-Game",
+        "identity_state": "UNRESOLVED",
+        "legacy_parser_blobs": {
+          "tools/otbm_atlas/assets.py": "25ed2400813bb3ccdc54482967ed05197eb1a850",
+          "tools/otbm_atlas/nodefile.py": "bed6f7a803d9de485c1f03cbdca4be0cb1521d30",
+          "tools/otbm_atlas/semantic.py": "a11343a472145aee4d9cf65c6ce28b3e4a71a2b3"
+        },
+        "legacy_repository": "blakinio/Otheryn",
+        "legacy_repository_sha": "e417c5e7c22986bf4acef0495eb47f7b72c97cce",
+        "source_family": "town",
+        "world_otbm_sha256": "3bd40d14fefec41f24c4b3ae879e420be1a831ef55b95dcbec721e587a09b034"
+      },
+      "search_terms": {
+        "aliases": [],
+        "label": "rookgaard"
+      }
+    },
+    {
+      "aliases": [],
+      "bounds": null,
+      "capabilities": [
+        "navigation",
+        "overlay-point"
+      ],
+      "id": "semantic-record:bfc67112a36ac3e580a0a55a9aedcb82",
+      "kind": "town",
+      "label": "Roshamuul",
+      "position": {
+        "floor": -6,
+        "x": 33513,
+        "y": 32363
+      },
+      "provenance": {
+        "authority": "Oteryn/Oteryn-Game",
+        "identity_state": "UNRESOLVED",
+        "legacy_parser_blobs": {
+          "tools/otbm_atlas/assets.py": "25ed2400813bb3ccdc54482967ed05197eb1a850",
+          "tools/otbm_atlas/nodefile.py": "bed6f7a803d9de485c1f03cbdca4be0cb1521d30",
+          "tools/otbm_atlas/semantic.py": "a11343a472145aee4d9cf65c6ce28b3e4a71a2b3"
+        },
+        "legacy_repository": "blakinio/Otheryn",
+        "legacy_repository_sha": "e417c5e7c22986bf4acef0495eb47f7b72c97cce",
+        "source_family": "town",
+        "world_otbm_sha256": "3bd40d14fefec41f24c4b3ae879e420be1a831ef55b95dcbec721e587a09b034"
+      },
+      "search_terms": {
+        "aliases": [],
+        "label": "roshamuul"
+      }
+    },
+    {
+      "aliases": [],
+      "bounds": null,
+      "capabilities": [
+        "navigation",
+        "overlay-point"
+      ],
+      "id": "semantic-record:b77c7c2b76ad5ac1cc1e9ab4376edf18",
+      "kind": "town",
+      "label": "Silvertides",
+      "position": {
+        "floor": -7,
+        "x": 33776,
+        "y": 32842
+      },
+      "provenance": {
+        "authority": "Oteryn/Oteryn-Game",
+        "identity_state": "UNRESOLVED",
+        "legacy_parser_blobs": {
+          "tools/otbm_atlas/assets.py": "25ed2400813bb3ccdc54482967ed05197eb1a850",
+          "tools/otbm_atlas/nodefile.py": "bed6f7a803d9de485c1f03cbdca4be0cb1521d30",
+          "tools/otbm_atlas/semantic.py": "a11343a472145aee4d9cf65c6ce28b3e4a71a2b3"
+        },
+        "legacy_repository": "blakinio/Otheryn",
+        "legacy_repository_sha": "e417c5e7c22986bf4acef0495eb47f7b72c97cce",
+        "source_family": "town",
+        "world_otbm_sha256": "3bd40d14fefec41f24c4b3ae879e420be1a831ef55b95dcbec721e587a09b034"
+      },
+      "search_terms": {
+        "aliases": [],
+        "label": "silvertides"
+      }
+    },
+    {
+      "aliases": [],
+      "bounds": null,
+      "capabilities": [
+        "navigation",
+        "overlay-point"
+      ],
+      "id": "semantic-record:6ce924ed0a0410df966d46d76683f6c9",
+      "kind": "town",
+      "label": "Svargrond",
+      "position": {
+        "floor": -7,
+        "x": 32212,
+        "y": 31132
+      },
+      "provenance": {
+        "authority": "Oteryn/Oteryn-Game",
+        "identity_state": "UNRESOLVED",
+        "legacy_parser_blobs": {
+          "tools/otbm_atlas/assets.py": "25ed2400813bb3ccdc54482967ed05197eb1a850",
+          "tools/otbm_atlas/nodefile.py": "bed6f7a803d9de485c1f03cbdca4be0cb1521d30",
+          "tools/otbm_atlas/semantic.py": "a11343a472145aee4d9cf65c6ce28b3e4a71a2b3"
+        },
+        "legacy_repository": "blakinio/Otheryn",
+        "legacy_repository_sha": "e417c5e7c22986bf4acef0495eb47f7b72c97cce",
+        "source_family": "town",
+        "world_otbm_sha256": "3bd40d14fefec41f24c4b3ae879e420be1a831ef55b95dcbec721e587a09b034"
+      },
+      "search_terms": {
+        "aliases": [],
+        "label": "svargrond"
+      }
+    },
+    {
+      "aliases": [],
+      "bounds": null,
+      "capabilities": [
+        "navigation",
+        "overlay-point"
+      ],
+      "id": "semantic-record:57d9ef64607b0360d0c01d338f7c70ba",
+      "kind": "town",
+      "label": "Targuna",
+      "position": {
+        "floor": -7,
+        "x": 31934,
+        "y": 31925
+      },
+      "provenance": {
+        "authority": "Oteryn/Oteryn-Game",
+        "identity_state": "UNRESOLVED",
+        "legacy_parser_blobs": {
+          "tools/otbm_atlas/assets.py": "25ed2400813bb3ccdc54482967ed05197eb1a850",
+          "tools/otbm_atlas/nodefile.py": "bed6f7a803d9de485c1f03cbdca4be0cb1521d30",
+          "tools/otbm_atlas/semantic.py": "a11343a472145aee4d9cf65c6ce28b3e4a71a2b3"
+        },
+        "legacy_repository": "blakinio/Otheryn",
+        "legacy_repository_sha": "e417c5e7c22986bf4acef0495eb47f7b72c97cce",
+        "source_family": "town",
+        "world_otbm_sha256": "3bd40d14fefec41f24c4b3ae879e420be1a831ef55b95dcbec721e587a09b034"
+      },
+      "search_terms": {
+        "aliases": [],
+        "label": "targuna"
       }
     },
     {
@@ -107,6 +1719,72 @@
         "aliases": [],
         "label": "thais"
       }
+    },
+    {
+      "aliases": [],
+      "bounds": null,
+      "capabilities": [
+        "navigation",
+        "overlay-point"
+      ],
+      "id": "semantic-record:482bbc9851c40eeb2fe4911c24654a8d",
+      "kind": "town",
+      "label": "Venore",
+      "position": {
+        "floor": -7,
+        "x": 32957,
+        "y": 32076
+      },
+      "provenance": {
+        "authority": "Oteryn/Oteryn-Game",
+        "identity_state": "UNRESOLVED",
+        "legacy_parser_blobs": {
+          "tools/otbm_atlas/assets.py": "25ed2400813bb3ccdc54482967ed05197eb1a850",
+          "tools/otbm_atlas/nodefile.py": "bed6f7a803d9de485c1f03cbdca4be0cb1521d30",
+          "tools/otbm_atlas/semantic.py": "a11343a472145aee4d9cf65c6ce28b3e4a71a2b3"
+        },
+        "legacy_repository": "blakinio/Otheryn",
+        "legacy_repository_sha": "e417c5e7c22986bf4acef0495eb47f7b72c97cce",
+        "source_family": "town",
+        "world_otbm_sha256": "3bd40d14fefec41f24c4b3ae879e420be1a831ef55b95dcbec721e587a09b034"
+      },
+      "search_terms": {
+        "aliases": [],
+        "label": "venore"
+      }
+    },
+    {
+      "aliases": [],
+      "bounds": null,
+      "capabilities": [
+        "navigation",
+        "overlay-point"
+      ],
+      "id": "semantic-record:477554946100076a8fa25561b9b7883e",
+      "kind": "town",
+      "label": "Yalahar",
+      "position": {
+        "floor": -7,
+        "x": 32787,
+        "y": 31276
+      },
+      "provenance": {
+        "authority": "Oteryn/Oteryn-Game",
+        "identity_state": "UNRESOLVED",
+        "legacy_parser_blobs": {
+          "tools/otbm_atlas/assets.py": "25ed2400813bb3ccdc54482967ed05197eb1a850",
+          "tools/otbm_atlas/nodefile.py": "bed6f7a803d9de485c1f03cbdca4be0cb1521d30",
+          "tools/otbm_atlas/semantic.py": "a11343a472145aee4d9cf65c6ce28b3e4a71a2b3"
+        },
+        "legacy_repository": "blakinio/Otheryn",
+        "legacy_repository_sha": "e417c5e7c22986bf4acef0495eb47f7b72c97cce",
+        "source_family": "town",
+        "world_otbm_sha256": "3bd40d14fefec41f24c4b3ae879e420be1a831ef55b95dcbec721e587a09b034"
+      },
+      "search_terms": {
+        "aliases": [],
+        "label": "yalahar"
+      }
     }
   ],
   "schema_version": 1,
@@ -116,7 +1794,8 @@
     "contract_id": "oteryn-game-atlas-export-v1",
     "game_revision": "25d628d6f7ebf4976ebd6d2a7dee9df21f19e3e3",
     "profile_id": "oteryn-game-atlas-semantic-search-v1",
+    "records": 88684,
     "repository": "Oteryn/Oteryn-Game",
-    "semantic_digest": "sha256:a4a4703962bd6984d31ef1dafcd27bad475d6b61f570d013560c16a704989bf8"
+    "semantic_digest": "sha256:0cc0546aff0e9a8f85716dcbe5babc6043e148e946a448b1d87f083410cb1005"
   }
 }

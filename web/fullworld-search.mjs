@@ -4,11 +4,16 @@ import {
   searchSemanticIndex,
   validateSemanticSearchIndex,
 } from '../src/browser/semantic-search.mjs';
+import {
+  findCreatureById,
+  searchCreatureRecords,
+  validateCreatureSearchRecords,
+} from '../src/browser/creature-search.mjs';
 
 const INDEX_URL = new URL('./semantic-search/index.json', import.meta.url);
-const CREATURE_ROOT = new URL('../data/creatures/', import.meta.url);
+const CREATURE_SEARCH_URL = new URL('./semantic-search/creatures.json', import.meta.url);
 const MAX_INDEX_BYTES = 2 * 1024 * 1024;
-const MAX_CREATURE_INDEX_BYTES = 4 * 1024 * 1024;
+const EXPECTED_CREATURE_SEMANTIC_DIGEST = 'sha256:01921968a6cb4f6ecea237820a053fc5052aaa1da556851f2c2a60d99890b5e1';
 const MAX_CREATURE_SEARCH_BYTES = 2 * 1024 * 1024;
 const MAX_RESULTS = 12;
 const state = { index: null, creatureSearch: [], active: null, lastQuery: '', lastResults: 0, status: 'LOADING' };
@@ -79,50 +84,25 @@ function kindLabel(kind) {
   return ({ npc: 'NPC', monster: 'Monster / Spawn', town: 'Town', waypoint: 'Waypoint', poi: 'POI', teleport: 'Teleport', house: 'House', quest_area: 'Quest area', mechanic: 'Mechanic', position: 'Position' })[kind] ?? kind;
 }
 
-function creaturePrefix(raw) {
-  const match = String(raw).trim().match(/^(npc|monster)\s*:\s*(.*)$/i);
-  if (match) return { kind: match[1].toLowerCase(), query: match[2].trim().toLowerCase() };
-  if (/^id\s*:/i.test(String(raw))) return { kind: 'none', query: '' };
-  return { kind: null, query: String(raw).trim().toLowerCase() };
-}
-
-function supplementalCreatureResults(raw, existingKeys) {
-  const { kind, query } = creaturePrefix(raw);
-  if (kind === 'none' || !query) return [];
-  const output = [];
-  for (const source of state.creatureSearch) {
-    if (kind && source.kind !== kind) continue;
-    const label = String(source.label ?? '');
-    const folded = label.toLowerCase();
-    let score = -1;
-    if (folded === query) score = 950;
-    else if (folded.startsWith(query)) score = 760;
-    else if (folded.includes(query)) score = 550;
-    if (score < 0) continue;
-    const key = `${source.kind}:${folded}:${source.position?.floor}:${source.position?.x}:${source.position?.y}`;
-    if (existingKeys.has(key)) continue;
-    output.push({
-      kind: source.kind, id: null, label, aliases: [], position: source.position, bounds: null,
-      provenance: { authority: 'Oteryn/Oteryn-Game', source_capability: 'static-creatures-v1', resolution_state: source.resolution_state },
-      capabilities: ['static-placement'], score,
-    });
-  }
-  output.sort((a, b) => b.score - a.score || a.label.localeCompare(b.label));
-  return output.slice(0, MAX_RESULTS);
+function resultIdentity(record) {
+  return record.id ?? `${record.kind}:${record.label.toLowerCase()}:${record.position.floor}:${record.position.x}:${record.position.y}`;
 }
 
 function queryAll(raw) {
   const primary = searchSemanticIndex(state.index, raw, { limit: MAX_RESULTS, currentFloor: currentFloor() });
   if (primary.mode === 'coordinate') return primary.results;
-  const keys = new Set(primary.results.map((record) => `${record.kind}:${record.label.toLowerCase()}:${record.position.floor}:${record.position.x}:${record.position.y}`));
-  const supplement = supplementalCreatureResults(raw, keys);
+  const existing = new Set(primary.results.map(resultIdentity));
+  const supplement = searchCreatureRecords(state.creatureSearch, raw, { limit: MAX_RESULTS })
+    .filter((record) => !existing.has(resultIdentity(record)));
   return [...primary.results, ...supplement]
-    .sort((a, b) => b.score - a.score || a.label.localeCompare(b.label))
+    .sort((a, b) => b.score - a.score || a.label.localeCompare(b.label) || resultIdentity(a).localeCompare(resultIdentity(b)))
     .slice(0, MAX_RESULTS);
 }
 
 function navigate(record, rawQuery) {
   const params = navigationSearchParams(record, location.search, state.index, rawQuery);
+  if (record.record_id) params.set('creature', record.record_id);
+  else params.delete('creature');
   location.search = params.toString();
 }
 
@@ -179,7 +159,7 @@ function wireForm(formId, inputId, suffix) {
   const input = document.querySelector(inputId);
   if (!form || !input) return;
   const host = resultHost(form, suffix);
-  input.placeholder = suffix === 'mobile' ? 'Search NPC, town or coordinates' : 'Search NPC, town, coordinates or type:query';
+  input.placeholder = suffix === 'mobile' ? 'Search city, NPC, monster, ID or coordinates' : 'Search city, NPC, monster, ID or coordinates';
   input.setAttribute('aria-label', 'Global semantic Atlas search');
   input.addEventListener('input', () => renderResults(host, input.value));
   input.addEventListener('focus', () => { if (input.value.trim()) renderResults(host, input.value); });
@@ -216,25 +196,28 @@ function renderActiveInspector() {
   const type = document.createElement('span'); type.textContent = kindLabel(record.kind);
   card.append(title, type);
   const position = document.createElement('p'); position.textContent = `Position: ${record.position.x}, ${record.position.y}, ${displayFloor(record.position.floor, state.index)} (native floor ${record.position.floor})`;
-  const id = document.createElement('p'); id.textContent = `Stable export id: ${record.id}`;
+  const id = document.createElement('p'); id.textContent = `Stable public id: ${record.id}`;
+  const recordId = record.record_id && record.record_id !== record.id ? document.createElement('p') : null;
+  if (recordId) recordId.textContent = `Placement record id: ${record.record_id}`;
   const caps = document.createElement('p'); caps.textContent = `Public capabilities: ${record.capabilities.length ? record.capabilities.join(', ') : 'none published'}`;
-  const source = document.createElement('p'); source.textContent = `Source: Oteryn/Oteryn-Game@${state.index.source.game_revision.slice(0, 12)} · ${state.index.source.profile_id}`;
+  const source = document.createElement('p');
+  source.textContent = record.provenance?.source_capability === 'static-creatures-v1'
+    ? 'Source: Oteryn/Oteryn-Game · static-creatures-v1'
+    : `Source: Oteryn/Oteryn-Game@${state.index.source.game_revision.slice(0, 12)} · ${state.index.source.profile_id}`;
   const bounds = document.createElement('p'); bounds.textContent = record.bounds ? 'Authoritative bounds published.' : 'Authoritative bounds: not published by Game.';
-  inspector.replaceChildren(card, position, id, caps, bounds, source);
+  inspector.replaceChildren(card, position, id);
+  if (recordId) inspector.append(recordId);
+  inspector.append(caps, bounds, source);
   addActiveLayer(record);
 }
 
 async function loadCreatureSearch() {
-  try {
-    const index = await boundedJson(new URL('index.json', CREATURE_ROOT), MAX_CREATURE_INDEX_BYTES);
-    requireValue(index.source?.contract_id === 'oteryn-game-atlas-export-v1' && index.source?.capability === 'static-creatures-v1', 'creature search source unsupported');
-    const search = await boundedJson(new URL(index.search_path, CREATURE_ROOT), MAX_CREATURE_SEARCH_BYTES);
-    requireValue(Array.isArray(search.records) && search.records.length <= 20000, 'creature search record count invalid');
-    return search.records.filter((record) => (record.kind === 'npc' || record.kind === 'monster') && record.position && Number.isSafeInteger(record.position.x) && Number.isSafeInteger(record.position.y) && Number.isSafeInteger(record.position.floor));
-  } catch (error) {
-    console.info(`Optional creature search extension unavailable: ${error.message ?? error}`);
-    return [];
-  }
+  const catalog = await boundedJson(CREATURE_SEARCH_URL, MAX_CREATURE_SEARCH_BYTES);
+  requireValue(catalog.schema_version === 1, 'unsupported creature search catalog schema');
+  requireValue(catalog.source?.contract_id === 'oteryn-game-atlas-export-v1' && catalog.source?.capability === 'static-creatures-v1', 'creature search source unsupported');
+  requireValue(catalog.source?.semantic_digest === EXPECTED_CREATURE_SEMANTIC_DIGEST, 'untrusted creature search semantic digest');
+  requireValue(catalog.source?.coordinate_profile === 'oteryn-native-floor-v1', 'creature search coordinate profile unsupported');
+  return validateCreatureSearchRecords(catalog.records);
 }
 
 async function boot() {
@@ -244,8 +227,11 @@ async function boot() {
   const raw = await boundedJson(INDEX_URL, MAX_INDEX_BYTES);
   state.index = validateSemanticSearchIndex(raw);
   state.creatureSearch = await loadCreatureSearch();
-  const activeId = new URLSearchParams(location.search).get('semantic');
-  state.active = activeId ? state.index.records.find((record) => record.id === activeId) ?? null : null;
+  const params = new URLSearchParams(location.search);
+  const activeId = params.get('semantic');
+  const creatureId = params.get('creature');
+  state.active = activeId ? state.index.records.find((record) => record.id === activeId) ?? findCreatureById(state.creatureSearch, activeId) : null;
+  if (!state.active && creatureId) state.active = findCreatureById(state.creatureSearch, creatureId);
   state.status = 'PASS';
   renderActiveInspector();
   window.addEventListener('oteryn-atlas-view', () => renderActiveInspector());
