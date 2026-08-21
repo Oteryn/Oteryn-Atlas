@@ -87,7 +87,10 @@ def build(source: dict[str, object], output: Path) -> dict[str, object]:
         }
         if "entity_id" in record:
             search_record["entity_id"] = record["entity_id"]
-        search.setdefault((kind, label.casefold()), search_record)
+        search_key = (kind, label.casefold())
+        current = search.get(search_key)
+        if current is None or ("entity_id" not in current and "entity_id" in search_record):
+            search[search_key] = search_record
 
     entries: list[dict[str, object]] = []
     for (floor, chunk_x, chunk_y), values in sorted(shards.items()):
