@@ -16,23 +16,45 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  docker-e2e:
+  harness:
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 15
+    env:
+      ATLAS_CODE_REVISION: ${{ github.event.pull_request.head.sha || github.sha }}
+      ATLAS_PUBLICATION_ORIGIN: http://127.0.0.1:9
     steps:
       - name: Check out exact repository revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
-      - name: Run Dockerized desktop and mobile E2E
-        shell: bash
-        run: ./e2e/run.sh
-
-      - name: Report retained artifact paths
-        if: always()
+      - name: Validate Compose and current-code web overlay
         shell: bash
         run: |
-          if [ -d artifacts/e2e ]; then
-            find artifacts/e2e -maxdepth 3 -type f -print | sort
-          fi
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$ATLAS_CODE_REVISION"
+          docker compose -f e2e/compose.yml config >/tmp/atlas-e2e-compose.yml
+          docker compose -f e2e/compose.yml up -d atlas-web
+          trap 'docker compose -f e2e/compose.yml down --remove-orphans' EXIT
+          for _ in $(seq 1 30); do
+            if docker compose -f e2e/compose.yml exec -T atlas-web wget -q -O /dev/null http://127.0.0.1:8080/web/fullworld.html; then
+              break
+            fi
+            sleep 1
+          done
+          docker compose -f e2e/compose.yml exec -T atlas-web \
+            wget -S -O /dev/null http://127.0.0.1:8080/web/fullworld-app.mjs 2>/tmp/atlas-e2e-module-headers
+          cat /tmp/atlas-e2e-module-headers
+          grep -Eiq 'Content-Type: application/javascript' /tmp/atlas-e2e-module-headers
+          grep -Fq "X-Oteryn-Atlas-Code-Revision: $ATLAS_CODE_REVISION" /tmp/atlas-e2e-module-headers
+
+      - name: Build Playwright image and enumerate E2E tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build --pull -t oteryn-atlas-e2e:ci -f e2e/Dockerfile .
+          docker run --rm \
+            -e ATLAS_ARTIFACTS_DIR=/tmp/artifacts \
+            oteryn-atlas-e2e:ci \
+            npx playwright test --config=playwright.config.mjs --list

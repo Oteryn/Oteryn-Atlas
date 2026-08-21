@@ -8,7 +8,9 @@ export function captureRuntimeFailures(page) {
   page.on('pageerror', (error) => state.failures.push(`pageerror: ${error.message}`));
   page.on('response', (response) => {
     if (response.status() === 206) state.partialResponses += 1;
-    if (response.status() >= 400 && !response.url().endsWith('/favicon.ico')) {
+    const url = new URL(response.url());
+    const optionalCreatureExtensionMissing = response.status() === 404 && url.pathname.startsWith('/data/creatures/');
+    if (response.status() >= 400 && !response.url().endsWith('/favicon.ico') && !optionalCreatureExtensionMissing) {
       state.failures.push(`HTTP ${response.status()} ${response.url()}`);
     }
   });
@@ -21,16 +23,23 @@ export async function gotoAtlas(page, entry) {
   expect(response.ok(), `Atlas entry returned HTTP ${response.status()}`).toBeTruthy();
   const expectedRevision = process.env.ATLAS_EXPECTED_REVISION?.trim();
   if (expectedRevision) {
-    expect(response.headers()['x-oteryn-atlas-revision']).toBe(expectedRevision);
+    const headers = response.headers();
+    const observedRevision = headers['x-oteryn-atlas-code-revision'] || headers['x-oteryn-atlas-revision'];
+    expect(observedRevision, 'Atlas entry revision header').toBe(expectedRevision);
   }
   return response;
 }
 
 export async function waitForAtlas(page) {
   const qualification = page.locator('#qualification-result');
-  await expect(qualification).toHaveAttribute('data-status', 'PASS', { timeout: 90_000 });
+  await page.waitForFunction(() => {
+    const status = document.querySelector('#qualification-result')?.dataset.status;
+    return status === 'PASS' || status === 'FAIL';
+  }, null, { timeout: 90_000 });
+  const status = await qualification.getAttribute('data-status');
   const raw = await qualification.textContent();
-  const result = JSON.parse(raw || '{}');
+  const result = raw ? JSON.parse(raw) : {};
+  expect(status, result.error || `qualification=${status}`).toBe('PASS');
   expect(result.status).toBe('PASS');
   expect(result.error).toBeNull();
   expect(result.capabilities?.blockedOrUnknownEnabled).toBe(false);
