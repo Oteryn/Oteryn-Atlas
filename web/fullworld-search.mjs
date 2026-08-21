@@ -5,8 +5,8 @@ import {
   validateSemanticSearchIndex,
 } from '../src/browser/semantic-search.mjs';
 
-const INDEX_URL = new URL('./semantic-search/index.json', location.href);
-const CREATURE_ROOT = new URL('../data/creatures/', location.href);
+const INDEX_URL = new URL('./semantic-search/index.json', import.meta.url);
+const CREATURE_ROOT = new URL('../data/creatures/', import.meta.url);
 const MAX_INDEX_BYTES = 2 * 1024 * 1024;
 const MAX_CREATURE_INDEX_BYTES = 4 * 1024 * 1024;
 const MAX_CREATURE_SEARCH_BYTES = 2 * 1024 * 1024;
