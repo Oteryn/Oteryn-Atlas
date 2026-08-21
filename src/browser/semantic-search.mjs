@@ -105,10 +105,7 @@ function scoreRecord(record, query, type, ranking) {
   const label = record.search_terms.label;
   const aliases = record.search_terms.aliases;
   if (type === 'id') {
-    const id = record.id.toLowerCase();
-    if (id === query) return ranking.exact_id;
-    if (id.startsWith(query)) return ranking.prefix_id;
-    return -1;
+    return record.id.toLowerCase() === query ? ranking.exact_id : -1;
   }
   if (type && record.kind !== type) return -1;
   if (label === query) return ranking.exact_label;
