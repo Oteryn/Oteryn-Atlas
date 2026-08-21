@@ -1,7 +1,8 @@
 import { navigationSearchParams, validateSemanticSearchIndex } from '../src/browser/semantic-search.mjs';
-import { searchCreatureRecords } from '../src/browser/creature-search.mjs';
+import { searchCreatureRecords, validateCreatureSearchRecords } from '../src/browser/creature-search.mjs';
 
 const out = document.querySelector('#qualification-result');
+const EXPECTED_CREATURE_DIGEST = 'sha256:01921968a6cb4f6ecea237820a053fc5052aaa1da556851f2c2a60d99890b5e1';
 function assert(condition, message) { if (!condition) throw new Error(message); }
 function tick() { return new Promise((resolve) => setTimeout(resolve, 0)); }
 
@@ -20,13 +21,13 @@ async function query(value) {
   input.value = value;
   input.dispatchEvent(new Event('input', { bubbles: true }));
   await tick();
-  return [...document.querySelectorAll('#semantic-search-results-desktop .semantic-search-result')].map((button) => button.textContent.replace(/\s+/g, ' ').trim());
+  return [...document.querySelectorAll('#semantic-search-results-desktop .semantic-search-result')]
+    .map((button) => button.textContent.replace(/\s+/g, ' ').trim());
 }
 
 try {
   const ready = await waitReady();
-  assert(ready.records >= 51, 'expected full non-creature semantic navigation catalog');
-  assert(ready.creatureSearchRecords === 2, 'browser creature fixture did not load');
+  assert(ready.records === 51, `expected 51 non-creature navigation records, got ${ready.records}`);
 
   const index = validateSemanticSearchIndex(await (await fetch('../web/semantic-search/index.json', { cache: 'no-store' })).json());
   const towns = index.records.filter((record) => record.kind === 'town');
@@ -34,27 +35,37 @@ try {
   assert(towns.length === 33, `expected 33 published towns, got ${towns.length}`);
   assert(waypoints.length === 18, `expected 18 published waypoints, got ${waypoints.length}`);
 
+  const creatureCatalog = await (await fetch('../web/semantic-search/creatures.json', { cache: 'no-store' })).json();
+  assert(creatureCatalog.schema_version === 1, 'creature catalog schema mismatch');
+  assert(creatureCatalog.source?.contract_id === 'oteryn-game-atlas-export-v1', 'creature catalog contract mismatch');
+  assert(creatureCatalog.source?.capability === 'static-creatures-v1', 'creature catalog capability mismatch');
+  assert(creatureCatalog.source?.semantic_digest === EXPECTED_CREATURE_DIGEST, 'creature catalog digest mismatch');
+  const creatureRecords = validateCreatureSearchRecords(creatureCatalog.records);
+  assert(creatureRecords.length === 1945, `expected 1945 unique creature labels, got ${creatureRecords.length}`);
+  assert(creatureRecords.filter((record) => record.entity_id).length === 1823, 'resolved creature entity-id coverage changed');
+  assert(ready.creatureSearchRecords === creatureRecords.length, 'browser did not load committed creature catalog');
+
   let results = await query('Thais');
   assert(results.length >= 1 && /Thais.*Town.*32369, 32241, 7/i.test(results[0]), 'Thais result missing/wrong');
 
   const anotherTown = towns.find((record) => record.label !== 'Thais');
   assert(anotherTown, 'second town missing from full catalog');
   results = await query(`town:${anotherTown.label}`);
-  assert(results.length >= 1 && results.some((value) => value.includes(anotherTown.label) && /Town/i.test(value)), 'full town filter failed');
+  assert(results.some((value) => value.includes(anotherTown.label) && /Town/i.test(value)), 'full town filter failed');
 
   results = await query('32369 32220 7');
   assert(results.length === 1 && /32369, 32220, 7.*Position/i.test(results[0]), 'coordinate alias result missing/wrong');
 
   results = await query('npc:Sam');
-  assert(results.length >= 1 && results.every((value) => /NPC/i.test(value) && !/Town/i.test(value)), 'full NPC filter failed');
+  assert(results.length >= 1 && /Sam.*NPC/i.test(results[0]) && results.every((value) => !/Town/i.test(value)), 'full NPC filter failed');
 
   results = await query('Dragon');
-  assert(results.length === 1 && /Dragon.*Monster/i.test(results[0]), 'monster name search failed');
+  assert(results.length >= 1 && /Dragon.*Monster/i.test(results[0]), 'monster name search failed');
   results = await query('monster:Dragon');
-  assert(results.length === 1 && /Dragon.*Monster/i.test(results[0]), 'monster filter failed');
+  assert(results.length >= 1 && /Dragon.*Monster/i.test(results[0]), 'monster filter failed');
 
-  const creatureFixture = globalThis.__CREATURE_BROWSER_FIXTURE__;
-  const samCreature = searchCreatureRecords(creatureFixture, 'Sam')[0];
+  const samCreature = searchCreatureRecords(creatureRecords, 'Sam')[0];
+  assert(samCreature?.label === 'Sam', 'Sam missing from committed creature catalog');
   results = await query(`id:${samCreature.id}`);
   assert(results.length === 1 && /Sam.*NPC/i.test(results[0]), 'creature entity id lookup failed');
   results = await query(`id:${samCreature.record_id}`);
@@ -71,7 +82,7 @@ try {
   out.dataset.status = 'PASS';
   out.textContent = JSON.stringify({
     status: 'PASS', towns: towns.length, waypoints: waypoints.length,
-    creatureSearchRecords: ready.creatureSearchRecords,
+    creatureSearchRecords: creatureRecords.length, creatureEntityIds: creatureRecords.filter((record) => record.entity_id).length,
     queries: ['Thais', `town:${anotherTown.label}`, '32369 32220 7', 'npc:Sam', 'Dragon', 'monster:Dragon', `id:${samCreature.id}`, `id:${samCreature.record_id}`, `id:${thais.id}`],
     navigation: params.toString(),
   });
