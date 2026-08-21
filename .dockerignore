@@ -1,0 +1,7 @@
+.git
+artifacts
+node_modules
+.work
+.chrome-*
+**/__pycache__
+**/*.pyc

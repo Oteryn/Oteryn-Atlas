@@ -491,6 +491,7 @@ function renderInspector() {
       <div class="notice-box"><strong>Authority:</strong> Oteryn/Oteryn-Game. Atlas is a derived read model; browser runtime never parses legacy world inputs.</div>
       <div class="notice-box limitation"><strong>Unavailable semantics stay off:</strong> named entities, towns, NPCs, monsters, transitions, houses, IDs, mechanics, raids, quest areas and POIs are not fabricated from pixels.</div>
     `;
+    window.dispatchEvent(new CustomEvent('oteryn-atlas-inspector-rendered'));
     return;
   }
   const tile = sceneTiles.get(`${view.floor}:${selected.x}:${selected.y}`);
@@ -517,6 +518,7 @@ function renderInspector() {
   }
   if (overviewCell) html += `<div class="overview-fact"><h2>Overview cell</h2><dl class="facts compact"><dt>Published tiles</dt><dd>${overviewCell.tiles}</dd><dt>Resolved primitives</dt><dd>${overviewCell.resolvedPrimitives}</dd><dt>Meaning</dt><dd>tile-presence density only</dd></dl></div>`;
   inspector.innerHTML = html;
+  window.dispatchEvent(new CustomEvent('oteryn-atlas-inspector-rendered'));
 }
 
 function updateSelectionBox() {

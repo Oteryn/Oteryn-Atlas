@@ -235,6 +235,7 @@ async function boot() {
   state.status = 'PASS';
   renderActiveInspector();
   window.addEventListener('oteryn-atlas-view', () => renderActiveInspector());
+  window.addEventListener('oteryn-atlas-inspector-rendered', () => renderActiveInspector());
   publish();
 }
 
