@@ -44,7 +44,7 @@ export async function waitForAtlas(page) {
   expect(result.error).toBeNull();
   expect(result.capabilities?.blockedOrUnknownEnabled).toBe(false);
   await expect(page.locator('#runtime-badge')).toContainText('VERIFIED FULL-WORLD');
-  await expect(page.locator('#diag-backend')).toContainText('WEBGL2');
+  await expect(page.locator('#diag-backend')).toContainText(/webgl2/i);
   await page.waitForFunction(
     () => globalThis.__OTERYN_ATLAS_SEMANTIC_SEARCH__?.status === 'PASS',
     null,

@@ -43,7 +43,7 @@ test('desktop FullWorld qualifies, streams verified ranges and navigates semanti
   await waitForAtlas(page);
 
   await expect(page.locator('#inspector-content')).toContainText('Thais');
-  await expect(page.locator('#inspector-content')).toContainText('Stable export id');
+  await expect(page.locator('#inspector-content')).toContainText('Stable public id');
   await expect(page.locator('[data-semantic-search-layer="town"]')).toContainText('Thais');
   assertNoRuntimeFailures(runtime);
 });
