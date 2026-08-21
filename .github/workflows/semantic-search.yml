@@ -150,6 +150,12 @@ jobs:
             exit 1
           fi
 
+      - name: Verify committed full creature search catalog exactly
+        shell: bash
+        run: |
+          set -euo pipefail
+          diff -u web/semantic-search/creatures.json /tmp/creature-index/search.json
+
       - name: Run real Chrome dropdown and navigation proof
         shell: bash
         run: |
@@ -171,8 +177,10 @@ jobs:
         run: |
           set -euo pipefail
           grep -q 'static-creatures-v1' web/fullworld-search.mjs
+          grep -q 'semantic-search/creatures.json' web/fullworld-search.mjs
+          grep -q 'static-creatures-v1' web/semantic-search/creatures.json
           grep -q 'semantic-search-source-v1' web/semantic-search/index.json
-          if grep -E '(\.otbm|world\.otbm|crystalserver|data-otservbr-global|Canary)' web/fullworld-search.mjs src/browser/creature-search.mjs; then
+          if grep -E '(\.otbm|world\.otbm|crystalserver|data-otservbr-global|Canary|data/creatures)' web/fullworld-search.mjs src/browser/creature-search.mjs; then
             echo 'Browser global search must not reference legacy world inputs.' >&2
             exit 1
           fi
