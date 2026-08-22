@@ -3,12 +3,6 @@ name: Synology Live Acceptance
 on:
   push:
     branches: [main]
-    paths:
-      - '.github/workflows/synology-live-acceptance.yml'
-      - 'e2e/Dockerfile'
-      - 'e2e/package.json'
-      - 'e2e/package-lock.json'
-      - 'e2e/tests/live-creature-preview.cjs'
   workflow_dispatch:
 
 permissions:
@@ -27,7 +21,7 @@ jobs:
       labels: oteryn-atlas
     timeout-minutes: 45
     env:
-      ATLAS_REV: 71e2aca1ac49692751f5d6c59a7126835fe1896a
+      ATLAS_REV: ${{ github.sha }}
       GAME_REV: 1ce7c60714dbd5d87da16d2eb0b8eac0c30c2282
       LEGACY_REV: e417c5e7c22986bf4acef0495eb47f7b72c97cce
       PREVIEW_CONTAINER: oteryn-atlas-fullworld-preview
@@ -65,6 +59,18 @@ jobs:
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
+
+      - name: Verify main-only deployment authority
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test "$GITHUB_REF" = 'refs/heads/main'
+          test "$GITHUB_SHA" = "$ATLAS_REV"
+          test "$(git rev-parse HEAD)" = "$ATLAS_REV"
+          git fetch --no-tags --depth=1 origin main
+          test "$(git rev-parse FETCH_HEAD)" = "$ATLAS_REV"
+          test -z "$(git status --porcelain)"
+          echo 'main-only deployment authority=PASS'
 
       - name: Build exact Game creature product
         shell: bash
