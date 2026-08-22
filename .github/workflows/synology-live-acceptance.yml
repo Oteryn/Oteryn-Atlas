@@ -288,7 +288,7 @@ jobs:
           container="oteryn-atlas-live-e2e-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           docker create \
             --name "$container" \
-            --network host \
+            --network bridge \
             --ipc host \
             --shm-size 1g \
             --entrypoint node \
