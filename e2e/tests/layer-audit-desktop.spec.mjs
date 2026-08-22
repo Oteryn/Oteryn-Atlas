@@ -1,7 +1,9 @@
 import { expect, test } from '@playwright/test';
+import { gotoAtlas, waitForAtlas } from './runtime.mjs';
 
 test('layer controls expose correct availability and fail-closed states', async ({ page }) => {
-  await page.goto('/web/fullworld.html?x=32369&y=32241&floor=-7&zoom=0.48', { waitUntil: 'domcontentloaded' });
+  await gotoAtlas(page, '/web/fullworld.html?x=32369&y=32241&floor=-7&zoom=0.48');
+  await waitForAtlas(page);
 
   await expect(page.getByText('Base semantic pixels', { exact: true })).toBeVisible();
   const base = page.getByText('Base semantic pixels', { exact: true }).locator('..').locator('input');
