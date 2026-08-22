@@ -1,6 +1,8 @@
 import { expect, test } from '@playwright/test';
 import {
   DESKTOP_ENTRY,
+  assertNoRuntimeFailures,
+  captureRuntimeFailures,
   expectQualificationFailure,
   gotoAtlas,
   qualificationResult,
@@ -41,4 +43,24 @@ test('unavailable creature index remains an isolated fail-closed optional surfac
   expect(creatures.error).toMatch(/index\.json HTTP 503/i);
   expect(creatures.drawnRecords).toBe(0);
   await expect(page.locator('#creature-status')).toContainText('Unavailable:');
+});
+
+test('optional favicon 404 is classified without weakening URL-specific HTTP failures', async ({ page }) => {
+  const runtime = captureRuntimeFailures(page);
+  await page.route('**/favicon.ico*', async (route) => {
+    await route.fulfill({ status: 404, contentType: 'text/plain', body: 'not found' });
+  });
+  await gotoAtlas(page, DESKTOP_ENTRY);
+  await waitForAtlas(page);
+
+  await page.evaluate(() => new Promise((resolve) => {
+    const image = new Image();
+    image.addEventListener('error', resolve, { once: true });
+    image.src = `/favicon.ico?e2e=${Date.now()}`;
+  }));
+  await expect.poll(() => runtime.allowedHttpFailures.some(({ url, status }) => {
+    const value = new URL(url);
+    return status === 404 && value.pathname === '/favicon.ico';
+  })).toBeTruthy();
+  assertNoRuntimeFailures(runtime);
 });

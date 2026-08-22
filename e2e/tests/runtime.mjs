@@ -25,6 +25,9 @@ function optionalConsoleFailure(message) {
   if (/^Creature overlay disabled: \/data\/creatures\/index\.json HTTP 404$/.test(text)) {
     return 'Creature index is an optional fail-closed extension on revisions that do not publish it.';
   }
+  if (text === 'Failed to load resource: the server responded with a status of 404 (Not Found)') {
+    return 'URL-specific HTTP response policy classifies the corresponding 404; this browser console line carries no URL.';
+  }
   return null;
 }
 export function captureRuntimeFailures(page) {
