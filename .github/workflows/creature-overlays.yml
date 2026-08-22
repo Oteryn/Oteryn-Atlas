@@ -113,7 +113,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          grep -q "EXPECTED_SEMANTIC_DIGEST = 'sha256:01921968a6cb4f6ecea237820a053fc5052aaa1da556851f2c2a60d99890b5e1'" web/fullworld-creatures.mjs
+          grep -q "EXPECTED_SEMANTIC_DIGEST = 'sha256:3ecb5570fa2d018089bb5301c73abc8073154329a1443498c84f38d8febd8f23'" web/fullworld-creatures.mjs
+          grep -q "EXPECTED_CAPABILITY = 'animated-creatures-v1'" web/fullworld-creatures.mjs
+          grep -q 'getAnimationRuntime' web/fullworld-creatures.mjs
           grep -q '__OTERYN_ATLAS_CREATURES__' web/fullworld-creatures.mjs
           grep -q "panel.id = 'creature-inspector'" web/fullworld-creatures.mjs
           grep -q "params.set('creature', item.record_id)" web/fullworld-creatures.mjs

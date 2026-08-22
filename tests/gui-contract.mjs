@@ -66,7 +66,8 @@ test('full-world GUI is a separate verified runtime entry while bounded proof re
   assert.match(fullworldIndex, /data-mode="classic"[^>]*>CLASSIC<\/button>/);
   assert.match(fullworldCss, /grid-template-columns: repeat\(4, 1fr\)/);
   assert.match(fullworldIndex, /id="floor-select"/);
-  assert.match(fullworldIndex, /id="animation-toggle"[^>]*disabled/);
+  assert.match(fullworldIndex, /id="animation-toggle"[^>]*type="checkbox"/);
+  assert.doesNotMatch(fullworldIndex, /id="animation-toggle"[^>]*disabled/);
   assert.match(fullworldApp, /SemanticRangeStore/);
   assert.match(fullworldApp, /loadOverviewWorld/);
   assert.match(fullworldApp, /mode: next\.mode \?\? 'auto'/);
@@ -87,7 +88,8 @@ test('full-world GUI pins exact G3/G4/runtime roots and keeps blocked semantics 
   ]) assert.ok(fullworldTrust.includes(root));
   assert.match(fullworldTrust, /id: 'npcs'.*status: 'BLOCKED'.*enabled: false/s);
   assert.match(fullworldTrust, /id: 'monsters-spawns'.*status: 'BLOCKED'.*enabled: false/s);
-  assert.match(fullworldTrust, /animation: Object\.freeze\([\s\S]*enabled: false/);
+  assert.match(fullworldTrust, /animation: Object\.freeze\([\s\S]*enabled: true/);
+  assert.match(fullworldApp, /getAnimationRuntime/);
 });
 
 test('full-world WebGL renderer preserves semantic order in one batched draw', () => {

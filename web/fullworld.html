@@ -73,8 +73,8 @@
 
         <section>
           <h2>Animation</h2>
-          <label class="layer disabled"><input id="animation-toggle" type="checkbox" disabled><span class="layer-name">Playback</span><span>STATIC</span></label>
-          <p class="rail-note" id="animation-note">Authoritative timing metadata is not published; visible verified phases remain static.</p>
+          <label class="layer"><input id="animation-toggle" type="checkbox"><span class="layer-name">Playback</span><span>VERIFIED</span></label>
+          <p class="rail-note" id="animation-note">Verified Game-owned 15.32 timing is opt-in; disabling playback preserves the published static phase.</p>
         </section>
 
         <section>
@@ -97,6 +97,7 @@
       <section class="map-stage fullworld-stage">
         <div class="map-frame" id="map-frame">
           <canvas id="atlas" aria-label="Full-world WebGL2 Atlas"></canvas>
+          <canvas id="animation-overlay" aria-label="Verified animated world presentations"></canvas>
           <canvas id="minimap-layer" aria-label="Verified visual minimap"></canvas>
           <canvas id="overview-overlay" aria-hidden="true"></canvas>
           <div class="selection-box" id="selection-box" hidden></div>

@@ -73,7 +73,8 @@ async function waitReady(page, { selectedId = null, npc = true, monster = true }
       const value = globalThis.__OTERYN_ATLAS_CREATURES__;
       if (!value || value.status !== 'PASS') return false;
       if (value.sourceSemanticDigest !== digest) return false;
-      if (value.cacheChunks > 96 || value.drawnRecords < 1) return false;
+      if (value.cacheChunks > 96 || value.drawnRecords < 1 || value.pixelDrawnRecords < 1) return false;
+      if (!value.animationRuntime || value.animationRuntime.creaturePrograms !== 1377) return false;
       if (value.enabled?.npc !== wantNpc || value.enabled?.monster !== wantMonster) return false;
       if (selected && (value.selectedRecordId !== selected || value.selectedVisible !== true)) return false;
       return true;
@@ -88,6 +89,9 @@ async function waitReady(page, { selectedId = null, npc = true, monster = true }
   assert.equal(value.totalChunks, 5746);
   assert.equal(value.searchRecords, 1945);
   assert.ok(value.drawnRecords > 0);
+  assert.ok(value.pixelDrawnRecords > 0);
+  assert.equal(value.animationRuntime.creaturePrograms, 1377);
+  assert.equal(value.animationRuntime.objectPrograms, 5190);
   assert.ok(value.cacheChunks <= 96);
   return value;
 }
@@ -185,9 +189,9 @@ function assertCreatureInspector(text, target, kindText) {
   assert.ok(text.includes(`X ${target.position.x} · Y ${target.position.y} · F ${target.position.floor}`));
   assert.ok(text.includes('Resolution: RESOLVED'));
   assert.ok(text.includes('Origin: base-map'));
-  assert.ok(text.includes('Authority: oteryn-game-atlas-export-v1 / static-creatures-v1'));
+  assert.ok(text.includes('Authority: oteryn-game-atlas-export-v1 / animated-creatures-v1'));
   assert.ok(text.includes(`Semantic digest: ${expectedDigest}`));
-  assert.match(text, /Static marker fallback/i);
+  assert.match(text, /Verified outfit pixels/i);
 }
 
 async function runDesktop(browser) {
@@ -208,6 +212,24 @@ async function runDesktop(browser) {
   assert.equal(await npcToggle.isChecked(), true);
   assert.equal(await monsterToggle.isChecked(), true);
   await page.screenshot({ path: `${evidenceDir}/desktop-initial.png`, fullPage: true });
+  const animationToggle = page.locator('#animation-toggle');
+  await animationToggle.waitFor({ state: 'visible', timeout: 30_000 });
+  assert.equal(await animationToggle.isDisabled(), false);
+  assert.equal(await animationToggle.isChecked(), false);
+  const beforeFrames = (await diagnostic(page)).animationRuntime.frameUpdates;
+  await animationToggle.check();
+  await page.waitForFunction((before) => {
+    const value = globalThis.__OTERYN_ATLAS_CREATURES__;
+    return value?.animationOn === true && value.animationRuntime?.frameUpdates > before;
+  }, beforeFrames, { timeout: 30_000 });
+  assert.equal(new URL(page.url()).searchParams.get('animation'), 'on');
+  await page.screenshot({ path: `${evidenceDir}/desktop-animation-on.png`, fullPage: true });
+  await animationToggle.uncheck();
+  await page.waitForFunction(() => globalThis.__OTERYN_ATLAS_CREATURES__?.animationOn === false, null, { timeout: 30_000 });
+  const frozenFrames = (await diagnostic(page)).animationRuntime.frameUpdates;
+  await page.waitForTimeout(500);
+  assert.equal((await diagnostic(page)).animationRuntime.frameUpdates, frozenFrames);
+  assert.equal(new URL(page.url()).searchParams.get('animation'), 'off');
 
   await searchAndSelect(page, targets.npc, 'NPC', {
     inputSelector: '#search-input',
@@ -246,7 +268,12 @@ async function runMobile(browser) {
   await monsterToggle.waitFor({ state: 'visible', timeout: 30_000 });
   assert.equal(await npcToggle.isChecked(), true);
   assert.equal(await monsterToggle.isChecked(), true);
-  await npcToggle.uncheck();
+  const animationToggle = page.locator('#animation-toggle');
+  assert.equal(await animationToggle.isDisabled(), false);
+  await animationToggle.check();
+  await page.waitForFunction(() => globalThis.__OTERYN_ATLAS_CREATURES__?.animationOn === true && globalThis.__OTERYN_ATLAS_CREATURES__.animationRuntime?.frameUpdates > 0, null, { timeout: 30_000 });
+  await animationToggle.uncheck();
+  await page.waitForFunction(() => globalThis.__OTERYN_ATLAS_CREATURES__?.animationOn === false, null, { timeout: 30_000 });  await npcToggle.uncheck();
   await waitReady(page, { npc: false, monster: true });
   assert.equal(new URL(page.url()).searchParams.get('creatures'), 'monster');
 

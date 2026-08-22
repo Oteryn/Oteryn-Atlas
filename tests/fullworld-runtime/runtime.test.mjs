@@ -119,14 +119,15 @@ function semanticRecord(x = 32360, y = 32230) {
 
 test('full-world RuntimeState round-trips deterministically', () => {
   const world = runtimeWorldCore();
-  const state = parseFullWorldViewState('?x=32360.125&y=32230.5&floor=-7&zoom=1.25&layers=minimap-overview&mode=auto&selected=-7:32360:32230&q=tile%2032360&animation=off&debug=bounds,cache', world);
-  assert.deepEqual(state, { animation: 'off', debugFlags: ['bounds', 'cache'], floor: -7, layers: ['minimap-overview'], mode: 'auto', overview: true, searchQuery: 'tile 32360', selected: { floor: -7, x: 32360, y: 32230 }, x: 32360.125, y: 32230.5, zoom: 1.25 });
+  const state = parseFullWorldViewState('?x=32360.125&y=32230.5&floor=-7&zoom=1.25&layers=minimap-overview&mode=auto&selected=-7:32360:32230&q=tile%2032360&animation=on&debug=bounds,cache', world);
+  assert.deepEqual(state, { animation: 'on', debugFlags: ['bounds', 'cache'], floor: -7, layers: ['minimap-overview'], mode: 'auto', overview: true, searchQuery: 'tile 32360', selected: { floor: -7, x: 32360, y: 32230 }, x: 32360.125, y: 32230.5, zoom: 1.25 });
   const serialized = serializeFullWorldViewState(state, world);
-  assert.equal(serialized, '?x=32360.125&y=32230.5&floor=-7&zoom=1.25&layers=minimap-overview&mode=auto&selected=-7%3A32360%3A32230&q=tile+32360&animation=off&debug=bounds%2Ccache');
+  assert.equal(serialized, '?x=32360.125&y=32230.5&floor=-7&zoom=1.25&layers=minimap-overview&mode=auto&selected=-7%3A32360%3A32230&q=tile+32360&animation=on&debug=bounds%2Ccache');
   assert.throws(() => parseFullWorldViewState('?floor=1', world), /not exported/);
   assert.throws(() => parseFullWorldViewState('?floor=-7&x=999&y=32230', world), /outside exported floor bounds/);
   assert.throws(() => parseFullWorldViewState('?floor=-7&layers=npcs', world), /not enabled/);
-  assert.throws(() => parseFullWorldViewState('?floor=-7&animation=on', world), /not yet supported/);
+  assert.equal(parseFullWorldViewState('?floor=-7&animation=off', world).animation, 'off');
+  assert.throws(() => parseFullWorldViewState('?floor=-7&animation=invalid', world), /animation/);
 });
 
 test('classic minimap mode is stable, minimap-only and URL round-trippable', () => {

@@ -21,6 +21,7 @@ import { recordsForResidentBuckets } from '../src/browser/fullworld-progressive.
 import { createFullWorldWebGLRenderer } from '../src/browser/fullworld-webgl.mjs';
 import { resolvePerformanceProfile, profileSummary } from '../src/browser/fullworld-performance.mjs';
 import { createFrameScheduler } from '../src/browser/frame-scheduler.mjs';
+import { getAnimationRuntime } from '../src/browser/animation-runtime-service.mjs';
 import { VerifiedContentCache } from '../src/browser/verified-content-cache.mjs';
 import { loadOverviewChunk, loadOverviewFloor, loadOverviewWorld } from '../src/layers/overview.mjs';
 import { LOD_POLICY, detailStreamWanted, lodBlend } from '../src/layers/minimap-lod.mjs';
@@ -35,6 +36,7 @@ const PIXEL_BUCKET_CONCURRENCY = performanceProfile.pixelBucketConcurrency;
 const $ = (selector) => document.querySelector(selector);
 const canvas = $('#atlas');
 const overlayCanvas = $('#overview-overlay');
+const animationCanvas = $('#animation-overlay');
 const minimapCanvas = $('#minimap');
 const frame = $('#map-frame');
 const qualification = $('#qualification-result');
@@ -69,6 +71,12 @@ let refreshEpoch = 0;
 let refreshAbortController = null;
 let dragging = null;
 let frameScheduler = null;
+let animationRuntime = null;
+let animationRuntimeError = null;
+let animationHandle = null;
+let animationLogicalMs = 0;
+let animationWallMs = null;
+let animationEpoch = 0;
 let persistentCache = null;
 let worldQuery = null;
 let detailReady = false;
@@ -193,7 +201,7 @@ function clampView(next) {
     ? { floor, x: Math.trunc(next.selected.x), y: Math.trunc(next.selected.y) }
     : null;
   return Object.freeze({
-    animation: 'off',
+    animation: next.animation === 'on' ? 'on' : 'off',
     debugFlags: Object.freeze([...(next.debugFlags ?? [])].sort()),
     floor,
     layers: Object.freeze(next.overview ? ['minimap-overview'] : []),
@@ -214,6 +222,7 @@ function syncViewUi() {
   $('#zoom-output').textContent = `${view.zoom.toFixed(2).replace(/0+$/, '').replace(/\.$/, '')}×`;
   $('#floor-select').value = String(view.floor);
   $('#overview-toggle').checked = view.overview;
+  $('#animation-toggle').checked = view.animation === 'on';
   $('#search-input').value = view.searchQuery ?? '';
   for (const button of document.querySelectorAll('#view-mode-control [data-mode]')) button.classList.toggle('active', button.dataset.mode === view.mode);
   const bounds = floorEntry(runtimeWorld, view.floor).bounds;
@@ -241,6 +250,55 @@ function anchorBoundsForScene(bundle) {
 function viewportBounds(bundle) {
   const rect = canvas.getBoundingClientRect();
   return viewportTileBounds(view, rect.width, rect.height, 0, bundle.runtimeFloor.bounds);
+}
+
+function rendererRecords(records) {
+  if (view?.animation !== 'on' || !animationRuntime) return records;
+  return records.filter((record) => !animationRuntime.hasObject(record));
+}
+function setRendererRecords(records) { renderer.setRecords(rendererRecords(records)); }
+async function drawWorldAnimation(timeMs) {
+  const epoch = ++animationEpoch;
+  const rect = animationCanvas.getBoundingClientRect();
+  const dpr = Math.max(1, Math.min(2, devicePixelRatio || 1));
+  const width = Math.max(1, Math.round(rect.width * dpr));
+  const height = Math.max(1, Math.round(rect.height * dpr));
+  if (animationCanvas.width !== width || animationCanvas.height !== height) { animationCanvas.width = width; animationCanvas.height = height; }
+  const ctx = animationCanvas.getContext('2d');
+  ctx.clearRect(0, 0, width, height);
+  animationCanvas.style.opacity = view?.animation === 'on' && animationRuntime ? '1' : '0';
+  if (view?.animation !== 'on' || !animationRuntime) return;
+  const visible = sceneRecords.filter((record) => animationRuntime.hasObject(record));
+  const frames = await Promise.all(visible.map(async (record) => {
+    const frame = animationRuntime.objectFrame(record, timeMs);
+    return frame ? [record, frame, await animationRuntime.bitmap(frame.contentId)] : null;
+  }));
+  if (epoch !== animationEpoch || view?.animation !== 'on') return;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.imageSmoothingEnabled = false;
+  for (const item of frames) {
+    if (!item) continue;
+    const [record, frame, bitmap] = item; const primitive = record.primitive;
+    const wx = record.x * 32 - (primitive.widthUnits - 32) + primitive.displacement.dxUnits;
+    const wy = record.y * 32 - (primitive.heightUnits - 32) + primitive.displacement.dyUnits;
+    const x = rect.width / 2 + (wx - view.x * 32) * view.zoom;
+    const y = rect.height / 2 + (wy - view.y * 32) * view.zoom;
+    ctx.drawImage(bitmap, x, y, bitmap.width * view.zoom, bitmap.height * view.zoom);
+  }
+  animationRuntime.noteFrameUpdate(frames.filter(Boolean).length);
+}
+function stopAnimationLoop() { if (animationHandle != null) cancelAnimationFrame(animationHandle); animationHandle = null; animationWallMs = null; }
+function animationTick(now) {
+  animationHandle = null;
+  if (view?.animation !== 'on' || !animationRuntime || document.hidden) return;
+  if (animationWallMs != null) animationLogicalMs += Math.max(0, now - animationWallMs);
+  animationWallMs = now; drawWorldAnimation(animationLogicalMs).catch(failClosed);
+  window.dispatchEvent(new CustomEvent('oteryn-atlas-animation-frame', { detail: { logicalTimeMs: animationLogicalMs, view: { ...view } } }));
+  animationHandle = requestAnimationFrame(animationTick);
+}
+function syncAnimationLoop() {
+  stopAnimationLoop(); setRendererRecords(sceneRecords);
+  if (view?.animation === 'on' && animationRuntime && !document.hidden) animationHandle = requestAnimationFrame(animationTick);
+  else drawWorldAnimation(0).catch(failClosed);
 }
 
 function renderFrame() {
@@ -274,7 +332,7 @@ function progressiveRender(records, residentBuckets, epoch, floorAtStart, needed
   if (!refreshIsCurrent(epoch, floorAtStart)) return;
   const readyRecords = recordsForResidentBuckets(records, pixelCatalog, runtimePixelCatalog, residentBuckets);
   sceneRecords = readyRecords;
-  renderer.setRecords(readyRecords);
+  setRendererRecords(readyRecords);
   renderStats = renderer.render(view);
   $('#status-detail').textContent = `${sceneGroups.length} authenticated row ranges · ${sceneTiles.size.toLocaleString()} tiles · ${readyRecords.length.toLocaleString()}/${records.length.toLocaleString()} primitives · ${residentBuckets.size}/${neededBucketCount} pixel buckets`;
   drawOverview().catch(failClosed);
@@ -310,7 +368,7 @@ async function refreshScene() {
     sceneRecords = [];
     sceneGroups = [];
     visibleSceneGroups = [];
-    renderer.setRecords([]);
+    setRendererRecords([]);
     renderStats = renderer.render(view);
     lastSceneLoadMs = performance.now() - started;
     if (initialLoadMs == null) initialLoadMs = performance.now() - bootStartedMs;
@@ -353,7 +411,7 @@ async function refreshScene() {
   const neededBuckets = requiredRuntimePixelBuckets(records, pixelCatalog, runtimePixelCatalog);
   if (records.length === 0) {
     sceneRecords = [];
-    renderer.setRecords([]);
+    setRendererRecords([]);
     renderStats = renderer.render(view);
   } else if (performanceProfile.name === 'local-max' && renderer.uploadedBucketIds().length === 0) {
     $('#status-detail').textContent = `${sceneGroups.length} authenticated row ranges · ${sceneTiles.size.toLocaleString()} tiles · authenticating explicit local-max pixel bundle…`;
@@ -389,7 +447,7 @@ async function refreshScene() {
   }
 
   sceneRecords = records;
-  renderer.setRecords(sceneRecords);
+  setRendererRecords(sceneRecords);
   detailReady = true;
   window.dispatchEvent(new CustomEvent('oteryn-atlas-view', { detail: { view: { ...view }, detailReady, detailStreaming } }));
   renderStats = renderer.render(view);
@@ -685,9 +743,10 @@ function applyView(next, options = {}) {
     sceneGroups = [];
     visibleSceneGroups = [];
     selected = null;
-    renderer.setRecords([]);
+    setRendererRecords([]);
   }
   syncViewUi();
+  syncAnimationLoop();
   scheduleRender('view');
   renderInspector();
   scheduleRefresh(options.delay ?? 80);
@@ -702,6 +761,7 @@ function wireInteraction() {
   $('#zoom-in').addEventListener('click', () => applyView({ ...view, zoom: view.zoom * 1.25 }));
   $('#zoom-out').addEventListener('click', () => applyView({ ...view, zoom: view.zoom / 1.25 }));
   $('#overview-toggle').addEventListener('change', (event) => applyView({ ...view, overview: event.target.checked }, { delay: 0 }));
+  $('#animation-toggle').addEventListener('change', (event) => applyView({ ...view, animation: event.target.checked ? 'on' : 'off' }, { delay: 0 }));
   $('#floor-select').addEventListener('change', (event) => applyView(changeFloor(view, Number(event.target.value), runtimeWorld), { delay: 0 }));
   const orderedFloors = () => [...runtimeWorld.floors].map((entry) => entry.floor).sort((a, b) => b - a);
   $('#floor-up').addEventListener('click', () => {
@@ -765,7 +825,8 @@ function wireInteraction() {
     scheduleRefresh(0);
   });
   canvas.addEventListener('pointercancel', () => { dragging = null; canvas.classList.remove('dragging'); });
-  window.addEventListener('resize', () => { scheduleRender('resize'); scheduleRefresh(100); });
+  window.addEventListener('resize', () => { scheduleRender('resize'); scheduleRefresh(100); if (view?.animation === 'on') drawWorldAnimation(animationLogicalMs).catch(failClosed); });
+  document.addEventListener('visibilitychange', syncAnimationLoop);
 }
 
 async function chooseInitialPublishedView(initialView) {
@@ -794,6 +855,11 @@ async function boot() {
   const runtimeBase = new URL(FULLWORLD_PATHS.runtimeIndex, location.href);
   const overviewBase = new URL(FULLWORLD_PATHS.overview, location.href);
   const pixelBucketBase = new URL(FULLWORLD_PATHS.pixelBuckets, location.href);
+  const animationBase = new URL(FULLWORLD_PATHS.animation, location.href);
+  try { animationRuntime = await getAnimationRuntime(animationBase); }
+  catch (error) { animationRuntimeError = error; animationRuntime = null; }
+  $('#animation-toggle').disabled = !animationRuntime;
+  if (animationRuntimeError) $('#animation-note').textContent = `Static fallback: ${animationRuntimeError.message}`;
   publication = await loadFullWorldPublication(publicationBase, FULLWORLD_TRUST);
   [semanticWorld, runtimeWorld, pixelCatalog, runtimePixelCatalog, overviewWorld] = await Promise.all([
     loadSemanticWorld(publicationBase, publication, FULLWORLD_TRUST),
@@ -808,6 +874,7 @@ async function boot() {
   worldQuery = createWorldQueryApi(runtimeWorld, FULLWORLD_CAPABILITIES);
   populateFloors();
   view = parseFullWorldViewState(location.search, runtimeWorld);
+  if (!animationRuntime && view.animation === 'on') view = Object.freeze({ ...view, animation: 'off' });
   view = await chooseInitialPublishedView(view);
   selected = view.selected ? { x: view.selected.x, y: view.selected.y } : null;
   const semanticBase = new URL('./', new URL(publication.semantic.path, publicationBase));
@@ -824,6 +891,7 @@ async function boot() {
     gpuTextureBudgetBytes: performanceProfile.gpuTextureBudgetBytes,
   });
   frameScheduler = createFrameScheduler(renderFrame);
+  syncAnimationLoop();
   $('#status-detail').textContent = `Performance profile ${performanceProfile.name} · ${GROUP_CONCURRENCY} semantic / ${PIXEL_BUCKET_CONCURRENCY} pixel fetchers · ${formatBytes(performanceProfile.semanticCacheBytes)} semantic cache`;
   syncViewUi();
   wireInteraction();
