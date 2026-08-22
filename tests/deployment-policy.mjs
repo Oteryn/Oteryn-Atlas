@@ -14,6 +14,9 @@ test('live Atlas deployment is bound to the triggering main SHA', () => {
   assert.match(workflow, /main-only deployment authority=PASS/);
   assert.match(workflow, /test "\$GITHUB_REF" = 'refs\/heads\/main'/);
   assert.match(workflow, /test "\$\(git rev-parse HEAD\)" = "\$ATLAS_REV"/);
+  assert.match(workflow, /Atomically deploy exact merged main/);
+  assert.match(workflow, /CANDIDATE_CONTAINER/);
+  assert.match(workflow, /deployment-rollback=PASS/);
 });
 
 test('repository policy forbids live deployment from task branches or dirty worktrees', () => {
