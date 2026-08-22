@@ -1,0 +1,35 @@
+name: Probe Atlas Runner Group Allow
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/probe-atlas-runner-group-allow.yml
+      - docs/evidence/ISSUE-35-runner-group-access.md
+
+permissions: {}
+
+jobs:
+  allow-atlas:
+    name: Atlas runner group accepts Atlas only
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on:
+      group: atlas-runners
+      labels: oteryn-atlas
+    timeout-minutes: 5
+    steps:
+      - name: Verify bounded Atlas runner identity
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test "${GITHUB_REPOSITORY}" = 'Oteryn/Oteryn-Atlas'
+          test "${RUNNER_SCOPE:-}" = organization
+          test "${RUNNER_GROUP:-}" = atlas-runners
+          test "${RUNNER_NAME:-}" = oteryn-synology-atlas
+          test "${RUNNER_LABELS:-}" = oteryn-atlas
+          test ! -e /var/lib/oteryn-staging-state
+          grep -F '"agentName": "oteryn-synology-atlas"' /runner/.runner
+          grep -F '"poolName": "atlas-runners"' /runner/.runner
+          grep -F '"gitHubUrl": "https://github.com/Oteryn"' /runner/.runner
+          echo 'atlas-runner-group-allow=PASS'
