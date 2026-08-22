@@ -28,12 +28,18 @@ export ATLAS_CODE_REVISION
 # In checkout-overlay mode the entry document is served by atlas-web, so bind
 # the browser proof to the exact checkout revision automatically. A direct
 # ATLAS_BASE_URL target can supply its own ATLAS_EXPECTED_REVISION explicitly.
+
 if [[ -z "${ATLAS_BASE_URL:-}" && -z "${ATLAS_EXPECTED_REVISION:-}" && "$ATLAS_CODE_REVISION" != "unknown" ]]; then
   ATLAS_EXPECTED_REVISION="$ATLAS_CODE_REVISION"
   export ATLAS_EXPECTED_REVISION
 fi
 
-compose=(docker compose -f e2e/compose.yml)
+ATLAS_E2E_PROJECT="${ATLAS_E2E_PROJECT:-oteryn-atlas-e2e-$$}"
+ATLAS_E2E_ARTIFACTS_HOST="${ATLAS_E2E_ARTIFACTS_HOST:-../artifacts/e2e/$ATLAS_E2E_PROJECT}"
+export ATLAS_E2E_PROJECT ATLAS_E2E_ARTIFACTS_HOST
+mkdir -p "artifacts/e2e/$ATLAS_E2E_PROJECT"
+
+compose=(docker compose -p "$ATLAS_E2E_PROJECT" -f e2e/compose.yml)
 cleanup() {
   "${compose[@]}" down --remove-orphans >/dev/null 2>&1 || true
 }

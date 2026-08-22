@@ -1,0 +1,44 @@
+import { expect, test } from '@playwright/test';
+import {
+  DESKTOP_ENTRY,
+  expectQualificationFailure,
+  gotoAtlas,
+  qualificationResult,
+  waitForAtlas,
+} from './runtime.mjs';
+
+test('required FullWorld publication failure is deterministic and fail-closed', async ({ page }) => {
+  await page.route('**/fullworld/publication/**', async (route) => {
+    await route.fulfill({ status: 503, contentType: 'application/json', body: '{"injected":"required-publication-failure"}' });
+  });
+  await gotoAtlas(page, DESKTOP_ENTRY);
+  const result = await expectQualificationFailure(page, /503|publication|fetch failed/i);
+  expect(result.capabilities?.blockedOrUnknownEnabled ?? false).toBeFalsy();
+  await expect(page.locator('#runtime-badge')).not.toContainText('VERIFIED FULL-WORLD');
+});
+
+test('malformed semantic search product fails closed without corrupting map qualification', async ({ page }) => {
+  await page.route('**/web/semantic-search/index.json', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: '{ malformed-json' });
+  });
+  await gotoAtlas(page, DESKTOP_ENTRY);
+  const { status, result } = await qualificationResult(page);
+  expect(status, result.error || 'FullWorld qualification').toBe('PASS');
+  await page.waitForFunction(() => globalThis.__OTERYN_ATLAS_SEMANTIC_SEARCH__?.status === 'FAIL', null, { timeout: 30_000 });
+  const search = await page.evaluate(() => globalThis.__OTERYN_ATLAS_SEMANTIC_SEARCH__);
+  expect(search.error).toMatch(/JSON|parse|unexpected/i);
+  await expect(page.locator('#runtime-badge')).toContainText('VERIFIED FULL-WORLD');
+});
+
+test('unavailable creature index remains an isolated fail-closed optional surface', async ({ page }) => {
+  await page.route('**/data/creatures/index.json', async (route) => {
+    await route.fulfill({ status: 503, contentType: 'application/json', body: '{"injected":"creature-index-failure"}' });
+  });
+  await gotoAtlas(page, `${DESKTOP_ENTRY}&creatures=npc,monster`);
+  await waitForAtlas(page);
+  await page.waitForFunction(() => globalThis.__OTERYN_ATLAS_CREATURES__?.status === 'FAIL', null, { timeout: 30_000 });
+  const creatures = await page.evaluate(() => globalThis.__OTERYN_ATLAS_CREATURES__);
+  expect(creatures.error).toMatch(/index\.json HTTP 503/i);
+  expect(creatures.drawnRecords).toBe(0);
+  await expect(page.locator('#creature-status')).toContainText('Unavailable:');
+});
