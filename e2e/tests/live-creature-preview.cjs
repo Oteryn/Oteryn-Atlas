@@ -11,7 +11,7 @@ const targets = JSON.parse(fs.readFileSync('/targets.json', 'utf8'));
 const evidenceDir = '/evidence';
 fs.mkdirSync(evidenceDir, { recursive: true });
 
-assert.match(preview ?? '', /^http:\/\/192\.168\.1\.2:8097$/);
+assert.match(preview ?? '', /^https?:\/\/[A-Za-z0-9.-]+(?::[0-9]{1,5})?$/);
 assert.match(expectedRevision ?? '', /^[0-9a-f]{40}$/);
 assert.match(expectedDigest ?? '', /^sha256:[0-9a-f]{64}$/);
 assert.equal(targets.npc.kind, 'npc');
@@ -21,13 +21,29 @@ function escapeRegex(value) {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+function isRelevantRuntimeUrl(value) {
+  try {
+    const { pathname } = new URL(value);
+    return pathname.startsWith('/data/creatures/') || pathname.startsWith('/fullworld/') || pathname === '/web/fullworld.html' || pathname.startsWith('/web/fullworld-');
+  } catch {
+    return false;
+  }
+}
+
 function watchRelevantErrors(page) {
   const errors = [];
   page.on('pageerror', (error) => errors.push(`pageerror: ${error.message}`));
   page.on('console', (message) => {
-    if (message.type() === 'error' && /creature|semantic|fullworld-search|fullworld-creatures/i.test(message.text())) {
+    if (message.type() === 'error' && /creature|semantic|fullworld/i.test(message.text())) {
       errors.push(`console.error: ${message.text()}`);
     }
+  });
+  page.on('requestfailed', (request) => {
+    const errorText = request.failure()?.errorText ?? 'unknown';
+    if (isRelevantRuntimeUrl(request.url()) && errorText !== 'net::ERR_ABORTED') errors.push(`requestfailed: ${request.url()} ${errorText}`);
+  });
+  page.on('response', (response) => {
+    if (response.status() >= 400 && isRelevantRuntimeUrl(response.url())) errors.push(`http ${response.status()}: ${response.url()}`);
   });
   return errors;
 }
@@ -100,7 +116,21 @@ function targetUrl(target, creatures = 'npc,monster') {
 async function assertRevisionResponse(page) {
   const response = await page.request.get(`${preview}/web/fullworld.html`);
   assert.equal(response.status(), 200);
-  assert.equal(response.headers()['x-oteryn-atlas-revision'], expectedRevision);
+  const headers = response.headers();
+  const revision = headers['x-oteryn-atlas-code-revision'] ?? headers['x-oteryn-atlas-revision'];
+  assert.equal(revision, expectedRevision);
+}
+
+async function displayedFloorFor(page, nativeFloor) {
+  const response = await page.request.get(`${preview}/web/semantic-search/index.json`);
+  assert.equal(response.status(), 200);
+  const index = await response.json();
+  const aliases = Object.entries(index.input_floor_aliases ?? {})
+    .filter(([, value]) => value === nativeFloor)
+    .map(([key]) => Number(key))
+    .filter(Number.isSafeInteger)
+    .sort((a, b) => a - b);
+  return aliases[0] ?? nativeFloor;
 }
 
 async function searchAndSelect(page, target, kindText, { inputSelector, hostSelector }) {
@@ -126,8 +156,8 @@ async function searchAndSelect(page, target, kindText, { inputSelector, hostSele
   const factualResult = await result.innerText();
   assert.match(factualResult, new RegExp(escapeRegex(target.label), 'i'));
   assert.match(factualResult, new RegExp(escapeRegex(kindText), 'i'));
-  assert.ok(factualResult.includes(String(target.position.x)));
-  assert.ok(factualResult.includes(String(target.position.y)));
+  const displayedFloor = await displayedFloorFor(page, target.position.floor);
+  assert.ok(factualResult.includes(`${target.position.x}, ${target.position.y}, ${displayedFloor}`));
 
   await Promise.all([
     page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 60_000 }),
@@ -144,6 +174,7 @@ function assertDeepLink(page, target, expectedCreatures) {
   assert.equal(params.get('q'), target.label);
   assert.equal(params.get('creature'), target.record_id);
   assert.equal(params.get('creatures'), expectedCreatures);
+  assert.equal(params.get('animation'), 'off');
 }
 
 function assertCreatureInspector(text, target, kindText) {
@@ -152,6 +183,10 @@ function assertCreatureInspector(text, target, kindText) {
   assert.ok(text.includes(expectedDigest));
   assert.match(text, new RegExp(escapeRegex(kindText), 'i'));
   assert.ok(text.includes(`X ${target.position.x} · Y ${target.position.y} · F ${target.position.floor}`));
+  assert.ok(text.includes('Resolution: RESOLVED'));
+  assert.ok(text.includes('Origin: base-map'));
+  assert.ok(text.includes('Authority: oteryn-game-atlas-export-v1 / static-creatures-v1'));
+  assert.ok(text.includes(`Semantic digest: ${expectedDigest}`));
   assert.match(text, /Static marker fallback/i);
 }
 
