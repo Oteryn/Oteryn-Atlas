@@ -28,6 +28,14 @@ Before editing, inspect the current default-branch head, this file, the active I
 - Require exact-head CI, including stable `atlas-gate`, before merge.
 - Squash merge only after all required checks/reviews pass; delete the completed task branch unless it has a documented continuing provenance role.
 
+## Live deployment authority
+
+- Live Atlas deployments originate only from merged `main`; task branches and detached experimental revisions must never be deployed.
+- Dirty working trees must never be deployed. A live deployment must use the exact GitHub Actions `github.sha` for `refs/heads/main`.
+- The deployed revision must match both the live container `org.oteryn.revision` label and the `X-Oteryn-Atlas-Revision` HTTP header before acceptance can pass.
+- Historical Atlas SHAs must not be hard-coded as live deployment targets. External Game/legacy evidence may remain explicitly pinned where provenance requires it.
+- Direct host mutation is not a normal deployment path; emergency rollback may only restore a previously merged `main` revision and must be re-qualified.
+
 ## Safety
 
 - Do not commit raw OTBM/OTB/SPR/DAT inputs, secrets, credentials, private data or unlicensed proprietary assets.
