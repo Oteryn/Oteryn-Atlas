@@ -34,3 +34,23 @@ export async function installGeometryEventLog(page) {
 export async function readGeometryEventLog(page) {
   return page.evaluate(() => globalThis.__OTERYN_ATLAS_GEOMETRY_EVENT_LOG__ ?? []);
 }
+
+
+export async function waitForCreatureAlignedToBase(page, requireAnchors = false) {
+  await page.waitForFunction((anchors) => {
+    const base = globalThis.__OTERYN_ATLAS_RENDERER_DIAGNOSTICS__;
+    const creature = globalThis.__OTERYN_ATLAS_CREATURES__?.render;
+    if (!base || !creature) return false;
+    if (anchors && !creature.anchors?.length) return false;
+    return creature.baseGenerationAtStart === base.generation
+      && creature.baseGenerationAtCommit === base.generation
+      && creature.view.floor === base.transform.floor
+      && Math.abs(creature.view.x - base.transform.centerTileX) < 1e-9
+      && Math.abs(creature.view.y - base.transform.centerTileY) < 1e-9
+      && Math.abs(creature.view.zoom - base.transform.zoom) < 1e-9;
+  }, requireAnchors, { timeout: 15_000 });
+  return page.evaluate(() => ({
+    base: globalThis.__OTERYN_ATLAS_RENDERER_DIAGNOSTICS__,
+    creature: globalThis.__OTERYN_ATLAS_CREATURES__?.render ?? null,
+  }));
+}

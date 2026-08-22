@@ -566,6 +566,12 @@ async function drawCommitted(records, committedBase) {
   const canvas = state.canvas;
   const epoch = ++state.drawEpoch;
   if (!canvas || !view || !committedBase?.generation) return null;
+  const rect = canvas.getBoundingClientRect();
+  const baseViewport = committedBase.transform;
+  if (Math.abs(rect.width - baseViewport.cssViewportWidth) > 0.01
+      || Math.abs(rect.height - baseViewport.cssViewportHeight) > 0.01) return null;
+  const dpr = Math.max(1, Math.min(2, devicePixelRatio || 1));
+  if (Math.abs(dpr - baseViewport.dpr) > 0.01) return null;
   const prepared = await prepareDraw(records, view);
   if (epoch !== state.drawEpoch || !sameRendererCommit(committedBase)) return null;
   state.lastPreparedRecords = prepared;

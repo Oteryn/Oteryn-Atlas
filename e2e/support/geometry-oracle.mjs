@@ -50,3 +50,28 @@ export function compareCreatureAnchors(renderer, creature) {
     },
   });
 }
+
+
+export function analyzeGeometryEventLog(log, tolerancePx = 0.25) {
+  if (!Array.isArray(log)) throw new TypeError('geometry event log must be an array');
+  if (!Number.isFinite(tolerancePx) || tolerancePx < 0 || tolerancePx > 2) throw new RangeError('geometry tolerance invalid');
+  const baseByGeneration = new Map(log.filter((entry) => entry?.kind === 'base').map((entry) => [entry.value?.generation, entry.value]));
+  const mismatches = [];
+  let checked = 0;
+  for (const entry of log.filter((item) => item?.kind === 'creature' && item.value?.anchors?.length)) {
+    const creature = entry.value;
+    const base = baseByGeneration.get(creature.baseGenerationAtCommit);
+    if (!base) {
+      mismatches.push(Object.freeze({ creatureGeneration: creature.generation, error: `missing base generation ${creature.baseGenerationAtCommit}` }));
+      continue;
+    }
+    checked += 1;
+    const result = compareCreatureAnchors(base, creature);
+    try {
+      result.assertWithin(tolerancePx);
+    } catch (error) {
+      mismatches.push(Object.freeze({ creatureGeneration: creature.generation, baseGeneration: base.generation, error: error.message, maxDriftPx: result.maxDriftPx, sample: result.samples[0] ?? null }));
+    }
+  }
+  return Object.freeze({ checked, mismatches: Object.freeze(mismatches), tolerancePx });
+}

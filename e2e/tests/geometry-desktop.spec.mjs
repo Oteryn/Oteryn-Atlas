@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { compareCreatureAnchors } from '../support/geometry-oracle.mjs';
+import { analyzeGeometryEventLog } from '../support/geometry-oracle.mjs';
 import {
   installGeometryEventLog,
   readGeometryEventLog,
@@ -15,34 +15,6 @@ import {
 
 const NPC_ENTRY = '/web/fullworld.html?x=32361&y=32198&floor=-7&zoom=2&mode=map&animation=on&creatures=npc&npcRole=shop';
 const DRIFT_TOLERANCE_PX = 0.25;
-
-function analyzeGeometryEvents(log) {
-  const baseByGeneration = new Map(log.filter((entry) => entry.kind === 'base').map((entry) => [entry.value.generation, entry.value]));
-  const mismatches = [];
-  let checked = 0;
-  for (const entry of log.filter((item) => item.kind === 'creature' && item.value?.anchors?.length)) {
-    const creature = entry.value;
-    const base = baseByGeneration.get(creature.baseGenerationAtCommit);
-    if (!base) {
-      mismatches.push({ creatureGeneration: creature.generation, error: `missing base generation ${creature.baseGenerationAtCommit}` });
-      continue;
-    }
-    checked += 1;
-    const result = compareCreatureAnchors(base, creature);
-    try {
-      result.assertWithin(DRIFT_TOLERANCE_PX);
-    } catch (error) {
-      mismatches.push({
-        creatureGeneration: creature.generation,
-        baseGeneration: base.generation,
-        error: error.message,
-        maxDriftPx: result.maxDriftPx,
-        sample: result.samples[0] ?? null,
-      });
-    }
-  }
-  return { checked, mismatches };
-}
 
 async function waitForFinalAlignment(page) {
   await page.waitForFunction(() => {
@@ -85,7 +57,7 @@ test('NPC overlay never commits independently from the base renderer during cont
   await waitForFinalAlignment(page);
 
   const log = await readGeometryEventLog(page);
-  const analysis = analyzeGeometryEvents(log);
+  const analysis = analyzeGeometryEventLog(log, DRIFT_TOLERANCE_PX);
   await testInfo.attach('geometry-event-log', {
     body: Buffer.from(JSON.stringify({ tolerancePx: DRIFT_TOLERANCE_PX, analysis, log }, null, 2)),
     contentType: 'application/json',
