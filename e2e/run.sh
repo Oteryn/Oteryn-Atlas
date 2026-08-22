@@ -28,6 +28,7 @@ export ATLAS_CODE_REVISION
 # In checkout-overlay mode the entry document is served by atlas-web, so bind
 # the browser proof to the exact checkout revision automatically. A direct
 # ATLAS_BASE_URL target can supply its own ATLAS_EXPECTED_REVISION explicitly.
+
 if [[ -z "${ATLAS_BASE_URL:-}" && -z "${ATLAS_EXPECTED_REVISION:-}" && "$ATLAS_CODE_REVISION" != "unknown" ]]; then
   ATLAS_EXPECTED_REVISION="$ATLAS_CODE_REVISION"
   export ATLAS_EXPECTED_REVISION

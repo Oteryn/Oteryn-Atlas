@@ -193,7 +193,7 @@ function setup() {
 
   const host = document.querySelector('#semantic-layer-list');
   if (host) {
-    for (const row of [...host.querySelectorAll('label')]) if (/NPCs|Monsters \/ Spawns/.test(row.textContent)) row.remove();
+    for (const row of [...host.querySelectorAll('label')]) if (/NPCs|Monsters \/ spawns/i.test(row.textContent)) row.remove();
     for (const [kind, label] of [['npc', 'NPCs'], ['monster', 'Monsters / Spawns']]) {
       const row = document.createElement('label');
       row.className = 'layer';

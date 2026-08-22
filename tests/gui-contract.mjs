@@ -130,7 +130,7 @@ test('full-world mobile layout keeps the map full-width and moves controls into 
     'mobile-search-form',
   ]) assert.match(fullworldIndex, new RegExp(`id="${id}"`));
   assert.match(fullworldIndex, /fullworld-mobile\.mjs/);
-  assert.match(fullworldCss, /@media \(max-width: 760px\)/);
+  assert.match(fullworldCss, /@media \(max-width: 980px\)/);
   assert.match(fullworldCss, /\.fullworld-shell \.workspace \{ grid-template-columns: minmax\(0, 1fr\); position: relative; overflow: hidden; \}/);
   assert.match(fullworldCss, /\.fullworld-shell \.left-rail, \.fullworld-shell \.inspector \{[\s\S]*position: absolute/);
   assert.match(fullworldCss, /\.fullworld-diagnostics \{ display: none; \}/);
