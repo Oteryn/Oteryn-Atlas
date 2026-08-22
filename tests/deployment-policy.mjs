@@ -14,7 +14,8 @@ test('live Atlas deployment is bound to the triggering main SHA', () => {
   assert.match(workflow, /main-only deployment authority=PASS/);
   assert.match(workflow, /test "\$GITHUB_REF" = 'refs\/heads\/main'/);
   assert.match(workflow, /test "\$\(git rev-parse HEAD\)" = "\$ATLAS_REV"/);
-  assert.match(workflow, /Atomically deploy exact merged main/);
+  assert.match(workflow, /Stage exact merged main candidate/);
+  assert.match(workflow, /Atomically publish and cut over qualified animated candidate/);
   assert.match(workflow, /CANDIDATE_CONTAINER/);
   assert.match(workflow, /deployment-rollback=PASS/);
 });
@@ -29,7 +30,7 @@ test('repository policy forbids live deployment from task branches or dirty work
 test('failed live acceptance restores the previous exact revision without assuming the previous creature catalog is absent', () => {
   const dollar = String.fromCharCode(36);
   assert.ok(workflow.includes('previous_revision=' + dollar + 'OLD_REV'));
-  assert.ok(workflow.includes('PREVIOUS_REVISION: ' + dollar + '{{ steps.deploy.outputs.previous_revision }}'));
+  assert.ok(workflow.includes('PREVIOUS_REVISION: ' + dollar + '{{ steps.product.outputs.previous_revision }}'));
   assert.match(workflow, /deployment-rollback-revision=PASS/);
   assert.doesNotMatch(workflow, /atlas-after-rollback/);
 });
@@ -42,4 +43,21 @@ test('live Chromium acceptance is isolated from host network churn', () => {
   assert.doesNotMatch(e2eStep, /--network host/);
   assert.match(e2eStep, /--network bridge/);
   assert.match(e2eStep, /-e "PREVIEW_URL=\$PREVIEW_URL"/);
+});
+
+test('live cutover waits for staged and qualified animation products', () => {
+  const stagedAnimation = workflow.indexOf('tar -C animation-runtime-a -cf - .');
+  const candidateAnimation = workflow.indexOf('http://192.168.1.2:18098/fullworld/animation/manifest.json');
+  const liveStop = workflow.indexOf('docker stop "$C" >/dev/null');
+  assert.notEqual(stagedAnimation, -1, 'animation staging command must exist');
+  assert.notEqual(candidateAnimation, -1, 'candidate animation verification must exist');
+  assert.notEqual(liveStop, -1, 'live cutover command must exist');
+  assert.ok(candidateAnimation > stagedAnimation, 'candidate animation must be verified after staging');
+  assert.ok(liveStop > candidateAnimation, 'live container must remain untouched until candidate product verification passes');
+});
+
+test('same-revision reruns stage into a run-scoped root without deleting the live revision root', () => {
+  assert.match(workflow, /NEW_ROOT="\$REVISION_ROOT\/\.staged-\$\{ATLAS_REV\}-\$\{GITHUB_RUN_ID\}-\$\{GITHUB_RUN_ATTEMPT\}"/);
+  assert.doesNotMatch(workflow, /rm -rf \/revisions\/\$ATLAS_REV/);
+  assert.match(workflow, /staged-root-cleanup=PASS/);
 });
