@@ -34,7 +34,10 @@ const state = {
   canvas: null,
   inspector: null,
   lastVisibleRecords: [],
+  lastPreparedRecords: [],
   lastDrawnRecords: 0,
+  refreshEpoch: 0,
+  drawEpoch: 0,
   animationRuntime: null,
   animationOn: initialParams.get('animation') === 'on',
   logicalTimeMs: 0,
@@ -269,6 +272,11 @@ async function waitForInitialView(timeoutMs = 30_000) {
   });
 }
 
+function repaintPreparedForCurrentState() {
+  state.drawEpoch += 1;
+  state.lastDrawnRecords = paintPrepared(state.lastPreparedRecords, state.view);
+}
+
 function setup() {
   const frame = document.querySelector('#map-frame');
   const base = document.querySelector('#atlas');
@@ -301,6 +309,7 @@ function setup() {
       input.addEventListener('change', () => {
         state.enabled[kind] = input.checked;
         persist();
+        repaintPreparedForCurrentState();
         refresh().catch(fail);
       });
     }
@@ -315,6 +324,7 @@ function setup() {
     section.querySelector('#npc-role-filter').addEventListener('change', (event) => {
       state.npcRole = npcRoleFilter(event.target.value);
       persist();
+      repaintPreparedForCurrentState();
       refresh().catch(fail);
     });
   }
@@ -332,13 +342,14 @@ function setup() {
   window.addEventListener('oteryn-atlas-view', (event) => {
     applyView(event.detail.view);
     persist();
+    repaintPreparedForCurrentState();
     refresh().catch(fail);
   });
   window.addEventListener('oteryn-atlas-animation-frame', (event) => {
     state.logicalTimeMs = event.detail.logicalTimeMs;
     if (state.animationOn && state.lastVisibleRecords.length) draw(state.lastVisibleRecords).then((count) => { state.lastDrawnRecords = count; publish('PASS'); }).catch(fail);
   });
-  window.addEventListener('resize', () => refresh().catch(fail));
+  window.addEventListener('resize', () => { repaintPreparedForCurrentState(); refresh().catch(fail); });
 }
 
 function navigate(item) {
@@ -408,15 +419,10 @@ function drawNpcIcon(context, x, y, glyph, size) {
   context.restore();
 }
 
-async function draw(records) {
+async function prepareDraw(records, view = state.view) {
   const canvas = state.canvas;
-  const view = state.view;
-  if (!canvas || !view) return 0;
+  if (!canvas || !view) return [];
   const rect = canvas.getBoundingClientRect();
-  const dpr = Math.max(1, Math.min(2, devicePixelRatio || 1));
-  const width = Math.max(1, Math.round(rect.width * dpr));
-  const height = Math.max(1, Math.round(rect.height * dpr));
-  if (canvas.width !== width || canvas.height !== height) { canvas.width = width; canvas.height = height; }
   const scale = 32 * view.zoom;
   const candidates = records.filter((record) => {
     if (!state.enabled[record.kind]) return false;
@@ -425,12 +431,23 @@ async function draw(records) {
     const y = rect.height / 2 + (record.position.y - view.y) * scale;
     return x >= -96 && y >= -96 && x <= rect.width + 96 && y <= rect.height + 96;
   });
-  const prepared = await Promise.all(candidates.map(async (record) => {
+  return Promise.all(candidates.map(async (record) => {
     const verified = record.presentation_resolution_state === 'RESOLVED' && state.animationRuntime?.hasCreature(record);
     if (!verified || (record.kind === 'npc' && view.zoom < 1)) return { record, marker: true };
     const frame = state.animationRuntime.creatureFrame(record, state.animationOn ? state.logicalTimeMs : 0);
     return { record, frame, bitmap: await state.animationRuntime.bitmap(frame.contentId), marker: false };
   }));
+}
+
+function paintPrepared(prepared, view = state.view) {
+  const canvas = state.canvas;
+  if (!canvas || !view) return 0;
+  const rect = canvas.getBoundingClientRect();
+  const dpr = Math.max(1, Math.min(2, devicePixelRatio || 1));
+  const width = Math.max(1, Math.round(rect.width * dpr));
+  const height = Math.max(1, Math.round(rect.height * dpr));
+  if (canvas.width !== width || canvas.height !== height) { canvas.width = width; canvas.height = height; }
+  const scale = 32 * view.zoom;
   const context = canvas.getContext('2d');
   context.clearRect(0, 0, width, height);
   context.save();
@@ -442,8 +459,12 @@ async function draw(records) {
   let pixelDrawn = 0;
   let markerDrawn = 0;
   let npcIcons = 0;
+  let drawn = 0;
   for (const item of prepared) {
     const { record } = item;
+    if (!state.enabled[record.kind]) continue;
+    if (record.kind === 'npc' && !npcMatchesRole(record, state.npcRole)) continue;
+    drawn += 1;
     const tileX = rect.width / 2 + (record.position.x - view.x) * scale;
     const tileY = rect.height / 2 + (record.position.y - view.y) * scale;
     if (!item.marker) {
@@ -473,23 +494,37 @@ async function draw(records) {
   state.markerDrawnRecords = markerDrawn;
   state.lastDrawnNpcIcons = npcIcons;
   state.animationRuntime?.noteFrameUpdate(state.animationOn ? pixelDrawn : 0);
-  return prepared.length;
+  return drawn;
+}
+
+async function draw(records, view = state.view) {
+  const epoch = ++state.drawEpoch;
+  const prepared = await prepareDraw(records, view);
+  if (epoch !== state.drawEpoch || view !== state.view) return state.lastDrawnRecords;
+  state.lastPreparedRecords = prepared;
+  state.lastDrawnRecords = paintPrepared(prepared, view);
+  return state.lastDrawnRecords;
 }
 
 async function refresh() {
   if (!state.index || !state.view || !state.canvas) return;
-  const entries = wantedEntries(state.view, state.canvas);
+  const epoch = ++state.refreshEpoch;
+  const view = state.view;
+  const entries = wantedEntries(view, state.canvas);
   const groups = await Promise.all(entries.map(loadEntry));
+  if (epoch !== state.refreshEpoch || view !== state.view) return;
   const records = groups.flat();
+  const prepared = await prepareDraw(records, view);
+  if (epoch !== state.refreshEpoch || view !== state.view) return;
   state.lastVisibleRecords = records;
-  state.lastDrawnRecords = await draw(records);
+  state.lastPreparedRecords = prepared;
+  state.lastDrawnRecords = paintPrepared(prepared, view);
   const selected = state.selectedId ? records.find((record) => record.record_id === state.selectedId) ?? null : null;
   renderCreatureInspector(selected);
   const status = document.querySelector('#creature-status');
   if (status) status.textContent = `Game-owned verified creatures · ${state.index.counts.records.toLocaleString()} placements · NPC ${npcRoleLabel(state.npcRole)} · ${entries.length} visible shards · ${state.pixelDrawnRecords} pixel / ${state.lastDrawnNpcIcons} NPC icon / ${state.markerDrawnRecords} marker`;
   publish('PASS', null, { visibleShards: entries.length, selectedVisible: Boolean(selected) });
 }
-
 async function boot() {
   publish();
   setup();

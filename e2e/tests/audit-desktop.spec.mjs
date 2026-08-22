@@ -17,7 +17,7 @@ test('audit desktop controls and LOD modes', async ({ page }) => {
   await waitRep(page, 'detail');
   const visibleText = await page.locator('body').innerText();
   expect(visibleText).not.toMatch(/Ã|Â|â€¦|â€”/);
-  await expect(page.locator('#animation-toggle')).toBeDisabled();
+  await expect(page.locator('#animation-toggle')).toBeEnabled();
   await expect(page.locator('#region-search')).toBeDisabled();
   await expect(page.locator('#region-zoom')).toBeDisabled();
 
