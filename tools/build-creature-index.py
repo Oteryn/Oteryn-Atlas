@@ -123,9 +123,10 @@ def build(source: dict[str, object], output: Path) -> dict[str, object]:
         "semantic_digest": source["semantic_digest"],
         "coordinate_profile": source["coordinate_profile"],
         "legacy_evidence": source.get("legacy_evidence"),
-        "appearance_product_root": source.get("appearance_product_root"),
-        "outfit_spatial_product_root": source.get("outfit_spatial_product_root"),
     }
+    for field in ("appearance_product_root", "outfit_spatial_product_root"):
+        if source.get(field) is not None:
+            source_metadata[field] = source[field]
     search_records = sorted(search.values(), key=lambda record: (str(record["label"]).casefold(), str(record["kind"])))
     search_data = canonical({"schema_version": 1, "source": source_metadata, "records": search_records}) + b"\n"
     (output / "search.json").write_bytes(search_data)
