@@ -294,6 +294,7 @@ function commitRenderer() {
     retainedGroups: sceneGroups.length,
     renderMs: nextStats.renderMs,
     gpuRenderMs: nextStats.gpuRenderMs,
+    framebufferProbe: nextStats.framebufferProbe,
     anchors: committedRendererAnchors(),
   });
   globalThis.__OTERYN_ATLAS_RENDERER_DIAGNOSTICS__ = snapshot;

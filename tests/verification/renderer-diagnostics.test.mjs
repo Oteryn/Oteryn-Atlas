@@ -19,6 +19,7 @@ test('renderer diagnostic snapshot is bounded, serializable and deeply immutable
     drawCalls: 1,
     visiblePrimitives: 44,
     retainedPrimitives: 55,
+    framebufferProbe: { sampleCount: 9, nonClearSamples: 4, blank: false, signature: 'deadbeef', recordIds: ['tile:1', 'tile:2'] },
     anchors: Array.from({ length: 40 }, (_, index) => ({ id: `tile:${index}`, floor: -7, x: 32360 + index, y: 32240 })),
   });
   assert.equal(snapshot.generation, 9);
@@ -27,6 +28,9 @@ test('renderer diagnostic snapshot is bounded, serializable and deeply immutable
   assert(Object.isFrozen(snapshot.transform));
   assert(Object.isFrozen(snapshot.anchors));
   assert(Object.isFrozen(snapshot.anchors[0]));
+  assert.equal(snapshot.framebufferProbe.signature, 'deadbeef');
+  assert(Object.isFrozen(snapshot.framebufferProbe));
+  assert(Object.isFrozen(snapshot.framebufferProbe.recordIds));
   assert.doesNotThrow(() => JSON.stringify(snapshot));
   assert.throws(() => { snapshot.transform.zoom = 99; }, TypeError);
 });

@@ -1,3 +1,5 @@
+import { sampleVisibleFramebufferRecords } from './framebuffer-probe.mjs';
+
 export class FullWorldWebGLRendererError extends Error {}
 
 const PAGE_SIZE = 1024;
@@ -65,10 +67,11 @@ export function createFullWorldWebGLRenderer(canvas,pixelCatalog,runtimePixelCat
     gl.uniform2f(centerLocation,view.x*32,view.y*32);gl.uniform2f(viewportLocation,canvas.width,canvas.height);gl.uniform1f(scaleLocation,view.zoom*dpr);
     let query=null;if(timerExtension){query=gl.createQuery();gl.beginQuery(timerExtension.TIME_ELAPSED_EXT,query);}
     const drawCalls=instanceCount>0?1:0;if(drawCalls)gl.drawArraysInstanced(gl.TRIANGLES,0,6,instanceCount);
-    if(query){gl.endQuery(timerExtension.TIME_ELAPSED_EXT);pendingQueries.push(query);}if(options.synchronousEvidence===true)gl.finish();
+    if(query){gl.endQuery(timerExtension.TIME_ELAPSED_EXT);pendingQueries.push(query);}if(options.synchronousEvidence===true||options.capture===true)gl.finish();
+    const framebufferProbe=(options.capture===true||options.synchronousEvidence===true)&&drawCalls?sampleVisibleFramebufferRecords(gl,records,view,canvas,dpr):null;
     const generation=++renderGeneration;
     const transform=Object.freeze({floor:view.floor,centerTileX:view.x,centerTileY:view.y,zoom:view.zoom,dpr,framebufferWidth:canvas.width,framebufferHeight:canvas.height,cssViewportWidth:canvas.width/dpr,cssViewportHeight:canvas.height/dpr,scaleDevicePixelsPerWorldUnit:view.zoom*dpr});
-    return Object.freeze({backend:'WebGL2-instanced-buckets',generation,transform,drawCalls,gpuRenderMs:latestGpuRenderMs,gpuTimerSupported:Boolean(timerExtension),gpuTextureBytes,instanceBufferBytes,maxArrayLayers,maxTextureSize,preserveDrawingBuffer:options.capture===true,renderMs:performance.now()-started,residentPixelBytes,submittedPrimitives:instanceCount,textureUploadMs:totalUploadMs,uploadedBuckets:uploadedBuckets.size,visiblePrimitives:options.measureVisibility===false?null:countVisible(records,view,canvas,dpr),viewportHeight:canvas.height,viewportWidth:canvas.width});
+    return Object.freeze({backend:'WebGL2-instanced-buckets',generation,transform,drawCalls,framebufferProbe,gpuRenderMs:latestGpuRenderMs,gpuTimerSupported:Boolean(timerExtension),gpuTextureBytes,instanceBufferBytes,maxArrayLayers,maxTextureSize,preserveDrawingBuffer:options.capture===true,renderMs:performance.now()-started,residentPixelBytes,submittedPrimitives:instanceCount,textureUploadMs:totalUploadMs,uploadedBuckets:uploadedBuckets.size,visiblePrimitives:options.measureVisibility===false?null:countVisible(records,view,canvas,dpr),viewportHeight:canvas.height,viewportWidth:canvas.width});
   }
   function uploadedBucketIds(){return [...uploadedBuckets.keys()].sort();}
   return Object.freeze({gl,render,setRecords,uploadBucket,uploadBundle,uploadedBucketIds});

@@ -104,7 +104,8 @@ test('full-world WebGL renderer preserves semantic order in one batched draw', (
 
 test('full-world renderer keeps evidence synchronization and capture opt-in only', () => {
   assert.match(fullworldRenderer, /preserveDrawingBuffer:options\.capture===true/);
-  assert.match(fullworldRenderer, /if\(options\.synchronousEvidence===true\)gl\.finish\(\)/);
+  assert.match(fullworldRenderer, /if\(options\.synchronousEvidence===true\|\|options\.capture===true\)gl\.finish\(\)/);
+  assert.match(fullworldRenderer, /sampleVisibleFramebufferRecords\(gl,records,view,canvas,dpr\)/);
   assert.doesNotMatch(fullworldRenderer, /preserveDrawingBuffer:true/);
 });
 
