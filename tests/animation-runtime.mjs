@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { phaseAt } from '../src/browser/animation-runtime.mjs';
+import { createAnimationRuntime, phaseAt } from '../src/browser/animation-runtime.mjs';
+import { sha256ContentId } from '../src/browser/loader.mjs';
 
 function program({ phases = 3, loopType = 'infinite', loopCount = 0, synchronized = true, durations = null } = {}) {
   return {
@@ -44,4 +45,35 @@ test('asynchronous start offset is deterministic per stable instance id', () => 
   const first = phaseAt(value, 0, 'npc:stable-instance');
   assert.equal(phaseAt(value, 0, 'npc:stable-instance'), first);
   assert.ok(first >= 0 && first < 4);
+});
+
+test('concurrent bitmap loads sharing one animation bucket perform one verified fetch', async () => {
+  const bucketBytes = new Uint8Array([1, 2, 3, 255, 5, 6, 7, 255]);
+  const firstBytes = bucketBytes.slice(0, 4);
+  const secondBytes = bucketBytes.slice(4, 8);
+  const bucketDigest = await sha256ContentId(bucketBytes);
+  const firstId = await sha256ContentId(firstBytes);
+  const secondId = await sha256ContentId(secondBytes);
+  let fetches = 0;
+  const fetcher = async () => {
+    fetches += 1;
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    return new Response(bucketBytes, { status: 200, headers: { 'content-length': String(bucketBytes.byteLength) } });
+  };
+  const runtime = createAnimationRuntime(new URL('https://atlas.invalid/animation/'), {
+    manifest: {}, objects: new Map(), creatures: new Map(), sprites: new Map(),
+    blobs: new Map([
+      [firstId, Object.freeze({ bucket: 'b0000', offset: 0, bytes: 4, width: 1, height: 1 })],
+      [secondId, Object.freeze({ bucket: 'b0000', offset: 4, bytes: 4, width: 1, height: 1 })],
+    ]),
+    buckets: new Map([['b0000', Object.freeze({ id: 'b0000', path: 'buckets/b0000.rgba', bytes: 8, digest: bucketDigest })]]),
+    fetcher,
+  });
+
+  const results = await Promise.all(Array.from({ length: 40 }, (_, index) => runtime.bitmap(index % 2 ? firstId : secondId)));
+  assert.equal(results.length, 40);
+  assert.equal(fetches, 1);
+  assert.equal(runtime.stats().bucketLoads, 1);
+  assert.equal(runtime.stats().cachedBuckets, 1);
+  assert.equal(runtime.stats().cachedBitmaps, 2);
 });
