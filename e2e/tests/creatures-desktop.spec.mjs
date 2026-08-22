@@ -86,3 +86,46 @@ test('desktop NPC category filter persists and uses functional icon rendering wh
   await expect(page.locator('#npc-role-filter')).toHaveValue('all');
   assertNoRuntimeFailures(runtime);
 });
+
+
+test('desktop creature overlay repaints in the same turn as continuous pan', async ({ page }) => {
+  const runtime = captureRuntimeFailures(page);
+  await page.addInitScript(() => {
+    const probe = { active: false, clears: 0, viewEvents: 0, missedImmediatePaints: 0 };
+    globalThis.__OTERYN_CREATURE_PAN_PROBE__ = probe;
+    const originalClearRect = CanvasRenderingContext2D.prototype.clearRect;
+    CanvasRenderingContext2D.prototype.clearRect = function (...args) {
+      if (this.canvas?.id === 'creature-overlay') probe.clears += 1;
+      return originalClearRect.apply(this, args);
+    };
+    window.addEventListener('oteryn-atlas-view', () => {
+      if (!probe.active) return;
+      probe.viewEvents += 1;
+      const clearsBefore = probe.clears;
+      queueMicrotask(() => {
+        if (probe.clears === clearsBefore) probe.missedImmediatePaints += 1;
+      });
+    });
+  });
+  await gotoAtlas(page, '/web/fullworld.html?x=32364&y=32240.2&floor=-7&zoom=1.04&mode=map&creatures=npc,monster');
+  await waitForAtlas(page);
+  const creatures = await creatureState(page);
+  test.skip(creatures.status === 'FAIL' && /HTTP 404/.test(creatures.error ?? ''), 'Current target has no optional creature publication.');
+  expect(creatures.status, creatures.error ?? 'creature runtime').toBe('PASS');
+  await expect.poll(() => page.evaluate(() => globalThis.__OTERYN_ATLAS_CREATURES__?.drawnRecords ?? 0)).toBeGreaterThan(0);
+  await page.evaluate(() => { globalThis.__OTERYN_CREATURE_PAN_PROBE__.active = true; });
+
+  const canvas = page.locator('#atlas');
+  const box = await canvas.boundingBox();
+  expect(box).not.toBeNull();
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2 + 180, box.y + box.height / 2 + 90, { steps: 12 });
+  await page.mouse.up();
+  await page.waitForTimeout(50);
+
+  const probe = await page.evaluate(() => globalThis.__OTERYN_CREATURE_PAN_PROBE__);
+  expect(probe.viewEvents).toBeGreaterThanOrEqual(4);
+  expect(probe.missedImmediatePaints, `creature overlay missed ${probe.missedImmediatePaints}/${probe.viewEvents} synchronous viewport paints`).toBe(0);
+  assertNoRuntimeFailures(runtime);
+});

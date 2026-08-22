@@ -47,7 +47,7 @@ test('layer controls expose correct availability and fail-closed states', async 
   for (const [kind, label] of [['npc', 'NPCs'], ['monster', 'Monsters / Spawns']]) {
     const row = rows.filter({ has: page.getByText(label, { exact: true }) });
     await expect(row).toHaveCount(1);
-    await expect(row).toContainText('STATIC');
+    await expect(row).toContainText('VERIFIED');
     await expect(row.locator(`input[data-creature-kind="${kind}"]`)).toBeEnabled();
     await expect(row.locator(`input[data-creature-kind="${kind}"]`)).not.toBeChecked();
   }
