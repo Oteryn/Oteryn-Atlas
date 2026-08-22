@@ -193,6 +193,46 @@ function renderCreatureInspector(record) {
   );
 }
 
+function applyView(nextView) {
+  requireValue(nextView && typeof nextView === 'object', 'invalid FullWorld view snapshot');
+  state.view = nextView;
+  state.animationOn = nextView.animation === 'on';
+}
+
+function consumePublishedView() {
+  const snapshot = globalThis.__OTERYN_ATLAS_VIEW__;
+  if (!snapshot || typeof snapshot !== 'object') return false;
+  applyView(snapshot);
+  return true;
+}
+
+async function waitForInitialView(timeoutMs = 30_000) {
+  if (state.view || consumePublishedView()) return;
+  await new Promise((resolve, reject) => {
+    let timer = null;
+    const cleanup = () => {
+      if (timer != null) clearTimeout(timer);
+      window.removeEventListener('oteryn-atlas-view', onView);
+    };
+    const onView = (event) => {
+      if (!event.detail?.view) return;
+      applyView(event.detail.view);
+      cleanup();
+      resolve();
+    };
+    window.addEventListener('oteryn-atlas-view', onView);
+    if (consumePublishedView()) {
+      cleanup();
+      resolve();
+      return;
+    }
+    timer = setTimeout(() => {
+      cleanup();
+      reject(new Error('FullWorld view snapshot unavailable during creature boot'));
+    }, timeoutMs);
+  });
+}
+
 function setup() {
   const frame = document.querySelector('#map-frame');
   const base = document.querySelector('#atlas');
@@ -249,8 +289,7 @@ function setup() {
   }
 
   window.addEventListener('oteryn-atlas-view', (event) => {
-    state.view = event.detail.view;
-    state.animationOn = state.view?.animation === 'on';
+    applyView(event.detail.view);
     persist();
     refresh().catch(fail);
   });
@@ -385,6 +424,7 @@ async function boot() {
     state.search = search.records;
     const status = document.querySelector('#creature-status');
     if (status) status.textContent = `Ready · ${index.counts.records.toLocaleString()} verified creature placements`;
+    await waitForInitialView();
     await refresh();
   } catch (error) {
     fail(error);

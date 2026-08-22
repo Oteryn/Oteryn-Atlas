@@ -215,6 +215,12 @@ function clampView(next) {
   });
 }
 
+function publishView() {
+  const snapshot = Object.freeze({ ...view });
+  globalThis.__OTERYN_ATLAS_VIEW__ = snapshot;
+  window.dispatchEvent(new CustomEvent('oteryn-atlas-view', { detail: { view: snapshot, detailReady, detailStreaming } }));
+}
+
 function syncViewUi() {
   $('#coord-x').textContent = view.x.toFixed(2).replace(/\.00$/, '');
   $('#coord-y').textContent = view.y.toFixed(2).replace(/\.00$/, '');
@@ -232,7 +238,7 @@ function syncViewUi() {
   $('#floor-up').disabled = index <= 0;
   $('#floor-down').disabled = index < 0 || index >= floors.length - 1;
   history.replaceState(null, '', serializeFullWorldViewState(view, runtimeWorld));
-  window.dispatchEvent(new CustomEvent('oteryn-atlas-view', { detail: { view: { ...view }, detailReady, detailStreaming } }));
+  publishView();
 }
 
 function setBadge(text, state = '') {
@@ -449,7 +455,7 @@ async function refreshScene() {
   sceneRecords = records;
   setRendererRecords(sceneRecords);
   detailReady = true;
-  window.dispatchEvent(new CustomEvent('oteryn-atlas-view', { detail: { view: { ...view }, detailReady, detailStreaming } }));
+  publishView();
   renderStats = renderer.render(view);
   if (renderStats.gpuTextureBytes > performanceProfile.gpuTextureBudgetBytes) throw new Error('GPU texture allocation exceeds runtime profile budget');
   if (renderStats.drawCalls > performanceProfile.drawCallTarget) throw new Error('draw-call target exceeded');

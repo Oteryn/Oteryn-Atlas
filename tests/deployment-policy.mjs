@@ -25,3 +25,11 @@ test('repository policy forbids live deployment from task branches or dirty work
   assert.match(agents, /dirty working trees.*must never be deployed/i);
   assert.match(agents, /deployed revision.*container.*header/i);
 });
+
+test('failed live acceptance restores the previous exact revision without assuming the previous creature catalog is absent', () => {
+  const dollar = String.fromCharCode(36);
+  assert.ok(workflow.includes('previous_revision=' + dollar + 'OLD_REV'));
+  assert.ok(workflow.includes('PREVIOUS_REVISION: ' + dollar + '{{ steps.deploy.outputs.previous_revision }}'));
+  assert.match(workflow, /deployment-rollback-revision=PASS/);
+  assert.doesNotMatch(workflow, /atlas-after-rollback/);
+});

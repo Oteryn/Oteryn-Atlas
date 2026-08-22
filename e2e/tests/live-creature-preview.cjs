@@ -68,20 +68,30 @@ async function waitSemanticReady(page) {
 }
 
 async function waitReady(page, { selectedId = null, npc = true, monster = true } = {}) {
-  await page.waitForFunction(
-    ({ digest, selected, wantNpc, wantMonster }) => {
-      const value = globalThis.__OTERYN_ATLAS_CREATURES__;
-      if (!value || value.status !== 'PASS') return false;
-      if (value.sourceSemanticDigest !== digest) return false;
-      if (value.cacheChunks > 96 || value.drawnRecords < 1 || value.pixelDrawnRecords < 1) return false;
-      if (!value.animationRuntime || value.animationRuntime.creaturePrograms !== 1377) return false;
-      if (value.enabled?.npc !== wantNpc || value.enabled?.monster !== wantMonster) return false;
-      if (selected && (value.selectedRecordId !== selected || value.selectedVisible !== true)) return false;
-      return true;
-    },
-    { digest: expectedDigest, selected: selectedId, wantNpc: npc, wantMonster: monster },
-    { timeout: 120_000 },
-  );
+  try {
+    await page.waitForFunction(
+      ({ digest, selected, wantNpc, wantMonster }) => {
+        const value = globalThis.__OTERYN_ATLAS_CREATURES__;
+        if (!value || value.status !== 'PASS') return false;
+        if (value.sourceSemanticDigest !== digest) return false;
+        if (value.cacheChunks > 96 || value.drawnRecords < 1 || value.pixelDrawnRecords < 1) return false;
+        if (!value.animationRuntime || value.animationRuntime.creaturePrograms !== 1377) return false;
+        if (value.enabled?.npc !== wantNpc || value.enabled?.monster !== wantMonster) return false;
+        if (selected && (value.selectedRecordId !== selected || value.selectedVisible !== true)) return false;
+        return true;
+      },
+      { digest: expectedDigest, selected: selectedId, wantNpc: npc, wantMonster: monster },
+      { timeout: 120_000 },
+    );
+  } catch (error) {
+    const state = await page.evaluate(() => ({
+      creatures: globalThis.__OTERYN_ATLAS_CREATURES__ ?? null,
+      fullworld: globalThis.__OTERYN_ATLAS_FULLWORLD__ ?? null,
+      view: globalThis.__OTERYN_ATLAS_VIEW__ ?? null,
+    }));
+    console.error('wait-ready-state=' + JSON.stringify(state));
+    throw error;
+  }
   const value = await diagnostic(page);
   assert.equal(value.status, 'PASS');
   assert.equal(value.sourceSemanticDigest, expectedDigest);
