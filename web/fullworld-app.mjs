@@ -21,6 +21,7 @@ import { recordsForResidentBuckets } from '../src/browser/fullworld-progressive.
 import { createFullWorldWebGLRenderer } from '../src/browser/fullworld-webgl.mjs';
 import { resolvePerformanceProfile, profileSummary } from '../src/browser/fullworld-performance.mjs';
 import { createFrameScheduler } from '../src/browser/frame-scheduler.mjs';
+import { AnimationPixelStore, animationFrameUpdates, buildAnimationBindings, commitAnimationUpdates, createAnimationClock, createAnimationScheduler, loadAnimationRuntime } from '../src/browser/animation-runtime.mjs';
 import { VerifiedContentCache } from '../src/browser/verified-content-cache.mjs';
 import { loadOverviewChunk, loadOverviewFloor, loadOverviewWorld } from '../src/layers/overview.mjs';
 import { LOD_POLICY, detailStreamWanted, lodBlend } from '../src/layers/minimap-lod.mjs';
@@ -69,6 +70,14 @@ let refreshEpoch = 0;
 let refreshAbortController = null;
 let dragging = null;
 let frameScheduler = null;
+let animationRuntime = null;
+let animationPixelStore = null;
+let animationBindings = [];
+let animationClock = null;
+let animationScheduler = null;
+let animationStatus = 'STATIC';
+let animationUpdatedInstances = 0;
+let animationLastFrameMs = null;
 let persistentCache = null;
 let worldQuery = null;
 let detailReady = false;
@@ -193,7 +202,7 @@ function clampView(next) {
     ? { floor, x: Math.trunc(next.selected.x), y: Math.trunc(next.selected.y) }
     : null;
   return Object.freeze({
-    animation: 'off',
+    animation: next.animation === 'on' ? 'on' : 'off',
     debugFlags: Object.freeze([...(next.debugFlags ?? [])].sort()),
     floor,
     layers: Object.freeze(next.overview ? ['minimap-overview'] : []),
@@ -214,6 +223,8 @@ function syncViewUi() {
   $('#zoom-output').textContent = `${view.zoom.toFixed(2).replace(/0+$/, '').replace(/\.$/, '')}×`;
   $('#floor-select').value = String(view.floor);
   $('#overview-toggle').checked = view.overview;
+  $('#animation-toggle').checked = view.animation === 'on';
+  $('#animation-toggle').disabled = !animationRuntime;
   $('#search-input').value = view.searchQuery ?? '';
   for (const button of document.querySelectorAll('#view-mode-control [data-mode]')) button.classList.toggle('active', button.dataset.mode === view.mode);
   const bounds = floorEntry(runtimeWorld, view.floor).bounds;
@@ -270,6 +281,85 @@ function refreshIsCurrent(epoch, floor) {
   return epoch === refreshEpoch && view.floor === floor;
 }
 
+function animationRequested() {
+  return view?.animation === 'on';
+}
+
+function disableAnimationPresentation(error) {
+  console.error(`Animation static fallback: ${error?.message ?? error}`);
+  animationScheduler?.cancel();
+  animationClock?.setEnabled(false);
+  if (renderer) {
+    renderer.setRecords(sceneRecords);
+    renderer.resetAnimationPixels();
+    renderStats = renderer.render(view);
+  }
+  animationBindings = [];
+  animationStatus = `STATIC_FALLBACK: ${error?.message ?? error}`;
+  animationUpdatedInstances = 0;
+  $('#animation-note').textContent = animationStatus;
+  if (view?.animation === 'on') view = clampView({ ...view, animation: 'off' });
+  syncViewUi();
+  updateDiagnostics();
+  publishQualification('PASS');
+}
+
+async function applyWorldAnimationFrame() {
+  if (!animationRuntime || !renderer || !animationRequested() || !detailReady || !animationBindings.length || document.hidden) {
+    animationScheduler?.update(false, 0, Infinity);
+    return;
+  }
+  const started = performance.now();
+  const frame = animationFrameUpdates(animationBindings, animationRuntime, performance.now(), Date.now());
+  const entries = [...frame.pixelEntries.values()];
+  await mapLimit(entries, Math.min(8, Math.max(1, entries.length)), async (entry) => {
+    const bytes = await animationPixelStore.load(entry, 'object', refreshAbortController?.signal ?? null);
+    renderer.uploadRuntimePixel(entry.contentId, entry.width, entry.height, bytes);
+  });
+  animationUpdatedInstances = renderer.updateRecordPixels(frame.updates);
+  commitAnimationUpdates(animationBindings, frame.updates);
+  animationLastFrameMs = performance.now() - started;
+  animationStatus = 'PLAYING';
+  renderStats = renderer.render(view);
+  updateDiagnostics();
+  updateSelectionBox();
+  animationScheduler.update(true, frame.animatedInstances, frame.nextDelayMs);
+  publishQualification('PASS');
+}
+
+async function configureWorldAnimation(records) {
+  animationScheduler?.cancel();
+  renderer.setRecords(records);
+  renderer.resetAnimationPixels();
+  animationBindings = animationRuntime ? buildAnimationBindings(records, animationRuntime) : [];
+  animationUpdatedInstances = 0;
+  animationClock?.setEnabled(Boolean(animationRuntime) && animationRequested() && !document.hidden);
+  animationStatus = !animationRuntime ? 'STATIC_FALLBACK' : animationRequested() ? (animationBindings.length ? 'READY' : 'ON_NO_VISIBLE_ANIMATIONS') : 'OFF';
+  if (animationRuntime && animationRequested() && animationBindings.length && !document.hidden) await applyWorldAnimationFrame();
+}
+
+async function setAnimationEnabled(enabled) {
+  if (enabled && !animationRuntime) return;
+  view = clampView({ ...view, animation: enabled ? 'on' : 'off' });
+  animationClock?.setEnabled(Boolean(animationRuntime) && enabled && !document.hidden);
+  if (!enabled) {
+    animationScheduler?.cancel();
+    renderer.setRecords(sceneRecords);
+    renderer.resetAnimationPixels();
+    animationStatus = 'OFF';
+    animationUpdatedInstances = 0;
+    renderStats = renderer.render(view);
+  } else {
+    animationBindings = buildAnimationBindings(sceneRecords, animationRuntime);
+    animationStatus = animationBindings.length ? 'READY' : 'ON_NO_VISIBLE_ANIMATIONS';
+    if (detailReady && animationBindings.length && !document.hidden) await applyWorldAnimationFrame();
+  }
+  syncViewUi();
+  window.dispatchEvent(new CustomEvent('oteryn-atlas-animation', { detail: { enabled: Boolean(enabled), elapsedMs: animationClock?.elapsed?.() ?? 0 } }));
+  updateDiagnostics();
+  publishQualification('PASS');
+}
+
 function progressiveRender(records, residentBuckets, epoch, floorAtStart, neededBucketCount) {
   if (!refreshIsCurrent(epoch, floorAtStart)) return;
   const readyRecords = recordsForResidentBuckets(records, pixelCatalog, runtimePixelCatalog, residentBuckets);
@@ -285,6 +375,12 @@ function progressiveRender(records, residentBuckets, epoch, floorAtStart, needed
 
 async function refreshScene() {
   refreshAbortController?.abort();
+  animationScheduler?.cancel();
+  if (renderer) {
+    renderer.setRecords(sceneRecords);
+    renderer.resetAnimationPixels();
+  }
+  animationBindings = [];
   const controller = new AbortController();
   refreshAbortController = controller;
   const epoch = ++refreshEpoch;
@@ -311,6 +407,10 @@ async function refreshScene() {
     sceneGroups = [];
     visibleSceneGroups = [];
     renderer.setRecords([]);
+    renderer.resetAnimationPixels();
+    animationBindings = [];
+    animationClock?.setEnabled(Boolean(animationRuntime) && animationRequested() && !document.hidden);
+    animationStatus = animationRequested() && animationRuntime ? 'ON_NO_VISIBLE_ANIMATIONS' : animationRuntime ? 'OFF' : 'STATIC_FALLBACK';
     renderStats = renderer.render(view);
     lastSceneLoadMs = performance.now() - started;
     if (initialLoadMs == null) initialLoadMs = performance.now() - bootStartedMs;
@@ -391,6 +491,11 @@ async function refreshScene() {
   sceneRecords = records;
   renderer.setRecords(sceneRecords);
   detailReady = true;
+  try {
+    await configureWorldAnimation(sceneRecords);
+  } catch (error) {
+    if (error?.name !== 'AbortError') disableAnimationPresentation(error);
+  }
   window.dispatchEvent(new CustomEvent('oteryn-atlas-view', { detail: { view: { ...view }, detailReady, detailStreaming } }));
   renderStats = renderer.render(view);
   if (renderStats.gpuTextureBytes > performanceProfile.gpuTextureBudgetBytes) throw new Error('GPU texture allocation exceeds runtime profile budget');
@@ -482,6 +587,9 @@ function renderInspector() {
       <div class="position-card"><strong>${runtimeWorld.counts.floors} floors</strong><span>${runtimeWorld.counts.tiles.toLocaleString()} tiles</span></div>
       <dl class="facts compact">
         <dt>Game SHA</dt><dd><code>${escapeHtml(FULLWORLD_TRUST.gameSha)}</code></dd>
+        <dt>Animation Game SHA</dt><dd><code>${escapeHtml(FULLWORLD_TRUST.animationGameSha)}</code></dd>
+        <dt>Animation product</dt><dd class="provenance-root">${escapeHtml(FULLWORLD_TRUST.animationProductRoot)}</dd>
+        <dt>Animation runtime</dt><dd>${escapeHtml(animationStatus)}</dd>
         <dt>Publication</dt><dd class="provenance-root">${escapeHtml(FULLWORLD_TRUST.publicationRoot)}</dd>
         <dt>Semantic</dt><dd class="provenance-root">${escapeHtml(FULLWORLD_TRUST.semanticRoot)}</dd>
         <dt>Pixels</dt><dd class="provenance-root">${escapeHtml(FULLWORLD_TRUST.pixelRoot)}</dd>
@@ -569,6 +677,8 @@ function updateDiagnostics() {
   $('#diag-primitives').textContent = (renderStats?.visiblePrimitives ?? renderStats?.submittedPrimitives)?.toLocaleString() ?? '—';
   $('#diag-draws').textContent = renderStats ? `${renderStats.drawCalls} / ${performanceProfile.drawCallTarget}` : '—';
   $('#diag-render').textContent = renderStats ? `${formatMs(renderStats.renderMs)} CPU${renderStats.gpuRenderMs == null ? '' : ` · ${formatMs(renderStats.gpuRenderMs)} GPU`}` : '—';
+  const animationPixels = animationPixelStore?.stats?.();
+  $('#diag-animation').textContent = `${animationStatus} · ${animationBindings.length} visible · ${animationUpdatedInstances} updated · ${formatBytes(renderStats?.animationResidentPixelBytes ?? 0)} GPU · ${formatBytes(animationPixels?.cacheBytes ?? 0)} cache`;
   $('#diag-heap').textContent = heap == null ? 'N/A' : `${formatBytes(heap)} · peak ${formatBytes(peakJsHeapBytes)}`;
   $('#status-source').textContent = `Publication ${FULLWORLD_TRUST.publicationRoot.slice(0, 19)}… · Game ${FULLWORLD_TRUST.gameSha.slice(0, 10)}…`;
   $('#status-layer').textContent = view.overview ? `Overview PROVEN · ${overviewCellsByFloor.get(view.floor)?.size?.toLocaleString() ?? '…'} cells` : 'Overview OFF';
@@ -585,6 +695,9 @@ function publishQualification(status, error = null) {
     classification: 'G5_BROWSER_QUALIFICATION_NOT_PRODUCTION_SLO',
     identities: {
       gameSha: FULLWORLD_TRUST.gameSha,
+      animationGameSha: FULLWORLD_TRUST.animationGameSha,
+      animationProductRoot: FULLWORLD_TRUST.animationProductRoot,
+      appearanceProductRoot: FULLWORLD_TRUST.appearanceProductRoot,
       overviewRoot: FULLWORLD_TRUST.overviewRoot,
       pixelRoot: FULLWORLD_TRUST.pixelRoot,
       pixelBucketRoot: FULLWORLD_TRUST.pixelBucketRoot,
@@ -614,7 +727,16 @@ function publishQualification(status, error = null) {
       browserRamBytes: null,
       browserRamReason: 'Browser process RSS is not exposed by page APIs; qualification harness may record external process metrics separately.',
       animationOnOffDeltaMs: null,
-      animationOnOffDeltaReason: FULLWORLD_CAPABILITIES.animation.enabled ? null : FULLWORLD_CAPABILITIES.animation.reason,
+      animationOnOffDeltaReason: 'External Chromium qualification records OFF/ON process and frame-time deltas; page diagnostics report bounded per-update work.',
+      animationFrameUpdateMs: animationLastFrameMs,
+      animationVisibleInstances: animationBindings.length,
+      animationUpdatedInstances,
+      animationGpuPixelBytes: renderStats.animationResidentPixelBytes ?? 0,
+      animationUploadedPixels: renderStats.uploadedAnimationPixels ?? 0,
+      animationPixelCacheBytes: animationPixelStore?.stats?.().cacheBytes ?? 0,
+      animationPixelNetworkBytes: animationPixelStore?.stats?.().networkBytes ?? 0,
+      animationScheduler: animationScheduler?.stats?.() ?? null,
+      animationStatus,
       visibleChunkCount,
       retainedChunkCount,
       visibleRangeGroups: visibleSceneGroups.length,
@@ -646,7 +768,7 @@ function publishQualification(status, error = null) {
       webglRenderMs: renderStats.renderMs,
     } : null,
     capabilities: {
-      animation: FULLWORLD_CAPABILITIES.animation,
+      animation: { ...FULLWORLD_CAPABILITIES.animation, deliveryAvailable: Boolean(animationRuntime), runtimeStatus: animationStatus },
       enabledLayers: FULLWORLD_CAPABILITIES.layers.filter((layer) => layer.enabled).map((layer) => layer.id),
       blockedOrUnknownEnabled: FULLWORLD_CAPABILITIES.layers.some((layer) => layer.enabled && layer.status !== 'PROVEN'),
     },
@@ -702,6 +824,7 @@ function wireInteraction() {
   $('#zoom-in').addEventListener('click', () => applyView({ ...view, zoom: view.zoom * 1.25 }));
   $('#zoom-out').addEventListener('click', () => applyView({ ...view, zoom: view.zoom / 1.25 }));
   $('#overview-toggle').addEventListener('change', (event) => applyView({ ...view, overview: event.target.checked }, { delay: 0 }));
+  $('#animation-toggle').addEventListener('change', (event) => setAnimationEnabled(event.target.checked).catch(disableAnimationPresentation));
   $('#floor-select').addEventListener('change', (event) => applyView(changeFloor(view, Number(event.target.value), runtimeWorld), { delay: 0 }));
   const orderedFloors = () => [...runtimeWorld.floors].map((entry) => entry.floor).sort((a, b) => b - a);
   $('#floor-up').addEventListener('click', () => {
@@ -765,6 +888,16 @@ function wireInteraction() {
     scheduleRefresh(0);
   });
   canvas.addEventListener('pointercancel', () => { dragging = null; canvas.classList.remove('dragging'); });
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      animationScheduler?.cancel();
+      animationClock?.setEnabled(false);
+      if (animationRequested()) animationStatus = 'PAUSED_HIDDEN';
+      return;
+    }
+    animationClock?.setEnabled(Boolean(animationRuntime) && animationRequested());
+    if (animationRuntime && animationRequested() && detailReady && animationBindings.length) applyWorldAnimationFrame().catch(disableAnimationPresentation);
+  });
   window.addEventListener('resize', () => { scheduleRender('resize'); scheduleRefresh(100); });
 }
 
@@ -794,6 +927,7 @@ async function boot() {
   const runtimeBase = new URL(FULLWORLD_PATHS.runtimeIndex, location.href);
   const overviewBase = new URL(FULLWORLD_PATHS.overview, location.href);
   const pixelBucketBase = new URL(FULLWORLD_PATHS.pixelBuckets, location.href);
+  const animationBase = new URL(FULLWORLD_PATHS.animation, location.href);
   publication = await loadFullWorldPublication(publicationBase, FULLWORLD_TRUST);
   [semanticWorld, runtimeWorld, pixelCatalog, runtimePixelCatalog, overviewWorld] = await Promise.all([
     loadSemanticWorld(publicationBase, publication, FULLWORLD_TRUST),
@@ -805,10 +939,23 @@ async function boot() {
   if (runtimePixelCatalog.manifest.counts.blobs !== pixelCatalog.blobs.size || runtimePixelCatalog.manifest.counts.bytes !== pixelCatalog.manifest.counts.rawBytesAfterDedupe) throw new Error('runtime pixel bucket/canonical pixel census mismatch');
   if (runtimeWorld.counts.floors !== semanticWorld.counts.floors || runtimeWorld.counts.shards !== semanticWorld.counts.shards || runtimeWorld.counts.tiles !== semanticWorld.counts.tiles || runtimeWorld.counts.resolvedPrimitives !== semanticWorld.counts.resolvedPrimitives) throw new Error('runtime index/world publication census mismatch');
   if (overviewWorld.counts.floors !== semanticWorld.counts.floors || overviewWorld.counts.chunks !== semanticWorld.counts.shards || overviewWorld.counts.tiles !== semanticWorld.counts.tiles || overviewWorld.counts.resolvedPrimitives !== semanticWorld.counts.resolvedPrimitives) throw new Error('overview/world publication census mismatch');
+  try {
+    animationRuntime = await loadAnimationRuntime(animationBase, FULLWORLD_TRUST.animationProductRoot);
+    animationPixelStore = new AnimationPixelStore(animationRuntime, fetch, 32 * 1024 * 1024);
+    animationStatus = 'READY';
+    $('#animation-note').textContent = `Verified Game animation product ${FULLWORLD_TRUST.animationProductRoot.slice(0, 19)}… · private preview rights scope`;
+  } catch (error) {
+    animationRuntime = null;
+    animationPixelStore = null;
+    animationStatus = `STATIC_FALLBACK: ${error?.message ?? error}`;
+    console.warn(animationStatus);
+    $('#animation-note').textContent = `${animationStatus}. Base world and factual creatures remain visible.`;
+  }
   worldQuery = createWorldQueryApi(runtimeWorld, FULLWORLD_CAPABILITIES);
   populateFloors();
   view = parseFullWorldViewState(location.search, runtimeWorld);
   view = await chooseInitialPublishedView(view);
+  if (!animationRuntime && view.animation === 'on') view = clampView({ ...view, animation: 'off' });
   selected = view.selected ? { x: view.selected.x, y: view.selected.y } : null;
   const semanticBase = new URL('./', new URL(publication.semantic.path, publicationBase));
   persistentCache = new VerifiedContentCache({ enabled: true, maxEntryBytes: 96 * 1024 * 1024 });
@@ -824,6 +971,9 @@ async function boot() {
     gpuTextureBudgetBytes: performanceProfile.gpuTextureBudgetBytes,
   });
   frameScheduler = createFrameScheduler(renderFrame);
+  animationClock = createAnimationClock();
+  animationClock.setEnabled(Boolean(animationRuntime) && view.animation === 'on' && !document.hidden);
+  animationScheduler = createAnimationScheduler(() => applyWorldAnimationFrame().catch(disableAnimationPresentation));
   $('#status-detail').textContent = `Performance profile ${performanceProfile.name} · ${GROUP_CONCURRENCY} semantic / ${PIXEL_BUCKET_CONCURRENCY} pixel fetchers · ${formatBytes(performanceProfile.semanticCacheBytes)} semantic cache`;
   syncViewUi();
   wireInteraction();

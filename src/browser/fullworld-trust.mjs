@@ -8,9 +8,13 @@ export const FULLWORLD_TRUST = Object.freeze({
   runtimeIndexRoot: 'sha256:fa30ae5fc47f0ca8a6d482ed87b5db2cd74f32f7f523df16187ca719b8e04f08',
   pixelBucketRoot: 'sha256:99cf23b01a0d652ff670a994a2b80cbef8d17036f514522d47f1aa98352d3116',
   sourceFingerprint: 'sha256:52613c4b755bee1ca32608b1b860413c3a9184870ca61114fad5a7670e80aee9',
+  animationGameSha: '8f6a4fdea4487a61c4cdaf1889d421ecd2265a31',
+  animationProductRoot: 'sha256:43ca727af914da89bba591a9e3c7324bfc72ffe96bd4ba0524bdf71a6c6a4caf',
+  appearanceProductRoot: 'sha256:0d1c8fc777d1d220a9d7723507fddd72585f7358d35a40209bd7415f1fe057c1',
 });
 
 export const FULLWORLD_PATHS = Object.freeze({
+  animation: '/data/animation/',
   minimap: '/fullworld/minimap/',
   overview: '/fullworld/overview/',
   publication: '/fullworld/publication/',
@@ -20,9 +24,12 @@ export const FULLWORLD_PATHS = Object.freeze({
 
 export const FULLWORLD_CAPABILITIES = Object.freeze({
   animation: Object.freeze({
-    enabled: false,
-    status: 'BLOCKED',
-    reason: 'Authoritative animation phase/timing publication is not available yet; static verified phases remain visible.',
+    enabled: true,
+    status: 'PROVEN',
+    capability: 'animated-world-and-creatures-v1',
+    productRoot: 'sha256:43ca727af914da89bba591a9e3c7324bfc72ffe96bd4ba0524bdf71a6c6a4caf',
+    rightsScope: 'PRIVATE_PREVIEW_VALIDATION_ONLY',
+    reason: 'Game-owned exact-15.32 animation semantics are supported; missing/corrupt delivery degrades to verified static presentation.',
   }),
   layers: Object.freeze([
     Object.freeze({ id: 'minimap-overview', label: 'Overview / density', status: 'PROVEN', enabled: true }),

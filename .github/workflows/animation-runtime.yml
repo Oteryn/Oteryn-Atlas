@@ -1,0 +1,150 @@
+name: Animation runtime
+
+on:
+  pull_request:
+    paths:
+      - 'src/browser/animation-runtime.mjs'
+      - 'src/browser/fullworld-trust.mjs'
+      - 'src/browser/fullworld-webgl.mjs'
+      - 'src/browser/fullworld.mjs'
+      - 'web/fullworld-app.mjs'
+      - 'web/fullworld-creatures.mjs'
+      - 'web/fullworld.html'
+      - 'tools/animation-runtime/**'
+      - 'tools/build-creature-index.py'
+      - 'tests/fullworld-runtime/animation.test.mjs'
+      - '.github/workflows/animation-runtime.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'src/browser/animation-runtime.mjs'
+      - 'src/browser/fullworld-webgl.mjs'
+      - 'tools/animation-runtime/**'
+      - '.github/workflows/animation-runtime.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  exact-15-32:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Check out exact Atlas revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Check out merged Game animation producer
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: Oteryn/Oteryn-Game
+          ref: 8f6a4fdea4487a61c4cdaf1889d421ecd2265a31
+          path: game
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Check out pinned migration corpus
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: blakinio/Otheryn
+          ref: e417c5e7c22986bf4acef0495eb47f7b72c97cce
+          path: legacy
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Verify immutable source revisions
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C game rev-parse HEAD)" = 8f6a4fdea4487a61c4cdaf1889d421ecd2265a31
+          test "$(git -C legacy rev-parse HEAD)" = e417c5e7c22986bf4acef0495eb47f7b72c97cce
+          test -s legacy/src/protobuf/appearances.proto
+      - name: Download and verify exact 15.32 source
+        shell: bash
+        run: |
+          set -euo pipefail
+          FILE_ID='1Dlo3bS4K1nS3mw4BhPZdlHT7lX5zRAvv'
+          EXPECTED='1a6bad8b7598cd874f534cd4aae2d249fb3d9b4458b3ccfa75754f91bb27870f'
+          curl -fL --retry 5 --retry-delay 2 "https://drive.usercontent.google.com/download?id=${FILE_ID}&export=download&confirm=t" -o /tmp/15.32.zip
+          test "$(sha256sum /tmp/15.32.zip | awk '{print $1}')" = "$EXPECTED"
+
+      - name: Compile and run pure runtime tests
+        run: |
+          python -m py_compile tools/animation-runtime/build_product.py tools/animation-runtime/verify_product.py tools/build-creature-index.py
+          node --check src/browser/animation-runtime.mjs
+          node --check src/browser/fullworld-webgl.mjs
+          node --check web/fullworld-app.mjs
+          node --check web/fullworld-creatures.mjs
+          node --test tests/fullworld-runtime/animation.test.mjs tests/fullworld-runtime/runtime.test.mjs
+
+      - name: Build exact Game appearance products
+        shell: bash
+        run: |
+          set -euo pipefail
+          python game/tools/game-atlas-appearances/export.py /tmp/15.32.zip /tmp/appearance
+          python game/tools/game-atlas-appearances/verify.py /tmp/appearance
+          python game/tools/game-atlas-outfit-spatial/export.py /tmp/15.32.zip /tmp/outfit-spatial
+          test "$(python -c 'import json;print(json.load(open("/tmp/appearance/manifest.json"))["product_root"])')" = 'sha256:0d1c8fc777d1d220a9d7723507fddd72585f7358d35a40209bd7415f1fe057c1'
+      - name: Build exact animated creature source
+        shell: bash
+        run: |
+          set -euo pipefail
+          WORLD='legacy/vendor/map-analysis/crystalserver/data-global/world'
+          NPC='legacy/vendor/map-analysis/crystalserver/data-global/npc'
+          MONSTER='legacy/vendor/map-analysis/crystalserver/data-global/monster'
+          python game/tools/game-atlas-creatures/animated.py "$WORLD" "$NPC" "$MONSTER" /tmp/appearance /tmp/outfit-spatial /tmp/creatures.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/creatures.json'))
+          assert d['capability']=='animated-creatures-v1'
+          assert d['semantic_digest']=='sha256:3ecb5570fa2d018089bb5301c73abc8073154329a1443498c84f38d8febd8f23'
+          assert d['statistics']['npc_presentation']['resolved_presentation_records']==973
+          assert d['statistics']['monster_presentation']['resolved_presentation_records']==87193
+          assert d['statistics']['presentation_unresolved']==1
+          PY
+
+      - name: Build Atlas products twice and require byte identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          for suffix in a b; do
+            python tools/build-creature-index.py /tmp/creatures.json "/tmp/creatures-$suffix"
+            python tools/animation-runtime/build_product.py --asset-zip /tmp/15.32.zip --appearance-product /tmp/appearance --creature-source /tmp/creatures.json --output "/tmp/animation-$suffix" --game-sha 8f6a4fdea4487a61c4cdaf1889d421ecd2265a31
+            python tools/animation-runtime/verify_product.py "/tmp/animation-$suffix"
+          done
+          diff -qr /tmp/creatures-a /tmp/creatures-b
+          diff -qr /tmp/animation-a /tmp/animation-b
+      - name: Verify exact roots, bounds and corruption rejection
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          a=json.load(open('/tmp/animation-a/manifest.json'))
+          c=json.load(open('/tmp/creatures-a/index.json'))
+          assert a['rootContentId']=='sha256:43ca727af914da89bba591a9e3c7324bfc72ffe96bd4ba0524bdf71a6c6a4caf'
+          assert a['objects']['programs']==5190 and a['creatures']['presentations']==1377
+          assert a['rights']['publicFullWorldRedistributionAuthorized'] is False
+          assert c['counts']=={'records':88633,'chunks':5746,'search_records':1945}
+          assert c['source']['capability']=='animated-creatures-v1'
+          assert c['source']['appearance_product_root']=='sha256:0d1c8fc777d1d220a9d7723507fddd72585f7358d35a40209bd7415f1fe057c1'
+          PY
+          cp -a /tmp/animation-a /tmp/animation-corrupt
+          printf X >> /tmp/animation-corrupt/creatures.json
+          if python tools/animation-runtime/verify_product.py /tmp/animation-corrupt >/tmp/corrupt.log 2>&1; then
+            echo 'ERROR: animation verifier accepted corruption' >&2
+            exit 1
+          fi
+          echo 'animation-exact-source=PASS'
+
+      - name: Prove browser authority boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -R --line-number -E '(\.otbm|\.spr|appearances-.*\.dat|crystalserver|data-otservbr-global)' src/browser web/fullworld-app.mjs web/fullworld-creatures.mjs; then
+            echo 'Browser runtime references forbidden legacy/raw source.' >&2
+            exit 1
+          fi
+          grep -F 'PRIVATE_PREVIEW_VALIDATION_ONLY' src/browser/fullworld-trust.mjs
+          grep -F 'sha256:43ca727af914da89bba591a9e3c7324bfc72ffe96bd4ba0524bdf71a6c6a4caf' src/browser/animation-runtime.mjs

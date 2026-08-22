@@ -10,7 +10,7 @@ from pathlib import Path
 CHUNK_SIZE = 64
 MAX_RECORDS = 200_000
 EXPECTED_CONTRACT = "oteryn-game-atlas-export-v1"
-EXPECTED_CAPABILITY = "static-creatures-v1"
+EXPECTED_CAPABILITIES = {"static-creatures-v1", "animated-creatures-v1"}
 RESOLUTION_STATES = {"RESOLVED", "AMBIGUOUS", "UNRESOLVED"}
 
 
@@ -25,8 +25,8 @@ def sha256(data: bytes) -> str:
 def validate(source: dict[str, object]) -> list[dict[str, object]]:
     if source.get("contract_id") != EXPECTED_CONTRACT:
         raise ValueError("unsupported Game export contract")
-    if source.get("capability") != EXPECTED_CAPABILITY:
-        raise ValueError("missing static-creatures-v1 capability")
+    if source.get("capability") not in EXPECTED_CAPABILITIES:
+        raise ValueError("unsupported Game creature capability")
     if source.get("coordinate_profile") != "oteryn-native-floor-v1":
         raise ValueError("unsupported coordinate profile")
     semantic_digest = source.get("semantic_digest")
@@ -73,9 +73,15 @@ def build(source: dict[str, object], output: Path) -> dict[str, object]:
         key = (int(position["floor"]), int(position["x"]) // CHUNK_SIZE, int(position["y"]) // CHUNK_SIZE)
         public = {
             field: record[field]
-            for field in ("record_id", "entity_id", "kind", "name", "position", "spawn_area", "origin", "resolution_state", "appearance")
+            for field in ("record_id", "entity_id", "kind", "name", "position", "spawn_area", "origin", "resolution_state", "appearance", "presentation_resolution_state", "presentation_reason", "presentation_fallback")
             if field in record
         }
+        outfit_presentation = record.get("outfit_presentation")
+        if isinstance(outfit_presentation, dict):
+            presentation_id = outfit_presentation.get("outfit_presentation_id")
+            if not isinstance(presentation_id, str) or not presentation_id.startswith("outfit-presentation:sha256:"):
+                raise ValueError("resolved outfit presentation identity missing")
+            public["outfit_presentation_id"] = presentation_id
         shards.setdefault(key, []).append(public)
         label = str(record["name"])
         search_record = {
@@ -123,6 +129,11 @@ def build(source: dict[str, object], output: Path) -> dict[str, object]:
         "semantic_digest": source["semantic_digest"],
         "coordinate_profile": source["coordinate_profile"],
         "legacy_evidence": source.get("legacy_evidence"),
+        "appearance_capability": source.get("appearance_capability"),
+        "appearance_product_root": source.get("appearance_product_root"),
+        "appearance_source": source.get("appearance_source"),
+        "outfit_spatial_capability": source.get("outfit_spatial_capability"),
+        "outfit_spatial_product_root": source.get("outfit_spatial_product_root"),
     }
     search_records = sorted(search.values(), key=lambda record: (str(record["label"]).casefold(), str(record["kind"])))
     search_data = canonical({"schema_version": 1, "source": source_metadata, "records": search_records}) + b"\n"

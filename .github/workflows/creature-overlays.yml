@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - tools/build-creature-index.py
+      - src/browser/animation-runtime.mjs
+      - tools/animation-runtime/**
       - web/fullworld-creatures.mjs
       - web/fullworld-minimap.mjs
       - .github/workflows/creature-overlays.yml
@@ -11,6 +13,8 @@ on:
     branches: [main]
     paths:
       - tools/build-creature-index.py
+      - src/browser/animation-runtime.mjs
+      - tools/animation-runtime/**
       - web/fullworld-creatures.mjs
       - web/fullworld-minimap.mjs
       - .github/workflows/creature-overlays.yml
@@ -29,7 +33,8 @@ jobs:
 
       - name: Compile producer consumer tooling
         run: |
-          python -m py_compile tools/build-creature-index.py
+          python -m py_compile tools/build-creature-index.py tools/animation-runtime/build_product.py tools/animation-runtime/verify_product.py
+          node --check src/browser/animation-runtime.mjs
           node --check web/fullworld-creatures.mjs
 
       - name: Run deterministic creature-index fixture
@@ -50,11 +55,16 @@ jobs:
 
           source = {
               'contract_id': 'oteryn-game-atlas-export-v1',
-              'capability': 'static-creatures-v1',
+              'capability': 'animated-creatures-v1',
               'semantic_revision': 1,
               'semantic_digest': 'sha256:' + '1' * 64,
               'coordinate_profile': 'oteryn-native-floor-v1',
               'legacy_evidence': {'repository': 'fixture', 'sha': '2' * 40},
+              'appearance_capability': 'animated-appearances-v1',
+              'appearance_product_root': 'sha256:' + '3' * 64,
+              'appearance_source': {'label': 'fixture'},
+              'outfit_spatial_capability': 'outfit-spatial-v1',
+              'outfit_spatial_product_root': 'sha256:' + '4' * 64,
               'npcs': [{
                   'kind': 'npc', 'name': 'Alice', 'record_id': 'npc:' + 'a' * 32,
                   'entity_id': 'npc-entity:' + 'b' * 32,
@@ -62,6 +72,8 @@ jobs:
                   'spawn_area': {'center': {'x': 100, 'y': 200, 'floor': -7}, 'radius': 1},
                   'origin': 'base-map', 'resolution_state': 'RESOLVED',
                   'appearance': {'outfit_key': '128-1-2-3-4-0', 'look_type': 128},
+                  'presentation_resolution_state': 'RESOLVED',
+                  'outfit_presentation': {'outfit_presentation_id': 'outfit-presentation:sha256:' + '5' * 64},
               }],
               'monster_spawns': [{
                   'kind': 'monster', 'name': 'Rat', 'record_id': 'monster:' + 'c' * 32,
@@ -98,6 +110,12 @@ jobs:
               chunk = index['chunks'][0]
               chunk_bytes = (first / chunk['path']).read_bytes()
               assert chunk['digest'] == 'sha256:' + hashlib.sha256(chunk_bytes).hexdigest()
+              chunk_payload = json.loads(chunk_bytes)
+              alice = next(record for record in chunk_payload['records'] if record['kind'] == 'npc')
+              assert alice['outfit_presentation_id'] == 'outfit-presentation:sha256:' + '5' * 64
+              assert 'outfit_presentation' not in alice
+              assert index['source']['capability'] == 'animated-creatures-v1'
+              assert index['source']['appearance_product_root'] == 'sha256:' + '3' * 64
               bad = dict(source)
               bad['npcs'] = [dict(source['npcs'][0], kind='monster')]
               try:
@@ -113,7 +131,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          grep -q "EXPECTED_SEMANTIC_DIGEST = 'sha256:01921968a6cb4f6ecea237820a053fc5052aaa1da556851f2c2a60d99890b5e1'" web/fullworld-creatures.mjs
+          grep -q "EXPECTED_CAPABILITY = 'animated-creatures-v1'" web/fullworld-creatures.mjs
+          grep -q "EXPECTED_SEMANTIC_DIGEST = 'sha256:3ecb5570fa2d018089bb5301c73abc8073154329a1443498c84f38d8febd8f23'" web/fullworld-creatures.mjs
+          grep -q "EXPECTED_APPEARANCE_ROOT = 'sha256:0d1c8fc777d1d220a9d7723507fddd72585f7358d35a40209bd7415f1fe057c1'" web/fullworld-creatures.mjs
           grep -q '__OTERYN_ATLAS_CREATURES__' web/fullworld-creatures.mjs
           grep -q "panel.id = 'creature-inspector'" web/fullworld-creatures.mjs
           grep -q "params.set('creature', item.record_id)" web/fullworld-creatures.mjs

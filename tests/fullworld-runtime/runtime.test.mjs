@@ -125,7 +125,8 @@ test('full-world RuntimeState round-trips deterministically', () => {
   assert.throws(() => parseFullWorldViewState('?floor=1', world), /not exported/);
   assert.throws(() => parseFullWorldViewState('?floor=-7&x=999&y=32230', world), /outside exported floor bounds/);
   assert.throws(() => parseFullWorldViewState('?floor=-7&layers=npcs', world), /not enabled/);
-  assert.throws(() => parseFullWorldViewState('?floor=-7&animation=on', world), /not yet supported/);
+  assert.equal(parseFullWorldViewState('?floor=-7&animation=on', world).animation, 'on');
+  assert.throws(() => parseFullWorldViewState('?floor=-7&animation=maybe', world), /unsupported animation playback mode/);
 });
 
 test('runtime spatial index selects only intersecting authenticated row groups', () => {

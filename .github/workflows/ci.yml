@@ -103,8 +103,8 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Run browser semantic consumer tests
-        run: node --test tests/browser-semantic.mjs tests/pixel-store.mjs tests/gui-contract.mjs
+      - name: Run browser semantic and animation consumer tests
+        run: node --test tests/browser-semantic.mjs tests/pixel-store.mjs tests/gui-contract.mjs tests/fullworld-runtime/runtime.test.mjs tests/fullworld-runtime/animation.test.mjs
 
       - name: Validate static browser entry
         shell: bash
