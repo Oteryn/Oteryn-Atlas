@@ -126,7 +126,7 @@ jobs:
         shell: bash
         run: |
           set -Eeuo pipefail
-          rm -rf -- atlas-source game-source legacy-source asset-15.32.zip appearance-a appearance-b spatial-a spatial-b animated-creatures-a.json animated-creatures-b.json creature-index-a creature-index-b animation-runtime-a animation-runtime-b e2e-targets.json first-chunk.txt e2e-evidence
+          rm -rf -- atlas-source game-source legacy-source asset-15.32.zip appearance-a appearance-b spatial-a spatial-b animated-creatures-a.json animated-creatures-b.json creature-index-a creature-index-b animation-runtime-a animation-runtime-b e2e-targets.json first-chunk.txt first-bucket.txt e2e-evidence
           fetch_exact() {
             local directory="$1" repository="$2" revision="$3"
             git init "$directory" >/dev/null
@@ -173,7 +173,7 @@ jobs:
           cmp animated-creatures-a.json animated-creatures-b.json
           diff -qr creature-index-a creature-index-b
           diff -qr animation-runtime-a animation-runtime-b
-          python3 - <<'PY'
+          docker exec -i "$python_container" sh -c 'cd / && python3 -' <<'PY'
           import json
           from pathlib import Path
           creatures=json.loads(Path('animated-creatures-a.json').read_text())
@@ -194,8 +194,12 @@ jobs:
               targets[kind]={'kind':kind,'label':item['label'],'record_id':item['record_id'],'position':item['position']}
           Path('e2e-targets.json').write_text(json.dumps(targets,indent=2,sort_keys=True)+chr(10))
           Path('first-chunk.txt').write_text(index['chunks'][0]['path']+chr(10))
+          Path('first-bucket.txt').write_text(animation['buckets'][0]['path']+chr(10))
           print(json.dumps({'animation_root':animation['rootContentId'],'creature_digest':creatures['semantic_digest'],'targets':targets},sort_keys=True))
           PY
+          docker cp "$python_container:/e2e-targets.json" e2e-targets.json
+          docker cp "$python_container:/first-chunk.txt" first-chunk.txt
+          docker cp "$python_container:/first-bucket.txt" first-bucket.txt
           docker rm -f "$python_container" >/dev/null
           trap - EXIT
           rm -rf -- legacy-source asset-15.32.zip appearance-b spatial-b creature-index-b animation-runtime-b animated-creatures-b.json
@@ -239,7 +243,7 @@ jobs:
           cmp creature-index-a/index.json /tmp/live-creatures.json
           cmp animation-runtime-a/manifest.json /tmp/live-animation.json
           cmp animation-runtime-a/programs.json /tmp/live-programs.json
-          first_bucket="$(python3 -c 'import json; print(json.load(open("animation-runtime-a/manifest.json"))["buckets"][0]["path"])')"
+          first_bucket="$(cat first-bucket.txt)"
           curl -fsS "$PREVIEW_URL/fullworld/animation/$first_bucket" -o /tmp/live-animation-bucket.rgba
           cmp "animation-runtime-a/$first_bucket" /tmp/live-animation-bucket.rgba
           first_chunk="$(cat first-chunk.txt)"; curl -fsS "$PREVIEW_URL/data/creatures/$first_chunk" -o /tmp/live-first-chunk.json; cmp "creature-index-a/$first_chunk" /tmp/live-first-chunk.json
@@ -370,5 +374,5 @@ jobs:
           if [[ -n "$BROWSER_IMAGE" ]]; then
             docker image rm -f "$BROWSER_IMAGE" >/dev/null 2>&1 || true
           fi
-          rm -rf -- atlas-source game-source legacy-source asset-15.32.zip appearance-a appearance-b spatial-a spatial-b animated-creatures-a.json animated-creatures-b.json creature-index-a creature-index-b animation-runtime-a animation-runtime-b e2e-targets.json first-chunk.txt e2e-evidence
+          rm -rf -- atlas-source game-source legacy-source asset-15.32.zip appearance-a appearance-b spatial-a spatial-b animated-creatures-a.json animated-creatures-b.json creature-index-a creature-index-b animation-runtime-a animation-runtime-b e2e-targets.json first-chunk.txt first-bucket.txt e2e-evidence
           echo 'task-owned-cleanup=PASS'
