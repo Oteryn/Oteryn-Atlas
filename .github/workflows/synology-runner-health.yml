@@ -1,0 +1,36 @@
+name: Synology Runner Health
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/synology-runner-health.yml'
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  atlas-runner-health:
+    name: Verify Atlas organization runner boundary
+    if: github.ref == 'refs/heads/main'
+    runs-on:
+      group: atlas-runners
+      labels: oteryn-atlas
+    timeout-minutes: 5
+    steps:
+      - name: Verify immutable Atlas runner identity and least-privilege mounts
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test "${GITHUB_REPOSITORY}" = 'Oteryn/Oteryn-Atlas'
+          test "${RUNNER_SCOPE:-}" = organization
+          test "${RUNNER_GROUP:-}" = atlas-runners
+          test "${RUNNER_NAME:-}" = oteryn-synology-atlas
+          test "${RUNNER_LABELS:-}" = oteryn-atlas
+          test -S /var/run/docker.sock
+          test ! -e /var/lib/oteryn-staging-state
+          grep -F '"agentName": "oteryn-synology-atlas"' /runner/.runner
+          grep -F '"poolName": "atlas-runners"' /runner/.runner
+          grep -F '"gitHubUrl": "https://github.com/Oteryn"' /runner/.runner
+          grep -F '"workFolder": "/work"' /runner/.runner
+          echo 'atlas-runner-health=PASS'
