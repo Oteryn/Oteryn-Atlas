@@ -40,6 +40,9 @@ jobs:
             exit 1
           fi
 
+      - name: Verify main-only deployment policy
+        run: node --test tests/deployment-policy.mjs
+
       - name: Verify selective-extraction provenance
         run: python tools/governance/verify_extraction_provenance.py
 

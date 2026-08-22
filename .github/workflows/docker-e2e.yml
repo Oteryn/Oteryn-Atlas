@@ -7,6 +7,8 @@ on:
       - 'e2e/**'
       - '.github/workflows/docker-e2e.yml'
       - '.github/workflows/synology-live-acceptance.yml'
+      - 'AGENTS.md'
+      - 'tests/deployment-policy.mjs'
   workflow_dispatch:
 
 permissions:
@@ -36,6 +38,7 @@ jobs:
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$ATLAS_CODE_REVISION"
           node --check e2e/tests/live-creature-preview.cjs
+          node --test tests/deployment-policy.mjs
           docker compose -f e2e/compose.yml config >/tmp/atlas-e2e-compose.yml
           docker compose -f e2e/compose.yml up -d atlas-web
           trap 'docker compose -f e2e/compose.yml down --remove-orphans' EXIT
