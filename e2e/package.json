@@ -1,6 +1,7 @@
 {
   "name": "@oteryn/atlas-e2e",
   "version": "0.0.0",
+  "description": "Oteryn Atlas Playwright E2E harness.",
   "private": true,
   "type": "module",
   "scripts": {
