@@ -33,3 +33,13 @@ test('failed live acceptance restores the previous exact revision without assumi
   assert.match(workflow, /deployment-rollback-revision=PASS/);
   assert.doesNotMatch(workflow, /atlas-after-rollback/);
 });
+
+test('live Chromium acceptance is isolated from host network churn', () => {
+  const start = workflow.indexOf('- name: Run live desktop and mobile Chromium E2E');
+  const end = workflow.indexOf('- name: Publish bounded browser evidence', start);
+  assert.ok(start >= 0 && end > start);
+  const e2eStep = workflow.slice(start, end);
+  assert.doesNotMatch(e2eStep, /--network host/);
+  assert.match(e2eStep, /--network bridge/);
+  assert.match(e2eStep, /-e "PREVIEW_URL=\$PREVIEW_URL"/);
+});
