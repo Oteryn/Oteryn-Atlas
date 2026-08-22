@@ -20,9 +20,22 @@ These instructions govern `Oteryn/Oteryn-Atlas`.
 
 Before editing, inspect the current default-branch head, this file, the active Issue/PR, overlapping work, and only the architecture/contracts relevant to the paths being changed. Read a nearer `AGENTS.md` if one exists for a touched path.
 
+## Testing completeness
+
+- Treat executable verification as part of implementation. Every shipped behavior and every bug fix must include the deep applicable tests in the same delivery unless a precise technical blocker is recorded.
+- Tests must prove behavior, not merely code/UI presence, a DOM node, a successful action, or a non-zero renderer counter. Cover relevant edge cases, failure paths, state transitions, reload/history behavior, malformed/unavailable inputs, and integration boundaries.
+- Map, camera, floor, viewport, WebGL, world-anchored layer, marker, creature or animation changes require geometry/transform/render synchronization verification where applicable. Performance-sensitive runtime changes require bounded stress/performance verification where applicable.
+- Every reproducible defect found by a user, agent, audit, CI or live acceptance must receive a permanent deterministic regression test before the fix is accepted. Prefer: reproduce -> failing regression -> fix -> full applicable exact-head verification.
+- Preserve independent test oracles: do not calculate an expected result exclusively through the same implementation path being tested.
+- Keep deterministic acceptance failures visible. Do not use retries, broad allowlists, enlarged tolerances, arbitrary sleeps or unconditional skips to turn a real first failure green.
+- Testability hooks may expose truthful read-only runtime diagnostics but must not mutate product state, bypass normal loading, inject fake authority, or become an alternate runtime data source.
+- Do not add a user-facing module verification/status system. The source of truth is the executable suite and exact-head evidence.
+- Follow the architecture and evidence contract in `docs/testing/ATLAS-VERIFICATION-PLATFORM.md` for cross-cutting test-platform work and for selecting the applicable verification layers for feature changes.
+
 ## Validation and merge
 
 - Run repository-selected checks applicable to the changed paths and deterministic fixture/contract tests for generated semantic data.
+- Run the complete applicable verification layers required by `docs/testing/ATLAS-VERIFICATION-PLATFORM.md` for changed behavior; targeted local checks do not replace exact-final-head qualification.
 - Review the complete changed-file set and full diff on the exact final head.
 - Verify browser runtime consumes Atlas projection data only.
 - Require exact-head CI, including stable `atlas-gate`, before merge.

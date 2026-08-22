@@ -1,6 +1,7 @@
 import { sha256ContentId } from '../src/browser/loader.mjs';
 import { getAnimationRuntime } from '../src/browser/animation-runtime-service.mjs';
 import { FULLWORLD_PATHS } from '../src/browser/fullworld-trust.mjs';
+import { createCreatureRenderSnapshot } from '../src/browser/creature-render-diagnostics.mjs';
 import { availableNpcFilters, npcMatchesRole, npcPresentationRoles, npcRoleFilter, npcRoleGlyph, npcRoleLabel, validateNpcRoleMetadata } from '../src/browser/npc-markers.mjs';
 
 const ROOT = new URL('../data/creatures/', location.href);
@@ -44,6 +45,8 @@ const state = {
   pixelDrawnRecords: 0,
   markerDrawnRecords: 0,
   lastDrawnNpcIcons: 0,
+  renderGeneration: 0,
+  lastRender: null,
 };
 
 function requireValue(condition, message) {
@@ -87,6 +90,7 @@ function publish(status = 'LOADING', error = null, extra = {}) {
     drawnNpcIcons: state.lastDrawnNpcIcons,
     animationOn: state.animationOn,
     animationRuntime: state.animationRuntime?.stats?.() ?? null,
+    render: state.lastRender,
     cacheChunks: state.cache.size,
     error: error ? String(error.message ?? error) : null,
     ...extra,
@@ -345,6 +349,12 @@ function setup() {
     repaintPreparedForCurrentState();
     refresh().catch(fail);
   });
+  window.addEventListener('oteryn-atlas-render-committed', (event) => {
+    if (!state.index || !state.canvas) return;
+    drawCommitted(state.lastVisibleRecords, event.detail).then((count) => {
+      if (count != null) { state.lastDrawnRecords = count; publish('PASS'); }
+    }).catch(fail);
+  });
   window.addEventListener('oteryn-atlas-animation-frame', (event) => {
     state.logicalTimeMs = event.detail.logicalTimeMs;
     if (state.animationOn && state.lastVisibleRecords.length) draw(state.lastVisibleRecords).then((count) => { state.lastDrawnRecords = count; publish('PASS'); }).catch(fail);
@@ -382,6 +392,34 @@ function renderSearch(query) {
     button.addEventListener('click', () => navigate(item));
     output.append(button);
   }
+}
+
+function rendererView(snapshot) {
+  const transform = snapshot?.transform;
+  if (!transform) return null;
+  return Object.freeze({
+    x: transform.centerTileX,
+    y: transform.centerTileY,
+    floor: transform.floor,
+    zoom: transform.zoom,
+  });
+}
+
+function sameView(left, right) {
+  return Boolean(left && right)
+    && left.floor === right.floor
+    && Math.abs(left.x - right.x) < 1e-9
+    && Math.abs(left.y - right.y) < 1e-9
+    && Math.abs(left.zoom - right.zoom) < 1e-9;
+}
+
+function sameRendererCommit(expected) {
+  const current = globalThis.__OTERYN_ATLAS_RENDERER_DIAGNOSTICS__;
+  return current?.generation === expected?.generation
+    && current?.transform?.floor === expected?.transform?.floor
+    && current?.transform?.centerTileX === expected?.transform?.centerTileX
+    && current?.transform?.centerTileY === expected?.transform?.centerTileY
+    && current?.transform?.zoom === expected?.transform?.zoom;
 }
 
 function drawNpcIcon(context, x, y, glyph, size) {
@@ -425,6 +463,7 @@ async function prepareDraw(records, view = state.view) {
   const rect = canvas.getBoundingClientRect();
   const scale = 32 * view.zoom;
   const candidates = records.filter((record) => {
+    if (record.position.floor !== view.floor) return false;
     if (!state.enabled[record.kind]) return false;
     if (record.kind === 'npc' && !npcMatchesRole(record, state.npcRole)) return false;
     const x = rect.width / 2 + (record.position.x - view.x) * scale;
@@ -439,7 +478,7 @@ async function prepareDraw(records, view = state.view) {
   }));
 }
 
-function paintPrepared(prepared, view = state.view) {
+function paintPrepared(prepared, view = state.view, committedBase = null) {
   const canvas = state.canvas;
   if (!canvas || !view) return 0;
   const rect = canvas.getBoundingClientRect();
@@ -460,6 +499,7 @@ function paintPrepared(prepared, view = state.view) {
   let markerDrawn = 0;
   let npcIcons = 0;
   let drawn = 0;
+  const anchors = [];
   for (const item of prepared) {
     const { record } = item;
     if (!state.enabled[record.kind]) continue;
@@ -467,6 +507,9 @@ function paintPrepared(prepared, view = state.view) {
     drawn += 1;
     const tileX = rect.width / 2 + (record.position.x - view.x) * scale;
     const tileY = rect.height / 2 + (record.position.y - view.y) * scale;
+    if (committedBase && anchors.length < 24) {
+      anchors.push({ id: record.record_id, kind: record.kind, floor: record.position.floor, x: record.position.x, y: record.position.y, screenX: tileX, screenY: tileY });
+    }
     if (!item.marker) {
       const displacement = item.frame.program.displacement ?? { x: 0, y: 0 };
       const x = tileX - (item.bitmap.width - 32 + Number(displacement.x ?? 0)) * view.zoom;
@@ -490,6 +533,18 @@ function paintPrepared(prepared, view = state.view) {
     }
   }
   context.restore();
+  if (committedBase && sameRendererCommit(committedBase)) {
+    state.renderGeneration += 1;
+    state.lastRender = createCreatureRenderSnapshot({
+      generation: state.renderGeneration,
+      baseGenerationAtStart: committedBase.generation,
+      baseGenerationAtCommit: committedBase.generation,
+      view,
+      canvas: { width: rect.width, height: rect.height, dpr },
+      anchors,
+    });
+    window.dispatchEvent(new CustomEvent('oteryn-atlas-creature-render-committed', { detail: state.lastRender }));
+  }
   state.pixelDrawnRecords = pixelDrawn;
   state.markerDrawnRecords = markerDrawn;
   state.lastDrawnNpcIcons = npcIcons;
@@ -506,6 +561,24 @@ async function draw(records, view = state.view) {
   return state.lastDrawnRecords;
 }
 
+async function drawCommitted(records, committedBase) {
+  const view = rendererView(committedBase);
+  const canvas = state.canvas;
+  const epoch = ++state.drawEpoch;
+  if (!canvas || !view || !committedBase?.generation) return null;
+  const rect = canvas.getBoundingClientRect();
+  const baseViewport = committedBase.transform;
+  if (Math.abs(rect.width - baseViewport.cssViewportWidth) > 0.01
+      || Math.abs(rect.height - baseViewport.cssViewportHeight) > 0.01) return null;
+  const dpr = Math.max(1, Math.min(2, devicePixelRatio || 1));
+  if (Math.abs(dpr - baseViewport.dpr) > 0.01) return null;
+  const prepared = await prepareDraw(records, view);
+  if (epoch !== state.drawEpoch || !sameRendererCommit(committedBase)) return null;
+  state.lastPreparedRecords = prepared;
+  state.lastDrawnRecords = paintPrepared(prepared, view, committedBase);
+  return state.lastDrawnRecords;
+}
+
 async function refresh() {
   if (!state.index || !state.view || !state.canvas) return;
   const epoch = ++state.refreshEpoch;
@@ -519,6 +592,11 @@ async function refresh() {
   state.lastVisibleRecords = records;
   state.lastPreparedRecords = prepared;
   state.lastDrawnRecords = paintPrepared(prepared, view);
+  const committedBase = globalThis.__OTERYN_ATLAS_RENDERER_DIAGNOSTICS__;
+  if (sameView(rendererView(committedBase), view)) {
+    const committedCount = await drawCommitted(records, committedBase);
+    if (committedCount != null) state.lastDrawnRecords = committedCount;
+  }
   const selected = state.selectedId ? records.find((record) => record.record_id === state.selectedId) ?? null : null;
   renderCreatureInspector(selected);
   const status = document.querySelector('#creature-status');
