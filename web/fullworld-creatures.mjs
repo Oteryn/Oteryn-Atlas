@@ -502,6 +502,7 @@ function paintPrepared(prepared, view = state.view, committedBase = null) {
   const anchors = [];
   for (const item of prepared) {
     const { record } = item;
+    if (record.position.floor !== view.floor) continue;
     if (!state.enabled[record.kind]) continue;
     if (record.kind === 'npc' && !npcMatchesRole(record, state.npcRole)) continue;
     drawn += 1;
