@@ -12,6 +12,9 @@ MAX_RECORDS = 200_000
 EXPECTED_CONTRACT = "oteryn-game-atlas-export-v1"
 EXPECTED_CAPABILITIES = {"static-creatures-v1", "animated-creatures-v1"}
 RESOLUTION_STATES = {"RESOLVED", "AMBIGUOUS", "UNRESOLVED"}
+ROLE_RESOLUTION_STATES = {"RESOLVED", "AMBIGUOUS"}
+NPC_ROLE_ORDER = ("bank", "travel", "shop", "quest", "blessing", "trainer")
+NPC_ROLES = set(NPC_ROLE_ORDER)
 
 
 def canonical(value: object) -> bytes:
@@ -29,6 +32,8 @@ def validate(source: dict[str, object]) -> list[dict[str, object]]:
         raise ValueError("unsupported creature capability")
     if source.get("coordinate_profile") != "oteryn-native-floor-v1":
         raise ValueError("unsupported coordinate profile")
+    if source.get("npc_role_schema_version") != 1:
+        raise ValueError("unsupported NPC role schema")
     semantic_digest = source.get("semantic_digest")
     if not isinstance(semantic_digest, str) or not semantic_digest.startswith("sha256:") or len(semantic_digest) != 71:
         raise ValueError("invalid Game semantic digest")
@@ -55,6 +60,29 @@ def validate(source: dict[str, object]) -> list[dict[str, object]]:
             name = record.get("name")
             if not isinstance(name, str) or not name.strip() or len(name) > 256:
                 raise ValueError("invalid creature name")
+            role_state = record.get("role_resolution_state")
+            roles = record.get("roles")
+            if expected_kind == "monster":
+                if role_state is not None or roles is not None:
+                    raise ValueError("monster records must not expose NPC role metadata")
+            elif role_state is None:
+                if roles is not None:
+                    raise ValueError("NPC roles require a role resolution state")
+            else:
+                if role_state not in ROLE_RESOLUTION_STATES:
+                    raise ValueError("invalid NPC role resolution state")
+                if role_state == "AMBIGUOUS" and roles is not None:
+                    raise ValueError("ambiguous NPC role metadata must not publish roles")
+                if roles is not None:
+                    if role_state != "RESOLVED" or not isinstance(roles, list) or not roles:
+                        raise ValueError("invalid NPC roles")
+                    indexes = []
+                    for role in roles:
+                        if not isinstance(role, str) or role not in NPC_ROLES:
+                            raise ValueError("unsupported NPC role")
+                        indexes.append(NPC_ROLE_ORDER.index(role))
+                    if len(set(roles)) != len(roles) or indexes != sorted(indexes):
+                        raise ValueError("NPC roles must be unique and use canonical order")
             records.append(record)
     if len(records) > MAX_RECORDS:
         raise ValueError("creature export exceeds bounded record cap")
@@ -73,7 +101,7 @@ def build(source: dict[str, object], output: Path) -> dict[str, object]:
         key = (int(position["floor"]), int(position["x"]) // CHUNK_SIZE, int(position["y"]) // CHUNK_SIZE)
         public = {
             field: record[field]
-            for field in ("record_id", "entity_id", "kind", "name", "position", "spawn_area", "origin", "resolution_state", "appearance", "presentation_resolution_state", "presentation_reason", "presentation_fallback", "outfit_presentation")
+            for field in ("record_id", "entity_id", "kind", "name", "position", "spawn_area", "origin", "resolution_state", "appearance", "presentation_resolution_state", "presentation_reason", "presentation_fallback", "outfit_presentation", "role_resolution_state", "roles")
             if field in record
         }
         shards.setdefault(key, []).append(public)
@@ -87,6 +115,10 @@ def build(source: dict[str, object], output: Path) -> dict[str, object]:
         }
         if "entity_id" in record:
             search_record["entity_id"] = record["entity_id"]
+        if "role_resolution_state" in record:
+            search_record["role_resolution_state"] = record["role_resolution_state"]
+        if "roles" in record:
+            search_record["roles"] = record["roles"]
         search_key = (kind, label.casefold())
         current = search.get(search_key)
         if current is None or ("entity_id" not in current and "entity_id" in search_record):
@@ -121,6 +153,7 @@ def build(source: dict[str, object], output: Path) -> dict[str, object]:
         "capability": source["capability"],
         "semantic_revision": source.get("semantic_revision"),
         "semantic_digest": source["semantic_digest"],
+        "npc_role_schema_version": source["npc_role_schema_version"],
         "coordinate_profile": source["coordinate_profile"],
         "legacy_evidence": source.get("legacy_evidence"),
     }

@@ -22,12 +22,12 @@ jobs:
     timeout-minutes: 45
     env:
       ATLAS_REV: ${{ github.sha }}
-      GAME_REV: 8f6a4fdea4487a61c4cdaf1889d421ecd2265a31
+      GAME_REV: 0161b80c351b644b47c28b290a6f54b44f775de7
       LEGACY_REV: e417c5e7c22986bf4acef0495eb47f7b72c97cce
       PREVIEW_CONTAINER: oteryn-atlas-fullworld-preview
       PREVIEW_URL: http://192.168.1.2:8097
       PYTHON_IMAGE: docker.io/library/python@sha256:2c941e860699f878900b0edc2403613c234d4b32eda3cc9fa7036991a2a63c4a
-      CREATURE_SEMANTIC_DIGEST: sha256:3ecb5570fa2d018089bb5301c73abc8073154329a1443498c84f38d8febd8f23
+      CREATURE_SEMANTIC_DIGEST: sha256:7dc951874c95424279737eaaf51cf2d50940162ef4799daea39a187a581ef0e8
       PUBLICATION_ROOT: sha256:9d0d2f3bb16a5a90f9b51a21366e4ed42963f5cb12366c404a20d9502ec4857f
       SEMANTIC_ROOT: sha256:27d7a83a7d9f498ea614b440ab4216cae5e6d11ea0527482410e40948cade5a9
       PIXEL_ROOT: sha256:8b8228fcc4574903e547cb7d65b96f3d45e5a9e67045091c1bceb6e54d3690ad
@@ -180,18 +180,23 @@ jobs:
           index=json.loads(Path('creature-index-a/index.json').read_text())
           animation=json.loads(Path('animation-runtime-a/manifest.json').read_text())
           assert creatures['capability']=='animated-creatures-v1'
-          assert creatures['semantic_digest']=='sha256:3ecb5570fa2d018089bb5301c73abc8073154329a1443498c84f38d8febd8f23'
+          assert creatures['npc_role_schema_version']==1
+          assert creatures['semantic_digest']=='sha256:7dc951874c95424279737eaaf51cf2d50940162ef4799daea39a187a581ef0e8'
           assert index['source']['capability']=='animated-creatures-v1'
+          assert index['source']['npc_role_schema_version']==1
           assert index['counts']=={'records':88633,'chunks':5746,'search_records':1945}
-          assert animation['rootContentId']=='sha256:7d9125797c4d49526ea48af9e804bfec0f3df77d9f22c92255a985a098130ae6'
+          assert animation['rootContentId']=='sha256:413de22b245288da68153e2c0e9d4efe4ee011421b56a09532c8119829079540'
           assert animation['counts']['object_programs']==5190 and animation['counts']['creature_programs']==1377 and animation['counts']['buckets']==43
           search=json.loads(Path('creature-index-a/search.json').read_text())['records']
           by_id={r['record_id']:r for r in search}
-          targets={}
-          for kind,key in [('npc','npcs'),('monster','monster_spawns')]:
-              source=next(r for r in creatures[key] if r.get('presentation_resolution_state')=='RESOLVED' and r.get('outfit_presentation') and r['outfit_presentation'].get('static_projection',{}).get('phase_count',1)>1)
-              item=by_id[source['record_id']]
-              targets[kind]={'kind':kind,'label':item['label'],'record_id':item['record_id'],'position':item['position']}
+          role_counts={role:sum(role in r.get('roles',[]) for r in creatures['npcs']) for role in ('bank','travel','shop','quest','blessing','trainer')}
+          assert role_counts=={'bank':25,'travel':51,'shop':313,'quest':432,'blessing':26,'trainer':54}
+          assert sum(bool(r.get('roles')) for r in creatures['npcs'])==705
+          assert sum(r.get('role_resolution_state')=='AMBIGUOUS' for r in creatures['npcs'])==10
+          npc_source=next(r for r in creatures['npcs'] if 'shop' in r.get('roles',[]) and r.get('presentation_resolution_state')=='RESOLVED' and r.get('outfit_presentation') and r['outfit_presentation'].get('static_projection',{}).get('phase_count',1)>1)
+          monster_source=next(r for r in creatures['monster_spawns'] if r.get('presentation_resolution_state')=='RESOLVED' and r.get('outfit_presentation') and r['outfit_presentation'].get('static_projection',{}).get('phase_count',1)>1)
+          npc_item=by_id[npc_source['record_id']]; monster_item=by_id[monster_source['record_id']]
+          targets={'npc':{'kind':'npc','label':npc_item['label'],'record_id':npc_item['record_id'],'position':npc_item['position'],'roles':npc_item['roles']},'monster':{'kind':'monster','label':monster_item['label'],'record_id':monster_item['record_id'],'position':monster_item['position']}}
           Path('e2e-targets.json').write_text(json.dumps(targets,indent=2,sort_keys=True)+chr(10))
           Path('first-chunk.txt').write_text(index['chunks'][0]['path']+chr(10))
           Path('first-bucket.txt').write_text(animation['buckets'][0]['path']+chr(10))

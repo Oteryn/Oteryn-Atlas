@@ -13,7 +13,7 @@ import {
 const INDEX_URL = new URL('./semantic-search/index.json', import.meta.url);
 const CREATURE_SEARCH_URL = new URL('./semantic-search/creatures.json', import.meta.url);
 const MAX_INDEX_BYTES = 2 * 1024 * 1024;
-const EXPECTED_CREATURE_SEMANTIC_DIGEST = 'sha256:01921968a6cb4f6ecea237820a053fc5052aaa1da556851f2c2a60d99890b5e1';
+const EXPECTED_CREATURE_SEMANTIC_DIGEST = 'sha256:81505e91d7089f91e71813ec43f97118932db9cc7fd76d291fa399447ee2dfa4';
 const MAX_CREATURE_SEARCH_BYTES = 2 * 1024 * 1024;
 const MAX_RESULTS = 12;
 const state = { index: null, creatureSearch: [], active: null, lastQuery: '', lastResults: 0, status: 'LOADING' };

@@ -15,6 +15,7 @@ assert.match(preview ?? '', /^https?:\/\/[A-Za-z0-9.-]+(?::[0-9]{1,5})?$/);
 assert.match(expectedRevision ?? '', /^[0-9a-f]{40}$/);
 assert.match(expectedDigest ?? '', /^sha256:[0-9a-f]{64}$/);
 assert.equal(targets.npc.kind, 'npc');
+assert.ok(Array.isArray(targets.npc.roles) && targets.npc.roles.includes('shop'));
 assert.equal(targets.monster.kind, 'monster');
 
 function escapeRegex(value) {
@@ -103,7 +104,7 @@ async function assertVisibleCreatureOverlay(page) {
   assert.ok(box && box.width > 0 && box.height > 0, 'creature overlay has no visible surface');
 }
 
-function targetUrl(target, creatures = 'npc,monster') {
+function targetUrl(target, creatures = 'npc,monster', npcRole = null) {
   const params = new URLSearchParams({
     x: String(target.position.x),
     y: String(target.position.y),
@@ -114,6 +115,7 @@ function targetUrl(target, creatures = 'npc,monster') {
     creatures,
     animation: 'off',
   });
+  if (npcRole) params.set('npcRole', npcRole);
   return `${preview}/web/fullworld.html?${params}`;
 }
 
@@ -198,12 +200,18 @@ async function runDesktop(browser) {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const page = await context.newPage();
   const errors = watchRelevantErrors(page);
-  await page.goto(targetUrl(targets.npc), { waitUntil: 'domcontentloaded', timeout: 60_000 });
+  await page.goto(targetUrl(targets.npc, 'npc,monster', 'shop'), { waitUntil: 'domcontentloaded', timeout: 60_000 });
   await assertRevisionResponse(page);
   await waitSemanticReady(page);
   const initial = await waitReady(page);
   assert.ok(initial.visibleRecords > 0);
+  assert.equal(initial.npcRole, 'shop');
+  assert.equal(initial.npcMarkerStyle, 'functional-icons-v1');
+  assert.ok(initial.drawnNpcIcons > 0);
   await assertVisibleCreatureOverlay(page);
+  const roleFilter = page.locator('#npc-role-filter');
+  await roleFilter.waitFor({ state: 'visible', timeout: 30_000 });
+  assert.equal(await roleFilter.inputValue(), 'shop');
 
   const npcToggle = page.locator('input[data-creature-kind="npc"]');
   const monsterToggle = page.locator('input[data-creature-kind="monster"]');

@@ -2,7 +2,7 @@ import { navigationSearchParams, validateSemanticSearchIndex } from '../src/brow
 import { searchCreatureRecords, validateCreatureSearchRecords } from '../src/browser/creature-search.mjs';
 
 const out = document.querySelector('#qualification-result');
-const EXPECTED_CREATURE_DIGEST = 'sha256:01921968a6cb4f6ecea237820a053fc5052aaa1da556851f2c2a60d99890b5e1';
+const EXPECTED_CREATURE_DIGEST = 'sha256:81505e91d7089f91e71813ec43f97118932db9cc7fd76d291fa399447ee2dfa4';
 function assert(condition, message) { if (!condition) throw new Error(message); }
 function tick() { return new Promise((resolve) => setTimeout(resolve, 0)); }
 
