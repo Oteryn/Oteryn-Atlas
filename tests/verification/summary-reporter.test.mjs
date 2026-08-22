@@ -8,6 +8,8 @@ test('summary reporter classifies verification-specific specs deterministically'
   assert.equal(classifyScenario('e2e/tests/render-probes-desktop.spec.mjs', []), 'render');
   assert.equal(classifyScenario('e2e/tests/stress-desktop.spec.mjs', []), 'stress');
   assert.equal(classifyScenario('e2e/tests/performance-desktop.spec.mjs', []), 'performance');
+  assert.equal(classifyScenario('e2e/tests/accessibility-desktop.spec.mjs', []), 'accessibility');
+  assert.equal(classifyScenario('e2e/tests/accessibility-mobile.spec.mjs', []), 'accessibility');
   assert.equal(classifyScenario('e2e/tests/desktop.spec.mjs', []), 'e2e');
   assert.equal(classifyScenario('anything.spec.mjs', [{ type: 'category', description: 'accessibility' }]), 'accessibility');
 });
