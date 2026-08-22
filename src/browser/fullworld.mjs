@@ -567,7 +567,7 @@ export function parseFullWorldViewState(input, runtimeWorld) {
   const requestedLayers = [...new Set((params.get('layers') ?? '').split(',').filter(Boolean))].sort();
   requireValue(requestedLayers.every((layer) => layer === 'minimap-overview'), 'requested semantic layer is not enabled by the verified hand-off');
   const animation = params.get('animation') ?? 'off';
-  requireValue(animation === 'off', 'animation playback is not yet supported by authoritative metadata');
+  requireValue(animation === 'off' || animation === 'on', 'animation must be on or off');
   const mode = normalizeViewMode(params.get('mode') ?? 'auto');
   const selected = normalizeSelection(params.get('selected'), floor, floors);
   const searchQuery = normalizeSearchQuery(params.get('q') ?? '');
@@ -630,7 +630,7 @@ export function changeFloor(state, nextFloor, runtimeWorld) {
   params.set('layers', Array.isArray(state.layers) ? state.layers.join(',') : (state.overview ? 'minimap-overview' : ''));
   params.set('mode', state.mode ?? 'auto');
   if (state.searchQuery) params.set('q', state.searchQuery);
-  params.set('animation', 'off');
+  params.set('animation', state.animation ?? 'off');
   if (Array.isArray(state.debugFlags) && state.debugFlags.length) params.set('debug', state.debugFlags.join(','));
   return parseFullWorldViewState(params, runtimeWorld);
 }

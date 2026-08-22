@@ -136,6 +136,8 @@ export function createAnimationRuntime(root, product) {
     while (bitmapCache.size > 512) { const key = bitmapCache.keys().next().value; bitmapCache.get(key)?.close?.(); bitmapCache.delete(key); }
     return value;
   }
+  function hasObject(record) { return product.objects.has(record?.presentation?.appearanceSourceId); }
+  function hasCreature(record) { return product.creatures.has(record?.outfit_presentation?.outfit_presentation_id); }
   function objectFrame(record, timeMs) {
     const program = product.objects.get(record.presentation.appearanceSourceId); if (!program) return null;
     const phase = phaseAt(program, timeMs, record.presentation.recordId);
@@ -152,5 +154,5 @@ export function createAnimationRuntime(root, product) {
   }
   function noteFrameUpdate(count = 1) { frameUpdates += count; }
   function stats() { return Object.freeze({ bucketBytes, bucketLoads, cachedBuckets: bucketCache.size, cachedBitmaps: bitmapCache.size, frameUpdates, objectPrograms: product.objects.size, creaturePrograms: product.creatures.size }); }
-  return Object.freeze({ bitmap, creatureFrame, manifest: product.manifest, noteFrameUpdate, objectFrame, stats });
+  return Object.freeze({ bitmap, creatureFrame, hasCreature, hasObject, manifest: product.manifest, noteFrameUpdate, objectFrame, stats });
 }

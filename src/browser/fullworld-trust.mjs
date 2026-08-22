@@ -11,6 +11,7 @@ export const FULLWORLD_TRUST = Object.freeze({
 });
 
 export const FULLWORLD_PATHS = Object.freeze({
+  animation: '/fullworld/animation/',
   minimap: '/fullworld/minimap/',
   overview: '/fullworld/overview/',
   publication: '/fullworld/publication/',
@@ -20,9 +21,9 @@ export const FULLWORLD_PATHS = Object.freeze({
 
 export const FULLWORLD_CAPABILITIES = Object.freeze({
   animation: Object.freeze({
-    enabled: false,
-    status: 'BLOCKED',
-    reason: 'Authoritative animation phase/timing publication is not available yet; static verified phases remain visible.',
+    enabled: true,
+    status: 'PROVEN',
+    reason: 'Verified 15.32 Game-owned animation programs are available; playback remains opt-in and static when disabled.',
   }),
   layers: Object.freeze([
     Object.freeze({ id: 'minimap-overview', label: 'Overview / density', status: 'PROVEN', enabled: true }),

@@ -1,9 +1,11 @@
 import { sha256ContentId } from '../src/browser/loader.mjs';
+import { getAnimationRuntime } from '../src/browser/animation-runtime-service.mjs';
+import { FULLWORLD_PATHS } from '../src/browser/fullworld-trust.mjs';
 
 const ROOT = new URL('../data/creatures/', location.href);
 const EXPECTED_CONTRACT = 'oteryn-game-atlas-export-v1';
-const EXPECTED_CAPABILITY = 'static-creatures-v1';
-const EXPECTED_SEMANTIC_DIGEST = 'sha256:01921968a6cb4f6ecea237820a053fc5052aaa1da556851f2c2a60d99890b5e1';
+const EXPECTED_CAPABILITY = 'animated-creatures-v1';
+const EXPECTED_SEMANTIC_DIGEST = 'sha256:3ecb5570fa2d018089bb5301c73abc8073154329a1443498c84f38d8febd8f23';
 const MAX_INDEX_CHUNKS = 20_000;
 const MAX_CHUNK_RECORDS = 5_000;
 const MAX_VISIBLE_CHUNKS = 64;
@@ -27,6 +29,11 @@ const state = {
   inspector: null,
   lastVisibleRecords: [],
   lastDrawnRecords: 0,
+  animationRuntime: null,
+  animationOn: initialParams.get('animation') === 'on',
+  logicalTimeMs: 0,
+  pixelDrawnRecords: 0,
+  markerDrawnRecords: 0,
 };
 
 function requireValue(condition, message) {
@@ -62,6 +69,10 @@ function publish(status = 'LOADING', error = null, extra = {}) {
     selectedRecordId: state.selectedId,
     visibleRecords: state.lastVisibleRecords.length,
     drawnRecords: state.lastDrawnRecords,
+    pixelDrawnRecords: state.pixelDrawnRecords,
+    markerDrawnRecords: state.markerDrawnRecords,
+    animationOn: state.animationOn,
+    animationRuntime: state.animationRuntime?.stats?.() ?? null,
     cacheChunks: state.cache.size,
     error: error ? String(error.message ?? error) : null,
     ...extra,
@@ -74,7 +85,9 @@ function fail(message) {
   const status = document.querySelector('#creature-status');
   if (status) status.textContent = `Unavailable: ${error.message}`;
   state.lastDrawnRecords = 0;
-  draw([]);
+  state.pixelDrawnRecords = 0;
+  state.markerDrawnRecords = 0;
+  draw([]).catch(() => {});
   publish('FAIL', error);
 }
 
@@ -152,7 +165,7 @@ function renderCreatureInspector(record) {
   if (!panel) return;
   panel.textContent = '';
   const heading = document.createElement('h3');
-  heading.textContent = 'Static creature';
+  heading.textContent = 'Verified creature';
   panel.append(heading);
   if (!record) {
     const empty = document.createElement('p');
@@ -172,8 +185,9 @@ function renderCreatureInspector(record) {
   if (record.entity_id) panel.append(createTextRow('Entity', record.entity_id));
   if (record.spawn_area) panel.append(createTextRow('Spawn area', `X ${record.spawn_area.center.x} · Y ${record.spawn_area.center.y} · F ${record.spawn_area.center.floor} · radius ${record.spawn_area.radius}`));
   if (record.appearance) panel.append(createTextRow('Outfit', record.appearance.outfit_key ?? record.appearance.look_type));
+  const verifiedPixel = record.presentation_resolution_state === 'RESOLVED' && state.animationRuntime?.hasCreature(record);
   panel.append(
-    createTextRow('Presentation', 'Static marker fallback; no unverified creature pixel asset is inferred.'),
+    createTextRow('Presentation', verifiedPixel ? `Verified outfit pixels · ${state.animationOn ? 'animated' : 'static verified phase'}` : `Factual marker fallback · ${record.presentation_reason ?? record.presentation_resolution_state ?? 'UNKNOWN'}`),
     createTextRow('Authority', `${EXPECTED_CONTRACT} / ${EXPECTED_CAPABILITY}`),
     createTextRow('Semantic digest', state.index.source.semantic_digest),
   );
@@ -186,7 +200,7 @@ function setup() {
 
   const canvas = document.createElement('canvas');
   canvas.id = 'creature-overlay';
-  canvas.setAttribute('aria-label', 'Static NPC and monster spawn overlays');
+  canvas.setAttribute('aria-label', 'Verified NPC and monster spawn presentations');
   Object.assign(canvas.style, { position: 'absolute', inset: '0', width: '100%', height: '100%', pointerEvents: 'none', zIndex: '6' });
   frame.append(canvas);
   state.canvas = canvas;
@@ -205,7 +219,7 @@ function setup() {
       name.className = 'layer-name';
       name.textContent = label;
       const status = document.createElement('span');
-      status.textContent = 'STATIC';
+      status.textContent = 'VERIFIED';
       row.append(input, name, status);
       host.append(row);
       input.addEventListener('change', () => {
@@ -219,7 +233,7 @@ function setup() {
   const region = document.querySelector('#region-controls');
   if (region) {
     const section = document.createElement('section');
-    section.innerHTML = '<h2>Creature search</h2><input id="creature-search" type="search" placeholder="Search NPCs or monsters" aria-label="Search static creatures"><div id="creature-results" class="region-results" aria-live="polite"></div><p class="rail-note" id="creature-status">Loading Game-owned static creature index…</p>';
+    section.innerHTML = '<h2>Creature search</h2><input id="creature-search" type="search" placeholder="Search NPCs or monsters" aria-label="Search verified creatures"><div id="creature-results" class="region-results" aria-live="polite"></div><p class="rail-note" id="creature-status">Loading Game-owned verified creature index…</p>';
     region.after(section);
     section.querySelector('#creature-search').addEventListener('input', (event) => renderSearch(event.target.value));
   }
@@ -236,8 +250,13 @@ function setup() {
 
   window.addEventListener('oteryn-atlas-view', (event) => {
     state.view = event.detail.view;
+    state.animationOn = state.view?.animation === 'on';
     persist();
     refresh().catch(fail);
+  });
+  window.addEventListener('oteryn-atlas-animation-frame', (event) => {
+    state.logicalTimeMs = event.detail.logicalTimeMs;
+    if (state.animationOn && state.lastVisibleRecords.length) draw(state.lastVisibleRecords).then((count) => { state.lastDrawnRecords = count; publish('PASS'); }).catch(fail);
   });
   window.addEventListener('resize', () => refresh().catch(fail));
 }
@@ -272,7 +291,7 @@ function renderSearch(query) {
   }
 }
 
-function draw(records) {
+async function draw(records) {
   const canvas = state.canvas;
   const view = state.view;
   if (!canvas || !view) return 0;
@@ -281,35 +300,52 @@ function draw(records) {
   const width = Math.max(1, Math.round(rect.width * dpr));
   const height = Math.max(1, Math.round(rect.height * dpr));
   if (canvas.width !== width || canvas.height !== height) { canvas.width = width; canvas.height = height; }
+  const scale = 32 * view.zoom;
+  const candidates = records.filter((record) => {
+    if (!state.enabled[record.kind]) return false;
+    const x = rect.width / 2 + (record.position.x - view.x) * scale;
+    const y = rect.height / 2 + (record.position.y - view.y) * scale;
+    return x >= -96 && y >= -96 && x <= rect.width + 96 && y <= rect.height + 96;
+  });
+  const prepared = await Promise.all(candidates.map(async (record) => {
+    const verified = record.presentation_resolution_state === 'RESOLVED' && state.animationRuntime?.hasCreature(record);
+    if (!verified) return { record, marker: true };
+    const frame = state.animationRuntime.creatureFrame(record, state.animationOn ? state.logicalTimeMs : 0);
+    return { record, frame, bitmap: await state.animationRuntime.bitmap(frame.contentId), marker: false };
+  }));
   const context = canvas.getContext('2d');
   context.clearRect(0, 0, width, height);
   context.save();
   context.scale(dpr, dpr);
+  context.imageSmoothingEnabled = false;
   context.font = '12px sans-serif';
   context.textBaseline = 'middle';
-  const scale = 32 * view.zoom;
-  let drawn = 0;
-  for (const record of records) {
-    if (!state.enabled[record.kind]) continue;
-    const x = rect.width / 2 + (record.position.x - view.x) * scale;
-    const y = rect.height / 2 + (record.position.y - view.y) * scale;
-    if (x < -20 || y < -20 || x > rect.width + 20 || y > rect.height + 20) continue;
-    const radius = Math.max(3, Math.min(7, view.zoom * 4));
-    context.beginPath();
-    context.arc(x, y, radius, 0, Math.PI * 2);
-    context.fillStyle = record.kind === 'npc' ? '#ffd166' : '#ef476f';
-    context.fill();
-    context.strokeStyle = '#111827';
-    context.lineWidth = 1.5;
-    context.stroke();
-    if (view.zoom >= 1) {
-      context.fillStyle = '#f8fafc';
-      context.fillText(record.name, x + 8, y);
+  let pixelDrawn = 0;
+  let markerDrawn = 0;
+  for (const item of prepared) {
+    const { record } = item;
+    const tileX = rect.width / 2 + (record.position.x - view.x) * scale;
+    const tileY = rect.height / 2 + (record.position.y - view.y) * scale;
+    if (!item.marker) {
+      const displacement = item.frame.program.displacement ?? { x: 0, y: 0 };
+      const x = tileX - (item.bitmap.width - 32 + Number(displacement.x ?? 0)) * view.zoom;
+      const y = tileY - (item.bitmap.height - 32 + Number(displacement.y ?? 0)) * view.zoom;
+      context.drawImage(item.bitmap, x, y, item.bitmap.width * view.zoom, item.bitmap.height * view.zoom);
+      pixelDrawn += 1;
+    } else {
+      const radius = Math.max(3, Math.min(7, view.zoom * 4));
+      context.beginPath(); context.arc(tileX, tileY, radius, 0, Math.PI * 2);
+      context.fillStyle = record.kind === 'npc' ? '#ffd166' : '#ef476f'; context.fill();
+      context.strokeStyle = '#111827'; context.lineWidth = 1.5; context.stroke();
+      markerDrawn += 1;
     }
-    drawn += 1;
+    if (view.zoom >= 1) { context.fillStyle = '#f8fafc'; context.fillText(record.name, tileX + 8, tileY); }
   }
   context.restore();
-  return drawn;
+  state.pixelDrawnRecords = pixelDrawn;
+  state.markerDrawnRecords = markerDrawn;
+  state.animationRuntime?.noteFrameUpdate(state.animationOn ? pixelDrawn : 0);
+  return pixelDrawn + markerDrawn;
 }
 
 async function refresh() {
@@ -318,11 +354,11 @@ async function refresh() {
   const groups = await Promise.all(entries.map(loadEntry));
   const records = groups.flat();
   state.lastVisibleRecords = records;
-  state.lastDrawnRecords = draw(records);
+  state.lastDrawnRecords = await draw(records);
   const selected = state.selectedId ? records.find((record) => record.record_id === state.selectedId) ?? null : null;
   renderCreatureInspector(selected);
   const status = document.querySelector('#creature-status');
-  if (status) status.textContent = `Game-owned static facts · ${state.index.counts.records.toLocaleString()} placements · ${entries.length} visible shards · ${state.lastDrawnRecords} drawn`;
+  if (status) status.textContent = `Game-owned verified creatures · ${state.index.counts.records.toLocaleString()} placements · ${entries.length} visible shards · ${state.pixelDrawnRecords} pixel / ${state.markerDrawnRecords} marker`;
   publish('PASS', null, { visibleShards: entries.length, selectedVisible: Boolean(selected) });
 }
 
@@ -332,10 +368,13 @@ async function boot() {
   try {
     requireValue(!selectedParam || RECORD_ID.test(selectedParam), 'invalid creature deep-link id');
     requireValue([...requested].every((kind) => kind === 'npc' || kind === 'monster'), 'unsupported creature layer');
+    state.animationRuntime = await getAnimationRuntime(new URL(FULLWORLD_PATHS.animation, location.href));
     const index = await boundedJson(new URL('index.json', ROOT), MAX_INDEX_BYTES);
     requireValue(index.schema_version === 1, 'unsupported creature index schema');
     requireValue(index.source?.contract_id === EXPECTED_CONTRACT && index.source?.capability === EXPECTED_CAPABILITY, 'unsupported creature index authority');
     requireValue(index.source?.semantic_digest === EXPECTED_SEMANTIC_DIGEST, 'untrusted Game creature semantic digest');
+    requireValue(index.source?.appearance_product_root === state.animationRuntime.manifest.source.appearance_product_root, 'creature/animation appearance root mismatch');
+    requireValue(index.source?.outfit_spatial_product_root === state.animationRuntime.manifest.source.outfit_spatial_product_root, 'creature/animation outfit root mismatch');
     requireValue(Array.isArray(index.chunks) && index.chunks.length === index.counts?.chunks && index.chunks.length <= MAX_INDEX_CHUNKS, 'creature index exceeds bounded chunk cap');
     requireValue(Number.isSafeInteger(index.search_bytes) && index.search_bytes > 0 && index.search_bytes <= MAX_SEARCH_BYTES, 'invalid creature search byte bound');
     requireValue(/^sha256:[0-9a-f]{64}$/.test(index.search_digest), 'invalid creature search digest');
@@ -345,7 +384,7 @@ async function boot() {
     requireValue(search.records.every((record) => RECORD_ID.test(record.record_id)), 'creature search record identity missing');
     state.search = search.records;
     const status = document.querySelector('#creature-status');
-    if (status) status.textContent = `Ready · ${index.counts.records.toLocaleString()} static placements`;
+    if (status) status.textContent = `Ready · ${index.counts.records.toLocaleString()} verified creature placements`;
     await refresh();
   } catch (error) {
     fail(error);
