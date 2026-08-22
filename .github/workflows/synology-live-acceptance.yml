@@ -119,6 +119,7 @@ jobs:
           test "$(docker inspect --format '{{ index .Config.Labels "org.oteryn.revision" }}' "$C")" = "$ATLAS_REV"
           trap - ERR INT TERM
           echo "backup_container=$BACKUP_CONTAINER" >> "$GITHUB_OUTPUT"
+          echo "previous_revision=$OLD_REV" >> "$GITHUB_OUTPUT"
           echo "changed=true" >> "$GITHUB_OUTPUT"
           echo 'exact-main-deployment=PASS'
 
@@ -336,6 +337,7 @@ jobs:
           E2E_OUTCOME: ${{ steps.e2e.outcome }}
           DEPLOY_CHANGED: ${{ steps.deploy.outputs.changed }}
           BACKUP_CONTAINER: ${{ steps.deploy.outputs.backup_container }}
+          PREVIOUS_REVISION: ${{ steps.deploy.outputs.previous_revision }}
           JOB_STATUS: ${{ job.status }}
         run: |
           set -Eeuo pipefail
@@ -351,7 +353,12 @@ jobs:
               docker rm -f "$PREVIEW_CONTAINER" >/dev/null 2>&1 || true
               docker rename "$BACKUP_CONTAINER" "$PREVIEW_CONTAINER"
               docker start "$PREVIEW_CONTAINER" >/dev/null
+              test -n "$PREVIOUS_REVISION"
+              docker inspect --format '{{ index .Config.Labels "org.oteryn.revision" }}' "$PREVIEW_CONTAINER" | grep -Fx "$PREVIOUS_REVISION"
+              curl -fsS -D /tmp/atlas-rollback.headers "$PREVIEW_URL/web/fullworld.html" -o /tmp/atlas-rollback.html
+              grep -qi "X-Oteryn-Atlas-Revision: $PREVIOUS_REVISION" /tmp/atlas-rollback.headers
               echo 'deployment-rollback=PASS'
+              echo 'deployment-rollback-revision=PASS'
             fi
           fi
 
@@ -363,11 +370,13 @@ jobs:
               -v "$PRODUCT_REPO_ROOT:/repo" "$HELPER_IMAGE" -c '
                 test -s /repo/data/creatures/index.json
                 rm -rf /repo/data/creatures
-                if test "$ANIMATION_PUBLISHED" = true; then rm -rf /repo/fullworld/animation; fi
+                test ! -e /repo/data/creatures
+                if test "$ANIMATION_PUBLISHED" = true; then
+                  rm -rf /repo/fullworld/animation
+                  test ! -e /repo/fullworld/animation
+                fi
                 if test "$PARENT_CREATED" = true; then rmdir /repo/data 2>/dev/null || true; fi
               '
-            code="$(curl -sS -w '%{http_code}' "$PREVIEW_URL/data/creatures/index.json" -o /tmp/atlas-after-rollback.json || true)"
-            test "$code" = 404
             echo 'animated-product-rollback=PASS'
           fi
 
