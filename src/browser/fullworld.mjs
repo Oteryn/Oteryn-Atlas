@@ -15,7 +15,7 @@ const MAX_FLOOR_BYTES = 4 * 1024 * 1024;
 const MAX_SOURCE_CHUNK_BYTES = 96 * 1024 * 1024;
 const MAX_GROUP_BYTES = 8 * 1024 * 1024;
 const APPEARANCE_PROFILE = 'oteryn-atlas-15-32-appearance-spatial-v1';
-const VIEW_MODES = new Set(['auto', 'minimap', 'map']);
+const VIEW_MODES = new Set(['auto', 'minimap', 'classic', 'map']);
 
 export class FullWorldError extends Error {}
 

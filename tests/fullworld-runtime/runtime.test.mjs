@@ -28,6 +28,7 @@ import {
 } from '../../src/browser/fullworld-pixels.mjs';
 import { canonicalJsonBytes, sha256ContentId } from '../../src/browser/loader.mjs';
 import { createWorldQueryApi } from '../../src/browser/world-query.mjs';
+import { detailStreamWanted, lodBlend, normalizeViewMode } from '../../src/layers/minimap-lod.mjs';
 import {
   RUNTIME_PIXEL_BUCKET_DOMAIN,
   loadRuntimePixelBuckets,
@@ -126,6 +127,16 @@ test('full-world RuntimeState round-trips deterministically', () => {
   assert.throws(() => parseFullWorldViewState('?floor=-7&x=999&y=32230', world), /outside exported floor bounds/);
   assert.throws(() => parseFullWorldViewState('?floor=-7&layers=npcs', world), /not enabled/);
   assert.throws(() => parseFullWorldViewState('?floor=-7&animation=on', world), /not yet supported/);
+});
+
+test('classic minimap mode is stable, minimap-only and URL round-trippable', () => {
+  const world = runtimeWorldCore();
+  assert.equal(normalizeViewMode('CLASSIC'), 'classic');
+  assert.equal(detailStreamWanted(8, true, 'classic'), false);
+  assert.deepEqual(lodBlend(8, 'classic', true), { detail: 0, minimap: 1, representation: 'classic' });
+  const state = parseFullWorldViewState('?floor=-7&x=32360&y=32230&zoom=1&mode=classic&animation=off', world);
+  assert.equal(state.mode, 'classic');
+  assert.match(serializeFullWorldViewState(state, world), /mode=classic/);
 });
 
 test('runtime spatial index selects only intersecting authenticated row groups', () => {

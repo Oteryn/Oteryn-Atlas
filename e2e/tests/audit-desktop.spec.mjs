@@ -33,6 +33,13 @@ test('audit desktop controls and LOD modes', async ({ page }) => {
   await expect(page.locator('#minimap-layer')).toHaveCSS('opacity', '1');
   await expect(page.locator('#atlas')).toHaveCSS('opacity', '0');
 
+  await page.locator('[data-mode="classic"]').click();
+  await expect.poll(() => new URL(page.url()).searchParams.get('mode')).toBe('classic');
+  await waitRep(page, 'classic');
+  await expect(page.locator('#minimap-layer')).toHaveCSS('opacity', '1');
+  await expect(page.locator('#atlas')).toHaveCSS('opacity', '0');
+  await expect(page.locator('#status-detail')).toContainText('classic palette preview');
+
   await page.locator('[data-mode="map"]').click();
   await expect.poll(() => new URL(page.url()).searchParams.get('mode')).toBe('map');
   await waitRep(page, 'detail');

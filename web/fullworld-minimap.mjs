@@ -2,6 +2,7 @@ import './fullworld-creatures.mjs';
 import { viewportTileBounds } from '../src/browser/fullworld.mjs';
 import { FULLWORLD_PATHS, FULLWORLD_TRUST } from '../src/browser/fullworld-trust.mjs';
 import { lodBlend } from '../src/layers/minimap-lod.mjs';
+import { transformClassicPalette } from '../src/layers/minimap-palette.mjs';
 import { loadMinimapFloor, loadMinimapWorld, loadVerifiedMinimapTile, selectMinimapChunks } from '../src/layers/minimap.mjs';
 
 const canvas = document.querySelector('#minimap-layer');
@@ -42,9 +43,23 @@ function rememberImage(key, image) {
   }
 }
 
-async function imageFor(entry) {
-  const cached = imageCache.get(entry.contentId);
-  if (cached) { imageCache.delete(entry.contentId); imageCache.set(entry.contentId, cached); return cached; }
+async function classicImage(image) {
+  const surface = document.createElement('canvas');
+  surface.width = image.width;
+  surface.height = image.height;
+  const ctx = surface.getContext('2d', { alpha: true, willReadFrequently: true });
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(image, 0, 0);
+  const pixels = ctx.getImageData(0, 0, surface.width, surface.height);
+  pixels.data.set(transformClassicPalette(pixels.data));
+  ctx.putImageData(pixels, 0, 0);
+  return createImageBitmap(surface, { premultiplyAlpha: 'default', colorSpaceConversion: 'default' });
+}
+
+async function imageFor(entry, mode = 'minimap') {
+  const key = `${mode}:${entry.contentId}`;
+  const cached = imageCache.get(key);
+  if (cached) { imageCache.delete(key); imageCache.set(key, cached); return cached; }
   const image = await loadVerifiedMinimapTile(minimapBase, entry, async (...args) => {
     const response = await fetch(...args);
     const clone = response.clone();
@@ -52,8 +67,10 @@ async function imageFor(entry) {
     transferredBytes += bytes.byteLength; tileRequests += 1;
     return response;
   }, decodePng);
-  rememberImage(entry.contentId, image);
-  return image;
+  const rendered = mode === 'classic' ? await classicImage(image) : image;
+  if (rendered !== image) image.close?.();
+  rememberImage(key, rendered);
+  return rendered;
 }
 async function floorFor(floor) {
   if (floorCache.has(floor)) return floorCache.get(floor);
@@ -96,7 +113,8 @@ async function render(detail) {
     const size = resize();
     const bounds = viewportTileBounds(view, size.width, size.height, 1, floor.bounds);
     const entries = selectMinimapChunks(floor, bounds);
-    const images = await Promise.all(entries.map(async (entry) => [entry, await imageFor(entry)]));
+    const imageMode = view.mode === 'classic' ? 'classic' : 'minimap';
+    const images = await Promise.all(entries.map(async (entry) => [entry, await imageFor(entry, imageMode)]));
     if (localEpoch !== epoch) return;
     const ctx = canvas.getContext('2d', { alpha: true });
     ctx.setTransform(size.dpr, 0, 0, size.dpr, 0, 0);
@@ -112,8 +130,10 @@ async function render(detail) {
     }
     if (firstUsefulPaintMs == null && images.length > 0) firstUsefulPaintMs = performance.now() - started;
     status.textContent = blend.representation === 'transition'
-      ? `Smooth minimap/detail transition · ${entries.length} bounded minimap tiles`
-      : `Verified visual minimap · ${entries.length} bounded tiles`;
+      ? `Smooth minimap/detail transition - ${entries.length} bounded minimap tiles`
+      : blend.representation === 'classic'
+        ? `Verified classic palette preview - ${entries.length} bounded tiles`
+        : `Verified visual minimap - ${entries.length} bounded tiles`;
     publish({ ready: images.length > 0, representation: blend.representation, visibleChunks: entries.length });
   } catch (error) {
     publish({ error, representation: blend.representation });
