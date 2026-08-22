@@ -19,6 +19,7 @@ import { loadFullWorldPixelCatalog } from '../src/browser/fullworld-pixels.mjs';
 import { loadRuntimePixelBuckets, loadVerifiedPixelBucket, loadVerifiedPixelBundle, requiredRuntimePixelBuckets } from '../src/browser/fullworld-pixel-buckets.mjs';
 import { recordsForResidentBuckets } from '../src/browser/fullworld-progressive.mjs';
 import { createFullWorldWebGLRenderer } from '../src/browser/fullworld-webgl.mjs';
+import { createRendererDiagnosticSnapshot } from '../src/browser/renderer-diagnostics.mjs';
 import { resolvePerformanceProfile, profileSummary } from '../src/browser/fullworld-performance.mjs';
 import { createFrameScheduler } from '../src/browser/frame-scheduler.mjs';
 import { getAnimationRuntime } from '../src/browser/animation-runtime-service.mjs';
@@ -263,6 +264,42 @@ function rendererRecords(records) {
   return records.filter((record) => !animationRuntime.hasObject(record));
 }
 function setRendererRecords(records) { renderer.setRecords(rendererRecords(records)); }
+
+function committedRendererAnchors() {
+  const anchors = [];
+  const seen = new Set();
+  for (const record of sceneRecords) {
+    const id = record.tileRecordId ?? `${record.floor}:${record.x}:${record.y}`;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    anchors.push({ id, floor: record.floor, x: record.x, y: record.y });
+    if (anchors.length >= 24) break;
+  }
+  return anchors;
+}
+
+function commitRenderer() {
+  const nextStats = renderer.render(view);
+  renderStats = nextStats;
+  const snapshot = createRendererDiagnosticSnapshot({
+    generation: nextStats.generation,
+    transform: nextStats.transform,
+    backend: nextStats.backend,
+    drawCalls: nextStats.drawCalls,
+    visiblePrimitives: nextStats.visiblePrimitives,
+    retainedPrimitives: sceneRecords.length,
+    visibleChunks: uniqueChunkCount(visibleSceneGroups),
+    retainedChunks: uniqueChunkCount(sceneGroups),
+    visibleGroups: visibleSceneGroups.length,
+    retainedGroups: sceneGroups.length,
+    renderMs: nextStats.renderMs,
+    gpuRenderMs: nextStats.gpuRenderMs,
+    anchors: committedRendererAnchors(),
+  });
+  globalThis.__OTERYN_ATLAS_RENDERER_DIAGNOSTICS__ = snapshot;
+  window.dispatchEvent(new CustomEvent('oteryn-atlas-render-committed', { detail: snapshot }));
+  return nextStats;
+}
 async function drawWorldAnimation(timeMs) {
   const epoch = ++animationEpoch;
   const rect = animationCanvas.getBoundingClientRect();
@@ -310,7 +347,7 @@ function syncAnimationLoop() {
 function renderFrame() {
   if (!renderer) return;
   try {
-    renderStats = renderer.render(view);
+    commitRenderer();
     drawOverview().catch(failClosed);
     updateDiagnostics();
     updateSelectionBox();
@@ -339,7 +376,7 @@ function progressiveRender(records, residentBuckets, epoch, floorAtStart, needed
   const readyRecords = recordsForResidentBuckets(records, pixelCatalog, runtimePixelCatalog, residentBuckets);
   sceneRecords = readyRecords;
   setRendererRecords(readyRecords);
-  renderStats = renderer.render(view);
+  commitRenderer();
   $('#status-detail').textContent = `${sceneGroups.length} authenticated row ranges · ${sceneTiles.size.toLocaleString()} tiles · ${readyRecords.length.toLocaleString()}/${records.length.toLocaleString()} primitives · ${residentBuckets.size}/${neededBucketCount} pixel buckets`;
   drawOverview().catch(failClosed);
   updateDiagnostics();
@@ -362,7 +399,7 @@ async function refreshScene() {
   // Verified overview is intentionally painted before any semantic-range or
   // pixel-bucket dependency. A slow authenticated detail stream must never
   // leave the owner with an unexplained black canvas.
-  renderStats = renderer.render(view);
+  commitRenderer();
   await drawOverview();
   updateDiagnostics();
   renderInspector();
@@ -375,7 +412,7 @@ async function refreshScene() {
     sceneGroups = [];
     visibleSceneGroups = [];
     setRendererRecords([]);
-    renderStats = renderer.render(view);
+    commitRenderer();
     lastSceneLoadMs = performance.now() - started;
     if (initialLoadMs == null) initialLoadMs = performance.now() - bootStartedMs;
     detailReady = false;
@@ -418,7 +455,7 @@ async function refreshScene() {
   if (records.length === 0) {
     sceneRecords = [];
     setRendererRecords([]);
-    renderStats = renderer.render(view);
+    commitRenderer();
   } else if (performanceProfile.name === 'local-max' && renderer.uploadedBucketIds().length === 0) {
     $('#status-detail').textContent = `${sceneGroups.length} authenticated row ranges · ${sceneTiles.size.toLocaleString()} tiles · authenticating explicit local-max pixel bundle…`;
     updateDiagnostics();
@@ -456,7 +493,7 @@ async function refreshScene() {
   setRendererRecords(sceneRecords);
   detailReady = true;
   publishView();
-  renderStats = renderer.render(view);
+  commitRenderer();
   if (renderStats.gpuTextureBytes > performanceProfile.gpuTextureBudgetBytes) throw new Error('GPU texture allocation exceeds runtime profile budget');
   if (renderStats.drawCalls > performanceProfile.drawCallTarget) throw new Error('draw-call target exceeded');
   lastSceneLoadMs = performance.now() - started;
@@ -902,7 +939,11 @@ async function boot() {
   syncViewUi();
   wireInteraction();
   renderInspector();
-  await refreshScene();
+  try {
+    await refreshScene();
+  } catch (error) {
+    if (error?.name !== 'AbortError') throw error;
+  }
 }
 
 await boot().catch(failClosed);
