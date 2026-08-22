@@ -72,14 +72,12 @@ jobs:
           test -z "$(git status --porcelain)"
           echo 'main-only deployment authority=PASS'
 
-      - name: Atomically deploy exact merged main
-        id: deploy
+      - name: Stage exact merged main candidate
+        id: stage
         shell: bash
         run: |
           set -Eeuo pipefail
           C="$PREVIEW_CONTAINER"
-          CANDIDATE_CONTAINER="${C}-candidate-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          BACKUP_CONTAINER="${C}-rollback-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           IMAGE="$(docker inspect --format '{{.Config.Image}}' "$C")"
           OLD_REV="$(docker inspect --format '{{ index .Config.Labels "org.oteryn.revision" }}' "$C")"
           OLD_REPO_ROOT="$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/srv/atlas/repo"}}{{.Source}}{{end}}{{end}}' "$C")"
@@ -87,41 +85,25 @@ jobs:
           MINIMAP_ROOT_PATH="$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/srv/atlas/minimap-product"}}{{.Source}}{{end}}{{end}}' "$C")"
           OLD_NGINX="$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/etc/nginx/conf.d/default.conf"}}{{.Source}}{{end}}{{end}}' "$C")"
           REVISION_ROOT="$(dirname "$(dirname "$OLD_REPO_ROOT")")"
-          NEW_ROOT="$REVISION_ROOT/$ATLAS_REV"
+          NEW_ROOT="$REVISION_ROOT/.staged-${ATLAS_REV}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           test "$(git rev-parse HEAD)" = "$ATLAS_REV"
-          test -n "$IMAGE"; test -n "$DATA_ROOT"; test -n "$MINIMAP_ROOT_PATH"; test -n "$OLD_NGINX"
-          docker rm -f "$CANDIDATE_CONTAINER" "$BACKUP_CONTAINER" >/dev/null 2>&1 || true
-          docker run --rm --user 0:0 --entrypoint sh -v "$REVISION_ROOT:/revisions" "$IMAGE" -c "rm -rf /revisions/$ATLAS_REV; mkdir -p /revisions/$ATLAS_REV/repo"
+          test "$(docker inspect --format '{{.State.Running}}' "$C")" = true
+          test "$(docker port "$C" 8080/tcp)" = '192.168.1.2:8097'
+          test -n "$IMAGE"; test -n "$OLD_REV"; test -n "$DATA_ROOT"; test -n "$MINIMAP_ROOT_PATH"; test -n "$OLD_NGINX"
+          {
+            echo "image=$IMAGE"
+            echo "old_revision=$OLD_REV"
+            echo "data_root=$DATA_ROOT"
+            echo "minimap_root=$MINIMAP_ROOT_PATH"
+            echo "revision_root=$REVISION_ROOT"
+            echo "new_root=$NEW_ROOT"
+          } >> "$GITHUB_OUTPUT"
+          docker rm -f "${C}-candidate-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" "${C}-rollback-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" >/dev/null 2>&1 || true
+          STAGE_NAME="$(basename "$NEW_ROOT")"
+          docker run --rm --user 0:0 --entrypoint sh -e STAGE_NAME="$STAGE_NAME" -v "$REVISION_ROOT:/revisions" "$IMAGE" -c 'rm -rf "/revisions/$STAGE_NAME"; mkdir -p "/revisions/$STAGE_NAME/repo"'
           tar --exclude=.git -cf - . | docker run --rm -i --user 0:0 --entrypoint sh -v "$NEW_ROOT/repo:/repo" "$IMAGE" -c 'tar -xf - -C /repo'
           docker run --rm --user 0:0 --entrypoint sh -v "$OLD_NGINX:/old:ro" -v "$NEW_ROOT:/new" -e OLD_REV="$OLD_REV" -e NEW_REV="$ATLAS_REV" "$IMAGE" -c 'sed "s/$OLD_REV/$NEW_REV/g" /old > /new/nginx.conf; test -s /new/nginx.conf'
-          docker run -d --name "$CANDIDATE_CONTAINER" --restart no -p 192.168.1.2:18098:8080 --label org.oteryn.preview=fullworld-atlas --label org.oteryn.revision="$ATLAS_REV" -v "$NEW_ROOT/nginx.conf:/etc/nginx/conf.d/default.conf:ro" -v "$DATA_ROOT:/srv/atlas/data:ro" -v "$MINIMAP_ROOT_PATH:/srv/atlas/minimap-product:ro" -v "$NEW_ROOT/repo:/srv/atlas/repo:ro" "$IMAGE" >/dev/null
-          for _ in $(seq 1 30); do curl -fsS -D /tmp/candidate.headers http://192.168.1.2:18098/web/fullworld.html -o /tmp/candidate.html && break; sleep 1; done
-          grep -qi "X-Oteryn-Atlas-Revision: $ATLAS_REV" /tmp/candidate.headers
-          cmp web/fullworld.html /tmp/candidate.html
-          docker rm -f "$CANDIDATE_CONTAINER" >/dev/null
-          docker stop "$C" >/dev/null
-          docker rename "$C" "$BACKUP_CONTAINER"
-          rollback_live() {
-            rc=$?
-            set +e
-            docker rm -f "$C" >/dev/null 2>&1 || true
-            docker rename "$BACKUP_CONTAINER" "$C" >/dev/null 2>&1 || true
-            docker start "$C" >/dev/null 2>&1 || true
-            exit "$rc"
-          }
-          trap rollback_live ERR INT TERM
-          if ! docker run -d --name "$C" --restart unless-stopped -p 192.168.1.2:8097:8080 --label org.oteryn.preview=fullworld-atlas --label org.oteryn.revision="$ATLAS_REV" -v "$NEW_ROOT/nginx.conf:/etc/nginx/conf.d/default.conf:ro" -v "$DATA_ROOT:/srv/atlas/data:ro" -v "$MINIMAP_ROOT_PATH:/srv/atlas/minimap-product:ro" -v "$NEW_ROOT/repo:/srv/atlas/repo:ro" "$IMAGE" >/dev/null; then
-            docker rename "$BACKUP_CONTAINER" "$C"; docker start "$C" >/dev/null; exit 1
-          fi
-          for _ in $(seq 1 30); do curl -fsS -D /tmp/live-new.headers "$PREVIEW_URL/web/fullworld.html" -o /tmp/live-new.html && break; sleep 1; done
-          grep -qi "X-Oteryn-Atlas-Revision: $ATLAS_REV" /tmp/live-new.headers
-          cmp web/fullworld.html /tmp/live-new.html
-          test "$(docker inspect --format '{{ index .Config.Labels "org.oteryn.revision" }}' "$C")" = "$ATLAS_REV"
-          trap - ERR INT TERM
-          echo "backup_container=$BACKUP_CONTAINER" >> "$GITHUB_OUTPUT"
-          echo "previous_revision=$OLD_REV" >> "$GITHUB_OUTPUT"
-          echo "changed=true" >> "$GITHUB_OUTPUT"
-          echo 'exact-main-deployment=PASS'
+          echo 'exact-main-candidate-staged=PASS'
 
       - name: Build exact animated Game and Atlas products
         shell: bash
@@ -210,49 +192,106 @@ jobs:
           trap - EXIT
           rm -rf -- legacy-source asset-15.32.zip appearance-b spatial-b creature-index-b animation-runtime-b animated-creatures-b.json
 
-      - name: Atomically publish animated products and verify live contract
+      - name: Atomically publish and cut over qualified animated candidate
         id: product
         shell: bash
         run: |
           set -Eeuo pipefail
-          C="$PREVIEW_CONTAINER"; PUBLISHED=0; ANIMATION_PUBLISHED=0; PARENT_CREATED=0
-          REPO_ROOT="$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/srv/atlas/repo"}}{{.Source}}{{end}}{{end}}' "$C")"
-          SHARED_DATA_ROOT="$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/srv/atlas/data"}}{{.Source}}{{end}}{{end}}' "$C")"
-          HELPER_IMAGE="$(docker inspect --format '{{.Image}}' "$C")"
+          C="$PREVIEW_CONTAINER"
+          IMAGE="${{ steps.stage.outputs.image }}"
+          OLD_REV="${{ steps.stage.outputs.old_revision }}"
+          DATA_ROOT="${{ steps.stage.outputs.data_root }}"
+          MINIMAP_ROOT_PATH="${{ steps.stage.outputs.minimap_root }}"
+          NEW_ROOT="${{ steps.stage.outputs.new_root }}"
+          REPO_ROOT="$NEW_ROOT/repo"
+          HELPER_IMAGE="$IMAGE"
+          CANDIDATE_CONTAINER="${C}-candidate-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          BACKUP_CONTAINER="${C}-rollback-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           test "$(docker inspect --format '{{.State.Running}}' "$C")" = true
-          test "$(docker inspect --format '{{ index .Config.Labels "org.oteryn.revision" }}' "$C")" = "$ATLAS_REV"
+          test "$(docker inspect --format '{{ index .Config.Labels "org.oteryn.revision" }}' "$C")" = "$OLD_REV"
           test "$(docker port "$C" 8080/tcp)" = '192.168.1.2:8097'
-          test -n "$REPO_ROOT"; test -n "$SHARED_DATA_ROOT"; test -n "$HELPER_IMAGE"
+          test -n "$IMAGE"; test -n "$OLD_REV"; test -n "$DATA_ROOT"; test -n "$MINIMAP_ROOT_PATH"
+          docker run --rm --entrypoint sh -v "$NEW_ROOT:/candidate:ro" "$IMAGE" -c 'test -s /candidate/nginx.conf'
           CREATURE_TMP=".creatures-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           ANIMATION_TMP=".animation-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          rollback_product() {
-            rc=$?; set +e
-            docker run --rm --user 0:0 --entrypoint sh -e CT="$CREATURE_TMP" -e AT="$ANIMATION_TMP" -e CP="$PUBLISHED" -e AP="$ANIMATION_PUBLISHED" -e PC="$PARENT_CREATED" -v "$REPO_ROOT:/repo" "$HELPER_IMAGE" -c '
-              rm -rf "/repo/data/$CT" "/repo/fullworld/$AT"
-              if test "$CP" = 1; then rm -rf /repo/data/creatures; fi
-              if test "$AP" = 1; then rm -rf /repo/fullworld/animation; fi
-              if test "$PC" = 1; then rmdir /repo/data 2>/dev/null || true; fi
-            ' >/dev/null 2>&1 || true
-            exit "$rc"
-          }
-          trap rollback_product ERR INT TERM
+          docker rm -f "$CANDIDATE_CONTAINER" "$BACKUP_CONTAINER" >/dev/null 2>&1 || true
           docker run --rm --user 0:0 --entrypoint sh -v "$REPO_ROOT:/repo" "$HELPER_IMAGE" -c 'mkdir -p /repo/data /repo/fullworld'
           tar -C creature-index-a -cf - . | docker run --rm -i --user 0:0 --entrypoint sh -e TMP="$CREATURE_TMP" -v "$REPO_ROOT:/repo" "$HELPER_IMAGE" -c '
             set -eu; rm -rf "/repo/data/$TMP" /repo/data/creatures; mkdir "/repo/data/$TMP"; tar -xf - -C "/repo/data/$TMP"; test -s "/repo/data/$TMP/index.json"; mv "/repo/data/$TMP" /repo/data/creatures'
-          PUBLISHED=1
           tar -C animation-runtime-a -cf - . | docker run --rm -i --user 0:0 --entrypoint sh -e TMP="$ANIMATION_TMP" -v "$REPO_ROOT:/repo" "$HELPER_IMAGE" -c '
             set -eu; rm -rf "/repo/fullworld/$TMP" /repo/fullworld/animation; mkdir "/repo/fullworld/$TMP"; tar -xf - -C "/repo/fullworld/$TMP"; test -s "/repo/fullworld/$TMP/manifest.json"; test -s "/repo/fullworld/$TMP/programs.json"; mv "/repo/fullworld/$TMP" /repo/fullworld/animation'
-          ANIMATION_PUBLISHED=1
+          {
+            echo "repo_root=$REPO_ROOT"
+            echo "helper_image=$HELPER_IMAGE"
+            echo "published=true"
+            echo "animation_published=true"
+            echo "parent_created=false"
+          } >> "$GITHUB_OUTPUT"
+
+          cleanup_candidate() {
+            rc=$?
+            set +e
+            docker rm -f "$CANDIDATE_CONTAINER" >/dev/null 2>&1 || true
+            exit "$rc"
+          }
+          trap cleanup_candidate ERR INT TERM
+          docker run -d --name "$CANDIDATE_CONTAINER" --restart no -p 192.168.1.2:18098:8080 --label org.oteryn.preview=fullworld-atlas --label org.oteryn.revision="$ATLAS_REV" -v "$NEW_ROOT/nginx.conf:/etc/nginx/conf.d/default.conf:ro" -v "$DATA_ROOT:/srv/atlas/data:ro" -v "$MINIMAP_ROOT_PATH:/srv/atlas/minimap-product:ro" -v "$REPO_ROOT:/srv/atlas/repo:ro" "$IMAGE" >/dev/null
+          for _ in $(seq 1 30); do curl -fsS -D /tmp/candidate.headers http://192.168.1.2:18098/web/fullworld.html -o /tmp/candidate.html && break; sleep 1; done
+          grep -qi "X-Oteryn-Atlas-Revision: $ATLAS_REV" /tmp/candidate.headers
+          cmp web/fullworld.html /tmp/candidate.html
+          curl -fsS http://192.168.1.2:18098/data/creatures/index.json -o /tmp/candidate-creatures.json
+          curl -fsS http://192.168.1.2:18098/fullworld/animation/manifest.json -o /tmp/candidate-animation.json
+          curl -fsS http://192.168.1.2:18098/fullworld/animation/programs.json -o /tmp/candidate-programs.json
+          cmp creature-index-a/index.json /tmp/candidate-creatures.json
+          cmp animation-runtime-a/manifest.json /tmp/candidate-animation.json
+          cmp animation-runtime-a/programs.json /tmp/candidate-programs.json
+          first_bucket="$(cat first-bucket.txt)"
+          curl -fsS "http://192.168.1.2:18098/fullworld/animation/$first_bucket" -o /tmp/candidate-animation-bucket.rgba
+          cmp "animation-runtime-a/$first_bucket" /tmp/candidate-animation-bucket.rgba
+          first_chunk="$(cat first-chunk.txt)"
+          curl -fsS "http://192.168.1.2:18098/data/creatures/$first_chunk" -o /tmp/candidate-first-chunk.json
+          cmp "creature-index-a/$first_chunk" /tmp/candidate-first-chunk.json
+          grep -F "$PUBLICATION_ROOT" <(curl -fsS http://192.168.1.2:18098/fullworld/publication/publication.json) >/dev/null
+          grep -F "$SEMANTIC_ROOT" <(curl -fsS http://192.168.1.2:18098/fullworld/publication/semantic/world.json) >/dev/null
+          grep -F "$PIXEL_ROOT" <(curl -fsS http://192.168.1.2:18098/fullworld/publication/pixels/manifest.json) >/dev/null
+          grep -F "$OVERVIEW_ROOT" <(curl -fsS http://192.168.1.2:18098/fullworld/overview/world.json) >/dev/null
+          grep -F "$RUNTIME_ROOT" <(curl -fsS http://192.168.1.2:18098/fullworld/runtime-index/world.json) >/dev/null
+          grep -F "$PIXEL_BUCKET_ROOT" <(curl -fsS http://192.168.1.2:18098/fullworld/pixel-buckets/manifest.json) >/dev/null
+          grep -F "$MINIMAP_ROOT" <(curl -fsS http://192.168.1.2:18098/fullworld/minimap/world.json) >/dev/null
+          echo 'qualified-candidate-products=PASS'
+          docker rm -f "$CANDIDATE_CONTAINER" >/dev/null
+          trap - ERR INT TERM
+
+          echo "backup_container=$BACKUP_CONTAINER" >> "$GITHUB_OUTPUT"
+          echo "previous_revision=$OLD_REV" >> "$GITHUB_OUTPUT"
+          docker stop "$C" >/dev/null
+          docker rename "$C" "$BACKUP_CONTAINER"
+          rollback_live() {
+            rc=$?
+            set +e
+            docker rm -f "$C" >/dev/null 2>&1 || true
+            docker rename "$BACKUP_CONTAINER" "$C" >/dev/null 2>&1 || true
+            docker start "$C" >/dev/null 2>&1 || true
+            exit "$rc"
+          }
+          trap rollback_live ERR INT TERM
+          if ! docker run -d --name "$C" --restart unless-stopped -p 192.168.1.2:8097:8080 --label org.oteryn.preview=fullworld-atlas --label org.oteryn.revision="$ATLAS_REV" -v "$NEW_ROOT/nginx.conf:/etc/nginx/conf.d/default.conf:ro" -v "$DATA_ROOT:/srv/atlas/data:ro" -v "$MINIMAP_ROOT_PATH:/srv/atlas/minimap-product:ro" -v "$REPO_ROOT:/srv/atlas/repo:ro" "$IMAGE" >/dev/null; then
+            docker rename "$BACKUP_CONTAINER" "$C"; docker start "$C" >/dev/null; exit 1
+          fi
+          for _ in $(seq 1 30); do curl -fsS -D /tmp/live-new.headers "$PREVIEW_URL/web/fullworld.html" -o /tmp/live-new.html && break; sleep 1; done
+          grep -qi "X-Oteryn-Atlas-Revision: $ATLAS_REV" /tmp/live-new.headers
+          cmp web/fullworld.html /tmp/live-new.html
+          test "$(docker inspect --format '{{ index .Config.Labels "org.oteryn.revision" }}' "$C")" = "$ATLAS_REV"
           curl -fsS "$PREVIEW_URL/data/creatures/index.json" -o /tmp/live-creatures.json
           curl -fsS "$PREVIEW_URL/fullworld/animation/manifest.json" -o /tmp/live-animation.json
           curl -fsS "$PREVIEW_URL/fullworld/animation/programs.json" -o /tmp/live-programs.json
           cmp creature-index-a/index.json /tmp/live-creatures.json
           cmp animation-runtime-a/manifest.json /tmp/live-animation.json
           cmp animation-runtime-a/programs.json /tmp/live-programs.json
-          first_bucket="$(cat first-bucket.txt)"
           curl -fsS "$PREVIEW_URL/fullworld/animation/$first_bucket" -o /tmp/live-animation-bucket.rgba
           cmp "animation-runtime-a/$first_bucket" /tmp/live-animation-bucket.rgba
-          first_chunk="$(cat first-chunk.txt)"; curl -fsS "$PREVIEW_URL/data/creatures/$first_chunk" -o /tmp/live-first-chunk.json; cmp "creature-index-a/$first_chunk" /tmp/live-first-chunk.json
+          curl -fsS "$PREVIEW_URL/data/creatures/$first_chunk" -o /tmp/live-first-chunk.json
+          cmp "creature-index-a/$first_chunk" /tmp/live-first-chunk.json
           grep -F "$PUBLICATION_ROOT" <(curl -fsS "$PREVIEW_URL/fullworld/publication/publication.json") >/dev/null
           grep -F "$SEMANTIC_ROOT" <(curl -fsS "$PREVIEW_URL/fullworld/publication/semantic/world.json") >/dev/null
           grep -F "$PIXEL_ROOT" <(curl -fsS "$PREVIEW_URL/fullworld/publication/pixels/manifest.json") >/dev/null
@@ -260,8 +299,9 @@ jobs:
           grep -F "$RUNTIME_ROOT" <(curl -fsS "$PREVIEW_URL/fullworld/runtime-index/world.json") >/dev/null
           grep -F "$PIXEL_BUCKET_ROOT" <(curl -fsS "$PREVIEW_URL/fullworld/pixel-buckets/manifest.json") >/dev/null
           grep -F "$MINIMAP_ROOT" <(curl -fsS "$PREVIEW_URL/fullworld/minimap/world.json") >/dev/null
-          { echo "repo_root=$REPO_ROOT"; echo "helper_image=$HELPER_IMAGE"; echo "published=true"; echo "animation_published=true"; echo "parent_created=false"; } >> "$GITHUB_OUTPUT"
           trap - ERR INT TERM
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          echo 'exact-main-deployment=PASS'
           echo 'live-animated-products-and-roots=PASS'
 
       - name: Build bounded Chromium acceptance image
@@ -340,10 +380,12 @@ jobs:
           PRODUCT_REPO_ROOT: ${{ steps.product.outputs.repo_root }}
           HELPER_IMAGE: ${{ steps.product.outputs.helper_image }}
           E2E_OUTCOME: ${{ steps.e2e.outcome }}
-          DEPLOY_CHANGED: ${{ steps.deploy.outputs.changed }}
-          BACKUP_CONTAINER: ${{ steps.deploy.outputs.backup_container }}
-          PREVIOUS_REVISION: ${{ steps.deploy.outputs.previous_revision }}
+          DEPLOY_CHANGED: ${{ steps.product.outputs.changed }}
+          BACKUP_CONTAINER: ${{ steps.product.outputs.backup_container }}
+          PREVIOUS_REVISION: ${{ steps.product.outputs.previous_revision }}
           JOB_STATUS: ${{ job.status }}
+          STAGED_ROOT: ${{ steps.stage.outputs.new_root }}
+          STAGE_IMAGE: ${{ steps.stage.outputs.image }}
         run: |
           set -Eeuo pipefail
           container="oteryn-atlas-live-e2e-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
@@ -383,6 +425,13 @@ jobs:
                 if test "$PARENT_CREATED" = true; then rmdir /repo/data 2>/dev/null || true; fi
               '
             echo 'animated-product-rollback=PASS'
+          fi
+
+          if [[ "$JOB_STATUS" != success && -n "$STAGED_ROOT" && -n "$STAGE_IMAGE" ]]; then
+            revision_root="$(dirname "$STAGED_ROOT")"
+            stage_name="$(basename "$STAGED_ROOT")"
+            docker run --rm --user 0:0 --entrypoint sh -e STAGE_NAME="$stage_name" -v "$revision_root:/revisions" "$STAGE_IMAGE" -c 'rm -rf "/revisions/$STAGE_NAME"'
+            echo 'staged-root-cleanup=PASS'
           fi
 
           if [[ -n "$BROWSER_IMAGE" ]]; then
