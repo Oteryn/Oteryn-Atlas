@@ -55,13 +55,16 @@ The deterministic suite covers:
 - mobile drawers, backdrop/Escape behavior, search/floor controls and 390x844 plus 844x390 responsive transitions;
 - bounded failure injection for required publication failure, malformed semantic search data and unavailable optional creature index;
 - critical accessible names and truthful disabled/hidden states.
+
 ## Network/error policy
 
 Unexpected page exceptions, console errors, failed requests and HTTP >=400 responses fail the suite. The allowlist is intentionally narrow: a missing favicon and a 404 for the optional `/data/creatures/index.json` entry point may be classified as expected. Once a creature index is present, missing child products are not ignored.
 
 ## Artifacts
 
-The host receives bounded output under `artifacts/e2e/`:
+Each runner invocation uses an isolated Compose project and, by default, an isolated `artifacts/e2e/<project>/` directory. Set `ATLAS_E2E_PROJECT` and `ATLAS_E2E_ARTIFACTS_HOST` only when a stable external name/path is required.
+
+Each run directory contains:
 
 - `summary.json` - compact target/revision/browser/project/scenario/timing/PASS-FAIL census;
 - `results.json` - Playwright JSON report;

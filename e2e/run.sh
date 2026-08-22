@@ -34,7 +34,12 @@ if [[ -z "${ATLAS_BASE_URL:-}" && -z "${ATLAS_EXPECTED_REVISION:-}" && "$ATLAS_C
   export ATLAS_EXPECTED_REVISION
 fi
 
-compose=(docker compose -f e2e/compose.yml)
+ATLAS_E2E_PROJECT="${ATLAS_E2E_PROJECT:-oteryn-atlas-e2e-$$}"
+ATLAS_E2E_ARTIFACTS_HOST="${ATLAS_E2E_ARTIFACTS_HOST:-../artifacts/e2e/$ATLAS_E2E_PROJECT}"
+export ATLAS_E2E_PROJECT ATLAS_E2E_ARTIFACTS_HOST
+mkdir -p "artifacts/e2e/$ATLAS_E2E_PROJECT"
+
+compose=(docker compose -p "$ATLAS_E2E_PROJECT" -f e2e/compose.yml)
 cleanup() {
   "${compose[@]}" down --remove-orphans >/dev/null 2>&1 || true
 }

@@ -24,14 +24,21 @@ if (-not $env:ATLAS_BASE_URL -and -not $env:ATLAS_EXPECTED_REVISION -and $env:AT
   $env:ATLAS_EXPECTED_REVISION = $env:ATLAS_CODE_REVISION
 }
 
+$project = if ($env:ATLAS_E2E_PROJECT) { $env:ATLAS_E2E_PROJECT } else { "oteryn-atlas-e2e-$PID" }
+$env:ATLAS_E2E_PROJECT = $project
+if (-not $env:ATLAS_E2E_ARTIFACTS_HOST) {
+  $env:ATLAS_E2E_ARTIFACTS_HOST = "../artifacts/e2e/$project"
+  New-Item -ItemType Directory -Force -Path (Join-Path $root "artifacts\e2e\$project") | Out-Null
+}
+
 $testExitCode = 1
 try {
-  docker compose -f e2e\compose.yml up --build --abort-on-container-exit --exit-code-from e2e e2e
+  docker compose -p $project -f e2e\compose.yml up --build --abort-on-container-exit --exit-code-from e2e e2e
   $testExitCode = $LASTEXITCODE
 } finally {
   $previousPreference = $ErrorActionPreference
   $ErrorActionPreference = 'Continue'
-  docker compose -f e2e\compose.yml down --remove-orphans *> $null
+  docker compose -p $project -f e2e\compose.yml down --remove-orphans *> $null
   $ErrorActionPreference = $previousPreference
 }
 

@@ -38,4 +38,4 @@ services:
       ATLAS_E2E_WORKERS: ${ATLAS_E2E_WORKERS:-2}
       ATLAS_ARTIFACTS_DIR: /artifacts
     volumes:
-      - ../artifacts/e2e:/artifacts
+      - ${ATLAS_E2E_ARTIFACTS_HOST:-../artifacts/e2e}:/artifacts
