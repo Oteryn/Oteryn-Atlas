@@ -7,7 +7,7 @@ export const LOD_POLICY = Object.freeze({
   maxZoom: 16,
 });
 
-export const VIEW_MODES = Object.freeze(['auto', 'minimap', 'map']);
+export const VIEW_MODES = Object.freeze(['auto', 'minimap', 'classic', 'map']);
 
 export function normalizeViewMode(value) {
   const mode = String(value ?? 'auto').toLowerCase();
@@ -18,7 +18,7 @@ export function normalizeViewMode(value) {
 export function detailStreamWanted(zoom, previous = false, mode = 'auto') {
   mode = normalizeViewMode(mode);
   if (!Number.isFinite(zoom)) throw new Error('zoom must be finite');
-  if (mode === 'minimap') return false;
+  if (mode === 'minimap' || mode === 'classic') return false;
   if (mode === 'map') return zoom >= LOD_POLICY.minimapZoom;
   return previous ? zoom >= LOD_POLICY.detailStreamExitZoom : zoom >= LOD_POLICY.detailStreamEnterZoom;
 }
@@ -26,6 +26,7 @@ export function lodBlend(zoom, mode = 'auto', detailReady = true) {
   mode = normalizeViewMode(mode);
   if (!Number.isFinite(zoom)) throw new Error('zoom must be finite');
   if (mode === 'minimap') return Object.freeze({ detail: 0, minimap: 1, representation: 'minimap' });
+  if (mode === 'classic') return Object.freeze({ detail: 0, minimap: 1, representation: 'classic' });
   if (mode === 'map' && zoom >= LOD_POLICY.minimapZoom) {
     return Object.freeze({ detail: detailReady ? 1 : 0, minimap: detailReady ? 0 : 1, representation: detailReady ? 'detail' : 'minimap-fallback' });
   }

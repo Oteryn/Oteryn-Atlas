@@ -41,6 +41,7 @@ test('GUI source does not advertise fabricated performance claims', () => {
 });
 
 await import('./fullworld-runtime/runtime.test.mjs');
+await import('./fullworld-runtime/minimap-palette.test.mjs');
 await import('./fullworld-runtime/performance.test.mjs');
 
 const fullworldIndex = await readFile(new URL('../web/fullworld.html', import.meta.url), 'utf8');
@@ -62,11 +63,14 @@ test('full-world GUI is a separate verified runtime entry while bounded proof re
   assert.match(fullworldIndex, /Technical overview/);
   assert.match(fullworldIndex, /id="minimap-layer"/);
   assert.match(fullworldIndex, /data-mode="auto"/);
+  assert.match(fullworldIndex, /data-mode="classic"[^>]*>CLASSIC<\/button>/);
+  assert.match(fullworldCss, /grid-template-columns: repeat\(4, 1fr\)/);
   assert.match(fullworldIndex, /id="floor-select"/);
   assert.match(fullworldIndex, /id="animation-toggle"[^>]*disabled/);
   assert.match(fullworldApp, /SemanticRangeStore/);
   assert.match(fullworldApp, /loadOverviewWorld/);
   assert.match(fullworldApp, /mode: next\.mode \?\? 'auto'/);
+  assert.match(fullworldApp, /data-mode/);
   assert.match(fullworldApp, /requiredRuntimePixelBuckets/);
   assert.doesNotMatch(fullworldApp, /\.otbm|Legacy IR|world\.otbm/);
 });
