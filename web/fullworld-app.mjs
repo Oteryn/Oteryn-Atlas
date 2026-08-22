@@ -419,7 +419,9 @@ async function refreshScene() {
     detailReady = false;
     detailBadge.textContent = 'VISUAL MINIMAP LOD';
     detailBadge.classList.add('overview-only');
-    $('#status-detail').textContent = 'Authenticated detail is paused by bounded LOD policy; verified visual minimap remains active.';
+    $('#status-detail').textContent = view.mode === 'classic'
+      ? 'Authenticated detail is paused by bounded LOD policy; verified classic palette preview remains active.'
+      : 'Authenticated detail is paused by bounded LOD policy; verified visual minimap remains active.';
     setBadge('VERIFIED FULL-WORLD · WEBGL2', 'ok');
     await drawOverview();
     updateDiagnostics();

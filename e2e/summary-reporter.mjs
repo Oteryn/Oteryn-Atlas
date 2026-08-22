@@ -51,6 +51,34 @@ export function normalizeSummaryScenario(input) {
   });
 }
 
+export function buildFailureManifest(summary) {
+  const failures = Object.freeze((summary.scenarios ?? [])
+    .filter((scenario) => scenario.status !== 'passed' && scenario.status !== 'skipped')
+    .slice(0, 64)
+    .map((scenario) => Object.freeze({
+      project: String(scenario.project ?? 'unknown').slice(0, 128),
+      scenario: String(scenario.scenario ?? 'unknown').slice(0, 512),
+      category: scenario.category ?? 'e2e',
+      status: scenario.status ?? 'unknown',
+      durationMs: scenario.durationMs ?? null,
+      seed: scenario.seed ?? null,
+      firstFailingActionIndex: scenario.firstFailingActionIndex ?? null,
+      skipReason: scenario.skipReason ?? null,
+      evidence: Object.freeze([...(scenario.evidence ?? [])].slice(0, 32)),
+      error: scenario.error == null ? null : String(scenario.error).slice(0, 4096),
+    })));
+  return Object.freeze({
+    version: 1,
+    status: summary.status,
+    atlasRevision: summary.metadata?.expectedRevision ?? null,
+    targetMode: summary.metadata?.targetMode ?? null,
+    targetURL: summary.metadata?.targetURL ?? null,
+    browserContainer: summary.metadata?.browserContainer ?? null,
+    projects: Object.freeze([...(summary.projects ?? [])].slice(0, 16)),
+    failures,
+  });
+}
+
 export default class AtlasSummaryReporter {
   onBegin(config) {
     this.startedAt = new Date().toISOString();
@@ -92,5 +120,9 @@ export default class AtlasSummaryReporter {
       scenarios: this.scenarios,
     };
     fs.writeFileSync(path.join(artifactsDir, 'summary.json'), `${JSON.stringify(summary, null, 2)}\n`);
+    if (result.status !== 'passed') {
+      const failure = buildFailureManifest(summary);
+      fs.writeFileSync(path.join(artifactsDir, 'failure.json'), `${JSON.stringify(failure, null, 2)}\n`);
+    }
   }
 }

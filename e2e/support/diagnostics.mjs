@@ -21,12 +21,20 @@ export async function installGeometryEventLog(page) {
     const log = [];
     const push = (kind, value) => {
       log.push({ kind, value });
-      if (log.length > 512) log.shift();
+      while (log.length > 512) log.shift();
+      // Creature commits are paired with the base snapshot they reference.
+      // Never retain an orphaned creature at the bounded-ring boundary.
+      while (log[0]?.kind === 'creature') log.shift();
+    };
+    const pushCreatureWithCurrentBase = (value) => {
+      const base = globalThis.__OTERYN_ATLAS_RENDERER_DIAGNOSTICS__;
+      if (base) push('base', base);
+      push('creature', value);
     };
     if (globalThis.__OTERYN_ATLAS_RENDERER_DIAGNOSTICS__) push('base', globalThis.__OTERYN_ATLAS_RENDERER_DIAGNOSTICS__);
-    if (globalThis.__OTERYN_ATLAS_CREATURES__?.render) push('creature', globalThis.__OTERYN_ATLAS_CREATURES__.render);
+    if (globalThis.__OTERYN_ATLAS_CREATURES__?.render) pushCreatureWithCurrentBase(globalThis.__OTERYN_ATLAS_CREATURES__.render);
     window.addEventListener('oteryn-atlas-render-committed', (event) => push('base', event.detail));
-    window.addEventListener('oteryn-atlas-creature-render-committed', (event) => push('creature', event.detail));
+    window.addEventListener('oteryn-atlas-creature-render-committed', (event) => pushCreatureWithCurrentBase(event.detail));
     globalThis.__OTERYN_ATLAS_GEOMETRY_EVENT_LOG__ = log;
   });
 }

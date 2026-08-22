@@ -36,11 +36,14 @@ async function ensureControlReachable(page, locator) {
   }).catch(() => false);
   if (inViewport) return false;
   const toggle = page.locator('#mobile-controls-toggle');
-  await expect(toggle).toBeVisible();
-  if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click();
-  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  const mobileDrawer = await toggle.isVisible();
+  if (mobileDrawer) {
+    if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  }
   await locator.scrollIntoViewIfNeeded();
-  return true;
+  await expect(locator).toBeVisible();
+  return mobileDrawer;
 }
 
 async function closeControlsDrawer(page, opened) {
@@ -92,13 +95,15 @@ async function setCreatureMode(page, value) {
   const opened = await ensureControlReachable(page, npc);
   const wantedNpc = value === 'npc' || value === 'both';
   const wantedMonster = value === 'monster' || value === 'both';
-  if ((await npc.isChecked()) !== wantedNpc) await npc.setChecked(wantedNpc);
-  if ((await monster.isChecked()) !== wantedMonster) await monster.setChecked(wantedMonster);
+  const npcChanged = (await npc.isChecked()) !== wantedNpc;
+  const monsterChanged = (await monster.isChecked()) !== wantedMonster;
+  if (npcChanged) await npc.setChecked(wantedNpc);
+  if (monsterChanged) await monster.setChecked(wantedMonster);
   await page.waitForFunction(({ npcEnabled, monsterEnabled }) => {
     const enabled = globalThis.__OTERYN_ATLAS_CREATURES__?.enabled;
     return enabled?.npc === npcEnabled && enabled?.monster === monsterEnabled;
   }, { npcEnabled: wantedNpc, monsterEnabled: wantedMonster }, { timeout: 15_000 });
-  await waitForCreatureCommit(page, before.creature);
+  if (npcChanged || monsterChanged) await waitForCreatureCommit(page, before.creature);
   await closeControlsDrawer(page, opened);
 }
 

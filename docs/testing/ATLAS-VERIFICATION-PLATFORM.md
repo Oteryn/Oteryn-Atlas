@@ -424,6 +424,30 @@ Failures must retain replay evidence. A scheduled failure is real work even if P
 
 Direct-preview qualification must verify the served revision exactly matches the intended merged `main` revision before success can be claimed. A stale live deployment is a failed qualification, not a pass for an older build.
 
+### 7.6 Executable CI and nightly wiring
+
+The repository implementation uses the existing required `atlas-gate` fan-in rather than a second optional status. `CI / verification-node` runs the deterministic Node contract/property suite and `CI / verification-browser` runs the complete Docker Playwright suite in checkout-overlay mode. Both are required inputs to `atlas-gate`. The Atlas candidate checkout in `CI` and the repository candidate checkout in `Extraction Provenance` use `${{ github.event.pull_request.head.sha || github.sha }}` so required qualification is performed on the exact pull-request head rather than GitHub's synthetic merge ref. `provenance-gate` remains a separate required branch-protection context and its pinned legacy-source checkout is unchanged.
+
+The browser gate uses the organization Atlas runner only for same-repository pull requests and `main` pushes. It serves the exact checkout locally and reads the existing FullWorld publication through `ATLAS_PUBLICATION_ORIGIN=http://192.168.1.2:8097`; it does not deploy, stop, rename or replace the live preview. The job shares the live-acceptance concurrency group so publication cutover cannot race a read-only qualification. A fork pull request does not execute repository-controlled code on this private runner; the browser job is therefore skipped and `atlas-gate` cannot become green until the candidate is reproduced on a trusted same-repository branch.
+
+`.github/workflows/verification-depth.yml` provides scheduled/nightly depth and manual dispatch. Its bounded deterministic expansion is:
+
+- the complete required browser suite once;
+- the critical geometry/framebuffer set repeated three times with retries still fixed at zero;
+- stress seeds `133`, `1096043585`, `2779096485`, and `3735928559`, each with 64 replayable actions;
+- opt-in `nightly-desktop-dpr2` and `nightly-tablet` Chromium profiles;
+- stable performance, visual, accessibility, race/fault and soak/leak specs when those worker-delivered files exist at the exact revision; absent categories are recorded in `optional-depth-skips.json` with an explicit reason rather than silently ignored;
+- the existing deterministic property test that kills controlled sign/scale coordinate mutants. A third-party mutation framework is not adopted until it demonstrates bounded additional signal.
+
+Required browser runs publish `summary.json`, `results.json`, HTML/test-result evidence and `failure.json` on failure. Nightly uploads each phase under a separate bounded artifact directory, including any action logs, performance/visual evidence emitted by the specs, and the explicit optional-depth applicability record. Workflow artifacts are retained for 14 days.
+
+Concrete local equivalents are:
+
+```text
+node --test tests/animation-runtime.mjs tests/browser-semantic.mjs tests/deployment-policy.mjs tests/gui-contract.mjs tests/npc-markers.mjs tests/pixel-store.mjs tests/semantic-search.mjs tests/semantic-search-creatures.mjs tests/synology-live-workflow.mjs tests/fullworld-layers/*.test.mjs tests/fullworld-runtime/*.test.mjs tests/properties/*.test.mjs tests/verification/*.test.mjs
+ATLAS_PUBLICATION_ORIGIN=http://192.168.1.2:8097 ATLAS_E2E_WORKERS=1 ./e2e/run.sh
+```
+
 ## 8. Browser/GPU matrix
 
 Use two complementary environments:

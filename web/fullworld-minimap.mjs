@@ -60,6 +60,14 @@ async function imageFor(entry, mode = 'minimap') {
   const key = `${mode}:${entry.contentId}`;
   const cached = imageCache.get(key);
   if (cached) { imageCache.delete(key); imageCache.set(key, cached); return cached; }
+  if (mode === 'classic') {
+    // CLASSIC is a presentation-only transform of the same authenticated minimap tile.
+    // Reuse the verified decoded source instead of issuing a duplicate network request.
+    const source = await imageFor(entry, 'minimap');
+    const rendered = await classicImage(source);
+    rememberImage(key, rendered);
+    return rendered;
+  }
   const image = await loadVerifiedMinimapTile(minimapBase, entry, async (...args) => {
     const response = await fetch(...args);
     const clone = response.clone();
@@ -67,10 +75,8 @@ async function imageFor(entry, mode = 'minimap') {
     transferredBytes += bytes.byteLength; tileRequests += 1;
     return response;
   }, decodePng);
-  const rendered = mode === 'classic' ? await classicImage(image) : image;
-  if (rendered !== image) image.close?.();
-  rememberImage(key, rendered);
-  return rendered;
+  rememberImage(key, image);
+  return image;
 }
 async function floorFor(floor) {
   if (floorCache.has(floor)) return floorCache.get(floor);

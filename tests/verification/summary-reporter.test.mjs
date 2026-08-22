@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { classifyScenario, normalizeSummaryScenario } from '../../e2e/summary-reporter.mjs';
+import {
+  buildFailureManifest,
+  classifyScenario,
+  normalizeSummaryScenario,
+} from '../../e2e/summary-reporter.mjs';
 
 test('summary reporter classifies verification-specific specs deterministically', () => {
   assert.equal(classifyScenario('e2e/tests/geometry-desktop.spec.mjs', []), 'geometry');
@@ -33,4 +37,44 @@ test('summary scenario preserves seed, first failure and explicit skip reason', 
   assert.equal(scenario.firstFailingActionIndex, 3);
   assert.equal(scenario.skipReason, 'optional publication absent');
   assert(Object.isFrozen(scenario));
+});
+
+test('failed browser runs produce a bounded machine-readable failure manifest', () => {
+  const failed = normalizeSummaryScenario({
+    project: 'desktop-chromium',
+    file: 'e2e/tests/stress-desktop.spec.mjs',
+    title: 'seeded stress',
+    annotations: [
+      { type: 'seed', description: '133' },
+      { type: 'first-failing-action', description: '7' },
+    ],
+    status: 'failed',
+    durationMs: 42,
+    retry: 0,
+    evidence: ['test-results/stress/trace.zip', 'action-log.json'],
+    error: 'geometry drift',
+  });
+  const passed = normalizeSummaryScenario({
+    project: 'desktop-chromium',
+    file: 'e2e/tests/geometry-desktop.spec.mjs',
+    title: 'geometry',
+    status: 'passed',
+    durationMs: 12,
+    retry: 0,
+  });
+  const manifest = buildFailureManifest({
+    status: 'failed',
+    metadata: { expectedRevision: 'abc123', browserContainer: 'sha256:browser' },
+    projects: [{ name: 'desktop-chromium', viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 }],
+    scenarios: [passed, failed],
+  });
+
+  assert.equal(manifest.version, 1);
+  assert.equal(manifest.status, 'failed');
+  assert.equal(manifest.atlasRevision, 'abc123');
+  assert.equal(manifest.failures.length, 1);
+  assert.equal(manifest.failures[0].seed, 133);
+  assert.equal(manifest.failures[0].firstFailingActionIndex, 7);
+  assert.deepEqual(manifest.failures[0].evidence, ['test-results/stress/trace.zip', 'action-log.json']);
+  assert(Object.isFrozen(manifest));
 });

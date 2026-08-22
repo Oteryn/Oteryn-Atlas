@@ -17,7 +17,13 @@ test('audit desktop controls and LOD modes', async ({ page }) => {
   await waitRep(page, 'detail');
   const visibleText = await page.locator('body').innerText();
   expect(visibleText).not.toMatch(/Ã|Â|â€¦|â€”/);
-  await expect(page.locator('#animation-toggle')).toBeEnabled();
+  const animationToggle = page.locator('#animation-toggle');
+  await expect(animationToggle).toBeEnabled();
+  await expect(animationToggle).not.toBeChecked();
+  await animationToggle.check();
+  await expect.poll(() => new URL(page.url()).searchParams.get('animation')).toBe('on');
+  await animationToggle.uncheck();
+  await expect.poll(() => new URL(page.url()).searchParams.get('animation')).toBe('off');
   await expect(page.locator('#region-search')).toBeDisabled();
   await expect(page.locator('#region-zoom')).toBeDisabled();
 

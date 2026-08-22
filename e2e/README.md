@@ -67,6 +67,7 @@ Each runner invocation uses an isolated Compose project and, by default, an isol
 Each run directory contains:
 
 - `summary.json` - compact target/revision/browser/project/scenario/timing/PASS-FAIL census;
+- `failure.json` - bounded machine-readable failing-scenario manifest when the run fails;
 - `results.json` - Playwright JSON report;
 - `html-report/` - browsable report;
 - `test-results/` - retained trace, video, screenshot and error context on failures.
@@ -74,3 +75,8 @@ Each run directory contains:
 Generated reports remain local/CI artifacts and are not intended for source-control commits.
 
 The source checkout is mounted read-only into the web container, no host service port is published by the harness, and the selected publication origin is exercised read-only.
+## CI tiers
+
+Required pull-request qualification is wired into `atlas-gate`: deterministic Node verification and the full Docker Playwright suite must both succeed on the exact candidate head. The Docker job is restricted to trusted same-repository pull requests before it can use the organization Atlas runner; fork candidates must be reproduced on a trusted branch before `atlas-gate` can pass. The browser job is read-only with respect to the FullWorld publication and never performs a live deployment.
+
+Scheduled depth is defined by `.github/workflows/verification-depth.yml`. `ATLAS_E2E_DEPTH=nightly` only adds the extra DPR/tablet projects; the normal required suite remains unchanged. The workflow separately runs the fixed stress seed matrix, repeated critical geometry/render scenarios, and stable worker-delivered performance/visual/accessibility/race/soak specs. Missing optional depth categories are recorded with explicit reasons in `optional-depth-skips.json`.
