@@ -48,6 +48,7 @@ const fullworldIndex = await readFile(new URL('../web/fullworld.html', import.me
 const fullworldApp = await readFile(new URL('../web/fullworld-app.mjs', import.meta.url), 'utf8');
 const fullworldCss = await readFile(new URL('../web/fullworld.css', import.meta.url), 'utf8');
 const fullworldMobile = await readFile(new URL('../web/fullworld-mobile.mjs', import.meta.url), 'utf8');
+const fullworldCreatures = await readFile(new URL('../web/fullworld-creatures.mjs', import.meta.url), 'utf8');
 const fullworldTrust = await readFile(new URL('../src/browser/fullworld-trust.mjs', import.meta.url), 'utf8');
 const fullworldRenderer = await readFile(new URL('../src/browser/fullworld-webgl.mjs', import.meta.url), 'utf8');
 const worldQuery = await readFile(new URL('../src/browser/world-query.mjs', import.meta.url), 'utf8');
@@ -144,4 +145,11 @@ test('full-world mobile layout keeps the map full-width and moves controls into 
   assert.match(fullworldMobile, /function setMobileDrawer/);
   assert.match(fullworldMobile, /desktopForm\.requestSubmit\(\)/);
   assert.doesNotMatch(fullworldMobile, /\.otbm|Legacy IR|world\.otbm/);
+});
+
+test('creature overlay cannot miss the current FullWorld view when it boots late', () => {
+  assert.match(fullworldApp, /const snapshot = Object\.freeze\(\{ \.\.\.view \}\)/);
+  assert.match(fullworldApp, /globalThis\.__OTERYN_ATLAS_VIEW__\s*=\s*snapshot/);
+  assert.match(fullworldCreatures, /globalThis\.__OTERYN_ATLAS_VIEW__/);
+  assert.match(fullworldCreatures, /waitForInitialView/);
 });
