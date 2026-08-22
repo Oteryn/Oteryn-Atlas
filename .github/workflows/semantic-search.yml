@@ -34,7 +34,7 @@ jobs:
   semantic-search:
     runs-on: ubuntu-24.04
     env:
-      GAME_REVISION: 25d628d6f7ebf4976ebd6d2a7dee9df21f19e3e3
+      GAME_REVISION: 0161b80c351b644b47c28b290a6f54b44f775de7
       LEGACY_REVISION: e417c5e7c22986bf4acef0495eb47f7b72c97cce
       NAVIGATION_KINDS: town,waypoint,poi,teleport,house,quest_area,mechanic
     steps:

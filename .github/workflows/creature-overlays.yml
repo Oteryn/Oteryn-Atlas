@@ -4,15 +4,25 @@ on:
   pull_request:
     paths:
       - tools/build-creature-index.py
+      - src/browser/npc-markers.mjs
+      - tests/npc-markers.mjs
+      - tests/creature-index-roles.py
       - web/fullworld-creatures.mjs
+      - web/fullworld.css
       - web/fullworld-minimap.mjs
+      - e2e/tests/creatures-desktop.spec.mjs
       - .github/workflows/creature-overlays.yml
   push:
     branches: [main]
     paths:
       - tools/build-creature-index.py
+      - src/browser/npc-markers.mjs
+      - tests/npc-markers.mjs
+      - tests/creature-index-roles.py
       - web/fullworld-creatures.mjs
+      - web/fullworld.css
       - web/fullworld-minimap.mjs
+      - e2e/tests/creatures-desktop.spec.mjs
       - .github/workflows/creature-overlays.yml
 
 permissions:
@@ -27,10 +37,13 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Compile producer consumer tooling
+      - name: Compile and test producer consumer tooling
         run: |
-          python -m py_compile tools/build-creature-index.py
+          python -m py_compile tools/build-creature-index.py tests/creature-index-roles.py
+          python tests/creature-index-roles.py
+          node --check src/browser/npc-markers.mjs
           node --check web/fullworld-creatures.mjs
+          node --test tests/npc-markers.mjs
 
       - name: Run deterministic creature-index fixture
         shell: bash
@@ -53,6 +66,7 @@ jobs:
               'capability': 'static-creatures-v1',
               'semantic_revision': 1,
               'semantic_digest': 'sha256:' + '1' * 64,
+              'npc_role_schema_version': 1,
               'coordinate_profile': 'oteryn-native-floor-v1',
               'legacy_evidence': {'repository': 'fixture', 'sha': '2' * 40},
               'npcs': [{
@@ -61,6 +75,7 @@ jobs:
                   'position': {'x': 100, 'y': 200, 'floor': -7},
                   'spawn_area': {'center': {'x': 100, 'y': 200, 'floor': -7}, 'radius': 1},
                   'origin': 'base-map', 'resolution_state': 'RESOLVED',
+                  'role_resolution_state': 'RESOLVED', 'roles': ['bank', 'quest'],
                   'appearance': {'outfit_key': '128-1-2-3-4-0', 'look_type': 128},
               }],
               'monster_spawns': [{
@@ -90,6 +105,9 @@ jobs:
               search = json.loads((first / 'search.json').read_text())
               assert search['records'][0]['record_id'] == 'npc:' + 'a' * 32
               assert search['records'][0]['entity_id'] == 'npc-entity:' + 'b' * 32
+              assert search['records'][0]['roles'] == ['bank', 'quest']
+              assert search['records'][0]['role_resolution_state'] == 'RESOLVED'
+              assert index['source']['npc_role_schema_version'] == 1
               assert search['records'][1]['record_id'] == 'monster:' + 'c' * 32
               assert search['records'][1]['entity_id'] == 'monster-entity:' + 'd' * 32
               search_bytes = (first / 'search.json').read_bytes()
@@ -113,9 +131,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          grep -q "EXPECTED_SEMANTIC_DIGEST = 'sha256:3ecb5570fa2d018089bb5301c73abc8073154329a1443498c84f38d8febd8f23'" web/fullworld-creatures.mjs
+          grep -q "EXPECTED_SEMANTIC_DIGEST = 'sha256:7dc951874c95424279737eaaf51cf2d50940162ef4799daea39a187a581ef0e8'" web/fullworld-creatures.mjs
           grep -q "EXPECTED_CAPABILITY = 'animated-creatures-v1'" web/fullworld-creatures.mjs
           grep -q 'getAnimationRuntime' web/fullworld-creatures.mjs
+          grep -q "EXPECTED_NPC_ROLE_SCHEMA = 1" web/fullworld-creatures.mjs
+          grep -q "NPC_MARKER_STYLE = 'functional-icons-v1'" web/fullworld-creatures.mjs
+          grep -q "id=\"npc-role-filter\"" web/fullworld-creatures.mjs
           grep -q '__OTERYN_ATLAS_CREATURES__' web/fullworld-creatures.mjs
           grep -q "panel.id = 'creature-inspector'" web/fullworld-creatures.mjs
           grep -q "params.set('creature', item.record_id)" web/fullworld-creatures.mjs

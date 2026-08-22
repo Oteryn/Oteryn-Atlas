@@ -69,7 +69,7 @@
     "kinds": 2,
     "records": 51
   },
-  "index_digest": "sha256:0c4344da796753f02fb7377df01fcbbccbde936db3f207a2631fdf0b383d1f9c",
+  "index_digest": "sha256:5634712de78744d9d280aa2f1fddf3c23227a23364ae92cf19d94ccdd66ce2ec",
   "input_floor_aliases": {
     "0": 0,
     "1": -1,
@@ -1792,10 +1792,10 @@
     "authority": "Oteryn/Oteryn-Game",
     "capability": "semantic-search-source-v1",
     "contract_id": "oteryn-game-atlas-export-v1",
-    "game_revision": "25d628d6f7ebf4976ebd6d2a7dee9df21f19e3e3",
+    "game_revision": "0161b80c351b644b47c28b290a6f54b44f775de7",
     "profile_id": "oteryn-game-atlas-semantic-search-v1",
     "records": 88684,
     "repository": "Oteryn/Oteryn-Game",
-    "semantic_digest": "sha256:0cc0546aff0e9a8f85716dcbe5babc6043e148e946a448b1d87f083410cb1005"
+    "semantic_digest": "sha256:035c911b11e588a969e8fb642965772eee598c30ad80d5d04f9ceda32461e530"
   }
 }

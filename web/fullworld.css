@@ -99,3 +99,11 @@
 .view-mode-control button { min-height: 36px; border: 1px solid var(--line); background: rgba(255,255,255,.03); color: var(--muted); border-radius: 6px; font-size: 11px; font-weight: 700; }
 .view-mode-control button.active { color: var(--text); border-color: rgba(75,163,255,.8); background: rgba(75,163,255,.14); }
 @media (max-width: 980px) { .view-mode-control button { min-height: 44px; } #atlas, #minimap-layer { touch-action: none; } }
+
+.npc-role-control { display: grid; gap: 5px; margin: 0 0 8px; }
+.npc-role-control span { color: var(--muted); font-size: 9px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.npc-role-control select {
+  min-width: 0; width: 100%; border: 1px solid var(--line); border-radius: 7px; padding: 7px 8px;
+  background: #081019; color: #cfe6fb; outline: none;
+}
+.npc-role-control select:focus { border-color: #3c78ad; box-shadow: 0 0 0 2px rgba(75,163,255,.08); }

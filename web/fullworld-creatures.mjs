@@ -1,11 +1,14 @@
 import { sha256ContentId } from '../src/browser/loader.mjs';
 import { getAnimationRuntime } from '../src/browser/animation-runtime-service.mjs';
 import { FULLWORLD_PATHS } from '../src/browser/fullworld-trust.mjs';
+import { availableNpcFilters, npcMatchesRole, npcPresentationRoles, npcRoleFilter, npcRoleGlyph, npcRoleLabel, validateNpcRoleMetadata } from '../src/browser/npc-markers.mjs';
 
 const ROOT = new URL('../data/creatures/', location.href);
 const EXPECTED_CONTRACT = 'oteryn-game-atlas-export-v1';
 const EXPECTED_CAPABILITY = 'animated-creatures-v1';
-const EXPECTED_SEMANTIC_DIGEST = 'sha256:3ecb5570fa2d018089bb5301c73abc8073154329a1443498c84f38d8febd8f23';
+const EXPECTED_SEMANTIC_DIGEST = 'sha256:7dc951874c95424279737eaaf51cf2d50940162ef4799daea39a187a581ef0e8';
+const EXPECTED_NPC_ROLE_SCHEMA = 1;
+const NPC_MARKER_STYLE = 'functional-icons-v1';
 const MAX_INDEX_CHUNKS = 20_000;
 const MAX_CHUNK_RECORDS = 5_000;
 const MAX_VISIBLE_CHUNKS = 64;
@@ -18,10 +21,13 @@ const RECORD_ID = /^(?:npc|monster):[0-9a-f]{32}$/;
 const initialParams = new URLSearchParams(location.search);
 const requested = new Set((initialParams.get('creatures') || '').split(',').filter(Boolean));
 const selectedParam = initialParams.get('creature') || null;
+const requestedNpcRole = npcRoleFilter(initialParams.get('npcRole'));
 const state = {
   index: null,
   view: null,
   enabled: { npc: requested.has('npc'), monster: requested.has('monster') },
+  npcRole: requestedNpcRole,
+  availableNpcRoles: ['all'],
   selectedId: selectedParam && RECORD_ID.test(selectedParam) ? selectedParam : null,
   cache: new Map(),
   search: [],
@@ -34,6 +40,7 @@ const state = {
   logicalTimeMs: 0,
   pixelDrawnRecords: 0,
   markerDrawnRecords: 0,
+  lastDrawnNpcIcons: 0,
 };
 
 function requireValue(condition, message) {
@@ -66,11 +73,15 @@ function publish(status = 'LOADING', error = null, extra = {}) {
     totalChunks: state.index?.counts?.chunks ?? null,
     searchRecords: state.index?.counts?.search_records ?? null,
     enabled: Object.freeze({ ...state.enabled }),
+    npcRole: state.npcRole,
+    availableNpcRoles: Object.freeze([...state.availableNpcRoles]),
+    npcMarkerStyle: NPC_MARKER_STYLE,
     selectedRecordId: state.selectedId,
     visibleRecords: state.lastVisibleRecords.length,
     drawnRecords: state.lastDrawnRecords,
     pixelDrawnRecords: state.pixelDrawnRecords,
     markerDrawnRecords: state.markerDrawnRecords,
+    drawnNpcIcons: state.lastDrawnNpcIcons,
     animationOn: state.animationOn,
     animationRuntime: state.animationRuntime?.stats?.() ?? null,
     cacheChunks: state.cache.size,
@@ -87,6 +98,7 @@ function fail(message) {
   state.lastDrawnRecords = 0;
   state.pixelDrawnRecords = 0;
   state.markerDrawnRecords = 0;
+  state.lastDrawnNpcIcons = 0;
   draw([]).catch(() => {});
   publish('FAIL', error);
 }
@@ -96,6 +108,8 @@ function persist() {
   const enabled = Object.entries(state.enabled).filter(([, on]) => on).map(([kind]) => kind).sort();
   if (enabled.length) params.set('creatures', enabled.join(','));
   else params.delete('creatures');
+  if (state.npcRole !== 'all') params.set('npcRole', state.npcRole);
+  else params.delete('npcRole');
   if (state.selectedId) params.set('creature', state.selectedId);
   else params.delete('creature');
   const next = `${location.pathname}?${params.toString()}${location.hash}`;
@@ -140,6 +154,8 @@ async function loadEntry(entry) {
     for (const record of value.records) {
       requireValue((record.kind === 'npc' || record.kind === 'monster') && RECORD_ID.test(record.record_id), 'invalid creature record');
       requireValue(record.position?.floor === entry.floor && Number.isSafeInteger(record.position?.x) && Number.isSafeInteger(record.position?.y), 'invalid creature position');
+      if (record.kind === 'npc') validateNpcRoleMetadata(record);
+      else requireValue(record.roles == null && record.role_resolution_state == null, 'monster record exposes NPC role metadata');
     }
     return value.records;
   });
@@ -185,12 +201,32 @@ function renderCreatureInspector(record) {
   if (record.entity_id) panel.append(createTextRow('Entity', record.entity_id));
   if (record.spawn_area) panel.append(createTextRow('Spawn area', `X ${record.spawn_area.center.x} · Y ${record.spawn_area.center.y} · F ${record.spawn_area.center.floor} · radius ${record.spawn_area.radius}`));
   if (record.appearance) panel.append(createTextRow('Outfit', record.appearance.outfit_key ?? record.appearance.look_type));
+  if (record.kind === 'npc') {
+    panel.append(createTextRow('NPC role resolution', record.role_resolution_state ?? 'UNKNOWN'));
+    panel.append(createTextRow('Map category', npcPresentationRoles(record).map(npcRoleLabel).join(', ')));
+  }
   const verifiedPixel = record.presentation_resolution_state === 'RESOLVED' && state.animationRuntime?.hasCreature(record);
   panel.append(
     createTextRow('Presentation', verifiedPixel ? `Verified outfit pixels · ${state.animationOn ? 'animated' : 'static verified phase'}` : `Factual marker fallback · ${record.presentation_reason ?? record.presentation_resolution_state ?? 'UNKNOWN'}`),
     createTextRow('Authority', `${EXPECTED_CONTRACT} / ${EXPECTED_CAPABILITY}`),
     createTextRow('Semantic digest', state.index.source.semantic_digest),
   );
+}
+
+function syncNpcRoleControl() {
+  const select = document.querySelector('#npc-role-filter');
+  if (!select) return;
+  state.availableNpcRoles = availableNpcFilters(state.search);
+  if (!state.availableNpcRoles.includes(state.npcRole)) state.npcRole = 'all';
+  select.textContent = '';
+  for (const role of state.availableNpcRoles) {
+    const option = document.createElement('option');
+    option.value = role;
+    option.textContent = npcRoleLabel(role);
+    option.selected = role === state.npcRole;
+    select.append(option);
+  }
+  persist();
 }
 
 function applyView(nextView) {
@@ -273,9 +309,14 @@ function setup() {
   const region = document.querySelector('#region-controls');
   if (region) {
     const section = document.createElement('section');
-    section.innerHTML = '<h2>Creature search</h2><input id="creature-search" type="search" placeholder="Search NPCs or monsters" aria-label="Search verified creatures"><div id="creature-results" class="region-results" aria-live="polite"></div><p class="rail-note" id="creature-status">Loading Game-owned verified creature index…</p>';
+    section.innerHTML = '<h2>Creature search</h2><label class="npc-role-control" for="npc-role-filter"><span>NPC category</span><select id="npc-role-filter" aria-label="Filter NPCs by map category"><option value="all">All NPCs</option></select></label><input id="creature-search" type="search" placeholder="Search NPCs or monsters" aria-label="Search verified creatures"><div id="creature-results" class="region-results" aria-live="polite"></div><p class="rail-note" id="creature-status">Loading Game-owned verified creature index…</p>';
     region.after(section);
     section.querySelector('#creature-search').addEventListener('input', (event) => renderSearch(event.target.value));
+    section.querySelector('#npc-role-filter').addEventListener('change', (event) => {
+      state.npcRole = npcRoleFilter(event.target.value);
+      persist();
+      refresh().catch(fail);
+    });
   }
 
   const inspectorContent = document.querySelector('#inspector-content');
@@ -311,6 +352,8 @@ function navigate(item) {
   const enabled = Object.entries(state.enabled).filter(([, on]) => on).map(([kind]) => kind).sort();
   if (enabled.length) params.set('creatures', enabled.join(','));
   else params.delete('creatures');
+  if (state.npcRole !== 'all') params.set('npcRole', state.npcRole);
+  else params.delete('npcRole');
   params.set('creature', item.record_id);
   location.search = params.toString();
 }
@@ -330,6 +373,41 @@ function renderSearch(query) {
   }
 }
 
+function drawNpcIcon(context, x, y, glyph, size) {
+  const left = Math.round(x - size / 2);
+  const top = Math.round(y - size / 2);
+  const mid = Math.floor(size / 2);
+  const pad = Math.max(2, Math.floor(size / 5));
+  context.save();
+  context.translate(left, top);
+  context.fillStyle = 'rgba(5, 10, 17, .94)';
+  context.fillRect(0, 0, size, size);
+  context.strokeStyle = '#d7e5f2';
+  context.lineWidth = 1;
+  context.strokeRect(0.5, 0.5, size - 1, size - 1);
+  context.fillStyle = '#ffd166'; context.strokeStyle = '#ffd166';
+  context.lineWidth = Math.max(1, Math.floor(size / 8));
+  context.lineCap = 'square'; context.lineJoin = 'miter';
+  if (glyph === 'coin') {
+    context.beginPath(); context.arc(mid, mid, Math.max(3, mid - pad), 0, Math.PI * 2); context.stroke();
+    context.fillRect(mid - 1, pad + 2, 2, size - (pad + 2) * 2);
+  } else if (glyph === 'travel') {
+    context.beginPath(); context.moveTo(mid, pad); context.lineTo(size - pad, mid); context.lineTo(mid, size - pad); context.lineTo(pad, mid); context.closePath(); context.stroke();
+    context.fillRect(mid - 1, pad + 2, 2, size - (pad + 2) * 2); context.fillRect(pad + 2, mid - 1, size - (pad + 2) * 2, 2);
+  } else if (glyph === 'bag') {
+    context.strokeRect(pad, mid - 1, size - pad * 2, size - mid - pad + 1); context.strokeRect(mid - 3, pad + 1, 6, Math.max(3, mid - pad - 1));
+  } else if (glyph === 'quest') {
+    context.fillRect(mid - 1, pad, 3, size - pad * 2 - 4); context.fillRect(mid - 1, size - pad - 2, 3, 3);
+  } else if (glyph === 'star') {
+    context.beginPath(); context.moveTo(mid, pad); context.lineTo(mid + 2, mid - 2); context.lineTo(size - pad, mid); context.lineTo(mid + 2, mid + 2); context.lineTo(mid, size - pad); context.lineTo(mid - 2, mid + 2); context.lineTo(pad, mid); context.lineTo(mid - 2, mid - 2); context.closePath(); context.fill();
+  } else if (glyph === 'book') {
+    context.strokeRect(pad, pad + 2, mid - pad, size - pad * 2 - 2); context.strokeRect(mid, pad + 2, mid - pad, size - pad * 2 - 2); context.fillRect(mid - 1, pad + 2, 2, size - pad * 2 - 2);
+  } else {
+    context.beginPath(); context.arc(mid, pad + 3, Math.max(2, Math.floor(size / 6)), 0, Math.PI * 2); context.fill(); context.fillRect(pad + 1, mid + 1, size - (pad + 1) * 2, Math.max(3, size - mid - pad - 1));
+  }
+  context.restore();
+}
+
 async function draw(records) {
   const canvas = state.canvas;
   const view = state.view;
@@ -342,13 +420,14 @@ async function draw(records) {
   const scale = 32 * view.zoom;
   const candidates = records.filter((record) => {
     if (!state.enabled[record.kind]) return false;
+    if (record.kind === 'npc' && !npcMatchesRole(record, state.npcRole)) return false;
     const x = rect.width / 2 + (record.position.x - view.x) * scale;
     const y = rect.height / 2 + (record.position.y - view.y) * scale;
     return x >= -96 && y >= -96 && x <= rect.width + 96 && y <= rect.height + 96;
   });
   const prepared = await Promise.all(candidates.map(async (record) => {
     const verified = record.presentation_resolution_state === 'RESOLVED' && state.animationRuntime?.hasCreature(record);
-    if (!verified) return { record, marker: true };
+    if (!verified || (record.kind === 'npc' && view.zoom < 1)) return { record, marker: true };
     const frame = state.animationRuntime.creatureFrame(record, state.animationOn ? state.logicalTimeMs : 0);
     return { record, frame, bitmap: await state.animationRuntime.bitmap(frame.contentId), marker: false };
   }));
@@ -359,8 +438,10 @@ async function draw(records) {
   context.imageSmoothingEnabled = false;
   context.font = '12px sans-serif';
   context.textBaseline = 'middle';
+  const npcSize = Math.round(Math.max(13, Math.min(20, 12 + view.zoom * 2)));
   let pixelDrawn = 0;
   let markerDrawn = 0;
+  let npcIcons = 0;
   for (const item of prepared) {
     const { record } = item;
     const tileX = rect.width / 2 + (record.position.x - view.x) * scale;
@@ -371,20 +452,28 @@ async function draw(records) {
       const y = tileY - (item.bitmap.height - 32 + Number(displacement.y ?? 0)) * view.zoom;
       context.drawImage(item.bitmap, x, y, item.bitmap.width * view.zoom, item.bitmap.height * view.zoom);
       pixelDrawn += 1;
-    } else {
+    }
+    if (record.kind === 'npc') {
+      const badgeOffset = item.marker ? 0 : Math.min(14, 8 + view.zoom * 3);
+      drawNpcIcon(context, tileX + badgeOffset, tileY - badgeOffset, npcRoleGlyph(record, state.npcRole), npcSize);
+      npcIcons += 1;
+    } else if (item.marker) {
       const radius = Math.max(3, Math.min(7, view.zoom * 4));
       context.beginPath(); context.arc(tileX, tileY, radius, 0, Math.PI * 2);
-      context.fillStyle = record.kind === 'npc' ? '#ffd166' : '#ef476f'; context.fill();
+      context.fillStyle = '#ef476f'; context.fill();
       context.strokeStyle = '#111827'; context.lineWidth = 1.5; context.stroke();
       markerDrawn += 1;
     }
-    if (view.zoom >= 1) { context.fillStyle = '#f8fafc'; context.fillText(record.name, tileX + 8, tileY); }
+    if (view.zoom >= (record.kind === 'npc' ? 1.5 : 1)) {
+      context.fillStyle = '#f8fafc'; context.fillText(record.name, tileX + 8, tileY);
+    }
   }
   context.restore();
   state.pixelDrawnRecords = pixelDrawn;
   state.markerDrawnRecords = markerDrawn;
+  state.lastDrawnNpcIcons = npcIcons;
   state.animationRuntime?.noteFrameUpdate(state.animationOn ? pixelDrawn : 0);
-  return pixelDrawn + markerDrawn;
+  return prepared.length;
 }
 
 async function refresh() {
@@ -397,7 +486,7 @@ async function refresh() {
   const selected = state.selectedId ? records.find((record) => record.record_id === state.selectedId) ?? null : null;
   renderCreatureInspector(selected);
   const status = document.querySelector('#creature-status');
-  if (status) status.textContent = `Game-owned verified creatures · ${state.index.counts.records.toLocaleString()} placements · ${entries.length} visible shards · ${state.pixelDrawnRecords} pixel / ${state.markerDrawnRecords} marker`;
+  if (status) status.textContent = `Game-owned verified creatures · ${state.index.counts.records.toLocaleString()} placements · NPC ${npcRoleLabel(state.npcRole)} · ${entries.length} visible shards · ${state.pixelDrawnRecords} pixel / ${state.lastDrawnNpcIcons} NPC icon / ${state.markerDrawnRecords} marker`;
   publish('PASS', null, { visibleShards: entries.length, selectedVisible: Boolean(selected) });
 }
 
@@ -412,6 +501,7 @@ async function boot() {
     requireValue(index.schema_version === 1, 'unsupported creature index schema');
     requireValue(index.source?.contract_id === EXPECTED_CONTRACT && index.source?.capability === EXPECTED_CAPABILITY, 'unsupported creature index authority');
     requireValue(index.source?.semantic_digest === EXPECTED_SEMANTIC_DIGEST, 'untrusted Game creature semantic digest');
+    requireValue(index.source?.npc_role_schema_version === EXPECTED_NPC_ROLE_SCHEMA, 'unsupported Game NPC role schema');
     requireValue(index.source?.appearance_product_root === state.animationRuntime.manifest.source.appearance_product_root, 'creature/animation appearance root mismatch');
     requireValue(index.source?.outfit_spatial_product_root === state.animationRuntime.manifest.source.outfit_spatial_product_root, 'creature/animation outfit root mismatch');
     requireValue(Array.isArray(index.chunks) && index.chunks.length === index.counts?.chunks && index.chunks.length <= MAX_INDEX_CHUNKS, 'creature index exceeds bounded chunk cap');
@@ -421,7 +511,13 @@ async function boot() {
     const search = await boundedJson(new URL(safeRelativePath(index.search_path), ROOT), MAX_SEARCH_BYTES, index.search_digest, index.search_bytes);
     requireValue(Array.isArray(search.records) && search.records.length === index.counts.search_records && search.records.length <= 20_000, 'creature search index count mismatch');
     requireValue(search.records.every((record) => RECORD_ID.test(record.record_id)), 'creature search record identity missing');
+    for (const record of search.records) {
+      requireValue(record.kind === 'npc' || record.kind === 'monster', 'invalid creature search kind');
+      if (record.kind === 'npc') validateNpcRoleMetadata(record);
+      else requireValue(record.roles == null && record.role_resolution_state == null, 'monster search record exposes NPC role metadata');
+    }
     state.search = search.records;
+    syncNpcRoleControl();
     const status = document.querySelector('#creature-status');
     if (status) status.textContent = `Ready · ${index.counts.records.toLocaleString()} verified creature placements`;
     await waitForInitialView();
