@@ -6,6 +6,10 @@ const nightly = fs.readFileSync(
   new URL('../../.github/workflows/verification-depth.yml', import.meta.url),
   'utf8',
 ).replace(/\r\n/g, '\n');
+const playwrightConfig = fs.readFileSync(
+  new URL('../../e2e/playwright.config.mjs', import.meta.url),
+  'utf8',
+).replace(/\r\n/g, '\n');
 
 function browserDepthBlock() {
   const start = nightly.indexOf('  browser-depth:\n');
@@ -26,4 +30,13 @@ test('nightly browser depth adds depth-only coverage instead of replaying the fu
   assert.match(browserDepth, /run_optional accessibility/);
   assert.match(browserDepth, /run_optional race-fault/);
   assert.match(browserDepth, /run_optional soak-leak/);
+});
+
+test('nightly depth has a bounded Synology-specific test timeout without weakening the PR default', () => {
+  const browserDepth = browserDepthBlock();
+
+  assert.match(browserDepth, /ATLAS_E2E_TEST_TIMEOUT_MS: ['"]?300000['"]?/);
+  assert.match(playwrightConfig, /ATLAS_E2E_TEST_TIMEOUT_MS/);
+  assert.match(playwrightConfig, /120_000/);
+  assert.match(playwrightConfig, /timeout:\s*testTimeout/);
 });
