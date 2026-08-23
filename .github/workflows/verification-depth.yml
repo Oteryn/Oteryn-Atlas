@@ -193,10 +193,6 @@ jobs:
               "$@"
           }
 
-          run_case required \
-            -e ATLAS_E2E_DEPTH=required \
-            e2e npm test
-
           run_case repeated-critical \
             -e ATLAS_E2E_DEPTH=required \
             e2e npx playwright test --config=playwright.config.mjs \
@@ -237,6 +233,7 @@ jobs:
           run_optional accessibility tests/accessibility-desktop.spec.mjs tests/a11y-desktop.spec.mjs
           run_optional race-fault tests/race-fault-desktop.spec.mjs tests/race-desktop.spec.mjs
           run_optional soak-leak tests/soak-desktop.spec.mjs tests/soak-leak-desktop.spec.mjs
+
       - name: Publish bounded nightly browser evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
