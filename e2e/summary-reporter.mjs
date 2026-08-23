@@ -19,6 +19,7 @@ export function classifyScenario(file, annotations = []) {
   if (/visual-.*\.spec\.mjs$/.test(normalized)) return 'visual';
   if (/stress-.*\.spec\.mjs$/.test(normalized)) return 'stress';
   if (/performance-.*\.spec\.mjs$/.test(normalized)) return 'performance';
+  if (/accessibility-.*\.spec\.mjs$/.test(normalized)) return 'accessibility';
   if (/resilience-.*\.spec\.mjs$/.test(normalized)) return 'failure';
   return 'e2e';
 }
