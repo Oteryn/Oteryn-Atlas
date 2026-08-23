@@ -109,32 +109,46 @@ export async function loadAnimationRuntime(baseUrl, fetcher = fetch) {
 }
 export function createAnimationRuntime(root, product) {
   const bucketCache = new Map();
+  const bucketPending = new Map();
   const bitmapCache = new Map();
+  const bitmapPending = new Map();
   let bucketBytes = 0;
   let bucketLoads = 0;
   let frameUpdates = 0;
   async function bucket(id) {
     const existing = bucketCache.get(id);
     if (existing) { bucketCache.delete(id); bucketCache.set(id, existing); return existing; }
+    if (bucketPending.has(id)) return bucketPending.get(id);
     const descriptor = product.buckets.get(id);
     requireValue(descriptor && descriptor.bytes <= MAX_BUCKET_BYTES && isSha(descriptor.digest), `animation bucket ${id} invalid`);
-    const bytes = await readBytes(new URL(safePath(descriptor.path), root), MAX_BUCKET_BYTES, descriptor.digest, descriptor.bytes, product.fetcher);
-    bucketCache.set(id, bytes); bucketBytes += bytes.byteLength; bucketLoads += 1;
-    while (bucketCache.size > 12) { const key = bucketCache.keys().next().value; bucketBytes -= bucketCache.get(key).byteLength; bucketCache.delete(key); }
-    return bytes;
+    const pending = (async () => {
+      const bytes = await readBytes(new URL(safePath(descriptor.path), root), MAX_BUCKET_BYTES, descriptor.digest, descriptor.bytes, product.fetcher);
+      bucketCache.set(id, bytes); bucketBytes += bytes.byteLength; bucketLoads += 1;
+      while (bucketCache.size > 12) { const key = bucketCache.keys().next().value; bucketBytes -= bucketCache.get(key).byteLength; bucketCache.delete(key); }
+      return bytes;
+    })();
+    bucketPending.set(id, pending);
+    try { return await pending; }
+    finally { if (bucketPending.get(id) === pending) bucketPending.delete(id); }
   }
   async function bitmap(contentId) {
     if (bitmapCache.has(contentId)) return bitmapCache.get(contentId);
+    if (bitmapPending.has(contentId)) return bitmapPending.get(contentId);
     const blob = product.blobs.get(contentId); requireValue(blob && product.buckets.has(blob.bucket), 'animation blob missing');
-    const bytes = await bucket(blob.bucket); requireValue(blob.offset >= 0 && blob.bytes > 0 && blob.offset + blob.bytes <= bytes.byteLength, 'animation blob range invalid');
-    const rgba = new Uint8ClampedArray(bytes.buffer.slice(bytes.byteOffset + blob.offset, bytes.byteOffset + blob.offset + blob.bytes));
-    requireValue(rgba.byteLength === blob.width * blob.height * 4, 'animation RGBA geometry mismatch');
-    let value;
-    if (typeof createImageBitmap === 'function') value = await createImageBitmap(new ImageData(rgba, blob.width, blob.height));
-    else value = Object.freeze({ rgba, width: blob.width, height: blob.height });
-    bitmapCache.set(contentId, value);
-    while (bitmapCache.size > 512) { const key = bitmapCache.keys().next().value; bitmapCache.get(key)?.close?.(); bitmapCache.delete(key); }
-    return value;
+    const pending = (async () => {
+      const bytes = await bucket(blob.bucket); requireValue(blob.offset >= 0 && blob.bytes > 0 && blob.offset + blob.bytes <= bytes.byteLength, 'animation blob range invalid');
+      const rgba = new Uint8ClampedArray(bytes.buffer.slice(bytes.byteOffset + blob.offset, bytes.byteOffset + blob.offset + blob.bytes));
+      requireValue(rgba.byteLength === blob.width * blob.height * 4, 'animation RGBA geometry mismatch');
+      let value;
+      if (typeof createImageBitmap === 'function') value = await createImageBitmap(new ImageData(rgba, blob.width, blob.height));
+      else value = Object.freeze({ rgba, width: blob.width, height: blob.height });
+      bitmapCache.set(contentId, value);
+      while (bitmapCache.size > 512) { const key = bitmapCache.keys().next().value; bitmapCache.get(key)?.close?.(); bitmapCache.delete(key); }
+      return value;
+    })();
+    bitmapPending.set(contentId, pending);
+    try { return await pending; }
+    finally { if (bitmapPending.get(contentId) === pending) bitmapPending.delete(contentId); }
   }
   function hasObject(record) { return product.objects.has(record?.presentation?.appearanceSourceId); }
   function hasCreature(record) { return product.creatures.has(record?.outfit_presentation?.outfit_presentation_id); }
