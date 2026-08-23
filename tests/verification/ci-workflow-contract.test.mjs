@@ -111,13 +111,13 @@ test('nightly depth does not duplicate the PR-gated full required browser matrix
   assert.match(nightly, /run_optional soak-leak/);
 });
 
-test('nightly browser depth has a bounded budget for its 80-scenario minimum workload', () => {
+test('nightly browser depth keeps a bounded self-hosted execution budget', () => {
   const browserDepthStart = nightly.indexOf('  browser-depth:\n');
   assert.notEqual(browserDepthStart, -1, 'missing browser-depth job');
   const browserDepth = nightly.slice(browserDepthStart);
   const match = browserDepth.match(/timeout-minutes:\s*(\d+)/);
   assert.ok(match, 'nightly browser-depth must declare a bounded timeout');
-  assert.ok(Number(match[1]) >= 180, `nightly browser-depth timeout ${match[1]}m is below the measured runner budget for the 80-scenario minimum workload`);
+  assert.ok(Number(match[1]) >= 180, `nightly browser-depth timeout ${match[1]}m is below the measured self-hosted depth budget`);
 });
 
 test('nightly Playwright profiles are opt-in and do not expand the PR suite implicitly', () => {
