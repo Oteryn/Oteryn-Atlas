@@ -27,6 +27,7 @@ $env:ATLAS_E2E_WORKERS = '1'
 ```
 
 The harness exposes and asserts the exact checkout SHA through `X-Oteryn-Atlas-Code-Revision`. Publication products are accepted only when they match the trust pins embedded in that checkout.
+On native Windows, `run.ps1` starts a bounded user-space TCP forwarder and routes Docker Desktop publication traffic through `host.docker.internal` while preserving the original publication Host identity. This avoids Docker bridge-to-LAN reachability failures without changing the NAS or the Atlas runtime, and the forwarder is stopped during runner cleanup.
 
 After the exact tested commit has been pushed to the PR branch, publish the verified local result from the generated `summary.json`:
 
