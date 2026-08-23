@@ -4,6 +4,12 @@ import { defineConfig } from '@playwright/test';
 const artifactsDir = process.env.ATLAS_ARTIFACTS_DIR || '/artifacts';
 const parsedWorkers = Number.parseInt(process.env.ATLAS_E2E_WORKERS || '2', 10);
 const workers = Number.isSafeInteger(parsedWorkers) && parsedWorkers > 0 ? parsedWorkers : 2;
+const parsedTestTimeout = Number.parseInt(process.env.ATLAS_E2E_TEST_TIMEOUT_MS || '120000', 10);
+const testTimeout = Number.isSafeInteger(parsedTestTimeout)
+  && parsedTestTimeout >= 30_000
+  && parsedTestTimeout <= 600_000
+  ? parsedTestTimeout
+  : 120_000;
 const baseURL = process.env.ATLAS_BASE_URL || 'http://atlas-web:8080';
 const expectedRevision = process.env.ATLAS_EXPECTED_REVISION?.trim() || null;
 const publicationOrigin = process.env.ATLAS_PUBLICATION_ORIGIN?.trim() || null;
@@ -66,7 +72,7 @@ export default defineConfig({
   workers,
   retries: 0,
   forbidOnly: true,
-  timeout: 120_000,
+  timeout: testTimeout,
   expect: { timeout: 15_000 },
   outputDir: path.join(artifactsDir, 'test-results'),
   metadata: {
