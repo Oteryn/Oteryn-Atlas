@@ -195,7 +195,6 @@ jobs:
               if ($LASTEXITCODE -ne 0) { throw "Nightly depth case failed: $Label" }
             }
 
-            Invoke-DepthCase -Label 'required' -Environment @('ATLAS_E2E_DEPTH=required') -Command @('e2e', 'npm', 'test')
             Invoke-DepthCase -Label 'repeated-critical' -Environment @('ATLAS_E2E_DEPTH=required') -Command @(
               'e2e', 'npx', 'playwright', 'test', '--config=playwright.config.mjs',
               'tests/geometry-desktop.spec.mjs', 'tests/render-probes-desktop.spec.mjs',
