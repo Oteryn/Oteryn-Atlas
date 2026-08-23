@@ -222,7 +222,7 @@ function publishView() {
   window.dispatchEvent(new CustomEvent('oteryn-atlas-view', { detail: { view: snapshot, detailReady, detailStreaming } }));
 }
 
-function syncViewUi() {
+function syncViewUi({ preserveExternalParams = false } = {}) {
   $('#coord-x').textContent = view.x.toFixed(2).replace(/\.00$/, '');
   $('#coord-y').textContent = view.y.toFixed(2).replace(/\.00$/, '');
   $('#coord-floor').textContent = String(view.floor);
@@ -238,7 +238,12 @@ function syncViewUi() {
   const index = floors.indexOf(view.floor);
   $('#floor-up').disabled = index <= 0;
   $('#floor-down').disabled = index < 0 || index >= floors.length - 1;
-  history.replaceState(null, '', serializeFullWorldViewState(view, runtimeWorld));
+  const serializedView = new URLSearchParams(serializeFullWorldViewState(view, runtimeWorld).replace(/^\?/, ''));
+  if (preserveExternalParams) {
+    const current = new URLSearchParams(location.search);
+    for (const [key, value] of current) if (!serializedView.has(key)) serializedView.append(key, value);
+  }
+  history.replaceState(null, '', `?${serializedView.toString()}`);
   publishView();
 }
 
@@ -944,7 +949,7 @@ async function boot() {
   frameScheduler = createFrameScheduler(renderFrame);
   syncAnimationLoop();
   $('#status-detail').textContent = `Performance profile ${performanceProfile.name} · ${GROUP_CONCURRENCY} semantic / ${PIXEL_BUCKET_CONCURRENCY} pixel fetchers · ${formatBytes(performanceProfile.semanticCacheBytes)} semantic cache`;
-  syncViewUi();
+  syncViewUi({ preserveExternalParams: true });
   wireInteraction();
   renderInspector();
   try {
