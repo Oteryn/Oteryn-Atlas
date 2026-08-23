@@ -1,0 +1,26 @@
+{
+    "schemaVersion":  1,
+    "baselineRevision":  "543f980",
+    "browserContainer":  "mcr.microsoft.com/playwright:v1.62.0-noble@sha256:baed2032d533817f3dbe6425de795788430ba345e819a1201337009ba17c9d07",
+    "playwrightVersion":  "1.62.0",
+    "locale":  "en-US",
+    "timezone":  "UTC",
+    "surfaces":  {
+                     "desktop-chromium":  {
+                                              "viewport":  {
+                                                               "width":  1440,
+                                                               "height":  900
+                                                           },
+                                              "dpr":  1
+                                          },
+                     "mobile-chromium":  {
+                                             "viewport":  {
+                                                              "width":  390,
+                                                              "height":  844
+                                                          },
+                                             "dpr":  2
+                                         }
+                 },
+    "rightsBoundary":  "Committed visual baselines contain Atlas-owned UI chrome only. Map, world, item, creature, NPC and other Game-derived raster pixels are excluded.",
+    "updatePolicy":  "Explicit reviewed --update-snapshots only; never auto-accept during ordinary qualification."
+}

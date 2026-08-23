@@ -9,6 +9,7 @@ RUN npm ci --ignore-scripts --no-audit --no-fund \
 COPY e2e/playwright.config.mjs e2e/summary-reporter.mjs ./
 COPY e2e/tests ./tests
 COPY e2e/support ./support
+COPY e2e/baselines ./baselines
 
 ENV CI=1
 CMD ["npm", "test"]
