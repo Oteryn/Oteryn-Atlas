@@ -116,32 +116,32 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p artifacts/e2e/nightly
-          python - <<'PY'
-          import json
-          from pathlib import Path
-
-          root = Path('e2e/tests')
-          expected = {
-              'performance': ['performance-desktop.spec.mjs'],
-              'visual': ['visual-desktop.spec.mjs'],
-              'accessibility': ['accessibility-desktop.spec.mjs', 'a11y-desktop.spec.mjs'],
-              'race-fault': ['race-fault-desktop.spec.mjs', 'race-desktop.spec.mjs'],
-              'soak-leak': ['soak-desktop.spec.mjs', 'soak-leak-desktop.spec.mjs'],
+          skips=()
+          has_any() {
+            local category="$1"
+            shift
+            for spec in "$@"; do
+              if [[ -f "e2e/$spec" ]]; then return 0; fi
+            done
+            skips+=("$category")
           }
-          skips = []
-          for category, candidates in expected.items():
-              if not any((root / candidate).is_file() for candidate in candidates):
-                  skips.append({
-                      'category': category,
-                      'status': 'skip',
-                      'reason': 'No stable worker-delivered spec for this category exists at the exact scheduled revision.',
-                      'candidates': candidates,
-                  })
-          Path('artifacts/e2e/nightly/optional-depth-skips.json').write_text(
-              json.dumps({'version': 1, 'atlasRevision': __import__('os').environ['ATLAS_CODE_REVISION'], 'skips': skips}, indent=2) + '\n',
-              encoding='utf-8',
-          )
-          PY
+          has_any performance tests/performance-desktop.spec.mjs
+          has_any visual tests/visual-desktop.spec.mjs
+          has_any accessibility tests/accessibility-desktop.spec.mjs tests/a11y-desktop.spec.mjs
+          has_any race-fault tests/race-fault-desktop.spec.mjs tests/race-desktop.spec.mjs
+          has_any soak-leak tests/soak-desktop.spec.mjs tests/soak-leak-desktop.spec.mjs
+
+          {
+            printf '{\n  "version": 1,\n  "atlasRevision": "%s",\n  "skips": [' "$ATLAS_CODE_REVISION"
+            first=1
+            for category in "${skips[@]}"; do
+              if [[ "$first" -eq 0 ]]; then printf ','; fi
+              printf '\n    {"category":"%s","status":"skip","reason":"No stable worker-delivered spec for this category exists at the exact scheduled revision."}' "$category"
+              first=0
+            done
+            if (( ${#skips[@]} > 0 )); then printf '\n  '; fi
+            printf ']\n}\n'
+          } > artifacts/e2e/nightly/optional-depth-skips.json
 
       - name: Run bounded replayable browser depth
         shell: bash

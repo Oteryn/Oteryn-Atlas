@@ -81,3 +81,10 @@ test('nightly Playwright profiles are opt-in and do not expand the PR suite impl
   assert.match(playwrightConfig, /viewport:\s*\{ width: 820, height: 1180 \}/);
   assert.match(playwrightConfig, /isMobile:\s*true/);
 });
+
+test('self-hosted nightly browser depth does not require host Python', () => {
+  const start = nightly.indexOf('  browser-depth:\n');
+  assert.notEqual(start, -1, 'missing browser-depth job');
+  const browserDepth = nightly.slice(start);
+  assert.doesNotMatch(browserDepth, /^\s*python(?:3)?\s/m);
+});
