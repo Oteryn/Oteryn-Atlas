@@ -102,15 +102,15 @@ test('nightly depth is scheduled, bounded, replayable, read-only and evidence-pr
 });
 
 test('nightly depth is additive and does not duplicate the PR-gated full required matrix', () => {
-  assert.doesNotMatch(nightly, /run_case required[\s\S]*?e2e npm test/);
-  assert.match(nightly, /run_case repeated-critical/);
-  assert.match(nightly, /run_case "stress-\$seed"/);
-  assert.match(nightly, /run_case extra-profiles/);
-  assert.match(nightly, /run_optional performance/);
-  assert.match(nightly, /run_optional visual/);
-  assert.match(nightly, /run_optional accessibility/);
-  assert.match(nightly, /run_optional race-fault/);
-  assert.match(nightly, /run_optional soak-leak/);
+  assert.doesNotMatch(nightly, /Invoke-DepthCase -Label ['"]required['"][\s\S]*?['"]npm['"], ['"]test['"]/);
+  assert.match(nightly, /Invoke-DepthCase -Label ['"]repeated-critical['"]/);
+  assert.match(nightly, /Invoke-DepthCase -Label "stress-\$seed"/);
+  assert.match(nightly, /Invoke-DepthCase -Label ['"]extra-profiles['"]/);
+  assert.match(nightly, /performance = @\('tests\/performance-desktop\.spec\.mjs'\)/);
+  assert.match(nightly, /visual = @\('tests\/visual-desktop\.spec\.mjs'\)/);
+  assert.match(nightly, /accessibility = @\('tests\/accessibility-desktop\.spec\.mjs'/);
+  assert.match(nightly, /'race-fault' = @\('tests\/race-fault-desktop\.spec\.mjs'/);
+  assert.match(nightly, /'soak-leak' = @\('tests\/soak-desktop\.spec\.mjs'/);
 });
 
 test('heavy browser verification is pinned to Molehill while Synology remains live-acceptance only', () => {
