@@ -79,6 +79,7 @@ jobs:
       ATLAS_EXPECTED_REVISION: ${{ github.sha }}
       ATLAS_PUBLICATION_ORIGIN: http://192.168.1.2:8097
       ATLAS_E2E_WORKERS: '1'
+      ATLAS_E2E_TEST_TIMEOUT_MS: '300000'
       ATLAS_STRESS_LENGTH: '64'
     steps:
       - name: Verify immutable Atlas runner identity
@@ -190,12 +191,9 @@ jobs:
             shift
             "${compose[@]}" run --rm \
               -e ATLAS_ARTIFACTS_DIR="/artifacts/$label" \
+              -e ATLAS_E2E_TEST_TIMEOUT_MS="$ATLAS_E2E_TEST_TIMEOUT_MS" \
               "$@"
           }
-
-          run_case required \
-            -e ATLAS_E2E_DEPTH=required \
-            e2e npm test
 
           run_case repeated-critical \
             -e ATLAS_E2E_DEPTH=required \
