@@ -9,7 +9,9 @@ function readText(url) {
 const ci = readText(new URL('../../.github/workflows/ci.yml', import.meta.url));
 const nightly = readText(new URL('../../.github/workflows/verification-depth.yml', import.meta.url));
 const provenance = readText(new URL('../../.github/workflows/extraction-provenance.yml', import.meta.url));
+const synology = readText(new URL('../../.github/workflows/synology-live-acceptance.yml', import.meta.url));
 const playwrightConfig = readText(new URL('../../e2e/playwright.config.mjs', import.meta.url));
+const agents = readText(new URL('../../AGENTS.md', import.meta.url));
 
 function block(source, start, end) {
   const begin = source.indexOf(start);
@@ -99,14 +101,45 @@ test('nightly depth is scheduled, bounded, replayable, read-only and evidence-pr
   assert.doesNotMatch(nightly, /PREVIEW_CONTAINER/);
 });
 
-test('nightly browser depth has a bounded budget for its 80-scenario minimum workload', () => {
+test('nightly depth is additive and does not duplicate the PR-gated full required matrix', () => {
+  assert.doesNotMatch(nightly, /run_case required[\s\S]*?e2e npm test/);
+  assert.match(nightly, /run_case repeated-critical/);
+  assert.match(nightly, /run_case "stress-\$seed"/);
+  assert.match(nightly, /run_case extra-profiles/);
+  assert.match(nightly, /run_optional performance/);
+  assert.match(nightly, /run_optional visual/);
+  assert.match(nightly, /run_optional accessibility/);
+  assert.match(nightly, /run_optional race-fault/);
+  assert.match(nightly, /run_optional soak-leak/);
+});
+
+test('heavy browser verification is pinned to Molehill while Synology remains live-acceptance only', () => {
+  const browserDepth = nightly.slice(nightly.indexOf('  browser-depth:\n'));
+  assert.match(browserDepth, /group: atlas-runners/);
+  assert.match(browserDepth, /labels: oteryn-atlas-pc/);
+  assert.match(browserDepth, /oteryn-molehill-atlas/);
+  assert.match(browserDepth, /ATLAS_RUNNER_OS -ne 'Windows'/);
+
+  assert.match(synology, /group: atlas-runners/);
+  assert.match(synology, /labels: oteryn-atlas/);
+  assert.match(synology, /oteryn-synology-atlas/);
+  assert.doesNotMatch(synology, /labels: oteryn-atlas-pc/);
+
+  assert.match(agents, /Molehill-PC/);
+  assert.match(agents, /heavy.*browser/i);
+  assert.match(agents, /Synology.*live acceptance/i);
+  assert.match(agents, /must not.*48-scenario/i);
+});
+
+test('nightly browser depth keeps a bounded self-hosted execution budget', () => {
   const browserDepthStart = nightly.indexOf('  browser-depth:\n');
   assert.notEqual(browserDepthStart, -1, 'missing browser-depth job');
   const browserDepth = nightly.slice(browserDepthStart);
   const match = browserDepth.match(/timeout-minutes:\s*(\d+)/);
   assert.ok(match, 'nightly browser-depth must declare a bounded timeout');
-  assert.ok(Number(match[1]) >= 180, `nightly browser-depth timeout ${match[1]}m is below the measured runner budget for the 80-scenario minimum workload`);
+  assert.ok(Number(match[1]) >= 180, `nightly browser-depth timeout ${match[1]}m is below the measured self-hosted depth budget`);
 });
+
 test('nightly Playwright profiles are opt-in and do not expand the PR suite implicitly', () => {
   assert.match(playwrightConfig, /ATLAS_E2E_DEPTH/);
   assert.match(playwrightConfig, /nightly-desktop-dpr2/);
