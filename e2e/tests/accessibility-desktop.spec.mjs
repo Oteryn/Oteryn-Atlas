@@ -1,37 +1,50 @@
 import { expect, test } from '@playwright/test';
-import {
-  DESKTOP_ENTRY,
-  assertNoRuntimeFailures,
-  captureRuntimeFailures,
-  gotoAtlas,
-  waitForAtlas,
-} from './runtime.mjs';
+import { DESKTOP_ENTRY, assertNoRuntimeFailures, captureRuntimeFailures, gotoAtlas, waitForAtlas } from './runtime.mjs';
 
-test('desktop core controls expose accessible names and truthful unavailable state', async ({ page }) => {
+test('desktop critical controls expose truthful accessible names and disabled states', async ({ page }) => {
   const runtime = captureRuntimeFailures(page);
   await gotoAtlas(page, DESKTOP_ENTRY);
   await waitForAtlas(page);
 
   await expect(page.getByRole('textbox', { name: 'Global semantic Atlas search' }).first()).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Zoom in' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Zoom out' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Higher floor' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Lower floor' })).toBeVisible();
-  await expect(page.getByRole('combobox', { name: 'Exported floor' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Zoom in' })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Zoom out' })).toBeEnabled();
+  await expect(page.getByRole('combobox', { name: 'Exported floor' })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Higher floor' })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Lower floor' })).toBeEnabled();
   await expect(page.getByRole('group', { name: 'Atlas view mode' })).toBeVisible();
   await expect(page.getByRole('complementary', { name: 'Inspector and provenance' })).toBeVisible();
   await expect(page.locator('#atlas')).toHaveAttribute('aria-label', 'Full-world WebGL2 Atlas');
-
   await expect(page.getByRole('searchbox', { name: 'Search Areas and Subareas' })).toBeDisabled();
   await expect(page.getByRole('combobox', { name: 'Region family' })).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Zoom to area' })).toBeDisabled();
+
+  for (const label of ['Areas', 'Subareas', 'Towns', 'Temples', 'Teleports / transitions', 'Houses', 'House doors', 'Action IDs', 'Unique IDs', 'Waypoints', 'Mechanics', 'Raids / encounters', 'Quest areas', 'POIs']) {
+    const row = page.locator('#semantic-layer-list .layer').filter({ has: page.getByText(label, { exact: true }) });
+    await expect(row).toHaveCount(1);
+    await expect(row.locator('input')).toBeDisabled();
+  }
+
   const playback = page.getByRole('checkbox', { name: /Playback/ });
   await expect(playback).toBeEnabled();
   await expect(playback).not.toBeChecked();
-
   await expect(page.getByRole('button', { name: 'Open Atlas controls' })).toBeHidden();
   await expect(page.getByRole('button', { name: 'Open inspector' })).toBeHidden();
   assertNoRuntimeFailures(runtime);
+});
+
+test('desktop keyboard navigation reaches search and zoom controls', async ({ page }) => {
+  await gotoAtlas(page, DESKTOP_ENTRY);
+  await waitForAtlas(page);
+  await page.locator('body').focus();
+  const reached = new Set();
+  for (let step = 0; step < 18; step += 1) {
+    await page.keyboard.press('Tab');
+    reached.add(await page.evaluate(() => document.activeElement?.id ?? ''));
+  }
+  expect(reached.has('search-input')).toBe(true);
+  expect(reached.has('zoom-out')).toBe(true);
+  expect(reached.has('zoom-in')).toBe(true);
 });
 
 test('desktop keyboard activates zoom, view mode and playback state', async ({ page }) => {

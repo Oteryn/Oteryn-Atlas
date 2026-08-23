@@ -18,7 +18,6 @@ export default defineConfig({
   timeout: 120_000,
   expect: { timeout: 15_000 },
   outputDir: path.join(artifactsDir, 'test-results'),
-  snapshotPathTemplate: path.join('baselines', '{projectName}', '{testFilePath}', '{arg}{ext}'),
   metadata: {
     targetMode: publicationOrigin ? 'checkout-overlay' : 'direct-preview',
     targetURL: baseURL,
