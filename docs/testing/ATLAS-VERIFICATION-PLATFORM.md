@@ -424,6 +424,30 @@ Failures must retain replay evidence. A scheduled failure is real work even if P
 
 Direct-preview qualification must verify the served revision exactly matches the intended merged `main` revision before success can be claimed. A stale live deployment is a failed qualification, not a pass for an older build.
 
+### 7.6 Executable CI and nightly wiring
+
+The repository implementation uses the existing required `atlas-gate` fan-in rather than a disconnected optional test island. `CI / verification-node` runs the deterministic Node contract/property suite. For trusted same-repository pull requests, `CI / verification-browser` is a lightweight GitHub-hosted evidence gate: it requires the exact pull-request head to carry an authenticated `atlas-local-e2e=success` commit status produced only after the complete Docker Playwright suite passes locally. Both are required inputs to the pull-request `atlas-gate`. The repository candidate checkout in `CI` and `Extraction Provenance` continues to use the exact pull-request head rather than GitHub's synthetic merge ref. `provenance-gate` remains a separate required branch-protection context and its pinned legacy-source checkout is unchanged.
+
+The heavy required browser workload is temporarily assigned to the local Molehill-PC Docker execution plane rather than the slower Synology organization runner. Native Windows checkout-overlay runs bridge Docker Desktop to the LAN publication through the read-only transparent `e2e/local-publication-forwarder.py` listener on `host.docker.internal`, because direct Docker bridge access to the LAN publication is not reliable on this host. The publisher `e2e/publish-local-e2e-status.ps1` rejects a dirty tree, a remote branch that does not equal the tested HEAD, a summary whose `expectedRevision` differs from HEAD, any non-passed scenario, or any retry before it can publish `atlas-local-e2e=success`. Fork pull requests cannot satisfy this trusted same-repository evidence gate. On `main` pushes the PR-only local-evidence job is skipped and `atlas-gate` requires that skip while retaining all deterministic CI inputs; merged-main/live browser qualification remains a separate exact-served-revision responsibility under section 7.5.
+
+`.github/workflows/verification-depth.yml` provides scheduled/nightly depth and manual dispatch. Its bounded deterministic expansion is:
+
+- the complete required browser suite once;
+- the critical geometry/framebuffer set repeated three times with retries still fixed at zero;
+- stress seeds `133`, `1096043585`, `2779096485`, and `3735928559`, each with 64 replayable actions;
+- opt-in `nightly-desktop-dpr2` and `nightly-tablet` Chromium profiles;
+- stable performance, visual, accessibility, race/fault and soak/leak specs when those worker-delivered files exist at the exact revision; absent categories are recorded in `optional-depth-skips.json` with an explicit reason rather than silently ignored;
+- the existing deterministic property test that kills controlled sign/scale coordinate mutants. A third-party mutation framework is not adopted until it demonstrates bounded additional signal.
+
+Required browser runs publish `summary.json`, `results.json`, HTML/test-result evidence and `failure.json` on failure. Nightly uploads each phase under a separate bounded artifact directory, including any action logs, performance/visual evidence emitted by the specs, and the explicit optional-depth applicability record. Workflow artifacts are retained for 14 days.
+
+Concrete local equivalents are:
+
+```text
+node --test tests/animation-runtime.mjs tests/browser-semantic.mjs tests/deployment-policy.mjs tests/gui-contract.mjs tests/npc-markers.mjs tests/pixel-store.mjs tests/semantic-search.mjs tests/semantic-search-creatures.mjs tests/synology-live-workflow.mjs tests/fullworld-layers/*.test.mjs tests/fullworld-runtime/*.test.mjs tests/properties/*.test.mjs tests/verification/*.test.mjs
+ATLAS_PUBLICATION_ORIGIN=http://192.168.1.2:8097 ATLAS_E2E_WORKERS=1 ./e2e/run.sh
+```
+
 ## 8. Browser/GPU matrix
 
 Use two complementary environments:

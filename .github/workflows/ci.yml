@@ -15,6 +15,7 @@ jobs:
       - name: Check out exact repository revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
 
       - name: Validate repository contract
@@ -52,6 +53,7 @@ jobs:
       - name: Check out exact repository revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
 
       - name: Compile semantic and pixel-metadata tooling
@@ -104,6 +106,7 @@ jobs:
       - name: Check out exact repository revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
 
       - name: Run browser semantic consumer tests
@@ -124,6 +127,7 @@ jobs:
       - name: Check out exact repository revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
 
       - name: Run real Chrome WebGL2 parity and GUI smoke
@@ -160,6 +164,7 @@ jobs:
       - name: Check out exact repository revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
 
       - name: Run project checks when package exists
@@ -184,6 +189,93 @@ jobs:
             fi
           fi
 
+  verification-node:
+    name: Deterministic verification contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      ATLAS_CODE_REVISION: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Check out exact Atlas candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Run deterministic Atlas verification suite
+        shell: bash
+        run: |
+          set -uo pipefail
+          test "$(git rev-parse HEAD)" = "$ATLAS_CODE_REVISION"
+          mkdir -p artifacts/verification
+          files=(
+            tests/animation-runtime.mjs
+            tests/browser-semantic.mjs
+            tests/deployment-policy.mjs
+            tests/gui-contract.mjs
+            tests/npc-markers.mjs
+            tests/pixel-store.mjs
+            tests/semantic-search.mjs
+            tests/semantic-search-creatures.mjs
+            tests/synology-live-workflow.mjs
+            tests/fullworld-layers/*.test.mjs
+            tests/fullworld-runtime/*.test.mjs
+            tests/properties/*.test.mjs
+            tests/verification/*.test.mjs
+          )
+          set +e
+          node --test "${files[@]}" 2>&1 | tee artifacts/verification/node-tests.log
+          rc="${PIPESTATUS[0]}"
+          set -e
+          python - "$rc" <<'PY'
+          import json
+          import os
+          import sys
+          from pathlib import Path
+
+          rc = int(sys.argv[1])
+          evidence = {
+              'version': 1,
+              'status': 'pass' if rc == 0 else 'fail',
+              'atlasRevision': os.environ['ATLAS_CODE_REVISION'],
+              'suite': 'deterministic-node',
+              'exitCode': rc,
+              'log': 'node-tests.log',
+          }
+          Path('artifacts/verification/node-summary.json').write_text(json.dumps(evidence, indent=2) + '\n', encoding='utf-8')
+          PY
+          exit "$rc"
+
+      - name: Publish deterministic verification evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: atlas-verification-node-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/verification/
+          if-no-files-found: error
+          retention-days: 14
+
+  verification-browser:
+    name: Local Docker Playwright evidence
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    needs: verification-node
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      statuses: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      ATLAS_CODE_REVISION: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - name: Require exact-head local Docker Playwright status
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REPOSITORY" = 'Oteryn/Oteryn-Atlas'
+          state="$(gh api "repos/$GITHUB_REPOSITORY/commits/$ATLAS_CODE_REVISION/statuses" --jq '[.[] | select(.context == "atlas-local-e2e")][0].state // ""')"
+          test "$state" = success
+
   atlas-gate:
     name: atlas-gate
     if: ${{ always() }}
@@ -193,6 +285,8 @@ jobs:
       - browser-semantic
       - browser-webgl-proof
       - project
+      - verification-node
+      - verification-browser
     runs-on: ubuntu-24.04
     steps:
       - name: Require all Atlas CI components
@@ -203,8 +297,16 @@ jobs:
           BROWSER_SEMANTIC: ${{ needs.browser-semantic.result }}
           BROWSER_WEBGL_PROOF: ${{ needs.browser-webgl-proof.result }}
           PROJECT: ${{ needs.project.result }}
+          VERIFICATION_NODE: ${{ needs.verification-node.result }}
+          VERIFICATION_BROWSER: ${{ needs.verification-browser.result }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
         run: |
           set -euo pipefail
-          for result in "$REPOSITORY_CONTRACT" "$SEMANTIC_PROOF" "$BROWSER_SEMANTIC" "$BROWSER_WEBGL_PROOF" "$PROJECT"; do
+          for result in "$REPOSITORY_CONTRACT" "$SEMANTIC_PROOF" "$BROWSER_SEMANTIC" "$BROWSER_WEBGL_PROOF" "$PROJECT" "$VERIFICATION_NODE"; do
             test "$result" = success
           done
+          if [[ "$GITHUB_EVENT_NAME" == pull_request ]]; then
+            test "$VERIFICATION_BROWSER" = success
+          else
+            test "$VERIFICATION_BROWSER" = skipped
+          fi

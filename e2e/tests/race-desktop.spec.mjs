@@ -5,6 +5,7 @@ import {
   installHeldRangeRequests,
   viewFromUrl,
   waitForCommittedView,
+  waitForQualifiedView,
 } from '../support/fault-network.mjs';
 import {
   DESKTOP_ENTRY,
@@ -68,7 +69,8 @@ test('superseded delayed range abort stays expected and newest view is the only 
     const committed = await waitForCommittedView(page, expected, before.generation);
     expect(committed.transform.centerTileX).toBe(32569);
     expect(committed.transform.centerTileY).toBe(32441);
-    await expect(page.locator('#runtime-badge')).toContainText('VERIFIED FULL-WORLD');
+    const qualified = await waitForQualifiedView(page, expected);
+    expect(qualified.status).toBe('PASS');
     assertNoRuntimeFailures(runtime);
   } finally {
     await faults.dispose();

@@ -1,8 +1,10 @@
-name: oteryn-atlas-e2e
+name: oteryn-atlas-e2e-selfhosted
 
 services:
   atlas-web:
-    image: ghcr.io/nginx/nginx-unprivileged:1.31.3-alpine3.24-slim@sha256:22f839c5fb4007dc24d203a170a9e03fc185d660bfefc34ac6823a7aef085cbc
+    build:
+      context: ..
+      dockerfile: e2e/Dockerfile.web
     read_only: true
     environment:
       ATLAS_CODE_REVISION: ${ATLAS_CODE_REVISION:-unknown}
@@ -13,11 +15,6 @@ services:
       ATLAS_PUBLICATION_HOST: ${ATLAS_PUBLICATION_HOST:-127.0.0.1}
       NGINX_ENVSUBST_FILTER: ^ATLAS_
       NGINX_ENVSUBST_OUTPUT_DIR: /tmp
-    volumes:
-      - ../web:/usr/share/nginx/html/web:ro
-      - ../src:/usr/share/nginx/html/src:ro
-      - ./nginx/default.conf.template:/etc/nginx/templates/default.conf.template:ro
-      - ./nginx/include-generated.conf:/etc/nginx/conf.d/default.conf:ro
     tmpfs:
       - /tmp
     healthcheck:
@@ -31,7 +28,7 @@ services:
       context: ..
       dockerfile: e2e/Dockerfile
     init: true
-    ipc: host
+    shm_size: 1gb
     depends_on:
       atlas-web:
         condition: service_healthy
@@ -42,4 +39,7 @@ services:
       ATLAS_E2E_WORKERS: ${ATLAS_E2E_WORKERS:-2}
       ATLAS_ARTIFACTS_DIR: /artifacts
     volumes:
-      - ${ATLAS_E2E_ARTIFACTS_HOST:-../artifacts/e2e}:/artifacts
+      - artifacts:/artifacts
+
+volumes:
+  artifacts:

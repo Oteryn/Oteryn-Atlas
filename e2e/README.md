@@ -27,6 +27,17 @@ $env:ATLAS_E2E_WORKERS = '1'
 ```
 
 The harness exposes and asserts the exact checkout SHA through `X-Oteryn-Atlas-Code-Revision`. Publication products are accepted only when they match the trust pins embedded in that checkout.
+On native Windows, `run.ps1` starts a bounded user-space TCP forwarder and routes Docker Desktop publication traffic through `host.docker.internal` while preserving the original publication Host identity. This avoids Docker bridge-to-LAN reachability failures without changing the NAS or the Atlas runtime, and the forwarder is stopped during runner cleanup.
+
+After the exact tested commit has been pushed to the PR branch, publish the verified local result from the generated `summary.json`:
+
+```powershell
+.\e2e\publish-local-e2e-status.ps1 `
+  -SummaryPath .\artifacts\e2e\<project>\summary.json `
+  -RemoteBranch agent/atlas-verify-ci-nightly-01
+```
+
+The publisher writes only the `atlas-local-e2e` commit status; it does not merge, deploy or modify the publication.
 ## Test a deployed preview directly
 
 Linux / WSL / Git Bash:
@@ -67,6 +78,7 @@ Each runner invocation uses an isolated Compose project and, by default, an isol
 Each run directory contains:
 
 - `summary.json` - compact target/revision/browser/project/scenario/timing/PASS-FAIL census;
+- `failure.json` - bounded machine-readable failing-scenario manifest when the run fails;
 - `results.json` - Playwright JSON report;
 - `html-report/` - browsable report;
 - `test-results/` - retained trace, video, screenshot and error context on failures.
@@ -74,3 +86,8 @@ Each run directory contains:
 Generated reports remain local/CI artifacts and are not intended for source-control commits.
 
 The source checkout is mounted read-only into the web container, no host service port is published by the harness, and the selected publication origin is exercised read-only.
+## CI tiers
+
+Required pull-request qualification is wired into `atlas-gate`: deterministic Node verification and authenticated exact-head local Docker Playwright evidence must both succeed. The heavy Playwright run is currently executed on Molehill-PC with Docker; GitHub CI only verifies the `atlas-local-e2e=success` status on the exact pull-request SHA. The publisher refuses dirty, stale-SHA, skipped/failed or retried evidence. Fork candidates cannot satisfy this trusted same-repository gate and must be reproduced on an authorized branch. `main` CI does not repeat the heavy PR workload; merged-main/live acceptance remains separately revision-qualified.
+
+Scheduled depth is defined by `.github/workflows/verification-depth.yml`. `ATLAS_E2E_DEPTH=nightly` only adds the extra DPR/tablet projects; the normal required suite remains unchanged. The workflow separately runs the fixed stress seed matrix, repeated critical geometry/render scenarios, and stable worker-delivered performance/visual/accessibility/race/soak specs. Missing optional depth categories are recorded with explicit reasons in `optional-depth-skips.json`.

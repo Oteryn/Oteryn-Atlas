@@ -16,6 +16,27 @@ if [[ -n "${ATLAS_PUBLICATION_ORIGIN:-}" && ! "$ATLAS_PUBLICATION_ORIGIN" =~ ^ht
   exit 2
 fi
 
+if [[ -n "${ATLAS_PUBLICATION_ORIGIN:-}" ]]; then
+  ATLAS_PUBLICATION_SCHEME="${ATLAS_PUBLICATION_ORIGIN%%://*}"
+  authority="${ATLAS_PUBLICATION_ORIGIN#*://}"
+  ATLAS_PUBLICATION_HOST="${authority%%:*}"
+  if [[ "$authority" == *:* ]]; then
+    port="${authority##*:}"
+  elif [[ "$ATLAS_PUBLICATION_SCHEME" == https ]]; then
+    port=443
+  else
+    port=80
+  fi
+  ATLAS_PUBLICATION_UPSTREAM="$ATLAS_PUBLICATION_HOST:$port"
+  ATLAS_PUBLICATION_HOST_HEADER="$authority"
+else
+  ATLAS_PUBLICATION_SCHEME=http
+  ATLAS_PUBLICATION_HOST=127.0.0.1
+  ATLAS_PUBLICATION_UPSTREAM=127.0.0.1:9
+  ATLAS_PUBLICATION_HOST_HEADER=127.0.0.1:9
+fi
+export ATLAS_PUBLICATION_SCHEME ATLAS_PUBLICATION_HOST ATLAS_PUBLICATION_UPSTREAM ATLAS_PUBLICATION_HOST_HEADER
+
 if [[ -z "${ATLAS_CODE_REVISION:-}" ]]; then
   if command -v git >/dev/null 2>&1 && git rev-parse --verify HEAD >/dev/null 2>&1; then
     ATLAS_CODE_REVISION="$(git rev-parse HEAD)"
@@ -28,7 +49,6 @@ export ATLAS_CODE_REVISION
 # In checkout-overlay mode the entry document is served by atlas-web, so bind
 # the browser proof to the exact checkout revision automatically. A direct
 # ATLAS_BASE_URL target can supply its own ATLAS_EXPECTED_REVISION explicitly.
-
 if [[ -z "${ATLAS_BASE_URL:-}" && -z "${ATLAS_EXPECTED_REVISION:-}" && "$ATLAS_CODE_REVISION" != "unknown" ]]; then
   ATLAS_EXPECTED_REVISION="$ATLAS_CODE_REVISION"
   export ATLAS_EXPECTED_REVISION

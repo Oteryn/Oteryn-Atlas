@@ -7,7 +7,58 @@ const workers = Number.isSafeInteger(parsedWorkers) && parsedWorkers > 0 ? parse
 const baseURL = process.env.ATLAS_BASE_URL || 'http://atlas-web:8080';
 const expectedRevision = process.env.ATLAS_EXPECTED_REVISION?.trim() || null;
 const publicationOrigin = process.env.ATLAS_PUBLICATION_ORIGIN?.trim() || null;
+const depth = process.env.ATLAS_E2E_DEPTH?.trim() || 'required';
 const browserContainer = 'mcr.microsoft.com/playwright:v1.62.0-noble@sha256:baed2032d533817f3dbe6425de795788430ba345e819a1201337009ba17c9d07';
+
+const projects = [
+  {
+    name: 'desktop-chromium',
+    testMatch: /desktop\.spec\.mjs$/,
+    use: { browserName: 'chromium', viewport: { width: 1440, height: 900 } },
+  },
+  {
+    name: 'mobile-chromium',
+    testMatch: /mobile\.spec\.mjs$/,
+    use: {
+      browserName: 'chromium',
+      viewport: { width: 390, height: 844 },
+      isMobile: true,
+      hasTouch: true,
+      deviceScaleFactor: 2,
+    },
+  },
+];
+
+if (depth === 'nightly') {
+  projects.push(
+    {
+      name: 'nightly-desktop-dpr2',
+      testMatch: [
+        /geometry-desktop\.spec\.mjs$/,
+        /render-probes-desktop\.spec\.mjs$/,
+      ],
+      use: {
+        browserName: 'chromium',
+        viewport: { width: 1920, height: 1080 },
+        deviceScaleFactor: 2,
+      },
+    },
+    {
+      name: 'nightly-tablet',
+      testMatch: [
+        /geometry-mobile\.spec\.mjs$/,
+        /responsive-mobile\.spec\.mjs$/,
+      ],
+      use: {
+        browserName: 'chromium',
+        viewport: { width: 820, height: 1180 },
+        isMobile: true,
+        hasTouch: true,
+        deviceScaleFactor: 1.5,
+      },
+    },
+  );
+}
 
 export default defineConfig({
   testDir: './tests',
@@ -24,6 +75,7 @@ export default defineConfig({
     publicationOrigin,
     expectedRevision,
     browserContainer,
+    workers,
   },
   reporter: [
     ['line'],
@@ -42,22 +94,5 @@ export default defineConfig({
     actionTimeout: 20_000,
     navigationTimeout: 60_000,
   },
-  projects: [
-    {
-      name: 'desktop-chromium',
-      testMatch: /desktop\.spec\.mjs$/,
-      use: { browserName: 'chromium', viewport: { width: 1440, height: 900 } },
-    },
-    {
-      name: 'mobile-chromium',
-      testMatch: /mobile\.spec\.mjs$/,
-      use: {
-        browserName: 'chromium',
-        viewport: { width: 390, height: 844 },
-        isMobile: true,
-        hasTouch: true,
-        deviceScaleFactor: 2,
-      },
-    },
-  ],
+  projects,
 });
