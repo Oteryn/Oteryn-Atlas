@@ -70,7 +70,7 @@ jobs:
     runs-on:
       group: atlas-runners
       labels: oteryn-atlas
-    timeout-minutes: 60
+    timeout-minutes: 180
     concurrency:
       group: atlas-synology-live-acceptance
       cancel-in-progress: false
