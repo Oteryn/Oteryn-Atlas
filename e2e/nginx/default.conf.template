@@ -1,3 +1,8 @@
+upstream atlas_publication_upstream {
+    server ${ATLAS_PUBLICATION_UPSTREAM};
+    keepalive 16;
+}
+
 server {
     listen 8080;
     listen [::]:8080;
@@ -14,26 +19,27 @@ server {
         return 302 /web/fullworld.html;
     }
 
-    # Full-world products are intentionally not committed to the Atlas source
-    # repository. Keep the current checkout as the code authority while
-    # proxying only the cryptographically verified publication families from
-    # an explicitly selected preview/publication origin.
+    # Reuse read-only publication connections during long checkout-overlay suites.
     location ^~ /fullworld/ {
-        proxy_pass ${ATLAS_PUBLICATION_ORIGIN};
+        proxy_pass ${ATLAS_PUBLICATION_SCHEME}://atlas_publication_upstream;
         proxy_http_version 1.1;
+        proxy_set_header Host "${ATLAS_PUBLICATION_HOST_HEADER}";
         proxy_set_header Connection "";
+        proxy_ssl_server_name on;
+        proxy_ssl_name "${ATLAS_PUBLICATION_HOST}";
         proxy_buffering off;
     }
 
-    # Creature search is an optional published extension on the current main.
     location ^~ /data/creatures/ {
-        proxy_pass ${ATLAS_PUBLICATION_ORIGIN};
+        proxy_pass ${ATLAS_PUBLICATION_SCHEME}://atlas_publication_upstream;
         proxy_http_version 1.1;
+        proxy_set_header Host "${ATLAS_PUBLICATION_HOST_HEADER}";
         proxy_set_header Connection "";
+        proxy_ssl_server_name on;
+        proxy_ssl_name "${ATLAS_PUBLICATION_HOST}";
         proxy_buffering off;
     }
 
-    # nginx's stock mime.types is not guaranteed to include ES-module .mjs.
     location ~* \.mjs$ {
         default_type application/javascript;
         try_files $uri =404;

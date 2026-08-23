@@ -147,6 +147,20 @@ jobs:
         shell: bash
         run: |
           set -Eeuo pipefail
+          ATLAS_PUBLICATION_SCHEME="${ATLAS_PUBLICATION_ORIGIN%%://*}"
+          authority="${ATLAS_PUBLICATION_ORIGIN#*://}"
+          ATLAS_PUBLICATION_HOST="${authority%%:*}"
+          if [[ "$authority" == *:* ]]; then
+            port="${authority##*:}"
+          elif [[ "$ATLAS_PUBLICATION_SCHEME" == https ]]; then
+            port=443
+          else
+            port=80
+          fi
+          ATLAS_PUBLICATION_UPSTREAM="$ATLAS_PUBLICATION_HOST:$port"
+          ATLAS_PUBLICATION_HOST_HEADER="$authority"
+          export ATLAS_PUBLICATION_SCHEME ATLAS_PUBLICATION_HOST ATLAS_PUBLICATION_UPSTREAM ATLAS_PUBLICATION_HOST_HEADER
+
           project="oteryn-atlas-nightly-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           compose=(docker compose -p "$project" -f e2e/compose.yml)
           cleanup() { "${compose[@]}" down --remove-orphans >/dev/null 2>&1 || true; }
