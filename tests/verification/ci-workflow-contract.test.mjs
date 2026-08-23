@@ -85,7 +85,7 @@ test('nightly depth is scheduled, bounded, replayable, read-only and evidence-pr
   assert.doesNotMatch(nightly, /pull_request:/);
   assert.match(nightly, /permissions:\s*\n\s*contents: read/);
   assert.match(nightly, /group: atlas-runners/);
-  assert.match(nightly, /labels: oteryn-atlas/);
+  assert.match(nightly, /labels: oteryn-atlas-pc/);
   assert.match(nightly, /ATLAS_PUBLICATION_ORIGIN: http:\/\/192\.168\.1\.2:8097/);
   assert.match(nightly, /ATLAS_STRESS_LENGTH: ['"]?64['"]?/);
   for (const seed of ['133', '1096043585', '2779096485', '3735928559']) {
