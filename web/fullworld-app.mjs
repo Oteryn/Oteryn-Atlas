@@ -309,15 +309,20 @@ async function drawWorldAnimation(timeMs) {
   const height = Math.max(1, Math.round(rect.height * dpr));
   if (animationCanvas.width !== width || animationCanvas.height !== height) { animationCanvas.width = width; animationCanvas.height = height; }
   const ctx = animationCanvas.getContext('2d');
-  ctx.clearRect(0, 0, width, height);
   animationCanvas.style.opacity = view?.animation === 'on' && animationRuntime ? '1' : '0';
-  if (view?.animation !== 'on' || !animationRuntime) return;
+  if (view?.animation !== 'on' || !animationRuntime) {
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, width, height);
+    return;
+  }
   const visible = sceneRecords.filter((record) => animationRuntime.hasObject(record));
   const frames = await Promise.all(visible.map(async (record) => {
     const frame = animationRuntime.objectFrame(record, timeMs);
     return frame ? [record, frame, await animationRuntime.bitmap(frame.contentId)] : null;
   }));
   if (epoch !== animationEpoch || view?.animation !== 'on') return;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, width, height);
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.imageSmoothingEnabled = false;
   for (const item of frames) {
     if (!item) continue;
