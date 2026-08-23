@@ -66,6 +66,18 @@ export async function waitForCommittedView(page, expected, afterGeneration = 0) 
   return committedRenderer(page);
 }
 
+export async function waitForQualifiedView(page, expected) {
+  await page.waitForFunction((wanted) => {
+    const result = globalThis.__OTERYN_ATLAS_FULLWORLD__;
+    const view = result?.view;
+    return result?.status === 'PASS'
+      && view?.floor === wanted.floor
+      && Math.abs(view.x - wanted.x) < 1e-9
+      && Math.abs(view.y - wanted.y) < 1e-9
+      && Math.abs(view.zoom - wanted.zoom) < 1e-9;
+  }, expected, { timeout: 90_000 });
+  return page.evaluate(() => globalThis.__OTERYN_ATLAS_FULLWORLD__);
+}
 export function viewFromUrl(url) {
   const value = new URL(url);
   return {
