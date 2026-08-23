@@ -69,7 +69,7 @@ jobs:
     name: Read-only Docker browser depth
     runs-on:
       group: atlas-runners
-      labels: oteryn-atlas
+      labels: oteryn-atlas-pc
     timeout-minutes: 180
     concurrency:
       group: atlas-synology-live-acceptance
@@ -80,21 +80,21 @@ jobs:
       ATLAS_PUBLICATION_ORIGIN: http://192.168.1.2:8097
       ATLAS_E2E_WORKERS: '1'
       ATLAS_STRESS_LENGTH: '64'
+      ATLAS_RUNNER_NAME: ${{ runner.name }}
+      ATLAS_RUNNER_OS: ${{ runner.os }}
     steps:
-      - name: Verify immutable Atlas runner identity
-        shell: bash
+      - name: Verify immutable Molehill Atlas runner identity
+        shell: pwsh
         run: |
-          set -Eeuo pipefail
-          test "$GITHUB_REPOSITORY" = 'Oteryn/Oteryn-Atlas'
-          test "${RUNNER_SCOPE:-}" = organization
-          test "${RUNNER_GROUP:-}" = atlas-runners
-          test "${RUNNER_NAME:-}" = oteryn-synology-atlas
-          test "${RUNNER_LABELS:-}" = oteryn-atlas
-          test -S /var/run/docker.sock
-          test ! -e /var/lib/oteryn-staging-state
-          grep -F '"agentName": "oteryn-synology-atlas"' /runner/.runner
-          grep -F '"poolName": "atlas-runners"' /runner/.runner
-          grep -F '"gitHubUrl": "https://github.com/Oteryn"' /runner/.runner
+          $ErrorActionPreference = 'Stop'
+          if ($env:GITHUB_REPOSITORY -ne 'Oteryn/Oteryn-Atlas') { throw 'Unexpected repository.' }
+          if ($env:ATLAS_RUNNER_NAME -ne 'oteryn-molehill-atlas') { throw "Unexpected runner: $env:ATLAS_RUNNER_NAME" }
+          if ($env:ATLAS_RUNNER_OS -ne 'Windows') { throw "Unexpected runner OS: $env:ATLAS_RUNNER_OS" }
+          docker version
+          if ($LASTEXITCODE -ne 0) { throw 'Docker is unavailable on the Molehill runner.' }
+          docker info | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw 'Docker Desktop engine is unavailable on the Molehill runner.' }
+          Write-Output 'molehill-atlas-runner-identity=PASS'
 
       - name: Check out exact scheduled main revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -103,140 +103,142 @@ jobs:
           persist-credentials: false
 
       - name: Verify exact checkout and read-only publication origin
-        shell: bash
+        shell: pwsh
         run: |
-          set -Eeuo pipefail
-          test "$(git rev-parse HEAD)" = "$ATLAS_CODE_REVISION"
-          if [[ "$GITHUB_EVENT_NAME" = schedule ]]; then test "$GITHUB_REF" = 'refs/heads/main'; fi
-          curl -fsS "$ATLAS_PUBLICATION_ORIGIN/fullworld/publication/publication.json" -o /tmp/atlas-nightly-publication.json
-          test -s /tmp/atlas-nightly-publication.json
+          $ErrorActionPreference = 'Stop'
+          if ((git rev-parse HEAD).Trim() -ne $env:ATLAS_CODE_REVISION) { throw 'Checkout revision mismatch.' }
+          if ($env:GITHUB_EVENT_NAME -eq 'schedule' -and $env:GITHUB_REF -ne 'refs/heads/main') { throw 'Scheduled nightly must run on main.' }
+          $response = Invoke-WebRequest -UseBasicParsing "$env:ATLAS_PUBLICATION_ORIGIN/fullworld/publication/publication.json"
+          if ($response.StatusCode -ne 200 -or [string]::IsNullOrWhiteSpace($response.Content)) { throw 'Publication origin preflight failed.' }
+          New-Item -ItemType Directory -Force artifacts/e2e/nightly | Out-Null
+          $response.Content | Set-Content -Encoding utf8 artifacts/e2e/nightly/publication-preflight.json
 
       - name: Record optional depth applicability
-        shell: bash
+        shell: pwsh
         run: |
-          set -euo pipefail
-          mkdir -p artifacts/e2e/nightly
-          skips=()
-          has_any() {
-            local category="$1"
-            shift
-            for spec in "$@"; do
-              if [[ -f "e2e/$spec" ]]; then return 0; fi
-            done
-            skips+=("$category")
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force artifacts/e2e/nightly | Out-Null
+          $categories = [ordered]@{
+            performance = @('tests/performance-desktop.spec.mjs')
+            visual = @('tests/visual-desktop.spec.mjs')
+            accessibility = @('tests/accessibility-desktop.spec.mjs', 'tests/a11y-desktop.spec.mjs')
+            'race-fault' = @('tests/race-fault-desktop.spec.mjs', 'tests/race-desktop.spec.mjs')
+            'soak-leak' = @('tests/soak-desktop.spec.mjs', 'tests/soak-leak-desktop.spec.mjs')
           }
-          has_any performance tests/performance-desktop.spec.mjs
-          has_any visual tests/visual-desktop.spec.mjs
-          has_any accessibility tests/accessibility-desktop.spec.mjs tests/a11y-desktop.spec.mjs
-          has_any race-fault tests/race-fault-desktop.spec.mjs tests/race-desktop.spec.mjs
-          has_any soak-leak tests/soak-desktop.spec.mjs tests/soak-leak-desktop.spec.mjs
-
-          {
-            printf '{\n  "version": 1,\n  "atlasRevision": "%s",\n  "skips": [' "$ATLAS_CODE_REVISION"
-            first=1
-            for category in "${skips[@]}"; do
-              if [[ "$first" -eq 0 ]]; then printf ','; fi
-              printf '\n    {"category":"%s","status":"skip","reason":"No stable worker-delivered spec for this category exists at the exact scheduled revision."}' "$category"
-              first=0
-            done
-            if (( ${#skips[@]} > 0 )); then printf '\n  '; fi
-            printf ']\n}\n'
-          } > artifacts/e2e/nightly/optional-depth-skips.json
+          $skips = @()
+          foreach ($entry in $categories.GetEnumerator()) {
+            $present = @($entry.Value | Where-Object { Test-Path (Join-Path 'e2e' $_) })
+            if ($present.Count -eq 0) {
+              $skips += [ordered]@{
+                category = $entry.Key
+                status = 'skip'
+                reason = 'No stable worker-delivered spec for this category exists at the exact scheduled revision.'
+              }
+            }
+          }
+          [ordered]@{ version = 1; atlasRevision = $env:ATLAS_CODE_REVISION; skips = $skips } |
+            ConvertTo-Json -Depth 5 | Set-Content -Encoding utf8 artifacts/e2e/nightly/optional-depth-skips.json
 
       - name: Run bounded replayable browser depth
-        shell: bash
+        shell: pwsh
         run: |
-          set -Eeuo pipefail
-          ATLAS_PUBLICATION_SCHEME="${ATLAS_PUBLICATION_ORIGIN%%://*}"
-          authority="${ATLAS_PUBLICATION_ORIGIN#*://}"
-          ATLAS_PUBLICATION_HOST="${authority%%:*}"
-          if [[ "$authority" == *:* ]]; then
-            port="${authority##*:}"
-          elif [[ "$ATLAS_PUBLICATION_SCHEME" == https ]]; then
-            port=443
-          else
-            port=80
-          fi
-          ATLAS_PUBLICATION_UPSTREAM="$ATLAS_PUBLICATION_HOST:$port"
-          ATLAS_PUBLICATION_HOST_HEADER="$authority"
-          export ATLAS_PUBLICATION_SCHEME ATLAS_PUBLICATION_HOST ATLAS_PUBLICATION_UPSTREAM ATLAS_PUBLICATION_HOST_HEADER
+          $ErrorActionPreference = 'Stop'
+          $origin = [Uri]$env:ATLAS_PUBLICATION_ORIGIN
+          $originPort = if ($origin.IsDefaultPort) { if ($origin.Scheme -eq 'https') { 443 } else { 80 } } else { $origin.Port }
+          $forwarder = $null
+          $project = "oteryn-atlas-nightly-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
+          $composeFile = 'e2e/compose.selfhosted.yml'
+          $artifactRoot = Join-Path (Get-Location) 'artifacts/e2e/nightly'
+          New-Item -ItemType Directory -Force $artifactRoot | Out-Null
 
-          project="oteryn-atlas-nightly-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          compose=(docker compose -p "$project" -f e2e/compose.selfhosted.yml)
-          export_artifacts() {
-            mkdir -p artifacts/e2e/nightly
-            local export_name="${project}-artifact-export"
-            "${compose[@]}" run --no-deps -d --name "$export_name" e2e sleep 600 >/dev/null 2>&1 || true
-            if docker inspect "$export_name" >/dev/null 2>&1; then
-              docker cp "$export_name:/artifacts/." artifacts/e2e/nightly/ || true
-              docker rm -f "$export_name" >/dev/null 2>&1 || true
-            fi
+          try {
+            $python = (Get-Command python -ErrorAction Stop).Source
+            $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
+            $listener.Start()
+            $forwardPort = ([System.Net.IPEndPoint]$listener.LocalEndpoint).Port
+            $listener.Stop()
+            $forwarderOut = Join-Path $artifactRoot 'publication-forwarder.log'
+            $forwarderErr = Join-Path $artifactRoot 'publication-forwarder.err.log'
+            $forwarder = Start-Process -FilePath $python -ArgumentList @(
+              'e2e/local-publication-forwarder.py', '--listen-host', '0.0.0.0', '--listen-port', "$forwardPort",
+              '--upstream-host', $origin.Host, '--upstream-port', "$originPort"
+            ) -WindowStyle Hidden -PassThru -RedirectStandardOutput $forwarderOut -RedirectStandardError $forwarderErr
+
+            $ready = $false
+            for ($attempt = 0; $attempt -lt 50; $attempt += 1) {
+              if ($forwarder.HasExited) { break }
+              $client = [System.Net.Sockets.TcpClient]::new()
+              try {
+                $connect = $client.ConnectAsync('127.0.0.1', $forwardPort)
+                if ($connect.Wait(200) -and $client.Connected) { $ready = $true; break }
+              } catch { } finally { $client.Dispose() }
+              Start-Sleep -Milliseconds 100
+            }
+            if (-not $ready) { throw "Publication forwarder failed; see $forwarderErr" }
+
+            $env:ATLAS_PUBLICATION_SCHEME = $origin.Scheme
+            $env:ATLAS_PUBLICATION_HOST = $origin.Host
+            $env:ATLAS_PUBLICATION_HOST_HEADER = $origin.Authority
+            $env:ATLAS_PUBLICATION_UPSTREAM = "host.docker.internal:$forwardPort"
+
+            docker compose -p $project -f $composeFile up -d --build atlas-web
+            if ($LASTEXITCODE -ne 0) { throw 'atlas-web build/start failed.' }
+            docker compose -p $project -f $composeFile build e2e
+            if ($LASTEXITCODE -ne 0) { throw 'E2E image build failed.' }
+
+            function Invoke-DepthCase {
+              param([string]$Label, [string[]]$Environment, [string[]]$Command)
+              $args = @('compose', '-p', $project, '-f', $composeFile, 'run', '--rm', '-e', "ATLAS_ARTIFACTS_DIR=/artifacts/$Label")
+              foreach ($item in $Environment) { $args += @('-e', $item) }
+              $args += $Command
+              & docker @args
+              if ($LASTEXITCODE -ne 0) { throw "Nightly depth case failed: $Label" }
+            }
+
+            Invoke-DepthCase -Label 'required' -Environment @('ATLAS_E2E_DEPTH=required') -Command @('e2e', 'npm', 'test')
+            Invoke-DepthCase -Label 'repeated-critical' -Environment @('ATLAS_E2E_DEPTH=required') -Command @(
+              'e2e', 'npx', 'playwright', 'test', '--config=playwright.config.mjs',
+              'tests/geometry-desktop.spec.mjs', 'tests/render-probes-desktop.spec.mjs',
+              '--project=desktop-chromium', '--repeat-each=3'
+            )
+            foreach ($seed in @('133', '1096043585', '2779096485', '3735928559')) {
+              Invoke-DepthCase -Label "stress-$seed" -Environment @(
+                'ATLAS_E2E_DEPTH=required', "ATLAS_STRESS_SEED=$seed", "ATLAS_STRESS_LENGTH=$env:ATLAS_STRESS_LENGTH"
+              ) -Command @('e2e', 'npx', 'playwright', 'test', '--config=playwright.config.mjs', 'tests/stress-desktop.spec.mjs', '--project=desktop-chromium')
+            }
+            Invoke-DepthCase -Label 'extra-profiles' -Environment @('ATLAS_E2E_DEPTH=nightly') -Command @(
+              'e2e', 'npx', 'playwright', 'test', '--config=playwright.config.mjs',
+              '--project=nightly-desktop-dpr2', '--project=nightly-tablet'
+            )
+
+            $optional = [ordered]@{
+              performance = @('tests/performance-desktop.spec.mjs')
+              visual = @('tests/visual-desktop.spec.mjs')
+              accessibility = @('tests/accessibility-desktop.spec.mjs', 'tests/a11y-desktop.spec.mjs')
+              'race-fault' = @('tests/race-fault-desktop.spec.mjs', 'tests/race-desktop.spec.mjs')
+              'soak-leak' = @('tests/soak-desktop.spec.mjs', 'tests/soak-leak-desktop.spec.mjs')
+            }
+            foreach ($entry in $optional.GetEnumerator()) {
+              $present = @($entry.Value | Where-Object { Test-Path (Join-Path 'e2e' $_) })
+              if ($present.Count -gt 0) {
+                $command = @('e2e', 'npx', 'playwright', 'test', '--config=playwright.config.mjs') + $present + @('--project=desktop-chromium')
+                Invoke-DepthCase -Label "optional-$($entry.Key)" -Environment @('ATLAS_E2E_DEPTH=required') -Command $command
+              }
+            }
+          } finally {
+            $previous = $ErrorActionPreference
+            $ErrorActionPreference = 'Continue'
+            $exportName = "$project-artifact-export"
+            docker compose -p $project -f $composeFile run --no-deps -d --name $exportName e2e sleep 600 | Out-Null
+            if ($LASTEXITCODE -eq 0) {
+              docker cp "${exportName}:/artifacts/." "$artifactRoot/" | Out-Null
+              docker rm -f $exportName | Out-Null
+            }
+            docker compose -p $project -f $composeFile down -v --remove-orphans | Out-Null
+            if ($forwarder -and -not $forwarder.HasExited) { Stop-Process -Id $forwarder.Id -Force }
+            $ErrorActionPreference = $previous
           }
-          cleanup() {
-            local rc=$?
-            trap - EXIT
-            set +e
-            export_artifacts
-            "${compose[@]}" down -v --remove-orphans >/dev/null 2>&1 || true
-            exit "$rc"
-          }
-          trap cleanup EXIT
 
-          "${compose[@]}" up -d --build atlas-web
-          "${compose[@]}" build e2e
-
-          run_case() {
-            local label="$1"
-            shift
-            "${compose[@]}" run --rm \
-              -e ATLAS_ARTIFACTS_DIR="/artifacts/$label" \
-              "$@"
-          }
-
-          run_case required \
-            -e ATLAS_E2E_DEPTH=required \
-            e2e npm test
-
-          run_case repeated-critical \
-            -e ATLAS_E2E_DEPTH=required \
-            e2e npx playwright test --config=playwright.config.mjs \
-              tests/geometry-desktop.spec.mjs tests/render-probes-desktop.spec.mjs \
-              --project=desktop-chromium --repeat-each=3
-
-          for seed in 133 1096043585 2779096485 3735928559; do
-            run_case "stress-$seed" \
-              -e ATLAS_E2E_DEPTH=required \
-              -e ATLAS_STRESS_SEED="$seed" \
-              -e ATLAS_STRESS_LENGTH="$ATLAS_STRESS_LENGTH" \
-              e2e npx playwright test --config=playwright.config.mjs \
-                tests/stress-desktop.spec.mjs --project=desktop-chromium
-          done
-
-          run_case extra-profiles \
-            -e ATLAS_E2E_DEPTH=nightly \
-            e2e npx playwright test --config=playwright.config.mjs \
-              --project=nightly-desktop-dpr2 --project=nightly-tablet
-
-          run_optional() {
-            local label="$1"
-            shift
-            local present=()
-            for spec in "$@"; do
-              if [[ -f "e2e/$spec" ]]; then present+=("$spec"); fi
-            done
-            if (( ${#present[@]} > 0 )); then
-              run_case "optional-$label" \
-                -e ATLAS_E2E_DEPTH=required \
-                e2e npx playwright test --config=playwright.config.mjs \
-                  "${present[@]}" --project=desktop-chromium
-            fi
-          }
-
-          run_optional performance tests/performance-desktop.spec.mjs
-          run_optional visual tests/visual-desktop.spec.mjs
-          run_optional accessibility tests/accessibility-desktop.spec.mjs tests/a11y-desktop.spec.mjs
-          run_optional race-fault tests/race-fault-desktop.spec.mjs tests/race-desktop.spec.mjs
-          run_optional soak-leak tests/soak-desktop.spec.mjs tests/soak-leak-desktop.spec.mjs
       - name: Publish bounded nightly browser evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
