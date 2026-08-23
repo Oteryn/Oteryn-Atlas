@@ -18,7 +18,7 @@ function block(source, start, end) {
   return source.slice(begin, finish === -1 ? source.length : finish);
 }
 
-test('atlas-gate requires deterministic verification and full Docker browser qualification', () => {
+test('atlas-gate requires exact-head local Docker browser evidence', () => {
   const nodeJob = block(ci, '  verification-node:\n', '  verification-browser:\n');
   const browserJob = block(ci, '  verification-browser:\n', '  atlas-gate:\n');
   const gateStart = ci.indexOf('  atlas-gate:\n');
@@ -30,19 +30,44 @@ test('atlas-gate requires deterministic verification and full Docker browser qua
   assert.match(nodeJob, /tests\/properties\/\*\.test\.mjs/);
   assert.match(nodeJob, /actions\/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a/);
 
+  assert.match(browserJob, /github\.event_name == 'pull_request'/);
   assert.match(browserJob, /github\.event\.pull_request\.head\.repo\.full_name == github\.repository/);
-  assert.match(browserJob, /group: atlas-runners/);
-  assert.match(browserJob, /labels: oteryn-atlas/);
-  assert.match(browserJob, /ATLAS_PUBLICATION_ORIGIN: http:\/\/192\.168\.1\.2:8097/);
-  assert.match(browserJob, /ATLAS_E2E_WORKERS: ['"]?1['"]?/);
-  assert.match(browserJob, /compose\.selfhosted\.yml/);
-  assert.match(browserJob, /docker cp/);
-  assert.match(browserJob, /actions\/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a/);
+  assert.match(browserJob, /needs: verification-node/);
+  assert.match(browserJob, /runs-on: ubuntu-24\.04/);
+  assert.match(browserJob, /statuses: read/);
+  assert.match(browserJob, /ATLAS_CODE_REVISION: \$\{\{ github\.event\.pull_request\.head\.sha \}\}/);
+  assert.match(browserJob, /atlas-local-e2e/);
+  assert.match(browserJob, /commits\/\$ATLAS_CODE_REVISION\/statuses/);
+  assert.match(browserJob, /test "\$state" = success/);
+  assert.doesNotMatch(browserJob, /group: atlas-runners/);
+  assert.doesNotMatch(browserJob, /labels: oteryn-atlas/);
+  assert.doesNotMatch(browserJob, /docker compose|compose\.selfhosted\.yml/);
 
   assert.match(gate, /- verification-node/);
   assert.match(gate, /- verification-browser/);
   assert.match(gate, /VERIFICATION_NODE:.*needs\.verification-node\.result/);
   assert.match(gate, /VERIFICATION_BROWSER:.*needs\.verification-browser\.result/);
+  assert.match(gate, /GITHUB_EVENT_NAME/);
+  assert.match(gate, /pull_request.*VERIFICATION_BROWSER.*success/s);
+});
+
+test('local Docker status publisher only accepts exact clean all-pass evidence', () => {
+  const publisherUrl = new URL('../../e2e/publish-local-e2e-status.ps1', import.meta.url);
+  assert.equal(fs.existsSync(publisherUrl), true, 'missing local E2E status publisher');
+  const publisher = readText(publisherUrl);
+  assert.match(publisher, /git status --porcelain/);
+  assert.match(publisher, /git ls-remote --heads origin/);
+  assert.match(publisher, /metadata\.expectedRevision/);
+  assert.match(publisher, /ExpectedScenarioCount = 48/);
+  assert.match(publisher, /targetMode -ne 'checkout-overlay'/);
+  assert.match(publisher, /metadata\.workers -ne 1/);
+  assert.match(playwrightConfig, /metadata:\s*\{[\s\S]*workers,/);
+  assert.match(publisher, /status -ne 'passed'/);
+  assert.match(publisher, /\.status -ne 'passed'/);
+  assert.match(publisher, /\.retry -ne 0/);
+  assert.match(publisher, /atlas-local-e2e/);
+  assert.match(publisher, /state = 'success'/);
+  assert.match(publisher, /statuses\/\$sha/);
 });
 
 test('required workflows verify the exact pull-request head rather than a synthetic merge ref', () => {

@@ -17,9 +17,10 @@ test('self-hosted Compose sends checkout into images instead of bind mounting ru
   assert.doesNotMatch(compose, /\.\.\/web:|\.\.\/src:|ATLAS_E2E_ARTIFACTS_HOST/);
 });
 
-test('self-hosted required and nightly jobs use the no-bind Compose path', () => {
-  assert.match(ci, /compose\.selfhosted\.yml/);
-  assert.match(ci, /docker cp/);
+test('required PR gate is status-only while nightly keeps the no-bind self-hosted Compose path', () => {
+  assert.match(ci, /atlas-local-e2e/);
+  assert.doesNotMatch(ci, /compose\.selfhosted\.yml/);
+  assert.doesNotMatch(ci, /docker cp/);
   assert.match(nightly, /compose\.selfhosted\.yml/);
   assert.match(nightly, /docker cp/);
 });

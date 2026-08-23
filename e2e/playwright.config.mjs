@@ -75,6 +75,7 @@ export default defineConfig({
     publicationOrigin,
     expectedRevision,
     browserContainer,
+    workers,
   },
   reporter: [
     ['line'],

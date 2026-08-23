@@ -256,85 +256,25 @@ jobs:
           retention-days: 14
 
   verification-browser:
-    name: Full Docker Playwright qualification
-    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
-    runs-on:
-      group: atlas-runners
-      labels: oteryn-atlas
-    timeout-minutes: 30
-    concurrency:
-      group: atlas-synology-live-acceptance
-      cancel-in-progress: false
+    name: Local Docker Playwright evidence
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    needs: verification-node
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      statuses: read
     env:
-      ATLAS_CODE_REVISION: ${{ github.event.pull_request.head.sha || github.sha }}
-      ATLAS_EXPECTED_REVISION: ${{ github.event.pull_request.head.sha || github.sha }}
-      ATLAS_PUBLICATION_ORIGIN: http://192.168.1.2:8097
-      ATLAS_E2E_WORKERS: '1'
-      ATLAS_E2E_PROJECT: atlas-required-${{ github.run_id }}-${{ github.run_attempt }}
+      GH_TOKEN: ${{ github.token }}
+      ATLAS_CODE_REVISION: ${{ github.event.pull_request.head.sha }}
     steps:
-      - name: Verify immutable Atlas runner identity
+      - name: Require exact-head local Docker Playwright status
         shell: bash
         run: |
-          set -Eeuo pipefail
+          set -euo pipefail
           test "$GITHUB_REPOSITORY" = 'Oteryn/Oteryn-Atlas'
-          test "${RUNNER_SCOPE:-}" = organization
-          test "${RUNNER_GROUP:-}" = atlas-runners
-          test "${RUNNER_NAME:-}" = oteryn-synology-atlas
-          test "${RUNNER_LABELS:-}" = oteryn-atlas
-          test -S /var/run/docker.sock
-          test ! -e /var/lib/oteryn-staging-state
-          grep -F '"agentName": "oteryn-synology-atlas"' /runner/.runner
-          grep -F '"poolName": "atlas-runners"' /runner/.runner
-          grep -F '"gitHubUrl": "https://github.com/Oteryn"' /runner/.runner
-
-      - name: Check out exact Atlas candidate
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
-          persist-credentials: false
-
-      - name: Run exact-head no-bind Docker Playwright suite
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          test "$(git rev-parse HEAD)" = "$ATLAS_CODE_REVISION"
-          ATLAS_PUBLICATION_SCHEME="${ATLAS_PUBLICATION_ORIGIN%%://*}"
-          authority="${ATLAS_PUBLICATION_ORIGIN#*://}"
-          ATLAS_PUBLICATION_HOST="${authority%%:*}"
-          if [[ "$authority" == *:* ]]; then
-            port="${authority##*:}"
-          elif [[ "$ATLAS_PUBLICATION_SCHEME" == https ]]; then
-            port=443
-          else
-            port=80
-          fi
-          ATLAS_PUBLICATION_UPSTREAM="$ATLAS_PUBLICATION_HOST:$port"
-          ATLAS_PUBLICATION_HOST_HEADER="$authority"
-          export ATLAS_PUBLICATION_SCHEME ATLAS_PUBLICATION_HOST ATLAS_PUBLICATION_UPSTREAM ATLAS_PUBLICATION_HOST_HEADER
-
-          mkdir -p artifacts/e2e/required
-          compose=(docker compose -p "$ATLAS_E2E_PROJECT" -f e2e/compose.selfhosted.yml)
-          cleanup() { "${compose[@]}" down -v --remove-orphans >/dev/null 2>&1 || true; }
-          trap cleanup EXIT
-
-          set +e
-          "${compose[@]}" up --build --abort-on-container-exit --exit-code-from e2e e2e
-          rc=$?
-          set -e
-          e2e_id="$("${compose[@]}" ps -a -q e2e)"
-          if [[ -n "$e2e_id" ]]; then
-            docker cp "$e2e_id:/artifacts/." artifacts/e2e/required/
-          fi
-          exit "$rc"
-
-      - name: Publish bounded Playwright evidence
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: atlas-verification-browser-${{ github.run_id }}-${{ github.run_attempt }}
-          path: artifacts/e2e/required/
-          if-no-files-found: error
-          retention-days: 14
+          state="$(gh api "repos/$GITHUB_REPOSITORY/commits/$ATLAS_CODE_REVISION/statuses" --jq '[.[] | select(.context == "atlas-local-e2e")][0].state // ""')"
+          test "$state" = success
 
   atlas-gate:
     name: atlas-gate
@@ -359,8 +299,14 @@ jobs:
           PROJECT: ${{ needs.project.result }}
           VERIFICATION_NODE: ${{ needs.verification-node.result }}
           VERIFICATION_BROWSER: ${{ needs.verification-browser.result }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
         run: |
           set -euo pipefail
-          for result in "$REPOSITORY_CONTRACT" "$SEMANTIC_PROOF" "$BROWSER_SEMANTIC" "$BROWSER_WEBGL_PROOF" "$PROJECT" "$VERIFICATION_NODE" "$VERIFICATION_BROWSER"; do
+          for result in "$REPOSITORY_CONTRACT" "$SEMANTIC_PROOF" "$BROWSER_SEMANTIC" "$BROWSER_WEBGL_PROOF" "$PROJECT" "$VERIFICATION_NODE"; do
             test "$result" = success
           done
+          if [[ "$GITHUB_EVENT_NAME" == pull_request ]]; then
+            test "$VERIFICATION_BROWSER" = success
+          else
+            test "$VERIFICATION_BROWSER" = skipped
+          fi
