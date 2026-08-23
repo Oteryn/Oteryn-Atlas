@@ -99,6 +99,18 @@ test('nightly depth is scheduled, bounded, replayable, read-only and evidence-pr
   assert.doesNotMatch(nightly, /PREVIEW_CONTAINER/);
 });
 
+test('nightly depth does not duplicate the PR-gated full required browser matrix', () => {
+  assert.doesNotMatch(nightly, /run_case required[\s\S]*?e2e npm test/);
+  assert.match(nightly, /run_case repeated-critical/);
+  assert.match(nightly, /run_case "stress-\$seed"/);
+  assert.match(nightly, /run_case extra-profiles/);
+  assert.match(nightly, /run_optional performance/);
+  assert.match(nightly, /run_optional visual/);
+  assert.match(nightly, /run_optional accessibility/);
+  assert.match(nightly, /run_optional race-fault/);
+  assert.match(nightly, /run_optional soak-leak/);
+});
+
 test('nightly browser depth has a bounded budget for its 80-scenario minimum workload', () => {
   const browserDepthStart = nightly.indexOf('  browser-depth:\n');
   assert.notEqual(browserDepthStart, -1, 'missing browser-depth job');
@@ -107,6 +119,7 @@ test('nightly browser depth has a bounded budget for its 80-scenario minimum wor
   assert.ok(match, 'nightly browser-depth must declare a bounded timeout');
   assert.ok(Number(match[1]) >= 180, `nightly browser-depth timeout ${match[1]}m is below the measured runner budget for the 80-scenario minimum workload`);
 });
+
 test('nightly Playwright profiles are opt-in and do not expand the PR suite implicitly', () => {
   assert.match(playwrightConfig, /ATLAS_E2E_DEPTH/);
   assert.match(playwrightConfig, /nightly-desktop-dpr2/);
