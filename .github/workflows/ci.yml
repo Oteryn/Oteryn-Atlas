@@ -271,7 +271,6 @@ jobs:
       ATLAS_PUBLICATION_ORIGIN: http://192.168.1.2:8097
       ATLAS_E2E_WORKERS: '1'
       ATLAS_E2E_PROJECT: atlas-required-${{ github.run_id }}-${{ github.run_attempt }}
-      ATLAS_E2E_ARTIFACTS_HOST: ../artifacts/e2e/required
     steps:
       - name: Verify immutable Atlas runner identity
         shell: bash
@@ -294,13 +293,39 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
 
-      - name: Run exact-head read-only Docker Playwright suite
+      - name: Run exact-head no-bind Docker Playwright suite
         shell: bash
         run: |
           set -Eeuo pipefail
           test "$(git rev-parse HEAD)" = "$ATLAS_CODE_REVISION"
+          ATLAS_PUBLICATION_SCHEME="${ATLAS_PUBLICATION_ORIGIN%%://*}"
+          authority="${ATLAS_PUBLICATION_ORIGIN#*://}"
+          ATLAS_PUBLICATION_HOST="${authority%%:*}"
+          if [[ "$authority" == *:* ]]; then
+            port="${authority##*:}"
+          elif [[ "$ATLAS_PUBLICATION_SCHEME" == https ]]; then
+            port=443
+          else
+            port=80
+          fi
+          ATLAS_PUBLICATION_UPSTREAM="$ATLAS_PUBLICATION_HOST:$port"
+          ATLAS_PUBLICATION_HOST_HEADER="$authority"
+          export ATLAS_PUBLICATION_SCHEME ATLAS_PUBLICATION_HOST ATLAS_PUBLICATION_UPSTREAM ATLAS_PUBLICATION_HOST_HEADER
+
           mkdir -p artifacts/e2e/required
-          ./e2e/run.sh
+          compose=(docker compose -p "$ATLAS_E2E_PROJECT" -f e2e/compose.selfhosted.yml)
+          cleanup() { "${compose[@]}" down -v --remove-orphans >/dev/null 2>&1 || true; }
+          trap cleanup EXIT
+
+          set +e
+          "${compose[@]}" up --build --abort-on-container-exit --exit-code-from e2e e2e
+          rc=$?
+          set -e
+          e2e_id="$("${compose[@]}" ps -a -q e2e)"
+          if [[ -n "$e2e_id" ]]; then
+            docker cp "$e2e_id:/artifacts/." artifacts/e2e/required/
+          fi
+          exit "$rc"
 
       - name: Publish bounded Playwright evidence
         if: always()

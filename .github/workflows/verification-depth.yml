@@ -162,19 +162,35 @@ jobs:
           export ATLAS_PUBLICATION_SCHEME ATLAS_PUBLICATION_HOST ATLAS_PUBLICATION_UPSTREAM ATLAS_PUBLICATION_HOST_HEADER
 
           project="oteryn-atlas-nightly-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          compose=(docker compose -p "$project" -f e2e/compose.yml)
-          cleanup() { "${compose[@]}" down --remove-orphans >/dev/null 2>&1 || true; }
+          compose=(docker compose -p "$project" -f e2e/compose.selfhosted.yml)
+          export_artifacts() {
+            mkdir -p artifacts/e2e/nightly
+            local export_name="${project}-artifact-export"
+            "${compose[@]}" run --no-deps -d --name "$export_name" e2e sleep 600 >/dev/null 2>&1 || true
+            if docker inspect "$export_name" >/dev/null 2>&1; then
+              docker cp "$export_name:/artifacts/." artifacts/e2e/nightly/ || true
+              docker rm -f "$export_name" >/dev/null 2>&1 || true
+            fi
+          }
+          cleanup() {
+            local rc=$?
+            trap - EXIT
+            set +e
+            export_artifacts
+            "${compose[@]}" down -v --remove-orphans >/dev/null 2>&1 || true
+            exit "$rc"
+          }
           trap cleanup EXIT
 
-          "${compose[@]}" up -d atlas-web
+          "${compose[@]}" up -d --build atlas-web
           "${compose[@]}" build e2e
 
           run_case() {
             local label="$1"
             shift
-            mkdir -p "artifacts/e2e/nightly/$label"
-            ATLAS_E2E_ARTIFACTS_HOST="../artifacts/e2e/nightly/$label" \
-              "${compose[@]}" run --rm "$@"
+            "${compose[@]}" run --rm \
+              -e ATLAS_ARTIFACTS_DIR="/artifacts/$label" \
+              "$@"
           }
 
           run_case required \
@@ -221,7 +237,6 @@ jobs:
           run_optional accessibility tests/accessibility-desktop.spec.mjs tests/a11y-desktop.spec.mjs
           run_optional race-fault tests/race-fault-desktop.spec.mjs tests/race-desktop.spec.mjs
           run_optional soak-leak tests/soak-desktop.spec.mjs tests/soak-leak-desktop.spec.mjs
-
       - name: Publish bounded nightly browser evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

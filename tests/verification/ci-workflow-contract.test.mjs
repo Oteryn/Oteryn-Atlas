@@ -35,7 +35,8 @@ test('atlas-gate requires deterministic verification and full Docker browser qua
   assert.match(browserJob, /labels: oteryn-atlas/);
   assert.match(browserJob, /ATLAS_PUBLICATION_ORIGIN: http:\/\/192\.168\.1\.2:8097/);
   assert.match(browserJob, /ATLAS_E2E_WORKERS: ['"]?1['"]?/);
-  assert.match(browserJob, /\.\/e2e\/run\.sh/);
+  assert.match(browserJob, /compose\.selfhosted\.yml/);
+  assert.match(browserJob, /docker cp/);
   assert.match(browserJob, /actions\/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a/);
 
   assert.match(gate, /- verification-node/);
