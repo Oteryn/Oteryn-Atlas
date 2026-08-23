@@ -200,13 +200,13 @@ function renderCreatureInspector(record) {
   panel.append(
     createTextRow('Name', record.name),
     createTextRow('Kind', record.kind === 'npc' ? 'NPC' : 'Monster / Spawn'),
-    createTextRow('Position', `X ${record.position.x} Â· Y ${record.position.y} Â· F ${record.position.floor}`),
+    createTextRow('Position', `X ${record.position.x} · Y ${record.position.y} · F ${record.position.floor}`),
     createTextRow('Resolution', record.resolution_state),
     createTextRow('Record', record.record_id),
     createTextRow('Origin', record.origin ?? 'UNKNOWN'),
   );
   if (record.entity_id) panel.append(createTextRow('Entity', record.entity_id));
-  if (record.spawn_area) panel.append(createTextRow('Spawn area', `X ${record.spawn_area.center.x} Â· Y ${record.spawn_area.center.y} Â· F ${record.spawn_area.center.floor} Â· radius ${record.spawn_area.radius}`));
+  if (record.spawn_area) panel.append(createTextRow('Spawn area', `X ${record.spawn_area.center.x} · Y ${record.spawn_area.center.y} · F ${record.spawn_area.center.floor} · radius ${record.spawn_area.radius}`));
   if (record.appearance) panel.append(createTextRow('Outfit', record.appearance.outfit_key ?? record.appearance.look_type));
   if (record.kind === 'npc') {
     panel.append(createTextRow('NPC role resolution', record.role_resolution_state ?? 'UNKNOWN'));
@@ -214,7 +214,7 @@ function renderCreatureInspector(record) {
   }
   const verifiedPixel = record.presentation_resolution_state === 'RESOLVED' && state.animationRuntime?.hasCreature(record);
   panel.append(
-    createTextRow('Presentation', verifiedPixel ? `Verified outfit pixels Â· ${state.animationOn ? 'animated' : 'static verified phase'}` : `Factual marker fallback Â· ${record.presentation_reason ?? record.presentation_resolution_state ?? 'UNKNOWN'}`),
+    createTextRow('Presentation', verifiedPixel ? `Verified outfit pixels · ${state.animationOn ? 'animated' : 'static verified phase'}` : `Factual marker fallback · ${record.presentation_reason ?? record.presentation_resolution_state ?? 'UNKNOWN'}`),
     createTextRow('Authority', `${EXPECTED_CONTRACT} / ${EXPECTED_CAPABILITY}`),
     createTextRow('Semantic digest', state.index.source.semantic_digest),
   );
@@ -322,7 +322,7 @@ function setup() {
   const region = document.querySelector('#region-controls');
   if (region) {
     const section = document.createElement('section');
-    section.innerHTML = '<h2>Creature search</h2><label class="npc-role-control" for="npc-role-filter"><span>NPC category</span><select id="npc-role-filter" aria-label="Filter NPCs by map category"><option value="all">All NPCs</option></select></label><input id="creature-search" type="search" placeholder="Search NPCs or monsters" aria-label="Search verified creatures"><div id="creature-results" class="region-results" aria-live="polite"></div><p class="rail-note" id="creature-status">Loading Game-owned verified creature indexâ€¦</p>';
+    section.innerHTML = '<h2>Creature search</h2><label class="npc-role-control" for="npc-role-filter"><span>NPC category</span><select id="npc-role-filter" aria-label="Filter NPCs by map category"><option value="all">All NPCs</option></select></label><input id="creature-search" type="search" placeholder="Search NPCs or monsters" aria-label="Search verified creatures"><div id="creature-results" class="region-results" aria-live="polite"></div><p class="rail-note" id="creature-status">Loading Game-owned verified creature index…</p>';
     region.after(section);
     section.querySelector('#creature-search').addEventListener('input', (event) => renderSearch(event.target.value));
     section.querySelector('#npc-role-filter').addEventListener('change', (event) => {
@@ -388,7 +388,7 @@ function renderSearch(query) {
   for (const item of state.search.filter((record) => record.label.toLowerCase().includes(normalized)).slice(0, 20)) {
     const button = document.createElement('button');
     button.type = 'button';
-    button.textContent = `${item.label} Â· ${item.kind} Â· X ${item.position.x} Y ${item.position.y} F ${item.position.floor}`;
+    button.textContent = `${item.label} · ${item.kind} · X ${item.position.x} Y ${item.position.y} F ${item.position.floor}`;
     button.addEventListener('click', () => navigate(item));
     output.append(button);
   }
@@ -601,7 +601,7 @@ async function refresh() {
   const selected = state.selectedId ? records.find((record) => record.record_id === state.selectedId) ?? null : null;
   renderCreatureInspector(selected);
   const status = document.querySelector('#creature-status');
-  if (status) status.textContent = `Game-owned verified creatures Â· ${state.index.counts.records.toLocaleString()} placements Â· NPC ${npcRoleLabel(state.npcRole)} Â· ${entries.length} visible shards Â· ${state.pixelDrawnRecords} pixel / ${state.lastDrawnNpcIcons} NPC icon / ${state.markerDrawnRecords} marker`;
+  if (status) status.textContent = `Game-owned verified creatures · ${state.index.counts.records.toLocaleString()} placements · NPC ${npcRoleLabel(state.npcRole)} · ${entries.length} visible shards · ${state.pixelDrawnRecords} pixel / ${state.lastDrawnNpcIcons} NPC icon / ${state.markerDrawnRecords} marker`;
   publish('PASS', null, { visibleShards: entries.length, selectedVisible: Boolean(selected) });
 }
 async function boot() {
@@ -633,7 +633,7 @@ async function boot() {
     state.search = search.records;
     syncNpcRoleControl();
     const status = document.querySelector('#creature-status');
-    if (status) status.textContent = `Ready Â· ${index.counts.records.toLocaleString()} verified creature placements`;
+    if (status) status.textContent = `Ready · ${index.counts.records.toLocaleString()} verified creature placements`;
     await waitForInitialView();
     await refresh();
   } catch (error) {

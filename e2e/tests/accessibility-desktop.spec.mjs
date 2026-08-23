@@ -1,4 +1,4 @@
-﻿import { expect, test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import { DESKTOP_ENTRY, assertNoRuntimeFailures, captureRuntimeFailures, gotoAtlas, waitForAtlas } from './runtime.mjs';
 
 test('desktop critical controls expose truthful accessible names and disabled states', async ({ page }) => {
@@ -14,7 +14,8 @@ test('desktop critical controls expose truthful accessible names and disabled st
   await expect(page.getByRole('button', { name: 'Lower floor' })).toBeEnabled();
 
   for (const label of ['Areas', 'Subareas', 'Towns', 'Temples', 'Teleports / transitions', 'Houses', 'House doors', 'Action IDs', 'Unique IDs', 'Waypoints', 'Mechanics', 'Raids / encounters', 'Quest areas', 'POIs']) {
-    const row = page.locator('#semantic-layer-list .layer').filter({ hasText: label });
+    const row = page.locator('#semantic-layer-list .layer').filter({ has: page.getByText(label, { exact: true }) });
+    await expect(row).toHaveCount(1);
     await expect(row.locator('input')).toBeDisabled();
   }
   assertNoRuntimeFailures(runtime);
