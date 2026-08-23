@@ -1,8 +1,8 @@
 export async function installHeldRangeRequests(page, { limit = 4 } = {}) {
-  const state = { held: [], seen: [], released: [], waiters: [] };
+  const state = { held: [], seen: [], released: [], waiters: [], releasedAll: false };
   const routeHandler = async (route, request) => {
     const range = request.headers()['range'];
-    if (!range || state.held.length >= limit) return route.continue();
+    if (!range || state.releasedAll || state.held.length >= limit) return route.continue();
     let release;
     const gate = new Promise((resolve) => { release = resolve; });
     const entry = { index: state.held.length, url: request.url(), range, release, route };
@@ -43,7 +43,7 @@ export async function installHeldRangeRequests(page, { limit = 4 } = {}) {
       if (!entry) throw new Error(`held request ${index} does not exist`);
       entry.release();
     },
-    releaseAll() { for (const entry of state.held) entry.release(); },
+    releaseAll() { state.releasedAll = true; for (const entry of state.held) entry.release(); },
     evidence() { return { seen: [...state.seen], released: [...state.released] }; },
     async dispose() { this.releaseAll(); await page.unroute('**/*', routeHandler); },
   };
