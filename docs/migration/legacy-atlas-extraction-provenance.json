@@ -1,5 +1,47 @@
 {
   "authority_basis": "blakinio/Otheryn/docs/architecture/OTERYN_ATLAS_EXTRACTION_REVIEW_2026-08-15.md plus current Atlas PR #4 architecture/provenance evidence",
+  "schema_version": 2,
+  "source": {
+    "repository": "blakinio/Otheryn",
+    "role": "bounded legacy Atlas/migration source only; unrelated Otheryn content out of scope",
+    "selection": [
+      "tools/otbm_atlas/**",
+      "tools/otbm_atlas_facts/**",
+      ".github/workflows/otbm-atlas-*"
+    ],
+    "sha": "e417c5e7c22986bf4acef0495eb47f7b72c97cce",
+    "tree_sha": "741f8ec6305dd0a1807c0ddfc8677f199df207a6"
+  },
+  "source_work": {
+    "disposition": "CLOSED_UNMERGED_HISTORICAL_PROVENANCE",
+    "head_sha": "6e27eb01488e2cd7d922d002e39da81637def4eb",
+    "pull_request": 447,
+    "state": "CLOSED_UNMERGED",
+    "merged": false,
+    "branch": "docs/OTH-20260817-dynamic-semantic-atlas-project",
+    "authority": "NON_AUTHORITATIVE_READ_ONLY",
+    "retention": "RETAIN_HISTORICAL_SOURCE_BRANCH"
+  },
+  "target": {
+    "base_sha": "3ed3650d8933e186f589d7111978b925c4bc0080",
+    "repository": "Oteryn/Oteryn-Atlas",
+    "immutable_extraction_closeout": {
+      "pull_request": 4,
+      "merge_sha": "750ecab7b600ea078a832f5f95059f08ce57a06a"
+    },
+    "terminal_verification_baseline_main_sha": "b0f2827965fcf02294456c1bdb3ff8242048b433",
+    "closeout_issue": 102
+  },
+  "bounded_source_coverage": {
+    "source_commit_sha": "e417c5e7c22986bf4acef0495eb47f7b72c97cce",
+    "source_tree_sha": "741f8ec6305dd0a1807c0ddfc8677f199df207a6",
+    "selected_blob_count": 144,
+    "manifest_row_count": 144,
+    "missing_manifest_paths": 0,
+    "blob_identity_mismatches": 0,
+    "extra_manifest_rows": 0,
+    "verification": "PINNED_GIT_TREE_EXACT"
+  },
   "rows": [
     {
       "final_disposition": "MONOREPO_WORKFLOW_RETIRED_REPLACED_BY_PROVIDER_CI",
@@ -2880,25 +2922,5 @@
       "target_paths": [],
       "transformation": "none; retained only as pinned legacy evidence for Game-side importer/content authority"
     }
-  ],
-  "schema_version": 1,
-  "source": {
-    "repository": "blakinio/Otheryn",
-    "role": "bounded legacy Atlas/migration source only; unrelated Otheryn content out of scope",
-    "selection": [
-      "tools/otbm_atlas/**",
-      "tools/otbm_atlas_facts/**",
-      ".github/workflows/otbm-atlas-*"
-    ],
-    "sha": "e417c5e7c22986bf4acef0495eb47f7b72c97cce"
-  },
-  "source_work": {
-    "disposition": "SUPERSEDE_AFTER_THIS_TARGET_CLOSEOUT_MERGES",
-    "head_sha": "6e27eb01488e2cd7d922d002e39da81637def4eb",
-    "pull_request": 447
-  },
-  "target": {
-    "base_sha": "3ed3650d8933e186f589d7111978b925c4bc0080",
-    "repository": "Oteryn/Oteryn-Atlas"
-  }
+  ]
 }

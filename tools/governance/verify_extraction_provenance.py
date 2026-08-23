@@ -71,20 +71,60 @@ def verify_source_repository(source_root: Path, source_sha: str) -> None:
     assert resolved == source_sha, f"source commit mismatch: {resolved} != {source_sha}"
 
 
+def verify_source_coverage(rows: list[dict], source_root: Path, source_sha: str) -> int:
+    raw = git(source_root, "ls-tree", "-r", "--name-only", source_sha)
+    selected = sorted(path for path in raw.splitlines() if path.startswith(SOURCE_PREFIXES))
+    mapped = sorted(row["source_path"] for row in rows)
+    missing = sorted(set(selected) - set(mapped))
+    extra = sorted(set(mapped) - set(selected))
+    assert not missing and not extra, f"bounded source coverage mismatch: missing={missing}, extra={extra}"
+    return len(selected)
+
+
+def verify_terminal_lifecycle(data: dict) -> None:
+    assert data["schema_version"] == 2
+    source = data["source"]
+    assert source["repository"] == "blakinio/Otheryn"
+    assert HEX40.fullmatch(source["sha"]) and HEX40.fullmatch(source["tree_sha"])
+    work = data["source_work"]
+    assert work["pull_request"] == 447
+    assert work["state"] == "CLOSED_UNMERGED" and work["merged"] is False
+    assert work["disposition"] == "CLOSED_UNMERGED_HISTORICAL_PROVENANCE"
+    assert work["authority"] == "NON_AUTHORITATIVE_READ_ONLY"
+    assert work["retention"] == "RETAIN_HISTORICAL_SOURCE_BRANCH"
+    target = data["target"]
+    merge = target["immutable_extraction_closeout"]
+    assert merge == {"pull_request": 4, "merge_sha": "750ecab7b600ea078a832f5f95059f08ce57a06a"}
+    coverage = data["bounded_source_coverage"]
+    assert coverage["source_commit_sha"] == source["sha"]
+    assert coverage["source_tree_sha"] == source["tree_sha"]
+    assert coverage["selected_blob_count"] == 144
+    assert coverage["manifest_row_count"] == 144
+    assert coverage["missing_manifest_paths"] == 0
+    assert coverage["blob_identity_mismatches"] == 0
+    assert coverage["extra_manifest_rows"] == 0
+
+
 def verify(map_path: Path, source_root: Path | None = None) -> dict[str, int]:
     data = json.loads(map_path.read_text(encoding="utf-8"))
-    assert data["schema_version"] == 1
+    verify_terminal_lifecycle(data)
     assert data["source"]["repository"] == "blakinio/Otheryn"
     assert data["target"]["repository"] == "Oteryn/Oteryn-Atlas"
     source_sha = data["source"]["sha"]
     if source_root is not None:
         verify_source_repository(source_root, source_sha)
+        actual_tree = git(source_root, "rev-parse", f"{source_sha}^{{tree}}")
+        assert actual_tree == data["source"]["tree_sha"], f"source tree mismatch: {actual_tree} != {data['source']['tree_sha']}"
 
     rows = data["rows"]
     assert len(rows) >= 100
     paths = [row["source_path"] for row in rows]
     assert paths == sorted(paths)
     assert len(paths) == len(set(paths))
+    assert data["bounded_source_coverage"]["manifest_row_count"] == len(rows)
+    if source_root is not None:
+        selected_count = verify_source_coverage(rows, source_root, source_sha)
+        assert data["bounded_source_coverage"]["selected_blob_count"] == selected_count
     counts = Counter()
     for row in rows:
         path = row["source_path"]
