@@ -8,6 +8,7 @@ on:
       - 'tools/animation-runtime/build.py'
       - 'web/fullworld-creatures.mjs'
       - 'tests/animation-runtime.mjs'
+      - 'tests/verification/creature-walking-in-place-contract.test.mjs'
       - 'e2e/**'
       - '.github/workflows/creature-walking-in-place.yml'
   workflow_dispatch:
@@ -28,6 +29,8 @@ jobs:
       GAME_SHA: 91b73a7566a59991ebf7d471eacb3a858b755c9c
       LEGACY_SHA: e417c5e7c22986bf4acef0495eb47f7b72c97cce
       OLD_ATLAS_SHA: 8d28fb5ea2f9b4937c517490073b1e14ab9efc58
+      OLD_GAME_SHA: 8f6a4fdea4487a61c4cdaf1889d421ecd2265a31
+      OLD_CREATURE_DIGEST: sha256:7dc951874c95424279737eaaf51cf2d50940162ef4799daea39a187a581ef0e8
       ZIP_SHA: 1a6bad8b7598cd874f534cd4aae2d249fb3d9b4458b3ccfa75754f91bb27870f
       CREATURE_DIGEST: sha256:5f10a15758199105584c38634d08254af79973cf7ce25d54bf46e54d8fee26ca
     steps:
@@ -66,7 +69,7 @@ jobs:
             vendor/map-analysis/crystalserver/data-global/npc
             vendor/map-analysis/crystalserver/data-global/monster
 
-      - name: Verify exact source revisions
+      - name: Verify exact revisions and pure runtime tests
         shell: bash
         env:
           EXPECTED_ATLAS_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -88,7 +91,7 @@ jobs:
             -o /tmp/15.32.zip
           test "$(sha256sum /tmp/15.32.zip | awk '{print $1}')" = "$ZIP_SHA"
 
-      - name: Build authoritative Game appearance and creature products
+      - name: Build authoritative Game products and verify playback census
         shell: bash
         run: |
           set -euo pipefail
@@ -109,20 +112,21 @@ jobs:
           assert data['outfit_spatial_product_root']=='sha256:62fdd7d0ce02652582f03bf971455f4a2f9ec1e472eaebfec5af739cf11a921e'
           npc=data['statistics']['npc_presentation']
           monster=data['statistics']['monster_presentation']
-          assert npc['resolved_playback_records']==972
-          assert npc['static_playback_fallback_records']==1
+          assert npc['resolved_moving_playback_records']==972
+          assert npc['fallback_static_playback_records']==1
           assert npc['playback_reason_counts']=={'MOVING_GROUP_UNAVAILABLE':1}
-          assert monster['resolved_playback_records']==87193
-          assert monster['static_playback_fallback_records']==0
+          assert monster['resolved_moving_playback_records']==87193
+          assert monster['fallback_static_playback_records']==0
           print('authoritative Game creature census: PASS')
           PY
 
-      - name: Build old static runtime and candidate v2 twice
+      - name: Build v1 static baseline and deterministic v2 candidate
         shell: bash
         run: |
           set -euo pipefail
           git fetch --no-tags --depth=1 origin "$OLD_ATLAS_SHA"
           git show "$OLD_ATLAS_SHA:tools/animation-runtime/build.py" > tools/animation-runtime/_build-v1.py
+          sed -i "s/$OLD_GAME_SHA/$GAME_SHA/g; s/$OLD_CREATURE_DIGEST/$CREATURE_DIGEST/g" tools/animation-runtime/_build-v1.py
           python tools/animation-runtime/_build-v1.py /tmp/15.32.zip /tmp/appearance /tmp/creatures.json /tmp/runtime-v1 >/tmp/runtime-v1-build.json
           rm tools/animation-runtime/_build-v1.py
           python tools/animation-runtime/build.py /tmp/15.32.zip /tmp/appearance /tmp/creatures.json /tmp/runtime-v2-a >/tmp/runtime-v2-a-build.json
@@ -132,10 +136,12 @@ jobs:
 
       - name: Prove OFF exactness, ON pixel change, fallback and ordinary fixtures
         shell: bash
+        env:
+          CANDIDATE_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           set -euo pipefail
           python - <<'PY'
-          import json
+          import json, os
           from pathlib import Path
 
           creatures=json.loads(Path('/tmp/creatures.json').read_text())
@@ -146,7 +152,7 @@ jobs:
 
           assert manifest['profile']=='oteryn-atlas-animation-runtime-v2'
           assert manifest['source']['game_sha']=='91b73a7566a59991ebf7d471eacb3a858b755c9c'
-          assert manifest['source']['creature_semantic_digest']=='sha256:5f10a15758199105584c38634d08254af79973cf7ce25d54bf46e54d8fee26ca'
+          assert manifest['source']['creature_semantic_digest']==creatures['semantic_digest']
           assert manifest['source']['playback_projection_capability']=='creature-moving-in-place-v1'
           assert manifest['counts']['creature_programs']==1377
           assert manifest['counts']['creature_static_programs']==1377
@@ -163,10 +169,10 @@ jobs:
                   assert new[field]==old[field], (presentation_id,field)
               assert new['presentation_mode']=='static'
 
-          all_records=creatures['npcs']+creatures['monster_spawns']
+          records=creatures['npcs']+creatures['monster_spawns']
           ordinary={}
           for name in ('Sheep','Pig','Chicken'):
-              record=next(r for r in all_records if r.get('name')==name and r.get('presentation_resolution_state')=='RESOLVED')
+              record=next(r for r in records if r.get('name')==name and r.get('presentation_resolution_state')=='RESOLVED')
               projection=record['outfit_presentation']['playback_projection']
               assert projection['playback_resolution_state']=='RESOLVED_MOVING_IN_PLACE'
               assert projection['presentation_mode']=='moving-in-place'
@@ -185,7 +191,6 @@ jobs:
                   'record_id':record['record_id'],
                   'position':record['position'],
                   'look_type':record['appearance']['look_type'],
-                  'presentation_id':record['outfit_presentation']['outfit_presentation_id'],
                   'phase_count':walking['phase_count'],
                   'south_pattern_x':projection['pattern_x'],
                   'displacement':walking['displacement'],
@@ -205,20 +210,16 @@ jobs:
 
           evidence={
               'status':'PASS',
-              'candidate_head': '${{ github.event.pull_request.head.sha || github.sha }}',
+              'candidate_head':os.environ['CANDIDATE_HEAD'],
               'game_sha':'91b73a7566a59991ebf7d471eacb3a858b755c9c',
               'game_creature_digest':creatures['semantic_digest'],
-              'old_runtime_root':old_manifest['rootContentId'],
+              'baseline_v1_root':old_manifest['rootContentId'],
               'runtime_root':manifest['rootContentId'],
               'runtime_counts':manifest['counts'],
-              'static_programs_byte_semantics_equal_v1':True,
+              'static_program_semantics_equal_v1':True,
               'deterministic_double_build':True,
               'ordinary_creatures':ordinary,
-              'fallback':{
-                  'name':fallback['name'],
-                  'record_id':fallback['record_id'],
-                  'reason':fp['playback_reason'],
-              },
+              'fallback':{'name':fallback['name'],'record_id':fallback['record_id'],'reason':fp['playback_reason']},
           }
           Path('/tmp/creature-walking-evidence.json').write_text(json.dumps(evidence,indent=2,sort_keys=True)+'\n')
           print(json.dumps(evidence,indent=2,sort_keys=True))
