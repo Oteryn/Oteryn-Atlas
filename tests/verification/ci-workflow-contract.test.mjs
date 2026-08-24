@@ -31,6 +31,14 @@ test('atlas-gate requires exact-head local Docker browser evidence', () => {
   assert.match(nodeJob, /node --test/);
   assert.match(nodeJob, /tests\/verification\/\*\.test\.mjs/);
   assert.match(nodeJob, /tests\/properties\/\*\.test\.mjs/);
+  for (const path of [
+    'tests/creature-presentation-geometry.mjs',
+    'tests/creature-interaction.mjs',
+    'tests/creature-interaction-target.mjs',
+    'tests/map-activation.mjs',
+    'tests/creature-map-activation-contract.mjs',
+    'tests/creature-interaction-runtime-contract.mjs',
+  ]) assert.ok(nodeJob.includes(path), `verification-node missing ${path}`);
   assert.match(nodeJob, /actions\/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a/);
 
   assert.match(browserJob, /github\.event_name == 'pull_request'/);
@@ -61,7 +69,7 @@ test('local Docker status publisher only accepts exact clean all-pass evidence',
   assert.match(publisher, /git status --porcelain/);
   assert.match(publisher, /git ls-remote --heads origin/);
   assert.match(publisher, /metadata\.expectedRevision/);
-  assert.match(publisher, /^\$ExpectedScenarioCount = 50$/m);
+  assert.match(publisher, /^\$ExpectedScenarioCount = 58$/m);
   assert.match(publisher, /targetMode -ne 'checkout-overlay'/);
   assert.match(publisher, /metadata\.workers -ne 1/);
   assert.match(playwrightConfig, /metadata:\s*\{[\s\S]*workers,/);
@@ -129,7 +137,7 @@ test('heavy browser verification is pinned to Molehill while Synology remains li
   assert.match(agents, /Molehill-PC/);
   assert.match(agents, /heavy.*browser/i);
   assert.match(agents, /Synology.*live acceptance/i);
-  assert.match(agents, /must not.*50-scenario/i);
+  assert.match(agents, /must not.*58-scenario/i);
 });
 
 test('nightly Molehill identity avoids pre-scheduling runner context expressions', () => {
@@ -175,5 +183,5 @@ test('Molehill local heavy qualification is machine-serialized to prevent public
   assert.match(localRunPs1, /Start-Sleep/);
   assert.match(localRunPs1, /Dispose\(\)/);
   assert.match(agents, /serializ/i);
-  assert.match(agents, /concurrent.*48-scenario|48-scenario.*concurrent/i);
+  assert.match(agents, /concurrent.*58-scenario|58-scenario.*concurrent/i);
 });
