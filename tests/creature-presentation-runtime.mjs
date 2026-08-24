@@ -40,7 +40,10 @@ test('forced modes remain canonical even if detail readiness is stale', () => {
   }).representation, 'classic');
   assert.equal(resolveCreatureEffectivePresentation({
     view: { mode: 'map', zoom: 0.125 }, detailReady: false,
-  }).representation, 'detail');
+  }).representation, 'minimap');
+  assert.equal(resolveCreatureEffectivePresentation({
+    view: { mode: 'map', zoom: 0.6 }, detailReady: false,
+  }).representation, 'minimap-fallback');
 });
 
 test('presentation backing store scales pixels without changing CSS geometry', () => {
