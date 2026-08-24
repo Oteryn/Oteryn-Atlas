@@ -1,6 +1,6 @@
 import { sha256ContentId } from './loader.mjs';
 
-export const ANIMATION_RUNTIME_PROFILE = 'oteryn-atlas-animation-runtime-v1';
+export const ANIMATION_RUNTIME_PROFILE = 'oteryn-atlas-animation-runtime-v2';
 export const ANIMATION_PRODUCT_ROOT = 'sha256:0d1c8fc777d1d220a9d7723507fddd72585f7358d35a40209bd7415f1fe057c1';
 export const OUTFIT_SPATIAL_ROOT = 'sha256:62fdd7d0ce02652582f03bf971455f4a2f9ec1e472eaebfec5af739cf11a921e';
 export const GAME_ANIMATION_SHA = '91b73a7566a59991ebf7d471eacb3a858b755c9c';
