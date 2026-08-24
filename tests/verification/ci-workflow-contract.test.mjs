@@ -141,6 +141,13 @@ test('nightly Molehill identity avoids pre-scheduling runner context expressions
   assert.match(browserDepth, /\$env:RUNNER_OS -ne 'Windows'/);
 });
 
+test('nightly Molehill steps use the Windows PowerShell shell available on the runner', () => {
+  const browserDepth = nightly.slice(nightly.indexOf('  browser-depth:\n'));
+  const powershellSteps = browserDepth.match(/^\s+shell:\s+powershell\s*$/gm) ?? [];
+
+  assert.doesNotMatch(browserDepth, /^\s+shell:\s+pwsh\s*$/gm);
+  assert.ok(powershellSteps.length >= 4, 'expected at least four Windows PowerShell steps');
+});
 test('nightly browser depth keeps a bounded self-hosted execution budget', () => {
   const browserDepthStart = nightly.indexOf('  browser-depth:\n');
   assert.notEqual(browserDepthStart, -1, 'missing browser-depth job');
