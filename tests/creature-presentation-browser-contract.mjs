@@ -4,6 +4,7 @@ import test from 'node:test';
 
 const appSource = await readFile(new URL('../web/fullworld-app.mjs', import.meta.url), 'utf8');
 const creatureSource = await readFile(new URL('../web/fullworld-creatures.mjs', import.meta.url), 'utf8');
+const controllerSource = await readFile(new URL('../src/browser/creature-presentation-controller.mjs', import.meta.url), 'utf8').catch(() => '');
 const overlayWorkflow = await readFile(new URL('../.github/workflows/creature-overlays.yml', import.meta.url), 'utf8');
 
 test('FullWorld publishes the canonical effective presentation signal without replacing the view seam', () => {
@@ -13,24 +14,26 @@ test('FullWorld publishes the canonical effective presentation signal without re
   assert.match(appSource, /__OTERYN_ATLAS_VIEW__ = snapshot/);
 });
 
-test('creature presentation uses a separate pointer-transparent canvas and versioned styles', () => {
-  assert.match(creatureSource, /creature-presentation-overlay/);
-  assert.match(creatureSource, /presentationCanvas/);
-  assert.match(creatureSource, /pointerEvents = 'none'/);
-  assert.match(creatureSource, /NPC_MARKER_STYLE = 'functional-icons-v2'/);
-  assert.match(creatureSource, /LABEL_STYLE = 'creature-labels-v1'/);
+test('creature presentation uses a separate pointer-transparent controller canvas and versioned styles', () => {
+  assert.match(creatureSource, /createCreaturePresentationController/);
   assert.doesNotMatch(creatureSource, /fillText\(record\.name/);
+  assert.match(controllerSource, /creature-presentation-overlay/);
+  assert.match(controllerSource, /presentationCanvas/);
+  assert.match(controllerSource, /pointerEvents = 'none'/);
+  assert.match(controllerSource, /NPC_MARKER_STYLE = 'functional-icons-v2'/);
+  assert.match(controllerSource, /LABEL_STYLE = 'creature-labels-v1'/);
 });
 
-test('shared runtime consumes canonical geometry, LOD, bounded layout and factual badge slots', () => {
-  assert.match(creatureSource, /creaturePresentationBounds/);
-  assert.match(creatureSource, /creaturePresentationLod/);
-  assert.match(creatureSource, /createCreaturePresentationLayoutKey/);
-  assert.match(creatureSource, /solveCreaturePresentationLayout/);
-  assert.match(creatureSource, /npcBadgeSlots/);
-  assert.match(creatureSource, /npcBadgePrimitive/);
-  assert.match(creatureSource, /relativeVisibleRects/);
-  assert.match(creatureSource, /presentationBackingStore/);
+test('shared runtime reuses canonical #113 presentation rectangles and worker seams', () => {
+  assert.match(controllerSource, /presentationRect/);
+  assert.doesNotMatch(controllerSource, /creaturePresentationBounds/);
+  assert.match(controllerSource, /creaturePresentationLod/);
+  assert.match(controllerSource, /createCreaturePresentationLayoutKey/);
+  assert.match(controllerSource, /solveCreaturePresentationLayout/);
+  assert.match(controllerSource, /npcBadgeSlots/);
+  assert.match(controllerSource, /npcBadgePrimitive/);
+  assert.match(controllerSource, /relativeVisibleRects/);
+  assert.match(controllerSource, /presentationBackingStore/);
 });
 
 test('creature overlay compatibility gate expects v2 factual icon presentation', () => {
