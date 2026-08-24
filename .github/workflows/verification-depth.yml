@@ -82,7 +82,7 @@ jobs:
       ATLAS_STRESS_LENGTH: '64'
     steps:
       - name: Verify immutable Molehill Atlas runner identity
-        shell: pwsh
+        shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'
           if ($env:GITHUB_REPOSITORY -ne 'Oteryn/Oteryn-Atlas') { throw 'Unexpected repository.' }
@@ -101,7 +101,7 @@ jobs:
           persist-credentials: false
 
       - name: Verify exact checkout and read-only publication origin
-        shell: pwsh
+        shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'
           if ((git rev-parse HEAD).Trim() -ne $env:ATLAS_CODE_REVISION) { throw 'Checkout revision mismatch.' }
@@ -112,7 +112,7 @@ jobs:
           $response.Content | Set-Content -Encoding utf8 artifacts/e2e/nightly/publication-preflight.json
 
       - name: Record optional depth applicability
-        shell: pwsh
+        shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'
           New-Item -ItemType Directory -Force artifacts/e2e/nightly | Out-Null
@@ -138,7 +138,7 @@ jobs:
             ConvertTo-Json -Depth 5 | Set-Content -Encoding utf8 artifacts/e2e/nightly/optional-depth-skips.json
 
       - name: Run bounded replayable browser depth
-        shell: pwsh
+        shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'
           $origin = [Uri]$env:ATLAS_PUBLICATION_ORIGIN
