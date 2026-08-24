@@ -430,9 +430,11 @@ The repository implementation uses the existing required `atlas-gate` fan-in rat
 
 The heavy required browser workload is temporarily assigned to the local Molehill-PC Docker execution plane rather than the slower Synology organization runner. Native Windows checkout-overlay runs bridge Docker Desktop to the LAN publication through the read-only transparent `e2e/local-publication-forwarder.py` listener on `host.docker.internal`, because direct Docker bridge access to the LAN publication is not reliable on this host. The publisher `e2e/publish-local-e2e-status.ps1` rejects a dirty tree, a remote branch that does not equal the tested HEAD, a summary whose `expectedRevision` differs from HEAD, any non-passed scenario, or any retry before it can publish `atlas-local-e2e=success`. Fork pull requests cannot satisfy this trusted same-repository evidence gate. On `main` pushes the PR-only local-evidence job is skipped and `atlas-gate` requires that skip while retaining all deterministic CI inputs; merged-main/live browser qualification remains a separate exact-served-revision responsibility under section 7.5.
 
+Scheduled/manual Molehill depth uses the installed Windows PowerShell execution shell. It does not share the Synology live-acceptance concurrency group, because GitHub concurrency replaces older pending executions and could otherwise cancel a required current-main deployment. Instead the read-only depth workflow verifies X-Oteryn-Atlas-Revision against its exact github.sha immediately before browser depth and again after it; a stale publication or a live cutover during the run therefore fails closed rather than producing a false green result.
+
 `.github/workflows/verification-depth.yml` provides scheduled/nightly depth and manual dispatch. Its bounded deterministic expansion is:
 
-- the complete required browser suite once;
+- no replay of the complete PR-required browser suite; the exact-head 48-scenario matrix remains the separate `atlas-local-e2e` merge gate;
 - the critical geometry/framebuffer set repeated three times with retries still fixed at zero;
 - stress seeds `133`, `1096043585`, `2779096485`, and `3735928559`, each with 64 replayable actions;
 - opt-in `nightly-desktop-dpr2` and `nightly-tablet` Chromium profiles;
