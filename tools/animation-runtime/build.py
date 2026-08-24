@@ -14,15 +14,17 @@ from typing import Any
 
 HERE = Path(__file__).resolve().parent
 MM_PATH = HERE.parent / "dyn-atlas-pixels" / "measure_metadata.py"
-PROFILE = "oteryn-atlas-animation-runtime-v1"
-GAME_SHA = "8f6a4fdea4487a61c4cdaf1889d421ecd2265a31"
+PROFILE = "oteryn-atlas-animation-runtime-v2"
+GAME_SHA = "91b73a7566a59991ebf7d471eacb3a858b755c9c"
 APPEARANCE_ROOT = "sha256:0d1c8fc777d1d220a9d7723507fddd72585f7358d35a40209bd7415f1fe057c1"
 OUTFIT_SPATIAL_ROOT = "sha256:62fdd7d0ce02652582f03bf971455f4a2f9ec1e472eaebfec5af739cf11a921e"
+CREATURE_SEMANTIC_DIGEST = "sha256:5f10a15758199105584c38634d08254af79973cf7ce25d54bf46e54d8fee26ca"
+PLAYBACK_PROJECTION_CAPABILITY = "creature-moving-in-place-v1"
 ZIP_SHA = "1a6bad8b7598cd874f534cd4aae2d249fb3d9b4458b3ccfa75754f91bb27870f"
 CATALOG_SHA = "35639e000c4c108665a091cfbdf699d549d995b37670bc08de575ab6cd380d85"
 APPEARANCE_SHA = "dc4f4c01e3701c77877c67895168e4399837046122d6d17e3e608a12a2fed075"
 BUCKET_LIMIT = 8 * 1024 * 1024
-ROOT_DOMAIN = b"OTERYN-ATLAS-ANIMATION-RUNTIME-V1\0"
+ROOT_DOMAIN = b"OTERYN-ATLAS-ANIMATION-RUNTIME-V2\0"
 
 
 class BuildError(RuntimeError):
@@ -75,6 +77,10 @@ def verify_inputs(asset_zip: Path, appearance_product: Path, creatures_path: Pat
     creatures = read_json(creatures_path)
     if creatures.get("capability") != "animated-creatures-v1":
         raise BuildError("animated-creatures-v1 required")
+    if creatures.get("playback_projection_capability") != PLAYBACK_PROJECTION_CAPABILITY:
+        raise BuildError("creature moving-in-place projection capability required")
+    if creatures.get("semantic_digest") != CREATURE_SEMANTIC_DIGEST:
+        raise BuildError("creature semantic digest mismatch")
     if creatures.get("appearance_product_root") != APPEARANCE_ROOT:
         raise BuildError("creature appearance root mismatch")
     if creatures.get("outfit_spatial_product_root") != OUTFIT_SPATIAL_ROOT:
@@ -160,8 +166,14 @@ def frame_sprite_id(program: dict[str, Any], phase: int, x: int, y: int, z: int,
     return int(values[index])
 
 
-def precompose_creature(presentation: dict[str, Any], programs_by_id: dict[str, dict[str, Any]], decode_sprite) -> dict[str, Any]:
-    projection = presentation["static_projection"]
+def precompose_creature_projection(
+    presentation: dict[str, Any],
+    projection: dict[str, Any],
+    programs_by_id: dict[str, dict[str, Any]],
+    decode_sprite,
+    *,
+    presentation_mode: str,
+) -> dict[str, Any]:
     program_id = projection["animation_program_id"]
     program = programs_by_id.get(program_id)
     if program is None:
@@ -199,9 +211,26 @@ def precompose_creature(presentation: dict[str, Any], programs_by_id: dict[str, 
         "displacement": projection["displacement"],
         "outfit_presentation_id": presentation["outfit_presentation_id"],
         "phase_count": phase_count,
+        "presentation_mode": presentation_mode,
         "selection_policy": projection["selection_policy"],
     }
     return {"core": core, "frames": frames}
+
+
+def finalize_creature_program(composed: dict[str, Any], add_blob) -> dict[str, Any]:
+    phase_ids = [add_blob(width, height, rgba) for width, height, rgba in composed["frames"]]
+    geometry = {(width, height) for width, height, _ in composed["frames"]}
+    if len(geometry) != 1:
+        raise BuildError("creature phase geometry drift")
+    width, height = next(iter(geometry))
+    return {**composed["core"], "phase_content_ids": phase_ids, "width": width, "height": height}
+
+
+def verify_stable_creature_geometry(static_program: dict[str, Any], walking_program: dict[str, Any]) -> None:
+    if static_program["width"] != walking_program["width"] or static_program["height"] != walking_program["height"]:
+        raise BuildError("creature playback geometry drift")
+    if static_program["displacement"] != walking_program["displacement"]:
+        raise BuildError("creature playback displacement drift")
 
 
 def build(asset_zip: Path, appearance_product: Path, creatures_path: Path, output: Path) -> dict[str, Any]:
@@ -220,7 +249,7 @@ def build(asset_zip: Path, appearance_product: Path, creatures_path: Path, outpu
         return content_id
     for program in object_programs:
         if int(program.get("layers", 0)) != 1:
-            raise BuildError("v1 object runtime requires prequalified one-layer programs")
+            raise BuildError("v2 object runtime requires prequalified one-layer programs")
         for sprite_id in program["sprite_source_ids"]:
             sprite_id = int(sprite_id)
             if str(sprite_id) in sprite_index:
@@ -237,14 +266,49 @@ def build(asset_zip: Path, appearance_product: Path, creatures_path: Path, outpu
                 raise BuildError("resolved creature presentation missing")
             unique_presentations.setdefault(str(presentation["outfit_presentation_id"]), presentation)
     creature_programs: list[dict[str, Any]] = []
+    walking_program_count = 0
+    walking_fallback_count = 0
     for presentation_id in sorted(unique_presentations):
-        composed = precompose_creature(unique_presentations[presentation_id], outfit_by_id, decode_sprite)
-        phase_ids = [add_blob(width, height, rgba) for width, height, rgba in composed["frames"]]
-        geometry = {(width, height) for width, height, _ in composed["frames"]}
-        if len(geometry) != 1:
-            raise BuildError("creature phase geometry drift")
-        width, height = next(iter(geometry))
-        creature_programs.append({**composed["core"], "phase_content_ids": phase_ids, "width": width, "height": height})
+        presentation = unique_presentations[presentation_id]
+        static_projection = presentation.get("static_projection")
+        playback_projection = presentation.get("playback_projection")
+        if not isinstance(static_projection, dict) or not isinstance(playback_projection, dict):
+            raise BuildError("resolved creature playback projections missing")
+        static_program = finalize_creature_program(
+            precompose_creature_projection(presentation, static_projection, outfit_by_id, decode_sprite, presentation_mode="static"),
+            add_blob,
+        )
+        playback_state = playback_projection.get("playback_resolution_state")
+        walking_program = None
+        fallback_reason = None
+        if playback_state == "RESOLVED_MOVING_IN_PLACE":
+            if playback_projection.get("presentation_mode") != "moving-in-place" or playback_projection.get("world_position_policy") != "UNCHANGED":
+                raise BuildError("invalid resolved moving-in-place projection")
+            if playback_projection.get("outfit_presentation_id") != presentation_id:
+                raise BuildError("moving projection presentation identity mismatch")
+            walking_program = finalize_creature_program(
+                precompose_creature_projection(presentation, playback_projection, outfit_by_id, decode_sprite, presentation_mode="moving-in-place"),
+                add_blob,
+            )
+            verify_stable_creature_geometry(static_program, walking_program)
+            walking_program_count += 1
+        elif playback_state == "FALLBACK_STATIC_PROJECTION":
+            fallback_reason = playback_projection.get("playback_reason")
+            if playback_projection.get("presentation_mode") != "static-fallback" or playback_projection.get("world_position_policy") != "UNCHANGED":
+                raise BuildError("invalid static playback fallback projection")
+            if playback_projection.get("outfit_presentation_id") != presentation_id:
+                raise BuildError("fallback projection presentation identity mismatch")
+            if not isinstance(fallback_reason, str) or not fallback_reason:
+                raise BuildError("static playback fallback reason missing")
+            walking_fallback_count += 1
+        else:
+            raise BuildError("unknown creature playback resolution state")
+        creature_programs.append({
+            "outfit_presentation_id": presentation_id,
+            "static_program": static_program,
+            "walking_program": walking_program,
+            "walking_fallback_reason": fallback_reason,
+        })
     archive.close()
 
     output.mkdir(parents=True, exist_ok=True)
@@ -281,6 +345,7 @@ def build(asset_zip: Path, appearance_product: Path, creatures_path: Path, outpu
         "appearance_product_root": APPEARANCE_ROOT,
         "outfit_spatial_product_root": OUTFIT_SPATIAL_ROOT,
         "creature_semantic_digest": creatures["semantic_digest"],
+        "playback_projection_capability": creatures["playback_projection_capability"],
         "zip_sha256": ZIP_SHA,
         "catalog_sha256": CATALOG_SHA,
         "appearance_sha256": APPEARANCE_SHA,
@@ -294,6 +359,9 @@ def build(asset_zip: Path, appearance_product: Path, creatures_path: Path, outpu
         "counts": {
             "object_programs": len(object_programs),
             "creature_programs": len(creature_programs),
+            "creature_static_programs": len(creature_programs),
+            "creature_walking_programs": walking_program_count,
+            "creature_walking_fallbacks": walking_fallback_count,
             "sprite_refs": len(sprite_index),
             "pixel_blobs": len(blobs),
             "pixel_bytes": sum(len(value[2]) for value in blobs.values()),
@@ -303,7 +371,7 @@ def build(asset_zip: Path, appearance_product: Path, creatures_path: Path, outpu
     root = sha(ROOT_DOMAIN + canonical(manifest_core))
     runtime_manifest = {**manifest_core, "rootContentId": root}
     manifest_bytes = canonical(runtime_manifest); (output / "manifest.json").write_bytes(manifest_bytes)
-    return {"rootContentId": root, **runtime_manifest["counts"], "creature_semantic_digest": creatures["semantic_digest"]}
+    return {"rootContentId": root, **runtime_manifest["counts"], "creature_semantic_digest": creatures["semantic_digest"], "playback_projection_capability": creatures["playback_projection_capability"]}
 
 
 def main() -> int:
