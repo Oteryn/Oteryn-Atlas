@@ -9,7 +9,9 @@ function readText(url) {
 const ci = readText(new URL('../../.github/workflows/ci.yml', import.meta.url));
 const nightly = readText(new URL('../../.github/workflows/verification-depth.yml', import.meta.url));
 const provenance = readText(new URL('../../.github/workflows/extraction-provenance.yml', import.meta.url));
+const synology = readText(new URL('../../.github/workflows/synology-live-acceptance.yml', import.meta.url));
 const playwrightConfig = readText(new URL('../../e2e/playwright.config.mjs', import.meta.url));
+const agents = readText(new URL('../../AGENTS.md', import.meta.url));
 
 function block(source, start, end) {
   const begin = source.indexOf(start);
@@ -85,7 +87,7 @@ test('nightly depth is scheduled, bounded, replayable, read-only and evidence-pr
   assert.doesNotMatch(nightly, /pull_request:/);
   assert.match(nightly, /permissions:\s*\n\s*contents: read/);
   assert.match(nightly, /group: atlas-runners/);
-  assert.match(nightly, /labels: oteryn-atlas/);
+  assert.match(nightly, /labels: oteryn-atlas-pc/);
   assert.match(nightly, /ATLAS_PUBLICATION_ORIGIN: http:\/\/192\.168\.1\.2:8097/);
   assert.match(nightly, /ATLAS_STRESS_LENGTH: ['"]?64['"]?/);
   for (const seed of ['133', '1096043585', '2779096485', '3735928559']) {
@@ -99,14 +101,45 @@ test('nightly depth is scheduled, bounded, replayable, read-only and evidence-pr
   assert.doesNotMatch(nightly, /PREVIEW_CONTAINER/);
 });
 
-test('nightly browser depth has a bounded budget for its 80-scenario minimum workload', () => {
+test('nightly depth is additive and does not duplicate the PR-gated full required matrix', () => {
+  assert.doesNotMatch(nightly, /Invoke-DepthCase -Label ['"]required['"][\s\S]*?['"]npm['"], ['"]test['"]/);
+  assert.match(nightly, /Invoke-DepthCase -Label ['"]repeated-critical['"]/);
+  assert.match(nightly, /Invoke-DepthCase -Label "stress-\$seed"/);
+  assert.match(nightly, /Invoke-DepthCase -Label ['"]extra-profiles['"]/);
+  assert.match(nightly, /performance = @\('tests\/performance-desktop\.spec\.mjs'\)/);
+  assert.match(nightly, /visual = @\('tests\/visual-desktop\.spec\.mjs'\)/);
+  assert.match(nightly, /accessibility = @\('tests\/accessibility-desktop\.spec\.mjs'/);
+  assert.match(nightly, /'race-fault' = @\('tests\/race-fault-desktop\.spec\.mjs'/);
+  assert.match(nightly, /'soak-leak' = @\('tests\/soak-desktop\.spec\.mjs'/);
+});
+
+test('heavy browser verification is pinned to Molehill while Synology remains live-acceptance only', () => {
+  const browserDepth = nightly.slice(nightly.indexOf('  browser-depth:\n'));
+  assert.match(browserDepth, /group: atlas-runners/);
+  assert.match(browserDepth, /labels: oteryn-atlas-pc/);
+  assert.match(browserDepth, /oteryn-molehill-atlas/);
+  assert.match(browserDepth, /ATLAS_RUNNER_OS -ne 'Windows'/);
+
+  assert.match(synology, /group: atlas-runners/);
+  assert.match(synology, /labels: oteryn-atlas/);
+  assert.match(synology, /oteryn-synology-atlas/);
+  assert.doesNotMatch(synology, /labels: oteryn-atlas-pc/);
+
+  assert.match(agents, /Molehill-PC/);
+  assert.match(agents, /heavy.*browser/i);
+  assert.match(agents, /Synology.*live acceptance/i);
+  assert.match(agents, /must not.*48-scenario/i);
+});
+
+test('nightly browser depth keeps a bounded self-hosted execution budget', () => {
   const browserDepthStart = nightly.indexOf('  browser-depth:\n');
   assert.notEqual(browserDepthStart, -1, 'missing browser-depth job');
   const browserDepth = nightly.slice(browserDepthStart);
   const match = browserDepth.match(/timeout-minutes:\s*(\d+)/);
   assert.ok(match, 'nightly browser-depth must declare a bounded timeout');
-  assert.ok(Number(match[1]) >= 180, `nightly browser-depth timeout ${match[1]}m is below the measured runner budget for the 80-scenario minimum workload`);
+  assert.ok(Number(match[1]) >= 180, `nightly browser-depth timeout ${match[1]}m is below the measured self-hosted depth budget`);
 });
+
 test('nightly Playwright profiles are opt-in and do not expand the PR suite implicitly', () => {
   assert.match(playwrightConfig, /ATLAS_E2E_DEPTH/);
   assert.match(playwrightConfig, /nightly-desktop-dpr2/);

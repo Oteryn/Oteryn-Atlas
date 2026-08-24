@@ -44,6 +44,15 @@ Before editing, inspect the current default-branch head, this file, the active I
 - Do not add a user-facing module verification/status system. The source of truth is the executable suite and exact-head evidence.
 - Follow the architecture and evidence contract in `docs/testing/ATLAS-VERIFICATION-PLATFORM.md` for cross-cutting test-platform work and for selecting the applicable verification layers for feature changes.
 
+## Verification execution placement
+
+- GitHub-hosted CI owns deterministic Node/contract/property checks, provenance, security/CodeQL, lightweight browser/WebGL verification and `atlas-gate` fan-in; it does not replace the heavy physical browser qualification.
+- Molehill-PC (`oteryn-molehill-atlas`, custom label `oteryn-atlas-pc`) owns heavy exact-head browser verification: the full Docker Playwright PR gate and scheduled/manual browser-depth work including repeated geometry/render probes, replayable stress, extra viewport/DPR profiles and stable performance/visual/accessibility/race/soak depth.
+- Synology (`oteryn-synology-atlas`, custom label `oteryn-atlas`) owns trusted merged-main deployment and live acceptance only: exact revision/container/header identity, publication/product checks, bounded desktop/mobile real-browser smoke, cutover and rollback proof.
+- Synology must not run the 48-scenario full PR matrix, broad stress matrices, soak, performance depth or visual-regression depth as a substitute for Molehill-PC capacity.
+- Nightly browser depth is additive to the exact-head PR gate and must not duplicate the generic full required matrix that already produced `atlas-local-e2e=success`.
+- If Molehill-PC is unavailable, the corresponding heavy browser proof remains blocked. Do not move that workload to Synology, reuse stale evidence, weaken timeouts/retries/tolerances or publish a copied `atlas-local-e2e` status.
+
 ## Validation and merge
 
 - Run repository-selected checks applicable to the changed paths and deterministic fixture/contract tests for generated semantic data.
