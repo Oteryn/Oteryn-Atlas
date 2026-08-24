@@ -649,7 +649,7 @@ No marginal-gain calculation across incompatible composition/revision/modifier c
 
 ## HISTORICAL CONTENTION VS LIVE OCCUPANCY
 
-Historical privacy-safe occupancy/contension can be a future MEASURED aggregate.
+Historical privacy-safe occupancy/contention can be a future MEASURED aggregate.
 
 Live occupancy is a separate future capability and is forbidden unless an explicit authoritative privacy-safe source exists.
 
