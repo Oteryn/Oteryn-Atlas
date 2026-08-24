@@ -46,9 +46,54 @@ test('successful visual evidence is exact-revision qualified and must be reviewe
   assert.match(helper, /screenshot/);
   assert.match(approver, /ConfirmReviewedAllScreenshots/);
   assert.match(approver, /summarySha256/);
+  assert.match(approver, /user-visual-scenarios\.json/);
+  assert.match(approver, /visualContractSha256/);
+  assert.match(approver, /browserProfile/);
   assert.match(approver, /artifactRootPrefix/);
   assert.match(publisher, /reviewRootPrefix/);
+  assert.match(publisher, /user-visual-scenarios\.json/);
+  assert.match(publisher, /visualContractSha256/);
+  assert.match(publisher, /browserProfile/);
   assert.match(publisher, /VisualReviewPath/);
   assert.match(publisher, /visual-review\.json/);
   assert.match(publisher, /approved/);
+});
+
+
+test('visual user acceptance contract enumerates complete primary user-facing states', async () => {
+  const contractPath = path.join(root, 'e2e/user-visual-scenarios.json');
+  assert.equal(existsSync(contractPath), true, 'visual scenario contract must exist');
+  const contract = JSON.parse(await read('e2e/user-visual-scenarios.json'));
+  assert.equal(contract.version, 1);
+  assert.equal(contract.primaryBrowser, 'chromium');
+  assert.deepEqual(contract.scenarios.map(({ id }) => id), [
+    'desktop.initial',
+    'desktop.search-inspector',
+    'desktop.layers',
+    'desktop.playback',
+    'desktop.minimap',
+    'desktop.classic',
+    'desktop.floor-mode',
+    'desktop.coordinate-pan',
+    'desktop.search-degraded',
+    'desktop.fail-closed',
+    'mobile.initial',
+    'mobile.controls',
+    'mobile.search',
+    'mobile.inspector',
+    'mobile.landscape',
+  ]);
+  for (const scenario of contract.scenarios) {
+    assert.equal(typeof scenario.project, 'string');
+    assert.match(scenario.project, /-chromium$/);
+  }
+
+  const audit = await read('e2e/tests/audit-desktop.spec.mjs');
+  const degraded = await read('e2e/tests/degraded-search-desktop.spec.mjs');
+  const resilience = await read('e2e/tests/resilience-desktop.spec.mjs');
+  for (const id of ['desktop.minimap', 'desktop.classic', 'desktop.floor-mode', 'desktop.coordinate-pan']) {
+    assert.match(audit, new RegExp(id.replace('.', '\.')));
+  }
+  assert.match(degraded, /desktop\.search-degraded/);
+  assert.match(resilience, /desktop\.fail-closed/);
 });
