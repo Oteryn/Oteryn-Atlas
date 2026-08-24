@@ -131,6 +131,16 @@ test('heavy browser verification is pinned to Molehill while Synology remains li
   assert.match(agents, /must not.*48-scenario/i);
 });
 
+test('nightly Molehill identity avoids pre-scheduling runner context expressions', () => {
+  const browserDepth = nightly.slice(nightly.indexOf('  browser-depth:\n'));
+  const jobEnv = block(browserDepth, '    env:\n', '    steps:\n');
+
+  assert.doesNotMatch(jobEnv, /\$\{\{\s*runner\./);
+  assert.doesNotMatch(jobEnv, /ATLAS_RUNNER_(?:NAME|OS):/);
+  assert.match(browserDepth, /\$env:RUNNER_NAME -ne 'oteryn-molehill-atlas'/);
+  assert.match(browserDepth, /\$env:RUNNER_OS -ne 'Windows'/);
+});
+
 test('nightly browser depth keeps a bounded self-hosted execution budget', () => {
   const browserDepthStart = nightly.indexOf('  browser-depth:\n');
   assert.notEqual(browserDepthStart, -1, 'missing browser-depth job');
