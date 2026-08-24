@@ -1,6 +1,7 @@
 'use strict';
 
 const assert = require('node:assert/strict');
+const crypto = require('node:crypto');
 const fs = require('node:fs');
 const { chromium } = require('@playwright/test');
 
@@ -9,6 +10,15 @@ const expectedRevision = process.env.ATLAS_REV;
 const expectedDigest = process.env.CREATURE_SEMANTIC_DIGEST;
 const targets = JSON.parse(fs.readFileSync('/targets.json', 'utf8'));
 const evidenceDir = '/evidence';
+const STATIC_EQUIVALENT_PRESENTATION = 'outfit-presentation:sha256:b16bfc92e9d9e9c8f790507f987a11b25a169c4343c9d68471de76a5f3565c88';
+const EXPECTED_ANIMATION_COVERAGE = {
+  multiPhasePrograms: 101,
+  phaseContentReferences: 2036,
+  phaseCountHistogram: { 1: 1276, 2: 2, 3: 4, 4: 4, 6: 1, 8: 88, 9: 2 },
+  staticEquivalentProgramIds: [STATIC_EQUIVALENT_PRESENTATION],
+  totalPrograms: 1377,
+  visuallyDynamicPrograms: 100,
+};
 fs.mkdirSync(evidenceDir, { recursive: true });
 
 assert.match(preview ?? '', /^https?:\/\/[A-Za-z0-9.-]+(?::[0-9]{1,5})?$/);
@@ -55,6 +65,32 @@ async function diagnostic(page) {
 
 async function semanticDiagnostic(page) {
   return page.evaluate(() => globalThis.__OTERYN_ATLAS_SEMANTIC_SEARCH__ ?? null);
+}
+
+async function publishedAnimationCoverage(page) {
+  const { analyzeCreatureAnimationCoverage } = await import('../support/creature-animation-coverage.mjs');
+  const manifestResponse = await page.request.get(`${preview}/fullworld/animation/manifest.json`);
+  assert.equal(manifestResponse.status(), 200);
+  const manifest = await manifestResponse.json();
+  const programsResponse = await page.request.get(`${preview}/fullworld/animation/programs.json`);
+  assert.equal(programsResponse.status(), 200);
+  const bytes = await programsResponse.body();
+  assert.equal(bytes.byteLength, manifest.programs.bytes);
+  assert.equal(`sha256:${crypto.createHash('sha256').update(bytes).digest('hex')}`, manifest.programs.digest);
+  const coverage = analyzeCreatureAnimationCoverage(JSON.parse(bytes.toString('utf8')));
+  assert.equal(coverage.totalPrograms, manifest.counts.creature_programs);
+  assert.deepEqual(coverage, EXPECTED_ANIMATION_COVERAGE);
+  return coverage;
+}
+
+async function waitForCreaturePixelState(page, baseline, shouldEqual, label) {
+  const deadline = Date.now() + 30_000;
+  while (Date.now() < deadline) {
+    const current = await page.locator('#creature-overlay').screenshot({ animations: 'disabled' });
+    if (current.equals(baseline) === shouldEqual) return current;
+    await page.evaluate(() => new Promise(requestAnimationFrame));
+  }
+  throw new Error(`creature pixel state timeout: ${label}`);
 }
 
 async function waitSemanticReady(page) {
@@ -212,6 +248,7 @@ async function runDesktop(browser) {
   const errors = watchRelevantErrors(page);
   await page.goto(targetUrl(targets.npc, 'npc,monster', 'shop'), { waitUntil: 'domcontentloaded', timeout: 60_000 });
   await assertRevisionResponse(page);
+  const animationCoverage = await publishedAnimationCoverage(page);
   await waitSemanticReady(page);
   const initial = await waitReady(page);
   assert.ok(initial.visibleRecords > 0);
@@ -230,6 +267,9 @@ async function runDesktop(browser) {
   assert.equal(await npcToggle.isChecked(), true);
   assert.equal(await monsterToggle.isChecked(), true);
   await page.screenshot({ path: `${evidenceDir}/desktop-initial.png`, fullPage: true });
+  await monsterToggle.uncheck();
+  await waitReady(page, { npc: true, monster: false });
+  const staticNpcPixels = await page.locator('#creature-overlay').screenshot({ animations: 'disabled' });
   const animationToggle = page.locator('#animation-toggle');
   await animationToggle.waitFor({ state: 'visible', timeout: 30_000 });
   assert.equal(await animationToggle.isDisabled(), false);
@@ -240,14 +280,18 @@ async function runDesktop(browser) {
     const value = globalThis.__OTERYN_ATLAS_CREATURES__;
     return value?.animationOn === true && value.animationRuntime?.frameUpdates > before;
   }, beforeFrames, { timeout: 30_000 });
+  await waitForCreaturePixelState(page, staticNpcPixels, false, 'NPC playback did not change pixels');
   assert.equal(new URL(page.url()).searchParams.get('animation'), 'on');
   await page.screenshot({ path: `${evidenceDir}/desktop-animation-on.png`, fullPage: true });
   await animationToggle.uncheck();
   await page.waitForFunction(() => globalThis.__OTERYN_ATLAS_CREATURES__?.animationOn === false, null, { timeout: 30_000 });
+  await waitForCreaturePixelState(page, staticNpcPixels, true, 'NPC static pixels were not restored');
   const frozenFrames = (await diagnostic(page)).animationRuntime.frameUpdates;
-  await page.waitForTimeout(500);
+  for (let frame = 0; frame < 3; frame += 1) await page.evaluate(() => new Promise(requestAnimationFrame));
   assert.equal((await diagnostic(page)).animationRuntime.frameUpdates, frozenFrames);
   assert.equal(new URL(page.url()).searchParams.get('animation'), 'off');
+  await monsterToggle.check();
+  await waitReady(page, { npc: true, monster: true });
 
   await searchAndSelect(page, targets.npc, 'NPC', {
     inputSelector: '#search-input',
@@ -265,7 +309,7 @@ async function runDesktop(browser) {
   await page.screenshot({ path: `${evidenceDir}/desktop-npc-only.png`, fullPage: true });
   assert.deepEqual(errors, []);
   await context.close();
-  return { initialVisibleRecords: initial.visibleRecords, selected: targets.npc.record_id };
+  return { animationCoverage, initialVisibleRecords: initial.visibleRecords, selected: targets.npc.record_id };
 }
 
 async function runMobile(browser) {
@@ -286,12 +330,19 @@ async function runMobile(browser) {
   await monsterToggle.waitFor({ state: 'visible', timeout: 30_000 });
   assert.equal(await npcToggle.isChecked(), true);
   assert.equal(await monsterToggle.isChecked(), true);
+  await npcToggle.uncheck();
+  await waitReady(page, { npc: false, monster: true });
+  const staticMonsterPixels = await page.locator('#creature-overlay').screenshot({ animations: 'disabled' });
   const animationToggle = page.locator('#animation-toggle');
   assert.equal(await animationToggle.isDisabled(), false);
+  const beforeFrames = (await diagnostic(page)).animationRuntime.frameUpdates;
   await animationToggle.check();
-  await page.waitForFunction(() => globalThis.__OTERYN_ATLAS_CREATURES__?.animationOn === true && globalThis.__OTERYN_ATLAS_CREATURES__.animationRuntime?.frameUpdates > 0, null, { timeout: 30_000 });
+  await page.waitForFunction((before) => globalThis.__OTERYN_ATLAS_CREATURES__?.animationOn === true
+    && (globalThis.__OTERYN_ATLAS_CREATURES__?.animationRuntime?.frameUpdates ?? 0) > before, beforeFrames, { timeout: 30_000 });
+  await waitForCreaturePixelState(page, staticMonsterPixels, false, 'monster playback did not change pixels');
   await animationToggle.uncheck();
-  await page.waitForFunction(() => globalThis.__OTERYN_ATLAS_CREATURES__?.animationOn === false, null, { timeout: 30_000 });  await npcToggle.uncheck();
+  await page.waitForFunction(() => globalThis.__OTERYN_ATLAS_CREATURES__?.animationOn === false, null, { timeout: 30_000 });
+  await waitForCreaturePixelState(page, staticMonsterPixels, true, 'monster static pixels were not restored');
   await waitReady(page, { npc: false, monster: true });
   assert.equal(new URL(page.url()).searchParams.get('creatures'), 'monster');
 
