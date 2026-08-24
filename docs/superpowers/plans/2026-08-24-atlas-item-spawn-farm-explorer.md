@@ -375,3 +375,17 @@ Expected: module-not-found or missing-export failure.
 - Fixed-drop and exact-PMF estimator models have independent deterministic tests; unsupported roll semantics disable exact probability math.
 - P50/P80/P95, authoritative task defaults, manual-vs-future-measured KPH, #113/#115 reuse, named rankings and mock-up-data prohibition are explicitly tested.
 - Execution order is Game producer -> Atlas publication -> pure logic -> UI -> search/ranking -> browser qualification -> closeout. Pure Atlas math/state may proceed in parallel only against clearly synthetic schema fixtures and cannot claim real item/drop/task facts before the Game producer is accepted and pinned.
+
+## Post-review execution deltas
+
+The following deltas are mandatory and refine the tasks above after the final semantic review:
+
+- **Task 1 / Game contract:** bind every exact loot model to content/ruleset/profile context and state whether it is a base/static model or includes a modifier class. Preserve richer multi-requirement/grouped task semantics or mark that task form unsupported; never flatten it.
+- **Task 1 / Game contract:** if placement `weight`, alternative-spawn or conditional activation semantics are needed for yield/capacity, publish/prove them explicitly. Do not let Atlas infer them from placement count.
+- **Task 2 / spatial index:** do not manufacture spawn-group identity by deduplicating equal `spawn_area` center/radius values. Carry a Game-owned stable group identity only if one is published.
+- **Task 3 / item time:** scalar manual KPH is `qualifying source-creature kills/hour` for the selected loot relation. A mixed-source item estimate needs an explicit per-source KPH/mixture model; otherwise time remains per selected source creature.
+- **Task 3 / kill task:** scalar KPH means `credited target kills/hour` when Game publishes task-credit semantics. Raw total hunt/team kills are not silently substituted.
+- **Task 3 / exact PMF:** compute expected kills as a bounded absorbing hitting-time recurrence, not `target / expected quantity`, and return explicit unreachable state for `p0=1`; cover `p=0` and `p=1` fixed-drop edges.
+- **Task 4 / copy:** distinguish `Base drop chance` / `Published drop model` from live/current chance unless an authoritative live modifier source exists. Percentage formatting is presentation only; calculations retain normalized exact probability.
+- **Task 5 / ranking:** `expected items per static clear` is disabled unless concurrent/activation semantics for the included placements are proven; otherwise use placement-count/spatial metrics only.
+- **Task 6 / acceptance:** add explicit tests for KPH scope, mixed-source refusal, modifier context, weighted placement gating, group-identity non-inference, PMF hitting-time edges, richer-task non-flattening and probability display-rounding isolation.

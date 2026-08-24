@@ -264,3 +264,19 @@ Return a compact evidence-backed closeout containing:
 - branch cleanup state.
 
 No invented success claims. If an external authority/capability remains unavailable, record the exact blocker and leave only that affected claim incomplete.
+
+## Final semantic review additions
+
+The normative review file contains these additional hard requirements and they must be implemented even if an earlier section is less specific:
+
+- item KPH means qualifying loot-opportunity kills/hour for the selected source model; do not use total hunt kills/hour;
+- authoritative kill-task KPH means credited target progress/hour under published task-credit semantics;
+- one scalar KPH cannot combine multiple source creatures with different drop models unless an explicit source-mixture/KPH model is supplied;
+- exact loot chance is revision/context bound; call it base/published chance unless an authoritative live modifier source proves current modifiers;
+- placement `weight`/conditional activation prevents static-clear yield/capacity claims until those semantics are proven;
+- equal spawn-area geometry is not authoritative spawn-group identity;
+- for exact per-kill PMFs, expected kills is an absorbing hitting-time calculation, not target divided by mean quantity; handle unreachable `p0=1` and fixed `p=0|1` explicitly;
+- preserve richer task requirement/credit structures or mark them unsupported; never flatten them to one item/creature;
+- percentage rounding is display-only and must never alter estimator inputs.
+
+Re-read the complete review addendum immediately before Phase A implementation and again before final diff review.

@@ -190,3 +190,78 @@ Add deterministic tests for:
 ## Final design decision
 
 Proceed with the original native FullWorld Item & Spawn Explorer architecture, with this review addendum treated as normative where it tightens or clarifies the original design.
+
+## 13. Effective KPH must be scoped to qualifying/credited kills
+
+A scalar `kills/hour` is meaningful only when its denominator matches the estimator model.
+
+For item farming against one selected source creature, v1 `effective KPH` means **qualifying kills of that source creature per hour**, i.e. loot opportunities governed by the selected relation. It must not mean all monsters killed during the hunt.
+
+For an authoritative kill task, the relevant value is **credited target kills/hour** under the exact Game task-credit semantics. Raw team kills or personal last-hits are not automatically equivalent to credited task progress.
+
+If an item is farmed from several source creatures with different drop models, Atlas must not combine them with one total-hunt KPH unless the input supplies an explicit per-source KPH/mixture model. V1 may instead require the user to select one source creature for time estimation while still mapping all sources.
+
+Future measured KPH from #117 must carry the same scope explicitly (`source creature`, `task-credit target`, or a fully specified mixed-hunt composition).
+
+## 14. Drop probabilities need revision/modifier context
+
+An exact probability is exact only for the Game ruleset/context that produced it.
+
+The Game farm contract must bind loot semantics to applicable content/ruleset/profile identity and must state whether the probability is a base/static value or includes any active modifier class. Atlas must not silently present a base chance as a live/current chance when events, bonuses, boosted loot, difficulty profiles or other modifiers can change the roll.
+
+Until a separate authoritative live modifier source exists, the UI should prefer wording such as `Base drop chance` / `Published drop model` when that is what the snapshot proves.
+
+## 15. Placement weights/activation semantics gate static-clear yield
+
+The current Game static-creature exporter can carry optional `weight` metadata on placement records. Therefore a placement record must not automatically be treated as one guaranteed simultaneous creature per clear/cycle.
+
+`Highest expected items per static clear` is allowed only after the refreshed Game contract proves that the relevant placements are concurrently/independently active in the way assumed by the formula, including any `weight`, alternative-spawn or conditional activation semantics.
+
+Without that proof, v1 ranking must fall back to semantics it actually owns, for example `Most verified placement records` or documented spatial spread. Placement density is a useful navigation metric, not a claim about guaranteed clear yield.
+
+Likewise, Atlas must not deduplicate repeated `spawn_area` center/radius values into an authoritative spawn-group count. If group identity matters, Game must export a stable group identity or an equivalent exact semantic relation.
+
+## 16. Exact PMF expected kills are a hitting-time problem
+
+For an exact per-kill quantity PMF, `Expected kills to N` must not be approximated as `N / expected quantity per kill` when overshoot is possible.
+
+Let `E(s)` be expected further kills required when `s > 0` items remain and let `p_y` be the probability of receiving quantity `y` in one kill. For a stationary exact PMF with `p_0 < 1`:
+
+`E(0) = 0`
+
+`E(s) = [1 + sum(y>0, p_y * E(max(0, s-y)))] / (1 - p_0)`
+
+Use a bounded deterministic implementation. If `p_0 = 1` and the target is positive, the target is unreachable and the estimator must return an explicit unavailable/unreachable state rather than infinity formatted as a time.
+
+The fixed-quantity Bernoulli case remains the simpler `ceil(N/q) / p` model. Calculations must also cover the exact edge cases `p=0` (unreachable) and `p=1` (deterministic).
+
+## 17. Do not flatten multi-requirement or grouped tasks
+
+The design's singular `required item` / `required creature` is a minimum v1 case, not permission to corrupt a richer authoritative task.
+
+If Game proves a task with multiple item requirements, multiple eligible creatures, substitution rules, shared-credit rules or other progress semantics, the producer must preserve the exact requirement/credit structure or classify that task form as unsupported for v1. Atlas must not choose one member and present it as the whole task.
+
+Weekly classification also does not prove reset schedule/time. Do not display a reset countdown unless Game publishes an explicit schedule contract.
+
+## 18. Percentage formatting must not change the calculation
+
+Game probability remains lossless rational authority. Atlas may render a human-friendly percentage, but rounding is presentation only and calculations must use the normalized underlying probability.
+
+The inspector/provenance surface should retain enough exact information to explain the published model. Avoid decimal formatting that suggests more source precision than the contract proves.
+
+## Review acceptance addendum
+
+Also test:
+- item KPH is scoped to qualifying source-creature loot opportunities, not all hunt kills;
+- kill-task KPH is scoped to credited target progress when authoritative task-credit semantics exist;
+- mixed-source item time is unavailable without an explicit source-mixture/KPH model;
+- base/published drop chance cannot be labelled live/current without authoritative modifier context;
+- weighted/conditional placements do not produce static-clear yield unless activation semantics are proven;
+- spawn-area equality is not used as authoritative spawn-group identity;
+- exact PMF expected-kill hitting time, including `p0=1`, `p=0` and `p=1` edge cases;
+- richer task requirements are preserved or explicitly unsupported rather than flattened;
+- percentage display rounding never changes estimator inputs.
+
+## Final reviewed decision
+
+Proceed with the native FullWorld Item & Spawn Farm Explorer architecture. The original design plus this complete review addendum and the implementation plan form one contract; when they differ in specificity, the stricter reviewed rule wins.
