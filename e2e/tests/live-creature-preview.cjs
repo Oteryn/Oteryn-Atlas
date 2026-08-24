@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const { chromium } = require('@playwright/test');
+const visualOracle = import('../support/visual-oracle.mjs');
 
 const preview = process.env.PREVIEW_URL;
 const expectedRevision = process.env.ATLAS_REV;
@@ -83,11 +84,17 @@ async function publishedAnimationCoverage(page) {
   return coverage;
 }
 
+async function captureCreaturePixelState(page) {
+  const { canvasPng } = await visualOracle;
+  return canvasPng(page, '#creature-overlay');
+}
+
 async function waitForCreaturePixelState(page, baseline, shouldEqual, label) {
+  const { exactPngPixelsEqual } = await visualOracle;
   const deadline = Date.now() + 30_000;
   while (Date.now() < deadline) {
-    const current = await page.locator('#creature-overlay').screenshot({ animations: 'disabled' });
-    if (current.equals(baseline) === shouldEqual) return current;
+    const current = await captureCreaturePixelState(page);
+    if ((await exactPngPixelsEqual(page, baseline, current)) === shouldEqual) return current;
     await page.evaluate(() => new Promise(requestAnimationFrame));
   }
   throw new Error(`creature pixel state timeout: ${label}`);
@@ -269,7 +276,7 @@ async function runDesktop(browser) {
   await page.screenshot({ path: `${evidenceDir}/desktop-initial.png`, fullPage: true });
   await monsterToggle.uncheck();
   await waitReady(page, { npc: true, monster: false });
-  const staticNpcPixels = await page.locator('#creature-overlay').screenshot({ animations: 'disabled' });
+  const staticNpcPixels = await captureCreaturePixelState(page);
   const animationToggle = page.locator('#animation-toggle');
   await animationToggle.waitFor({ state: 'visible', timeout: 30_000 });
   assert.equal(await animationToggle.isDisabled(), false);
@@ -332,7 +339,7 @@ async function runMobile(browser) {
   assert.equal(await monsterToggle.isChecked(), true);
   await npcToggle.uncheck();
   await waitReady(page, { npc: false, monster: true });
-  const staticMonsterPixels = await page.locator('#creature-overlay').screenshot({ animations: 'disabled' });
+  const staticMonsterPixels = await captureCreaturePixelState(page);
   const animationToggle = page.locator('#animation-toggle');
   assert.equal(await animationToggle.isDisabled(), false);
   const beforeFrames = (await diagnostic(page)).animationRuntime.frameUpdates;

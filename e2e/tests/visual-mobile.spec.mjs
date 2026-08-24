@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { MOBILE_ENTRY, assertNoRuntimeFailures, captureRuntimeFailures, gotoAtlas, waitForAtlas } from './runtime.mjs';
+import { canvasPng, exactPngPixelsEqual } from '../support/visual-oracle.mjs';
 
 const MONSTER_PLAYBACK_ENTRY = '/web/fullworld.html?x=32724&y=31155&floor=-15&zoom=2&mode=minimap&perf=reference&animation=off&creatures=npc,monster';
 
@@ -39,17 +40,17 @@ test('mobile Atlas-owned chrome retains reviewed visual contracts', async ({ pag
       && value.enabled?.monster === true
       && value.pixelDrawnRecords > 0;
   }, null, { timeout: 30_000 });
-  const staticMonsterPixels = await page.locator('#creature-overlay').screenshot({ animations: 'disabled' });
+  const staticMonsterPixels = await canvasPng(page, '#creature-overlay');
   const playback = page.locator('#animation-toggle');
   const beforeFrames = await page.evaluate(() => globalThis.__OTERYN_ATLAS_CREATURES__?.animationRuntime?.frameUpdates ?? 0);
   await playback.check();
   await page.waitForFunction((before) => globalThis.__OTERYN_ATLAS_CREATURES__?.animationOn === true
     && (globalThis.__OTERYN_ATLAS_CREATURES__?.animationRuntime?.frameUpdates ?? 0) > before, beforeFrames, { timeout: 30_000 });
-  await expect.poll(async () => !(await page.locator('#creature-overlay').screenshot({ animations: 'disabled' })).equals(staticMonsterPixels),
+  await expect.poll(async () => !(await exactPngPixelsEqual(page, staticMonsterPixels, await canvasPng(page, '#creature-overlay'))),
     { timeout: 30_000 }).toBeTruthy();
   await playback.uncheck();
   await page.waitForFunction(() => globalThis.__OTERYN_ATLAS_CREATURES__?.animationOn === false, null, { timeout: 30_000 });
-  await expect.poll(async () => (await page.locator('#creature-overlay').screenshot({ animations: 'disabled' })).equals(staticMonsterPixels),
+  await expect.poll(async () => exactPngPixelsEqual(page, staticMonsterPixels, await canvasPng(page, '#creature-overlay')),
     { timeout: 30_000 }).toBeTruthy();
   assertNoRuntimeFailures(runtime);
 });
