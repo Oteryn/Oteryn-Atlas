@@ -42,7 +42,7 @@ ATLAS_ISSUE = re.compile(r"^https://github\.com/Oteryn/Oteryn-Atlas/issues/[1-9]
 
 
 def git_blob_sha(path: Path) -> str:
-    payload = path.read_bytes()
+    payload = path.read_bytes().replace(b"\r\n", b"\n")
     header = f"blob {len(payload)}\0".encode("ascii")
     return hashlib.sha1(header + payload).hexdigest()
 

@@ -26,7 +26,7 @@ Material IA identities are locked in the companion JSON. High-signal current ide
 - `.github/CODEOWNERS`: blob `e3e59db55ac2b97068aae54a805373fc1261eee5`;
 - `docs/agents/BRANCH_LIFECYCLE_ADR.md`: blob `72b4554ab8130cde375e8985f3d4fe4f53ee0e42`;
 - `docs/agents/BRANCH_LIFECYCLE_POLICY.json`: blob `2d2ece5c5649ee8fd426bbcad3ce879899aa09f5`;
-- `docs/testing/ATLAS-VERIFICATION-PLATFORM.md`: blob `482abc9d0b54ba103e817743205360248646c11f`;
+- `docs/testing/ATLAS-VERIFICATION-PLATFORM.md`: blob `482abc7e7bb96dd0a7ded71205b3e7e6e83544fe`;
 - `.github/workflows/ci.yml`: blob `913cedcae9423e9487fb2849fe4644e31ed82a55`;
 - historical FullWorld handoff: blob `12f9aa0426596b7128f3455d068daa46dced8b1d`.
 
