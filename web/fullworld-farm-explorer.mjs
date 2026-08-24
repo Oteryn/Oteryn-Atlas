@@ -19,14 +19,14 @@ export function buildFarmUiReadiness({ farmPublicationAvailable = false, interac
   const itemTask = farmPublicationAvailable
     ? frozenState('AVAILABLE', 'VERIFIED', 'Accepted Game farm-intelligence publication is available.')
     : frozenState('UPSTREAM_BLOCKED', 'UNKNOWN', 'Accepted Game farm-intelligence publication is not available.');
-  const mapInteraction = interactionSeamAvailable && presentationSeamAvailable
-    ? frozenState('AVAILABLE', 'VERIFIED', 'Canonical creature interaction and presentation seams are available.')
-    : frozenState('DEPENDENCY_BLOCKED', 'UNKNOWN', 'Canonical #113/#115 creature interaction/presentation seams are not both available.');
-  return Object.freeze({
-    item_task: itemTask,
-    map_interaction: mapInteraction,
-    custom_kill: frozenState('AVAILABLE', 'ESTIMATE', 'Custom kill estimate uses an explicit manual credited-progress KPH assumption.'),
-  });
+  const mapInteraction = interactionSeamAvailable
+    ? frozenState('AVAILABLE', 'VERIFIED', 'Canonical creature-interaction-v1 map seam is available.')
+    : frozenState('DEPENDENCY_BLOCKED', 'UNKNOWN', 'Canonical creature interaction seam is unavailable.');
+  const presentationEnrichment = presentationSeamAvailable
+    ? frozenState('AVAILABLE', 'VERIFIED', 'Canonical creature presentation enrichment is available.')
+    : frozenState('DEPENDENCY_BLOCKED', 'UNKNOWN', 'Creature label/badge presentation enrichment remains owned by #115 and is not duplicated by Farm Explorer.');
+  return Object.freeze({ item_task: itemTask, map_interaction: mapInteraction, presentation_enrichment: presentationEnrichment,
+    custom_kill: frozenState('AVAILABLE', 'ESTIMATE', 'Custom kill estimate uses an explicit manual credited-progress KPH assumption.') });
 }
 
 export function validateFarmCreatureCatalog(catalog) {
@@ -72,7 +72,8 @@ async function boundedJson(url, maxBytes) {
   requireValue(bytes.byteLength <= maxBytes, `${url.pathname} exceeds byte limit`);
   return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
 }
-const runtime = { records: [], selected: null, readiness: buildFarmUiReadiness(), error: null };
+const interactionSeamAvailable = globalThis.__OTERYN_ATLAS_CREATURES__?.interactionVersion === 'creature-interaction-v1';
+const runtime = { records: [], selected: null, readiness: buildFarmUiReadiness({ interactionSeamAvailable, presentationSeamAvailable: false }), error: null };
 
 function byId(id) { return document.getElementById(id); }
 function positiveInt(value, fallback = 100) {
@@ -186,6 +187,7 @@ function publish() {
     status: runtime.error ? 'FAIL' : 'PASS',
     itemTaskState: runtime.readiness.item_task.state,
     mapInteractionState: runtime.readiness.map_interaction.state,
+    presentationEnrichmentState: runtime.readiness.presentation_enrichment.state,
     customKillState: runtime.readiness.custom_kill.state,
     creatureCatalogRecords: runtime.records.length,
     selectedCreatureId: usableMonster(runtime.selected) ? runtime.selected.entity_id : null,

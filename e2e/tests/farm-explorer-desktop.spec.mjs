@@ -18,7 +18,8 @@ test('desktop Farm Explorer fails closed for upstream facts and keeps custom kil
   const farm = await waitForFarm(page);
   expect(farm.status, farm.error ?? 'farm runtime').toBe('PASS');
   expect(farm.itemTaskState).toBe('UPSTREAM_BLOCKED');
-  expect(farm.mapInteractionState).toBe('DEPENDENCY_BLOCKED');
+  expect(farm.mapInteractionState).toBe('AVAILABLE');
+  expect(farm.presentationEnrichmentState).toBe('DEPENDENCY_BLOCKED');
   await expect(page.locator('#farm-explorer')).toContainText('Monster drop sources');
   await expect(page.locator('#farm-explorer')).toContainText('UPSTREAM_BLOCKED');
   await page.locator('#farm-creature-search').fill('Rat');

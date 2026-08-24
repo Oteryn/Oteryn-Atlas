@@ -18,6 +18,8 @@ test('mobile Farm Explorer remains reachable and truthful in the existing contro
   const farm = await waitForFarm(page);
   expect(farm.status, farm.error ?? 'farm runtime').toBe('PASS');
   expect(farm.itemTaskState).toBe('UPSTREAM_BLOCKED');
+  expect(farm.mapInteractionState).toBe('AVAILABLE');
+  expect(farm.presentationEnrichmentState).toBe('DEPENDENCY_BLOCKED');
   await page.locator('#mobile-controls-toggle').click();
   await expect(page.locator('#mobile-controls-panel')).toHaveClass(/mobile-open/);
   await expect(page.locator('#farm-explorer')).toBeVisible();
@@ -30,7 +32,7 @@ test('mobile Farm Explorer remains reachable and truthful in the existing contro
   await page.locator('#farm-time-base').selectOption('trip_wall');
   await page.locator('#farm-estimate-button').click();
   await expect(page.locator('#farm-estimate-output')).toContainText('2.00 h');
-  await expect(page.locator('#farm-explorer')).toContainText('DEPENDENCY_BLOCKED');
+  await expect(page.locator('#farm-explorer')).toContainText('PRESENTATION DEPENDENCY');
   expect(new URL(page.url()).searchParams.get('farmTimeBase')).toBe('trip_wall');
   await expect(page.locator('#farm-explorer')).toHaveCSS('overflow-x', /visible|hidden|clip|auto/);
   assertNoRuntimeFailures(runtime);
