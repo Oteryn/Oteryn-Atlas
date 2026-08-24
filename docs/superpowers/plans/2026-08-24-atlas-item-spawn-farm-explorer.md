@@ -4,9 +4,9 @@
 
 **Goal:** Deliver a native FullWorld Item & Spawn Farm Explorer that joins Game-owned item/loot/task facts to verified creature placements, renders readable heatmap/cluster/detail LOD, and calculates truthfully labelled item-farm and kill-target estimates.
 
-**Architecture:** Oteryn-Game publishes a versioned, public-safe farm-intelligence contract; Oteryn-Atlas compiles bounded farm-intelligence and creature-keyed spatial products, then consumes them through pure estimator/state/LOD modules and one FullWorld explorer controller. Game facts remain authoritative; Atlas calculations are derived/estimated and must never become a second source of Game semantics.
+**Architecture:** Oteryn-Game publishes a versioned, public-safe farm-intelligence contract. Oteryn-Atlas compiles bounded farm-intelligence and creature-keyed spatial products, then consumes them through pure estimator/state/LOD modules and one FullWorld explorer controller. Game facts remain authoritative; Atlas calculations remain derived/estimated.
 
-**Tech Stack:** Python 3 deterministic producers/validators, JavaScript ES modules, Node.js `node:test`, Canvas/WebGL-compatible FullWorld overlays, Playwright Chromium/Docker verification, existing GitHub `atlas-gate` / `provenance-gate` lifecycle.
+**Tech Stack:** Python 3 deterministic producers/validators, JavaScript ES modules, Node.js `node:test`, Canvas/WebGL-compatible FullWorld overlays, Playwright Chromium/Docker, existing GitHub `atlas-gate` / `provenance-gate` lifecycle.
 
 **Spec:** `docs/superpowers/specs/2026-08-24-atlas-item-spawn-farm-explorer-design.md`
 
@@ -16,28 +16,28 @@
 
 ## Global Constraints
 
-- Atlas lifecycle authority: `Oteryn/Oteryn-Atlas#114`; parent FullWorld programme `#11`; verification `#85`; visual-user acceptance `#111`.
+- Atlas lifecycle authority: `Oteryn/Oteryn-Atlas#114`; parent `#11`; verification `#85`; visual-user acceptance `#111`.
 - Game producer lifecycle authority: `Oteryn/Oteryn-Game#75`.
-- Related future measured KPH/hunt analytics authority: `Oteryn/Oteryn-Atlas#117`; Farm Explorer must not create a duplicate analytics/profile system.
-- Related creature interaction/presentation geometry: `Oteryn/Oteryn-Atlas#113` and `#115`; reuse their canonical seams when present.
-- Design-time Atlas main was `db5de3938ef815fb467dd2ad911a1ed92b13dccf`; design-time Game main has already advanced to at least `6945e962035bac83d1f19b00984df5b82719ebb9`. These are evidence only; refresh both repositories before every mutation phase.
-- Oteryn-Game owns item, creature, loot, probability, quantity, task, weekly classification, placement and any accepted respawn facts. Atlas owns only validation, indexes, LOD aggregates and derived estimates.
+- Future measured KPH/hunt analytics authority: `Oteryn/Oteryn-Atlas#117`; Farm Explorer must not create a duplicate analytics/profile system.
+- Creature interaction/presentation geometry: `Oteryn/Oteryn-Atlas#113` and `#115`; reuse their canonical seams when present.
+- Design-time Atlas `main` was `db5de3938ef815fb467dd2ad911a1ed92b13dccf`; Game `main` subsequently advanced to `6945e962035bac83d1f19b00984df5b82719ebb9`. These are evidence only; refresh both repositories before every mutation phase.
+- Oteryn-Game owns item, creature, loot, probability, quantity, task, weekly classification, placement and accepted respawn facts. Atlas owns validation, indexes, LOD aggregates and derived estimates.
 - Never use TibiaRoute, wiki/fansites, browser-side OTBM/Lua/XML parsing, sprite similarity, filenames, guessed regions or names-only joins as runtime authority.
-- The generated UI mock-up is illustrative only. No example number, place name, task count, drop chance, spawn count, respawn value or time from the mock-up may enter real fixtures or product claims.
-- No unweighted/naive `average drop chance` across multiple source creatures.
+- Generated UI mock-up values are illustrative only. No example number/place/task/drop/spawn/respawn/time from the mock-up may enter real fixtures or product claims.
+- No unweighted `average drop chance` across multiple source creatures.
 - `monster_spawns` are factual exported placement records. Placement count is not live occupancy, simultaneous capacity or guaranteed kills per cycle.
-- `spawn_time_seconds`, if projected, must remain provenance-bound to the accepted creature publication and is not by itself proof of the complete live respawn algorithm.
+- `spawn_time_seconds`, if projected, remains provenance-bound to the accepted creature publication and is not by itself proof of the complete live respawn algorithm.
 - V1 time estimates require an explicit `effective kills/hour` source. No universal KPH default and no fixed solo/party multiplier.
-- Item estimator labels use mathematically defined `Expected`, `P50`, `P80`, `P95`; kill-target basic estimate is `N / KPH` with no invented uncertainty range.
-- Authoritative task quantity/kill count initializes the estimator target while remaining separately visible as a Game fact; user edits are local estimate state only.
-- Atlas runtime remains inside the existing FullWorld shell; no second map application and no unrelated global navigation rewrite.
-- All discovered defects follow RED -> minimal fix -> GREEN -> full applicable exact-head verification. Playwright retries remain `0`.
-- Game implementation must avoid active Wave-1 allocations `apps/game-server/src/domain/**` (PR #56) and `apps/game-server/src/content/**` (PR #58) unless the coordinator explicitly transfers ownership.
-- Live Atlas deployment/acceptance occurs only from merged `main`; Synology is not the heavy PR verification runner.
+- Item estimator labels use defined `Expected`, `P50`, `P80`, `P95`; basic kill-target estimate is `N / KPH` with no invented uncertainty range.
+- Authoritative task quantity/kill count initializes the estimator target while remaining separately visible as a Game fact; user edits are estimate state only.
+- Runtime stays inside the existing FullWorld shell; no second map application and no unrelated global navigation rewrite.
+- Playwright retries remain `0`; no arbitrary sleeps, broad tolerances or test-only authority bypasses.
+- Game implementation must avoid active Wave-1 allocations `apps/game-server/src/domain/**` (PR #56) and `apps/game-server/src/content/**` (PR #58) unless ownership is explicitly transferred.
+- Live Atlas acceptance occurs only from merged `main`; Molehill-PC owns heavy PR browser qualification, Synology merged-main live acceptance.
 
 ---
 
-### Task 1: Game farm-intelligence contract and deterministic producer
+### Task 1: Game farm-intelligence contract and producer
 
 **Repository:** `Oteryn/Oteryn-Game`
 
@@ -46,70 +46,87 @@
 - Create: `tools/game-atlas-farm-intelligence/export.py`
 - Create: `tools/game-atlas-farm-intelligence/verify.py`
 - Create: `tools/game-atlas-farm-intelligence/self_test.py`
-- Create only if current accepted source data can be legally/provenly represented as a compact deterministic test input: `tools/game-atlas-farm-intelligence/fixtures/acceptance-source.json`
-- Modify only if required for a dedicated non-overlapping producer workflow: `.github/workflows/game-atlas-farm-intelligence.yml`
+- Optional only when current accepted evidence can be committed as a small public-safe fixture: `tools/game-atlas-farm-intelligence/fixtures/acceptance-source.json`
+- Optional workflow only if current CI requires a dedicated producer job: `.github/workflows/game-atlas-farm-intelligence.yml`
 
 **Interfaces:**
-- Consumes: accepted Game-owned/reference-migration evidence already authorized by the Game->Atlas boundary; exact current creature entity identity semantics from `tools/game-atlas-creatures/export.py`.
-- Produces: `oteryn-game-atlas-farm-intelligence-v1` snapshot with `contract_id`, `schema_version`, producer/source identity, semantic digest, capability states, bounded item records, loot relations, task records and explicit probability/quantity roll semantics.
-- Stable loot relation shape must carry a producer-owned relation id, stable creature entity id, stable item id, probability model and quantity model. It must be possible to determine whether the relation normalizes to one exact per-kill quantity PMF.
+- Consumes: accepted Game/reference-migration evidence and current stable creature entity identity from `tools/game-atlas-creatures/export.py`.
+- Produces: `oteryn-game-atlas-farm-intelligence-v1` with producer/source identity, semantic digest, capability states, item records, creature->item relations, task records, exact probability representation and explicit quantity/roll semantics.
 
-- [ ] **Step 1: Refresh Game GitHub preflight and freeze the task boundary.** Resolve current `main`, Issue #75, root/nearer `AGENTS.md`, open PR #56/#58 heads and all producer-path overlap. Create/reuse one Game task branch from refreshed `main`; do not edit DOMAIN/CONTENT allocated paths.
+- [ ] **Step 1: Refresh preflight.** Resolve current Game `main`, Issue #75, repository instructions, PR #56/#58 heads and overlapping producer work. Create/reuse one dedicated Game task branch from refreshed `main`.
 
-- [ ] **Step 2: Write the contract before producer code.** Define exact closed capability states `SUPPORTED`, `PARTIAL`, `UNSUPPORTED`; stable ID rules; rational probability `{numerator, denominator}` validation; quantity variants `fixed`, `discrete_pmf`, `bounded_unknown`, `unsupported`; per-kill roll semantics; task types `delivery` and `kill`; explicit optional `weekly=true` only when proven; deterministic canonical ordering and hard bounds.
+- [ ] **Step 2: Write the contract first.** Define closed capability states `SUPPORTED|PARTIAL|UNSUPPORTED`, stable IDs, rational probabilities `{numerator, denominator}`, quantity kinds `fixed|discrete_pmf|bounded_unknown|unsupported`, task kinds `delivery|kill`, explicit weekly classification, canonical order and hard bounds.
 
-- [ ] **Step 3: Write RED producer tests in `self_test.py`.** Include fixture cases that assert:
+- [ ] **Step 3: Write RED probability and quantity tests.** The first exact cases must include:
 
 ```python
-assert normalize_probability({"numerator": 1, "denominator": 4}) == (1, 4)
-assert normalize_quantity({"kind": "fixed", "quantity": 2})["per_kill_pmf"] == [[0, 3], [2, 1]] or True  # replace only with the contract's exact normalized representation
+assert normalize_probability({"numerator": 1, "denominator": 4}) == {
+    "numerator": 1,
+    "denominator": 4,
+}
+assert normalize_quantity({"kind": "fixed", "quantity": 2}) == {
+    "kind": "fixed",
+    "quantity": 2,
+}
 ```
 
-The actual test must not use the illustrative `or True`; instead assert the exact representation chosen in the contract. Also add explicit failing cases for denominator `0`, numerator greater than denominator, duplicate item/relation/task IDs, dangling creature/item references, ambiguous chance scale, bounded-unknown quantity, unknown multi-roll semantics, capability `UNSUPPORTED`, deterministic reordering and source-digest changes.
+Add failures for denominator `0`, negative numerator, numerator greater than denominator, non-integers, ambiguous chance scale, non-positive fixed quantity, malformed PMF, PMF probability mass not equal to 1, and bounded ranges with `min > max`.
 
-- [ ] **Step 4: Run the self-test and verify RED for missing producer functions.** Run:
+- [ ] **Step 4: Write RED graph/capability tests.** Require rejection of duplicate item/relation/task IDs and dangling item/creature/task references. Require deterministic output under input reordering and a changed semantic digest when one authoritative source relation changes. Require explicit `UNSUPPORTED` rather than an empty-array inference.
+
+- [ ] **Step 5: Run RED.** Run:
 
 ```bash
 python tools/game-atlas-farm-intelligence/self_test.py
 ```
 
-Expected: failure because the new contract implementation is not yet present.
+Expected: import/function failure because producer helpers do not exist yet.
 
-- [ ] **Step 5: Implement the minimal deterministic producer.** Implement pure helpers such as:
+- [ ] **Step 6: Implement the deterministic producer.** Implement concrete helpers with these signatures:
 
 ```python
-def canonical_bytes(value: object) -> bytes: ...
-def normalize_probability(raw: object) -> dict[str, int]: ...
-def normalize_quantity(raw: object) -> dict[str, object]: ...
-def build_snapshot(source: dict[str, object], producer_sha: str) -> dict[str, object]: ...
+def canonical_bytes(value: object) -> bytes:
+    return json.dumps(value, ensure_ascii=False, separators=(",", ":"), sort_keys=True).encode("utf-8")
+
+
+def normalize_probability(raw: dict[str, object]) -> dict[str, int]:
+    numerator = raw.get("numerator")
+    denominator = raw.get("denominator")
+    if not isinstance(numerator, int) or isinstance(numerator, bool):
+        raise ExportError("probability numerator must be an integer")
+    if not isinstance(denominator, int) or isinstance(denominator, bool):
+        raise ExportError("probability denominator must be an integer")
+    if denominator <= 0 or numerator < 0 or numerator > denominator:
+        raise ExportError("invalid probability rational")
+    return {"numerator": numerator, "denominator": denominator}
 ```
 
-Keep all semantic inference inside this Game-owned boundary. If accepted source evidence cannot prove an item/loot/task field, emit the truthful capability/unresolved state; do not guess.
+Implement `normalize_quantity(...)` and `build_snapshot(...)` with the contract's exact schema. Missing or ambiguous source semantics must become capability/unresolved state, never guessed values.
 
-- [ ] **Step 6: Normalize exact roll models to per-kill semantics.** If the accepted runtime proves one Bernoulli opportunity per kill, publish that explicitly. If it proves multiple independent rolls or another exact finite model, normalize it to an exact per-kill quantity PMF or publish enough exact roll-program semantics for a deterministic consumer normalization. If neither is provable, mark exact completion-probability support unavailable.
+- [ ] **Step 7: Prove roll semantics.** For one Bernoulli loot opportunity per kill, publish that explicitly. For multiple independent rolls or another exact finite mechanism, normalize to an exact **per-kill quantity PMF** or publish an exact roll program that deterministically normalizes to one. If neither can be proven, mark exact completion-probability capability unsupported for that relation.
 
-- [ ] **Step 7: Implement `verify.py` as an independent consumer-side producer validator.** Verify contract id/version, capabilities, IDs, probability rational bounds, PMF mass, quantity bounds, task references, creature identity shape, counts/byte limits, canonical digest and public-safe provenance. Reject unknown critical schema features.
+- [ ] **Step 8: Implement an independent validator.** `verify.py` must check contract/version, capabilities, IDs, probability bounds, PMF mass, quantity bounds, task references, creature identity format, canonical digest, counts/bytes and public-safe provenance. Reject unknown critical schema features.
 
-- [ ] **Step 8: Produce truthful current-source census evidence.** Run the producer against the current accepted source boundary if it is available on the authorized execution host. Record supported/partial/unsupported capability counts; do not substitute website data when local authoritative inputs are unavailable.
+- [ ] **Step 9: Produce truthful current-source evidence.** If the accepted source boundary is available on the authorized execution host, generate `target/game-atlas-farm-intelligence/acceptance.json` and a capability census. If not, record the exact blocker and ship truthful capability metadata; do not substitute web data.
 
-- [ ] **Step 9: Run Game verification to GREEN.** At minimum:
+- [ ] **Step 10: Run Game GREEN verification.** Use:
 
 ```bash
 python tools/game-atlas-farm-intelligence/self_test.py
-python tools/game-atlas-farm-intelligence/verify.py <generated-snapshot-path>
+python tools/game-atlas-farm-intelligence/verify.py target/game-atlas-farm-intelligence/acceptance.json
 python tools/agents/validate_governance.py
 cargo +1.94.0 test --locked --workspace --all-targets
 cargo +1.94.0 clippy --locked --workspace --all-targets -- -D warnings
 git diff --check
 ```
 
-If repository-selected commands differ at refreshed head, use the exact current contract and record the executed commands/results.
+If a current repository-selected command supersedes one of these, run the current command and record it in PR evidence.
 
-- [ ] **Step 10: Commit and deliver the Game producer through Issue #75.** Review the full changed-file set, push exact head, open/update one PR, require current Game gates/review policy, squash-merge, delete the branch where policy permits, and record the exact merged Game SHA + farm semantic digest. Atlas Task 2 must pin these exact identities.
+- [ ] **Step 11: Deliver Game first.** Review full diff, push exact head, open/update one PR under #75, require current gates/review policy, squash-merge, delete branch where policy allows, and record exact merged Game SHA + farm semantic digest for Task 2.
 
 ---
 
-### Task 2: Atlas farm publication and creature spatial secondary index
+### Task 2: Atlas farm publication and creature-keyed spatial index
 
 **Repository:** `Oteryn/Oteryn-Atlas`
 
@@ -118,23 +135,21 @@ If repository-selected commands differ at refreshed head, use the exact current 
 - Create: `tools/build-farm-spatial-index.py`
 - Create: `tests/farm-intelligence-build.py`
 - Create: `tests/farm-spatial-index.py`
-- Generated/runtime product roots: `data/farm-intelligence/**`, `data/farm-spatial/**` according to the repository's current generated-publication policy; do not commit large generated artifacts unless current policy explicitly requires it.
-- Modify only when needed to expose the selected generated product in existing publication/serve paths: current publication tooling discovered at execution time, without changing unrelated world roots.
+- Generated products: `data/farm-intelligence/**`, `data/farm-spatial/**` according to the current publication policy; do not commit large generated artifacts unless current repository policy requires them.
 
 **Interfaces:**
-- Consumes: exact merged Game farm snapshot from Task 1; exact accepted creature publication currently consumed by `tools/build-creature-index.py`.
-- Produces: bounded Atlas `farm-intelligence` manifest/detail/search shards and creature-keyed `farm-spatial` shards/aggregate cells, all root/digest linked to exact Game and creature source identities.
-- `farm-spatial` key: stable `monster-entity:*` / accepted successor identity, never display name.
+- Consumes: exact merged Game farm snapshot/digest from Task 1 and exact accepted creature publication used by `tools/build-creature-index.py`.
+- Produces: bounded farm item/task search/detail products and stable-creature-ID keyed placement/aggregate shards. No name-only join.
 
-- [ ] **Step 1: Refresh Atlas main/Issue #114/open PR overlap after Task 1 merges.** Rebase/create the Atlas implementation branch from current `main`; read #113/#115 merge state before choosing interaction geometry seams.
+- [ ] **Step 1: Refresh Atlas preflight after Game merge.** Resolve current `main`, #114, PR overlap, #113/#115 status and current publication rules; create/rebase the Atlas implementation branch from current `main`.
 
-- [ ] **Step 2: Write RED contract tests.** In `tests/farm-intelligence-build.py`, create a minimal synthetic schema fixture proving item -> source relation, fixed quantity, discrete PMF, unsupported quantity and task records. Assert exact source revision/digest binding, stable deterministic output and unsupported capability preservation.
+- [ ] **Step 2: Write RED farm-product tests.** Use a synthetic schema fixture containing one fixed-quantity relation, one exact PMF relation, one bounded-unknown relation and one task. Assert exact Game revision/digest binding, capability preservation, canonical ordering and deterministic output.
 
-- [ ] **Step 3: Write RED spatial-index tests.** In `tests/farm-spatial-index.py`, use synthetic accepted creature records with two entities/floors and assert that only exact entity IDs join. Include a same-name/different-id record and require no name fallback.
+- [ ] **Step 3: Write RED spatial tests.** Use two stable creature IDs with intentionally identical display names. Assert only exact entity ID joins and that a name match never repairs an unresolved identity.
 
-- [ ] **Step 4: Add a RED spawn-time provenance test.** When the refreshed accepted creature snapshot includes `spawn_time_seconds`, require the farm-spatial index to copy it only together with the exact source creature semantic/root identity. If refreshed semantics are not accepted for public analysis, assert the field is omitted and capability states say why.
+- [ ] **Step 4: Write RED placement/timer provenance tests.** Assert `placement_count` is distinct from live occupancy/capacity. If refreshed creature source publishes accepted `spawn_time_seconds`, require any projected timer to carry exact source-root binding. If timer semantics are not accepted for farm analysis, assert it is absent with explicit capability state.
 
-- [ ] **Step 5: Run the tests and verify RED.** Run:
+- [ ] **Step 5: Run RED.** Run:
 
 ```bash
 python tests/farm-intelligence-build.py
@@ -143,19 +158,17 @@ python tests/farm-spatial-index.py
 
 Expected: failure because builders do not exist.
 
-- [ ] **Step 6: Implement `build-farm-intelligence.py`.** Validate contract id/version/capabilities and source digest before writing any product. Build deterministic item search/detail and task shards with hard record/byte limits. Do not compute average drop chance. Preserve per-source exact models.
+- [ ] **Step 6: Implement `build-farm-intelligence.py`.** Validate Game contract/version/digest before writing any output. Preserve probability/quantity per source creature. Build bounded item/task search and detail shards. Do not emit `averageDropChance`.
 
-- [ ] **Step 7: Implement `build-farm-spatial-index.py`.** Read only the accepted creature publication, create a creature-entity keyed placement index, deterministic floor/cell aggregates and optional provenance-bound `spawn_time_seconds`. Aggregate cells must be presentation/derived data with `identityAuthority=false` or the repository's equivalent declaration.
+- [ ] **Step 7: Implement `build-farm-spatial-index.py`.** Read only accepted creature projection data, key by stable creature entity ID, emit floor/placement shards and deterministic multi-resolution cells. Mark aggregate/cell identity as non-authoritative. Preserve optional accepted timer data without promoting it to live-state semantics.
 
-- [ ] **Step 8: Assert terminology/count integrity.** Tests must prove that the product exposes `placement_count` separately from any optional `spawn_area_count`/timer facts and never emits fields named/semantically implying `live_count`, `occupied`, `available_now` or `simultaneous_capacity` without a separate accepted authority.
+- [ ] **Step 8: Prove deterministic roots.** Build twice from identical bytes and require identical product roots. Change one source relation and require farm root change; change one creature placement and require spatial root change.
 
-- [ ] **Step 9: Run builders twice and prove deterministic roots.** For identical input bytes, outputs and product roots/digests must match exactly. Change one source relation and require the appropriate root/digest to change.
-
-- [ ] **Step 10: Commit the publication layer.** Commit producer consumer/tests together; do not include UI changes in this commit. Record pinned Game merge SHA/farm digest and creature publication root in the PR evidence.
+- [ ] **Step 9: Run GREEN and commit.** Run both tests, relevant existing creature-index tests and `git diff --check`; commit publication layer without UI scope.
 
 ---
 
-### Task 3: Pure Atlas estimator, URL state and LOD logic
+### Task 3: Pure estimator, URL state and LOD logic
 
 **Repository:** `Oteryn/Oteryn-Atlas`
 
@@ -168,7 +181,6 @@ Expected: failure because builders do not exist.
 - Create: `tests/farm-lod.mjs`
 
 **Interfaces:**
-- `farm-intelligence.mjs` produces pure functions:
 
 ```js
 export function expectedKillsFixed({ targetQuantity, probability, successQuantity }) {}
@@ -180,52 +192,51 @@ export function estimateTimeHours({ kills, effectiveKph }) {}
 export function estimateKillTargetTimeHours({ targetKills, effectiveKph }) {}
 ```
 
-- `farm-state.mjs` produces `parseFarmState(URLSearchParams)` and `serializeFarmState(state, URLSearchParams)` using stable IDs and validated bounded positive inputs.
-- `farm-lod.mjs` produces `chooseFarmLod({ mode, zoom, projectedDensity, visiblePlacements })` and deterministic cluster/cell selection helpers; `AUTO` is monotonic and bounded.
+`farm-state.mjs` exports `parseFarmState(params)` and `serializeFarmState(state, params)`. `farm-lod.mjs` exports `chooseFarmLod({ mode, zoom, projectedDensity, visiblePlacements })` plus deterministic cluster/cell helpers.
 
-- [ ] **Step 1: Write independent-oracle RED tests for fixed-quantity math.** Include exact small cases, for example `p=0.5`, target `2`, `q=1`: expected kills `4`; completion after 2 kills `0.25`; P50 threshold is the minimum integer `k` whose binomial tail is at least `0.5`.
+- [ ] **Step 1: Write RED fixed-drop oracle tests.** For `p=0.5`, target `2`, `q=1`, require expected kills `4` and completion probability after 2 kills `0.25`. For `q=2`, target `3`, require `r=2` successful rolls before threshold calculations.
 
-- [ ] **Step 2: Write RED P50/P80/P95 threshold tests.** Verify minimality: threshold `k` passes the target probability and `k-1` does not. Include `q>1` with `r=ceil(N/q)`.
+- [ ] **Step 2: Write RED P50/P80/P95 tests.** Each threshold is the minimum integer `k` where completion probability is at least `0.50`, `0.80` or `0.95`; assert `k` passes and `k-1` fails.
 
-- [ ] **Step 3: Write RED exact PMF tests.** Use a tiny per-kill PMF such as `{0: 0.5, 1: 0.5}` and another with quantities `{0,1,2}`. Assert bounded DP results against hand-enumerated probabilities. Reject negative quantities, non-normalized probabilities, oversized target/state/kill bounds and unknown roll semantics.
+- [ ] **Step 3: Write RED PMF tests.** Hand-enumerate tiny distributions such as `{0:0.5,1:0.5}` and `{0:0.5,1:0.25,2:0.25}`. Reject malformed/non-normalized PMFs, oversized target/state/kill bounds and unknown roll semantics.
 
-- [ ] **Step 4: Write RED KPH tests.** `estimateTimeHours` must reject `0`, negative, `NaN`, `Infinity` and absent KPH. `estimateKillTargetTimeHours({targetKills:100,effectiveKph:200})` must equal `0.5` exactly. No `fast/typical/conservative` multipliers exist in the pure API.
+- [ ] **Step 4: Write RED KPH tests.** Reject absent, `0`, negative, `NaN` and `Infinity`. Require `100 / 200 = 0.5h` for a custom kill target. There are no `fast/typical/conservative` multipliers in v1.
 
-- [ ] **Step 5: Write RED multiple-source tests.** Query normalization must expose per-source probabilities individually and must not return `averageDropChance` unless an explicit weighting provider is passed and named. V1 default path must omit it.
+- [ ] **Step 5: Write RED multiple-source tests.** Default query output exposes each source relation separately and contains no unweighted average drop chance.
 
-- [ ] **Step 6: Run and verify RED.** Run:
-
-```bash
-node --test tests/farm-intelligence.mjs tests/farm-state.mjs tests/farm-lod.mjs
-```
-
-Expected: module-not-found/function-not-defined failures.
-
-- [ ] **Step 7: Implement minimal estimator functions.** Use stable numerics, bounded binomial/DP calculations and explicit iteration caps. Do not use simulation randomness where an exact bounded calculation is available.
-
-- [ ] **Step 8: Implement URL state.** Supported public parameters:
+- [ ] **Step 6: Write RED URL tests.** Round-trip:
 
 ```text
 item=<stable-item-id>
 farmQty=<positive-int>
-farmKph=<positive-number>   # only when user supplied
+farmKph=<positive-number>
 farmTask=<stable-task-id>
 farmCreature=<stable-creature-id>
 farmKills=<positive-int>
 farmView=auto|heatmap|clusters|spawns
 ```
 
-Reject contradictory `farmTask` + incompatible custom item/creature combinations rather than silently merging them.
+Reject malformed, non-finite, over-limit and contradictory combinations.
 
-- [ ] **Step 9: Implement authoritative-task initialization helper.** A selected delivery task initializes estimate target from its factual required item quantity; a selected kill/weekly task initializes target from its factual kill count. Return separate `authoritativeRequirement` and `estimateTarget` fields so edits cannot rewrite the fact.
+- [ ] **Step 7: Write RED task-initialization tests.** A delivery task returns separate `authoritativeRequirement.quantity` and editable `estimateTarget.quantity`; a kill/weekly task returns separate factual and editable kill counts. Free item/custom kill mode defaults to `100` only when no authoritative task owns the requirement.
 
-- [ ] **Step 10: Implement LOD logic.** `AUTO` chooses far heatmap, medium clusters and near placements from current zoom/density/count with monotonic boundaries. Exact thresholds must be constants justified by Task 6 visual/performance qualification and covered by tests; manual modes bypass auto selection without changing factual results.
+- [ ] **Step 8: Run RED.** Run:
 
-- [ ] **Step 11: Re-run pure tests to GREEN and commit.** Run targeted Node tests plus existing relevant viewport/creature tests before committing.
+```bash
+node --test tests/farm-intelligence.mjs tests/farm-state.mjs tests/farm-lod.mjs
+```
+
+Expected: module-not-found or missing-export failure.
+
+- [ ] **Step 9: Implement exact bounded calculations.** Use exact binomial-tail calculation for the one-Bernoulli fixed-quantity model and bounded deterministic DP/convolution for exact per-kill PMFs. Use explicit caps for kills, target quantity and PMF state size; no random simulation in the deterministic oracle path.
+
+- [ ] **Step 10: Implement state and LOD.** URL parsing preserves existing FullWorld camera/floor/animation state. `AUTO` chooses heatmap -> clusters -> placements monotonically based on zoom/density/count; manual modes override only presentation. Exact thresholds are finalized from Task 6 measured visual/performance evidence.
+
+- [ ] **Step 11: Run GREEN and commit.** Run new tests plus existing relevant viewport/creature tests and `git diff --check`.
 
 ---
 
-### Task 4: FullWorld Explorer UI and map analysis overlay
+### Task 4: FullWorld Explorer UI and farm overlay
 
 **Repository:** `Oteryn/Oteryn-Atlas`
 
@@ -233,72 +244,64 @@ Reject contradictory `farmTask` + incompatible custom item/creature combinations
 - Create: `web/fullworld-farm-explorer.mjs`
 - Modify: `web/fullworld.html`
 - Modify: `web/fullworld.css`
-- Modify: `web/fullworld-search.mjs` only if item/task results are cleanly integrated with current semantic search
-- Modify: `web/fullworld-creatures.mjs` only for a small shared presentation seam proven necessary by #113/#115 integration; do not duplicate the creature renderer
+- Modify only if needed: `web/fullworld-search.mjs`
+- Modify only for a small shared presentation seam: `web/fullworld-creatures.mjs`
 - Create: `tests/farm-gui-contract.mjs`
 
 **Interfaces:**
-- Consumes: verified `farm-intelligence` + `farm-spatial` products, `globalThis.__OTERYN_ATLAS_VIEW__` / `oteryn-atlas-view`, existing floor/camera/zoom state, animation runtime for near-detail creature presentation, and #113/#115 canonical geometry when available.
-- Produces: one `#farm-analysis-overlay` canvas and one explorer state/controller; no DOM node per placement.
-- Publishes bounded read-only diagnostics under `globalThis.__OTERYN_ATLAS_FARM__` containing status, source roots, selected IDs, active LOD, visible aggregate/cluster/placement counts, estimator input source and render generation; diagnostics never mutate product state.
+- Consumes: verified farm products, current `__OTERYN_ATLAS_VIEW__` / `oteryn-atlas-view`, current floor/camera/zoom state, existing animation/creature presentation and #113/#115 canonical geometry when available.
+- Produces: one `#farm-analysis-overlay`, one Explorer controller and bounded read-only diagnostics `globalThis.__OTERYN_ATLAS_FARM__`.
 
-- [ ] **Step 1: Write RED GUI contract tests.** Assert that FullWorld contains one explorer host and one farm overlay, no second map canvas/app shell, and module import paths are valid.
+- [ ] **Step 1: Write RED GUI contract.** Assert exactly one Explorer host and one farm overlay inside the current FullWorld shell; no second app/map shell and no DOM node per placement.
 
-- [ ] **Step 2: Implement the minimal FullWorld shell.** Add `Item & Task Explorer` controls inside the current left rail/mobile drawer model and separate `VERIFIED FACTS` / `ESTIMATE` sections in the existing inspector flow. Add `#farm-analysis-overlay` to `#map-frame` with pointer behavior coordinated with existing creature interaction.
+- [ ] **Step 2: Add shell and loading.** Add `Item & Task Explorer` to existing controls/mobile drawer model; add separate `VERIFIED FACTS` and `ESTIMATE` inspector blocks. Verify manifest/root/digest before showing farm data. Farm failure must not disable base Atlas.
 
-- [ ] **Step 3: Implement bounded product loading.** Validate manifest/root/digest before exposing results. Load only selected item/task relations and required creature spatial shards. A failed farm product disables Explorer only; base map/NPC/monster layers remain operational.
+- [ ] **Step 3: Add item source rows.** Show source creature, exact per-source probability, exact/bounded quantity semantics and verified placement count. Never show a global average drop chance in the default path.
 
-- [ ] **Step 4: Implement item source list semantics.** Each source row shows factual creature name, exact per-source probability, exact/bounded quantity semantics and verified placement count. Do not render a global average drop chance.
+- [ ] **Step 4: Add task target behavior.** Authoritative task requirement remains visibly factual while estimate target can be edited. Weekly label appears only when Game proves weekly semantics. Otherwise use `Kill target` / `Custom kill target`.
 
-- [ ] **Step 5: Implement task semantics.** Authoritative delivery/kill/weekly task shows its factual requirement in `VERIFIED FACTS`; estimator target initializes from it. Custom kill mode is explicitly labelled `Custom kill target` and defaults to `100` only when no authoritative task owns the count.
+- [ ] **Step 5: Add estimator UI.** Item mode shows `Expected`, `P50`, `P80`, `P95` kills; matching times appear only after effective KPH exists. Kill mode shows target/KPH time. KPH source is `Manual assumption` in v1; reserve a distinct future `Measured` source for #117.
 
-- [ ] **Step 6: Implement estimator presentation.** Item mode shows `Expected`, `P50`, `P80`, `P95` kills and matching times only after KPH exists. Kill mode shows `N / effective KPH`. Display KPH source as `Manual assumption`; reserve a distinct future `Measured` provider contract for #117.
+- [ ] **Step 6: Add far LOD.** Draw deterministic heatmap/aggregate cells in a batched Canvas/WebGL-compatible pass using the same committed FullWorld transform. Copy says `verified placements`, never `monsters available now`.
 
-- [ ] **Step 7: Implement far heatmap.** Draw deterministic aggregate cells in one batched canvas pass using the exact committed FullWorld transform. Tooltip/selection copy must say `verified placements` and contributing source creatures, not live monsters.
+- [ ] **Step 7: Add medium LOD.** Draw deterministic clusters with placement count and source composition. Rankings are named by metric: `Most verified placements`, `Highest expected items per static clear`, or another documented static metric.
 
-- [ ] **Step 8: Implement medium clusters.** Draw deterministic cluster badges with placement count and source composition. Rank cards use named metrics only, e.g. `Most verified placements` or `Highest expected items per static clear` where exact models permit it.
+- [ ] **Step 8: Add near LOD.** Reuse existing verified creature presentation and animation. Do not add a second sprite decoder, animation clock, creature hit-test registry or selection/deep-link system.
 
-- [ ] **Step 9: Implement near placement detail.** Reuse existing verified creature presentation/animation path and current selection geometry. Do not create a second sprite decoder, animation clock, click target registry or `creature=` selection system.
+- [ ] **Step 9: Reconcile #113/#115.** If merged, consume canonical presentation bounds/hit-testing/selection. If still unmerged, keep farm interaction limited to farm cells/clusters/highlights and expose one reusable geometry seam for later reconciliation.
 
-- [ ] **Step 10: Integrate #113/#115 if merged.** Consume their canonical presentation bounds/hit-testing/selected state. If not merged, keep the farm overlay interaction limited to farm clusters/highlights and expose a small shared bounds seam rather than inventing a competing creature interaction model.
+- [ ] **Step 10: Add history/mobile behavior.** Explorer state survives reload/back/forward and coexists with normal FullWorld state. Reuse current mobile drawers and accessibility behavior.
 
-- [ ] **Step 11: Implement URL/history synchronization.** Explorer state must round-trip through reload/back/forward without overwriting normal FullWorld floor/camera/zoom/animation state.
-
-- [ ] **Step 12: Implement mobile behavior.** Reuse current controls/inspector drawers; no new parallel navigation. Verify inputs, lists, ranking cards and inspector facts/estimates remain readable at current supported mobile widths.
-
-- [ ] **Step 13: Run GUI contract + pure tests to GREEN and commit.** Also run existing creature/animation/search/mobile tests that touch shared seams.
+- [ ] **Step 11: Run GREEN and commit.** Run `node --test tests/farm-gui-contract.mjs` plus farm pure tests and all touched creature/search/mobile regressions.
 
 ---
 
-### Task 5: Search, selection and truthful ranking integration
+### Task 5: Global search and truthful static ranking
 
 **Repository:** `Oteryn/Oteryn-Atlas`
 
 **Files:**
 - Modify: `web/fullworld-search.mjs`
-- Modify: `src/browser/semantic-search.mjs` only if current search architecture requires a shared result-type seam
+- Modify only if current architecture requires it: `src/browser/semantic-search.mjs`
 - Create: `tests/farm-search.mjs`
-- Extend: `tests/farm-intelligence.mjs`
 
 **Interfaces:**
-- Consumes: stable item/task search records from Task 2 and Explorer state actions from Task 4.
-- Produces: item/task result types that focus Explorer state rather than assigning fake coordinates; named ranking metrics only.
+- Consumes: stable item/task search records and Explorer state actions.
+- Produces: non-spatial item/task results that open Explorer state, plus deterministic static ranking helpers.
 
-- [ ] **Step 1: Write RED item/task search tests.** Selecting an item result must dispatch/focus `item=<stable-id>` without changing camera position. Selecting a task result must set `farmTask=<stable-id>` and initialize estimator target from the authoritative requirement.
+- [ ] **Step 1: Write RED item/task search tests.** Selecting an item sets/focuses stable item state without changing camera coordinates. Selecting an authoritative task initializes its factual target.
 
-- [ ] **Step 2: Write RED no-fake-coordinate test.** Item/task search records without factual positions must remain non-spatial; consumer must not fabricate `(0,0,0)` or reuse a source creature's coordinates as the item's identity position.
+- [ ] **Step 2: Write RED no-fake-coordinate test.** Item/task results without factual positions remain non-spatial; consumer must not synthesize `(0,0,0)` or assign a source creature position to the item.
 
-- [ ] **Step 3: Write RED ranking label tests.** Before measured #117 analytics, reject/omit generic `Best place to farm` unless the card also names the exact deterministic metric. Ensure no mock-up place names are hard-coded.
+- [ ] **Step 3: Write RED ranking-copy test.** Generic `Best place to farm` is forbidden before a measured #117 metric exists. A card must name its exact static metric. Generated mock-up place names must not be hard-coded.
 
-- [ ] **Step 4: Implement minimal search integration.** Reuse current search ranking/keyboard behavior where possible; add item/task result adapters only.
+- [ ] **Step 4: Implement minimal search adapters and static ranking.** Reuse current search keyboard/ranking behavior where possible. Static rankings may use placement count, exact static-clear expected yield or documented spatial spread; none is called observed farm speed.
 
-- [ ] **Step 5: Implement deterministic ranking helpers.** Supported v1 metrics are explicit and reproducible from static facts, e.g. placement count, static-clear expected yield, spatial spread. Do not call them observed farm speed.
-
-- [ ] **Step 6: Run search + state + GUI tests to GREEN and commit.**
+- [ ] **Step 5: Run GREEN and commit.** Run farm search/state/GUI tests and existing semantic-search tests.
 
 ---
 
-### Task 6: Browser geometry, visual, failure and performance acceptance
+### Task 6: Real-browser geometry, visual, failure and performance qualification
 
 **Repository:** `Oteryn/Oteryn-Atlas`
 
@@ -308,67 +311,67 @@ Reject contradictory `farmTask` + incompatible custom item/creature combinations
 - Create: `e2e/tests/farm-explorer-geometry.spec.mjs`
 - Create: `e2e/tests/farm-explorer-failure.spec.mjs`
 - Create: `e2e/tests/farm-explorer-performance.spec.mjs`
-- Extend visual acceptance evidence only through the current #111 framework; do not commit unauthorized Game/world raster baselines.
-- Extend existing support helpers only when necessary: `e2e/support/geometry-oracle.mjs`, `e2e/support/performance.mjs`, `e2e/support/artifacts.mjs`.
+- Extend only as necessary: `e2e/support/geometry-oracle.mjs`, `e2e/support/performance.mjs`, `e2e/support/artifacts.mjs`
 
 **Interfaces:**
-- Consumes: real FullWorld browser runtime, exact tested farm publication, existing geometry/performance/artifact oracles.
-- Produces: revision-qualified real Chromium proof for user journey, transform synchronization, failure isolation, dense/sparse boundedness and readable LOD.
+- Consumes: real FullWorld runtime and exact tested farm publication.
+- Produces: revision-qualified Chromium evidence for user journeys, transform synchronization, failure isolation, dense/sparse boundedness and readable LOD.
 
-- [ ] **Step 1: Add desktop RED journey.** Exercise item search -> source creature -> far heatmap -> medium clusters -> near placements -> target edit -> KPH edit -> P50/P80/P95 -> reload/back/forward. Assert factual/estimate labels and no average drop chance.
+- [ ] **Step 1: Write desktop journey.** Exercise item search -> source selection -> far heatmap -> medium clusters -> near placements -> target edit -> KPH edit -> P50/P80/P95 -> reload/back/forward. Assert FACT/ESTIMATE separation and absence of average drop chance.
 
-- [ ] **Step 2: Add authoritative task RED journey.** Select a real exported delivery or kill task when available and assert factual required count initializes but remains separate from editable estimate target. If current Game capability is unsupported, assert truthful unavailable state plus working custom kill target instead of fabricating a task.
+- [ ] **Step 2: Write task journey.** If current Game export supports a real authoritative task, assert factual required count initializes but remains separate from editable estimate target. If task capability is unsupported, assert truthful unavailable state plus working custom kill target; never create a fake task for acceptance.
 
-- [ ] **Step 3: Add mobile RED journey.** Verify drawer reachability, scroll/readability, target/KPH editing, map LOD control and inspector facts/estimates with no horizontal overflow or essential-control occlusion.
+- [ ] **Step 3: Write mobile journey.** Verify drawer reachability, readable item/source/task controls, target/KPH editing, LOD control, inspector facts/estimates and no horizontal overflow/critical occlusion.
 
-- [ ] **Step 4: Add geometry RED oracle.** Capture farm overlay world anchors and base map projection before/after pan, zoom, resize, floor changes and mode transitions. Require the same committed transform linkage and justified pixel tolerance used by current geometry policy.
+- [ ] **Step 4: Write geometry oracle.** Compare farm-overlay world anchors with base-map projection before/after pan, zoom, resize, floor and mode transitions using the repository's justified geometry tolerance. Add stale-floor/source-selection regressions.
 
-- [ ] **Step 5: Add stale-floor and source-selection regressions.** After a floor/source change, no placement from the old committed selection/floor may paint in the new frame.
+- [ ] **Step 5: Write failure cases.** Corrupt manifest/root, missing optional detail shard, unknown contract version, unresolved creature join, unsupported quantity model and invalid KPH. Explorer fails closed by capability; unrelated Atlas layers remain usable.
 
-- [ ] **Step 6: Add failure RED cases.** Corrupt farm manifest/root, missing optional item shard, unknown contract version, unresolved creature join, unsupported quantity model and invalid KPH. Explorer must fail closed by capability while base Atlas remains usable.
+- [ ] **Step 6: Measure sparse and dense cases.** Record visible aggregate/cluster/placement counts, draw/update duration, cache/shard counts, request/byte evidence where measurable and pan/zoom frame behavior. Derive any blocking budget from measured evidence instead of inventing a threshold.
 
-- [ ] **Step 7: Add performance evidence.** Pick one sparse and one dense truthful exported case. Record visible aggregate/cluster/placement count, draw/update time, cache/shard count, request/byte evidence where available and pan/zoom frame behavior. Establish any blocking threshold from measured baseline evidence; do not invent one in advance.
+- [ ] **Step 7: Review user-facing screenshots/artifacts.** Far/medium/near desktop and mobile must be visibly readable and avoid the reference product's equal-size-sprite clutter. Use #111 rules; do not commit unauthorized world/sprite raster baselines.
 
-- [ ] **Step 8: Perform real visual review.** Capture representative desktop/mobile screenshots/artifacts at far/medium/near LOD and verify that world-scale view is materially less cluttered than equal-size-sprite rendering. Review artifacts manually; DOM presence alone is not acceptance.
+- [ ] **Step 8: Verify mock-up data did not leak.** Search final changed product/fixture files for illustrative mock-up numbers and place names; any occurrence must be removed or explicitly synthetic and unable to be mistaken for current Game facts.
 
-- [ ] **Step 9: Verify mock-up values are absent.** Search the product/test fixture diff for illustrative numbers/place names from the generated mock-up and require any occurrence to be either removed or explicitly synthetic/non-authoritative with no real-data claim.
+- [ ] **Step 9: Run targeted specs twice with retries `0`, then full exact-head Docker Playwright on Molehill-PC.** Publish the exact tested head status required by current CI. Do not move heavy PR verification to Synology.
 
-- [ ] **Step 10: Run targeted specs twice with retries `0`, then complete exact-head Docker Playwright on Molehill-PC.** Publish the exact tested head as the repository-required local E2E status; do not move heavy verification to Synology.
-
-- [ ] **Step 11: Commit E2E/acceptance coverage only after all targeted scenarios are stable without retries or arbitrary sleeps.**
+- [ ] **Step 10: Commit acceptance coverage after stable GREEN runs.**
 
 ---
 
-### Task 7: Cross-repository integration, exact-head gates, merge and merged-main acceptance
+### Task 7: Cross-repository closeout
 
 **Repositories:** `Oteryn/Oteryn-Game`, `Oteryn/Oteryn-Atlas`
 
 **Files:**
-- No new feature scope. Update only lifecycle/evidence docs/issues/PR metadata required by current repository policy.
+- No new feature scope; update lifecycle/evidence records required by current repository policy only.
 
 **Interfaces:**
 - Consumes: merged Game farm contract and final Atlas implementation head.
-- Produces: exact-head verified, protected squash merges and merged-main Atlas live acceptance.
+- Produces: exact-head verified protected merges and merged-main live acceptance.
 
-- [ ] **Step 1: Reconfirm Game authority.** Verify the Game farm-intelligence producer is merged, exact merge SHA/digest match what Atlas pins, Issue #75 is terminal/accurate, and no later Game change invalidates the accepted artifact.
+- [ ] **Step 1: Reconfirm Game pin.** Verify Game farm producer is merged, exact merge SHA/digest match Atlas pin and no later accepted Game change invalidates the artifact.
 
-- [ ] **Step 2: Run full applicable Atlas deterministic suite.** Include new Python/Node tests plus existing creature/animation/search/geometry/verification contracts touched by shared seams. Run `git diff --check`.
+- [ ] **Step 2: Run full applicable Atlas deterministic suite.** Include new Python/Node tests and all touched creature/animation/search/geometry/verification contracts; run `git diff --check`.
 
-- [ ] **Step 3: Run exact-head heavy browser qualification on Molehill-PC.** Complete Docker Playwright PR gate with retries `0`, publish exact head status, review failure/success artifacts and retain revision-qualified evidence.
+- [ ] **Step 3: Run exact-head heavy browser gate.** Molehill-PC completes Docker Playwright with retries `0`; review artifacts and publish exact-head local E2E status.
 
-- [ ] **Step 4: Review complete Atlas final diff.** Confirm no external-site runtime authority, no proprietary copied assets, no mock-up data masquerading as facts, no average drop chance without weighting, no live-spawn claims and no duplicate creature interaction/animation runtime.
+- [ ] **Step 4: Review complete final diff.** Confirm no external-site runtime authority, no proprietary copied assets, no mock-up values as facts, no unweighted average chance, no live-spawn claim and no duplicate interaction/animation runtime.
 
-- [ ] **Step 5: Push final Atlas head and require GitHub checks.** `atlas-gate` and `provenance-gate` must be green on the exact final head; resolve applicable review threads before merge.
+- [ ] **Step 5: Require exact-head GitHub checks.** `atlas-gate` and `provenance-gate` are green on the exact final head and applicable review threads are resolved.
 
-- [ ] **Step 6: Squash-merge the Atlas PR and delete the completed branch.** Verify merged `main` contains the intended paths and exact squash SHA. Close #114 only when Definition of Done is actually met; leave #11/#85/#111/#117 according to their own wider lifecycle.
+- [ ] **Step 6: Squash-merge Atlas and clean branch.** Verify merged `main` contains intended files and exact squash SHA. Close #114 only when its Definition of Done is actually satisfied; do not close wider #11/#85/#111/#117 prematurely.
 
-- [ ] **Step 7: Deploy/accept only merged main.** Use existing trusted merged-main Synology workflow. Verify served revision label/header, publication/product health, bounded desktop/mobile live smoke and rollback evidence according to `AGENTS.md`.
+- [ ] **Step 7: Run merged-main live acceptance only.** Existing trusted Synology workflow verifies served revision label/header, publication/product health, bounded desktop/mobile smoke and rollback evidence.
 
-- [ ] **Step 8: Record terminal evidence.** Record exact Game merge SHA/farm digest, Atlas squash merge SHA, source creature publication root, farm publication roots, supported/partial/unsupported capability census, exact estimator models shipped, browser evidence identity and measured runtime impact.
+- [ ] **Step 8: Record terminal evidence.** Persist exact Game merge SHA/farm digest, Atlas squash SHA, creature publication root, farm product roots, capability census, estimator models shipped, browser evidence identity and measured runtime impact.
 
 ## Plan self-review result
 
-- Spec coverage: Game authority, Atlas publication, estimator math, task defaults, URL state, LOD, interaction geometry, partial-data behavior, mobile, search, failure isolation, performance, visual acceptance and closeout are each assigned to a task.
-- Review addendum coverage: no average drop chance; placement/live distinction; spawn-time provenance; per-kill PMF semantics; P50/P80/P95 labels; authoritative task defaults; Hunt Intelligence provider seam; #113/#115 geometry reuse; named ranking metrics; partial capability behavior; mock-up-data prohibition are all represented in executable steps.
-- No task depends on guessed Game facts. Current-source capability gaps are expected to fail closed rather than be filled from the web.
-- Execution order is intentionally Game producer -> Atlas publication -> pure logic -> UI -> search/ranking -> browser qualification -> merge/acceptance. Pure Atlas math/state can be developed in parallel with the Game producer only against explicit synthetic schema fixtures and cannot claim real facts until Task 1 is merged/pinned.
+- All requirements from the design and normative review are assigned to executable tasks.
+- No task depends on guessed Game facts or external website authority.
+- No naive average-drop metric exists in the planned v1 API or UI.
+- Placement/timer/live-state semantics remain separate.
+- Fixed-drop and exact-PMF estimator models have independent deterministic tests; unsupported roll semantics disable exact probability math.
+- P50/P80/P95, authoritative task defaults, manual-vs-future-measured KPH, #113/#115 reuse, named rankings and mock-up-data prohibition are explicitly tested.
+- Execution order is Game producer -> Atlas publication -> pure logic -> UI -> search/ranking -> browser qualification -> closeout. Pure Atlas math/state may proceed in parallel only against clearly synthetic schema fixtures and cannot claim real item/drop/task facts before the Game producer is accepted and pinned.
