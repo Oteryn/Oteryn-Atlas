@@ -80,16 +80,14 @@ jobs:
       ATLAS_PUBLICATION_ORIGIN: http://192.168.1.2:8097
       ATLAS_E2E_WORKERS: '1'
       ATLAS_STRESS_LENGTH: '64'
-      ATLAS_RUNNER_NAME: ${{ runner.name }}
-      ATLAS_RUNNER_OS: ${{ runner.os }}
     steps:
       - name: Verify immutable Molehill Atlas runner identity
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           if ($env:GITHUB_REPOSITORY -ne 'Oteryn/Oteryn-Atlas') { throw 'Unexpected repository.' }
-          if ($env:ATLAS_RUNNER_NAME -ne 'oteryn-molehill-atlas') { throw "Unexpected runner: $env:ATLAS_RUNNER_NAME" }
-          if ($env:ATLAS_RUNNER_OS -ne 'Windows') { throw "Unexpected runner OS: $env:ATLAS_RUNNER_OS" }
+          if ($env:RUNNER_NAME -ne 'oteryn-molehill-atlas') { throw "Unexpected runner: $env:RUNNER_NAME" }
+          if ($env:RUNNER_OS -ne 'Windows') { throw "Unexpected runner OS: $env:RUNNER_OS" }
           docker version
           if ($LASTEXITCODE -ne 0) { throw 'Docker is unavailable on the Molehill runner.' }
           docker info | Out-Null

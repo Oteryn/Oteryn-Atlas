@@ -118,7 +118,7 @@ test('heavy browser verification is pinned to Molehill while Synology remains li
   assert.match(browserDepth, /group: atlas-runners/);
   assert.match(browserDepth, /labels: oteryn-atlas-pc/);
   assert.match(browserDepth, /oteryn-molehill-atlas/);
-  assert.match(browserDepth, /ATLAS_RUNNER_OS -ne 'Windows'/);
+  assert.match(browserDepth, /RUNNER_OS -ne 'Windows'/);
 
   assert.match(synology, /group: atlas-runners/);
   assert.match(synology, /labels: oteryn-atlas/);
