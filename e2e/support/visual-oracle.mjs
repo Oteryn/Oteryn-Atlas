@@ -7,6 +7,19 @@ export async function canvasAlphaCount(page, selector) {
   });
 }
 
+export async function canvasPng(page, selector) {
+  const base64 = await page.locator(selector).evaluate((canvas) => {
+    if (!(canvas instanceof HTMLCanvasElement)) throw new Error(`visual oracle target is not a canvas: ${canvas?.id ?? 'unknown'}`);
+    return canvas.toDataURL('image/png').split(',')[1];
+  });
+  return Buffer.from(base64, 'base64');
+}
+
+export async function exactPngPixelsEqual(page, before, after) {
+  const comparison = await comparePngOutsideRects(page, before, after, []);
+  return comparison.changedOutside === 0;
+}
+
 export async function comparePngOutsideRects(page, before, after, rectangles) {
   return page.evaluate(async ({ before64, after64, rectangles: rawRects }) => {
     async function decode(base64) {
