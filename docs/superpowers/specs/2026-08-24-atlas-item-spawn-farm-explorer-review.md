@@ -265,3 +265,17 @@ Also test:
 ## Final reviewed decision
 
 Proceed with the native FullWorld Item & Spawn Farm Explorer architecture. The original design plus this complete review addendum and the implementation plan form one contract; when they differ in specificity, the stricter reviewed rule wins.
+
+## 19. Integrate the merged Hunt Intelligence contract (#119)
+
+Atlas `main` advanced during this review: PR #119 merged as `3618bf5614c31b91e6846083066be8d77385eea2` and added:
+- `docs/agents/tasks/active/ATLAS-HUNT-INTELLIGENCE-PROJECT.md`;
+- `docs/agents/prompts/ATLAS-HUNT-INTELLIGENCE-IMPLEMENTATION.md`.
+
+Those documents explicitly make Game Intelligence authoritative for privacy-safe measured gameplay aggregates and require Hunt Intelligence to reuse the Item & Spawn Explorer primitives from #114.
+
+Therefore Farm Explorer's future measured-KPH provider seam must align with the merged Hunt Intelligence contract rather than inventing a parallel schema. At minimum it must be capable of carrying the relevant hunt/source scope, content and ruleset revision, party/cohort dimensions, time base, observation window, sample/quality/privacy state and the `MEASURED` trust class.
+
+V1 manual KPH remains a user assumption. When measured data arrives, Atlas must keep `VERIFIED`, `MEASURED`, `ESTIMATE` and `UNAVAILABLE` classes distinct and must not silently replace manual input with an incomparable measured cohort.
+
+PR #119 is now part of the implementation base. Executors must read both merged Hunt Intelligence files before designing the measured-provider interface.

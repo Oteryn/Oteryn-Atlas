@@ -280,3 +280,13 @@ The normative review file contains these additional hard requirements and they m
 - percentage rounding is display-only and must never alter estimator inputs.
 
 Re-read the complete review addendum immediately before Phase A implementation and again before final diff review.
+
+## Merged Hunt Intelligence coordination
+
+Atlas PR #119 is merged on the implementation base as `3618bf5614c31b91e6846083066be8d77385eea2`. Before defining the future measured-KPH/provider interface, additionally read:
+- `docs/agents/tasks/active/ATLAS-HUNT-INTELLIGENCE-PROJECT.md`;
+- `docs/agents/prompts/ATLAS-HUNT-INTELLIGENCE-IMPLEMENTATION.md`.
+
+That merged contract makes Oteryn Game Intelligence authoritative for privacy-safe measured gameplay aggregates and defines `VERIFIED`, `MEASURED`, `ESTIMATE`, `UNAVAILABLE` trust classes plus revision/cohort/time-base/sample/quality/privacy semantics.
+
+Farm Explorer must expose a compatible seam and must not create a duplicate measured analytics schema. Manual KPH remains explicit user assumption until a comparable accepted measured cohort is available; never silently substitute an incompatible cohort.

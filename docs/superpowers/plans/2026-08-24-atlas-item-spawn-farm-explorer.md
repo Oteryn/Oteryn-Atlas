@@ -389,3 +389,13 @@ The following deltas are mandatory and refine the tasks above after the final se
 - **Task 4 / copy:** distinguish `Base drop chance` / `Published drop model` from live/current chance unless an authoritative live modifier source exists. Percentage formatting is presentation only; calculations retain normalized exact probability.
 - **Task 5 / ranking:** `expected items per static clear` is disabled unless concurrent/activation semantics for the included placements are proven; otherwise use placement-count/spatial metrics only.
 - **Task 6 / acceptance:** add explicit tests for KPH scope, mixed-source refusal, modifier context, weighted placement gating, group-identity non-inference, PMF hitting-time edges, richer-task non-flattening and probability display-rounding isolation.
+
+### Merged Hunt Intelligence base integration
+
+PR #119 is now merged on the Atlas base as `3618bf5614c31b91e6846083066be8d77385eea2`. Before Task 3/4 interface work, read:
+- `docs/agents/tasks/active/ATLAS-HUNT-INTELLIGENCE-PROJECT.md`;
+- `docs/agents/prompts/ATLAS-HUNT-INTELLIGENCE-IMPLEMENTATION.md`.
+
+The future measured-KPH provider must reuse the Hunt Intelligence/Game Intelligence aggregate semantics and trust classes, including revision/cohort/time-base/sample/quality/privacy context. Do not create a second measured analytics contract in Farm Explorer.
+
+Task 3 tests must prove manual KPH remains an explicit assumption and an incompatible measured cohort is not silently substituted. Task 4 copy must distinguish `VERIFIED`, `MEASURED`, `ESTIMATE` and `UNAVAILABLE` consistently with the merged Hunt Intelligence project.
