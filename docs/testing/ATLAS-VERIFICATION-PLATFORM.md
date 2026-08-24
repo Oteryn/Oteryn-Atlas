@@ -260,6 +260,8 @@ For the currently pinned `oteryn-atlas-animation-runtime-v1` publication (`rootC
 
 Browser qualification must separately sample at least one verified multi-phase NPC and one verified multi-phase monster/spawn. With playback OFF, capture the deterministic static creature pixels; with playback ON, require an actual creature-overlay pixel change while factual creature anchors/identity stay unchanged; after playback is disabled, require exact restoration of the static creature pixels. Merged-main live acceptance must repeat this pixel-level proof against the deployed revision.
 
+Creature-layer pixel equality must be evaluated against the backing pixels of #creature-overlay itself and compared as decoded RGBA, not by byte equality of a DOM element screenshot. On mobile, controls/backdrops can be composited above the canvas inside the same screenshot rectangle even while the creature backing store is byte-for-byte visually restored. UI/chrome screenshots remain separate visual-acceptance evidence; they must not contaminate the animation-layer oracle.
+
 ### 5.7A User-facing visual acceptance
 
 Targeted pixel regression and geometry/render oracles do not by themselves answer whether Atlas is usable and visually coherent as a user actually sees it. Every materially user-visible Atlas change therefore has an additional user-facing visual acceptance layer in the real browser.

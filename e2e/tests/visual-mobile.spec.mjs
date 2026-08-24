@@ -1,5 +1,8 @@
 import { expect, test } from '@playwright/test';
 import { MOBILE_ENTRY, assertNoRuntimeFailures, captureRuntimeFailures, gotoAtlas, waitForAtlas } from './runtime.mjs';
+import { canvasPng, exactPngPixelsEqual } from '../support/visual-oracle.mjs';
+
+const MONSTER_PLAYBACK_ENTRY = '/web/fullworld.html?x=32724&y=31155&floor=-15&zoom=2&mode=minimap&perf=reference&animation=off&creatures=npc,monster';
 import { assertUserVisibleSurface, captureUserVisualEvidence } from '../support/user-acceptance.mjs';
 
 test('mobile Atlas-owned chrome and drawers retain reviewed user-facing visual contracts', async ({ page }, testInfo) => {
@@ -109,5 +112,33 @@ test('mobile Atlas-owned chrome and drawers retain reviewed user-facing visual c
     surfaceMetrics: landscapeMetrics,
     note: 'Landscape-like mobile resize with the map and primary controls still usable.',
   });
+
+  await gotoAtlas(page, MONSTER_PLAYBACK_ENTRY);
+  await waitForAtlas(page);
+  await page.locator('#mobile-controls-toggle').click();
+  const npcToggle = page.locator('input[data-creature-kind="npc"]');
+  const monsterToggle = page.locator('input[data-creature-kind="monster"]');
+  await expect(npcToggle).toBeChecked();
+  await expect(monsterToggle).toBeChecked();
+  await npcToggle.uncheck();
+  await page.waitForFunction(() => {
+    const value = globalThis.__OTERYN_ATLAS_CREATURES__;
+    return value?.status === 'PASS'
+      && value.enabled?.npc === false
+      && value.enabled?.monster === true
+      && value.pixelDrawnRecords > 0;
+  }, null, { timeout: 30_000 });
+  const staticMonsterPixels = await canvasPng(page, '#creature-overlay');
+  const playback = page.locator('#animation-toggle');
+  const beforeFrames = await page.evaluate(() => globalThis.__OTERYN_ATLAS_CREATURES__?.animationRuntime?.frameUpdates ?? 0);
+  await playback.check();
+  await page.waitForFunction((before) => globalThis.__OTERYN_ATLAS_CREATURES__?.animationOn === true
+    && (globalThis.__OTERYN_ATLAS_CREATURES__?.animationRuntime?.frameUpdates ?? 0) > before, beforeFrames, { timeout: 30_000 });
+  await expect.poll(async () => !(await exactPngPixelsEqual(page, staticMonsterPixels, await canvasPng(page, '#creature-overlay'))),
+    { timeout: 30_000 }).toBeTruthy();
+  await playback.uncheck();
+  await page.waitForFunction(() => globalThis.__OTERYN_ATLAS_CREATURES__?.animationOn === false, null, { timeout: 30_000 });
+  await expect.poll(async () => exactPngPixelsEqual(page, staticMonsterPixels, await canvasPng(page, '#creature-overlay')),
+    { timeout: 30_000 }).toBeTruthy();
   assertNoRuntimeFailures(runtime);
 });
