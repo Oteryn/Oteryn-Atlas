@@ -266,22 +266,15 @@ Also test:
 
 ## Final reviewed decision
 
-Proceed with the native FullWorld Item & Spawn Farm Explorer architecture. The original design plus this complete review addendum and the implementation plan form one contract; when they differ in specificity, the stricter reviewed rule wins.
+Proceed with the native FullWorld Item & Spawn Farm Explorer architecture as an **Atlas-only execution**. The original design plus this complete review addendum and implementation plan form one contract; when they differ, the stricter reviewed/Atlas-only rule wins. Game #75 remains read-only upstream requirement/evidence.
 
-## 19. Integrate the merged Hunt Intelligence contract (#119)
+## 19. Integrate the merged Hunt Intelligence contract (#119/#123)
 
-Atlas `main` advanced during this review: PR #119 merged as `3618bf5614c31b91e6846083066be8d77385eea2` and added:
-- `docs/agents/tasks/active/ATLAS-HUNT-INTELLIGENCE-PROJECT.md`;
-- `docs/agents/prompts/ATLAS-HUNT-INTELLIGENCE-IMPLEMENTATION.md`.
+Hunt Intelligence PR #119 established the shared measured-analytics contract and PR #123 hardened it on Atlas `main@42d268aa98a7d48e8a7a9ed2e95e4a9c14753909` to Atlas-only execution with strict #113/#114/#115 dependency gates, world/revision/modifier/privacy/completeness-aware analytics and no Game mutation.
 
-Those documents explicitly make Game Intelligence authoritative for privacy-safe measured gameplay aggregates and require Hunt Intelligence to reuse the Item & Spawn Explorer primitives from #114.
+Executors must read current `docs/agents/tasks/active/ATLAS-HUNT-INTELLIGENCE-PROJECT.md` and `docs/agents/prompts/ATLAS-HUNT-INTELLIGENCE-IMPLEMENTATION.md` from refreshed Atlas main before defining the measured-provider interface.
 
-Therefore Farm Explorer's future measured-KPH provider seam must align with the merged Hunt Intelligence contract rather than inventing a parallel schema. At minimum it must be capable of carrying the relevant hunt/source scope, content and ruleset revision, party/cohort dimensions, time base, observation window, sample/quality/privacy state and the `MEASURED` trust class.
-
-V1 manual KPH remains a user assumption. When measured data arrives, Atlas must keep `VERIFIED`, `MEASURED`, `ESTIMATE` and `UNAVAILABLE` classes distinct and must not silently replace manual input with an incomparable measured cohort.
-
-PR #119 is now part of the implementation base. Executors must read both merged Hunt Intelligence files before designing the measured-provider interface.
-
+Farm Explorer future measured KPH must reuse that contract: relevant source/hunt scope, world/profile, content/ruleset/modifier revisions, party/cohort dimensions, time base, observation window, sample/quality/privacy state and `MEASURED` trust class. V1 manual KPH remains a user assumption; Atlas keeps `VERIFIED`, `MEASURED`, `ESTIMATE` and `UNAVAILABLE` distinct and never substitutes an incomparable cohort.
 
 ## 20. Atlas-only execution boundary
 The implementation alias has no write authority in Game. Inspect Game main/contracts/publications read-only. Missing data is recorded only in Atlas as `UPSTREAM_REQUIREMENT` / `UPSTREAM_BLOCKED`; do not create/update/close Game issues, branches, files, commits, PRs, comments, reviews, contracts or workflows.
