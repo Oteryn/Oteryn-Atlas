@@ -27,6 +27,33 @@ if (-not $env:ATLAS_E2E_ARTIFACTS_HOST) {
 $artifactDir = Join-Path $root "artifacts\e2e\$project"
 New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
 
+$lockTimeoutSeconds = 7200
+if ($env:ATLAS_E2E_LOCK_TIMEOUT_SECONDS) {
+  $parsedLockTimeout = 0
+  if (-not [int]::TryParse($env:ATLAS_E2E_LOCK_TIMEOUT_SECONDS, [ref]$parsedLockTimeout) -or $parsedLockTimeout -lt 1 -or $parsedLockTimeout -gt 21600) {
+    throw 'ATLAS_E2E_LOCK_TIMEOUT_SECONDS must be an integer from 1 through 21600.'
+  }
+  $lockTimeoutSeconds = $parsedLockTimeout
+}
+$lockPath = Join-Path ([IO.Path]::GetTempPath()) 'oteryn-atlas-heavy-e2e.lock'
+$lockDeadline = [DateTime]::UtcNow.AddSeconds($lockTimeoutSeconds)
+$lockStream = $null
+while (-not $lockStream) {
+  try {
+    $lockStream = [IO.File]::Open($lockPath, [IO.FileMode]::OpenOrCreate, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+  } catch [IO.IOException] {
+    if ([DateTime]::UtcNow -ge $lockDeadline) {
+      throw "Timed out waiting for the machine-wide Atlas heavy E2E lock: $lockPath"
+    }
+    Start-Sleep -Seconds 2
+  }
+}
+$lockOwner = [Text.Encoding]::UTF8.GetBytes("pid=$PID project=$project revision=$env:ATLAS_CODE_REVISION`n")
+$lockStream.SetLength(0)
+$lockStream.Write($lockOwner, 0, $lockOwner.Length)
+$lockStream.Flush()
+Write-Output "Acquired machine-wide Atlas heavy E2E lock: $lockPath"
+
 $publicationForwarder = $null
 if ($env:ATLAS_PUBLICATION_ORIGIN) {
   $origin = [Uri]$env:ATLAS_PUBLICATION_ORIGIN
@@ -83,6 +110,10 @@ try {
   docker compose -p $project -f e2e\compose.yml down --remove-orphans *> $null
   if ($publicationForwarder -and -not $publicationForwarder.HasExited) {
     Stop-Process -Id $publicationForwarder.Id -Force
+  }
+  if ($lockStream) {
+    $lockStream.Dispose()
+    $lockStream = $null
   }
   $ErrorActionPreference = $previousPreference
 }
