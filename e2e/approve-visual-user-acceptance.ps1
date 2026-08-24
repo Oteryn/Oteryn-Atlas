@@ -56,13 +56,14 @@ foreach ($scenarioId in $RequiredScenarios) {
   $screenshot = (Resolve-Path (Join-Path $manifestDir $entry.Data.screenshot)).Path
   $digest = 'sha256:' + (Get-FileHash $screenshot -Algorithm SHA256).Hash.ToLowerInvariant()
   if ($digest -ne $entry.Data.screenshotSha256) { throw "Visual evidence $scenarioId screenshot digest mismatch." }
-  $artifactRootFull = (Resolve-Path $artifactRoot).Path.TrimEnd('\')
-  if (-not $entry.Path.StartsWith($artifactRootFull, [System.StringComparison]::OrdinalIgnoreCase)) { throw 'Manifest escaped artifact root.' }
-  if (-not $screenshot.StartsWith($artifactRootFull, [System.StringComparison]::OrdinalIgnoreCase)) { throw 'Screenshot escaped artifact root.' }
+  $artifactRootFull = (Resolve-Path $artifactRoot).Path.TrimEnd('\', '/')
+  $artifactRootPrefix = $artifactRootFull + [IO.Path]::DirectorySeparatorChar
+  if (-not $entry.Path.StartsWith($artifactRootPrefix, [System.StringComparison]::OrdinalIgnoreCase)) { throw 'Manifest escaped artifact root.' }
+  if (-not $screenshot.StartsWith($artifactRootPrefix, [System.StringComparison]::OrdinalIgnoreCase)) { throw 'Screenshot escaped artifact root.' }
   $reviewed += [ordered]@{
     scenarioId = $scenarioId
-    manifestPath = $entry.Path.Substring($artifactRootFull.Length).TrimStart('\').Replace('\', '/')
-    screenshotPath = $screenshot.Substring($artifactRootFull.Length).TrimStart('\').Replace('\', '/')
+    manifestPath = $entry.Path.Substring($artifactRootPrefix.Length).Replace('\', '/')
+    screenshotPath = $screenshot.Substring($artifactRootPrefix.Length).Replace('\', '/')
     screenshotSha256 = $digest
   }
 }

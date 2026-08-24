@@ -53,10 +53,11 @@ foreach ($scenarioId in $RequiredVisualScenarios) {
   if ($reviewScenarios -notcontains $scenarioId) { throw "Visual review is missing required scenario $scenarioId." }
   $entries = @($review.evidence | Where-Object { $_.scenarioId -eq $scenarioId })
   if ($entries.Count -ne 1) { throw "Visual review evidence census for $scenarioId is $($entries.Count), expected 1." }
-  $reviewRoot = (Split-Path $resolvedReview -Parent).TrimEnd('\')
+  $reviewRoot = (Resolve-Path (Split-Path $resolvedReview -Parent)).Path.TrimEnd('\', '/')
+  $reviewRootPrefix = $reviewRoot + [IO.Path]::DirectorySeparatorChar
   $relativeScreenshot = ([string]$entries[0].screenshotPath).Replace('/', '\')
   $resolvedScreenshot = (Resolve-Path (Join-Path $reviewRoot $relativeScreenshot)).Path
-  if (-not $resolvedScreenshot.StartsWith($reviewRoot, [System.StringComparison]::OrdinalIgnoreCase)) { throw 'Visual review screenshot escaped review root.' }
+  if (-not $resolvedScreenshot.StartsWith($reviewRootPrefix, [System.StringComparison]::OrdinalIgnoreCase)) { throw 'Visual review screenshot escaped review root.' }
   $digest = 'sha256:' + (Get-FileHash $resolvedScreenshot -Algorithm SHA256).Hash.ToLowerInvariant()
   if ($digest -ne $entries[0].screenshotSha256) { throw "Visual review screenshot changed after approval for $scenarioId." }
 }
