@@ -1,6 +1,6 @@
 # Atlas targeted visual baselines
 
-These baselines are deliberately targeted. They cover stable controls plus selected composite user-visible surfaces such as the map frame, inspector and mobile drawers; they do not replace geometry, framebuffer, renderer-state or user-facing full-frame review oracles.
+These baselines are deliberately targeted. They cover stable controls plus selected composite Atlas-owned user-visible surfaces such as the inspector and mobile drawers; they do not replace geometry, framebuffer, renderer-state or user-facing full-frame review oracles.
 
 Generation contract:
 - browser: repository-pinned Playwright Chromium image from `e2e/playwright.config.mjs`;
