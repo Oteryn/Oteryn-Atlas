@@ -94,6 +94,13 @@ test('creature playback keeps static OFF deterministic and advances authoritativ
   assert.equal(walkingSecond.contentId, moving1);
   assert.equal(walkingFirst.presentationMode, 'moving-in-place');
   assert.equal(walkingSecond.presentationMode, 'moving-in-place');
+
+  const legacyOff = runtime.creatureFrame(record, 0);
+  const legacyOn = runtime.creatureFrame(record, 100);
+  assert.equal(legacyOff.contentId, staticId);
+  assert.equal(legacyOff.presentationMode, 'static');
+  assert.equal(legacyOn.contentId, moving1);
+  assert.equal(legacyOn.presentationMode, 'moving-in-place');
   assert.deepEqual({ record_id: record.record_id, x: record.x, y: record.y, floor: record.floor }, { record_id: 'npc:fixture', x: 100, y: 200, floor: 7 });
 });
 
