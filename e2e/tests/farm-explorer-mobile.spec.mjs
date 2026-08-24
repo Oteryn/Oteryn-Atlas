@@ -23,10 +23,10 @@ test('mobile Farm Explorer remains reachable and truthful in the existing contro
   await page.locator('#mobile-controls-toggle').click();
   await expect(page.locator('#mobile-controls-panel')).toHaveClass(/mobile-open/);
   await expect(page.locator('#farm-explorer')).toBeVisible();
-  await page.locator('#farm-creature-search').fill('Rat');
-  const rat = page.locator('#farm-creature-results .farm-creature-result').filter({ hasText: /^Rat$/ }).first();
-  await expect(rat).toBeVisible();
-  await rat.click();
+  await page.locator('#farm-creature-search').fill('Cave Rat');
+  const caveRat = page.locator('#farm-creature-results .farm-creature-result').filter({ hasText: /^Cave Rat$/ }).first();
+  await expect(caveRat).toBeVisible();
+  await caveRat.click();
   await page.locator('#farm-target-kills').fill('90');
   await page.locator('#farm-kph').fill('45');
   await page.locator('#farm-time-base').selectOption('trip_wall');

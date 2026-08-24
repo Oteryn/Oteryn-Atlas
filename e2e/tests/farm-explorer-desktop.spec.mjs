@@ -22,11 +22,11 @@ test('desktop Farm Explorer fails closed for upstream facts and keeps custom kil
   expect(farm.presentationEnrichmentState).toBe('DEPENDENCY_BLOCKED');
   await expect(page.locator('#farm-explorer')).toContainText('Monster drop sources');
   await expect(page.locator('#farm-explorer')).toContainText('UPSTREAM_BLOCKED');
-  await page.locator('#farm-creature-search').fill('Rat');
-  const rat = page.locator('#farm-creature-results .farm-creature-result').filter({ hasText: /^Rat$/ }).first();
-  await expect(rat).toBeVisible();
-  await rat.click();
-  await expect.poll(() => new URL(page.url()).searchParams.get('farmCreature')).toBe('monster-entity:80295e51265b3662bfbea2ea01ee3ccb');
+  await page.locator('#farm-creature-search').fill('Cave Rat');
+  const caveRat = page.locator('#farm-creature-results .farm-creature-result').filter({ hasText: /^Cave Rat$/ }).first();
+  await expect(caveRat).toBeVisible();
+  await caveRat.click();
+  await expect.poll(() => new URL(page.url()).searchParams.get('farmCreature')).toBe('monster-entity:8b41afe4c98e72744557d7adc250f7e6');
   await page.locator('#farm-target-kills').fill('120');
   await page.locator('#farm-kph').fill('60');
   await page.locator('#farm-time-base').selectOption('hunt_wall');
@@ -40,7 +40,7 @@ test('desktop Farm Explorer fails closed for upstream facts and keeps custom kil
   await page.reload({ waitUntil: 'domcontentloaded' });
   await waitForAtlas(page);
   const reloaded = await waitForFarm(page);
-  expect(reloaded.selectedCreatureId).toBe('monster-entity:80295e51265b3662bfbea2ea01ee3ccb');
+  expect(reloaded.selectedCreatureId).toBe('monster-entity:8b41afe4c98e72744557d7adc250f7e6');
   await expect(page.locator('#farm-target-kills')).toHaveValue('120');
   await expect(page.locator('#farm-kph')).toHaveValue('60');
   await expect(page.locator('#farm-estimate-output')).toContainText('2.00 h');
