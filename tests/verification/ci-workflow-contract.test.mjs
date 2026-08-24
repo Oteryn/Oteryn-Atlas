@@ -12,6 +12,7 @@ const provenance = readText(new URL('../../.github/workflows/extraction-provenan
 const synology = readText(new URL('../../.github/workflows/synology-live-acceptance.yml', import.meta.url));
 const playwrightConfig = readText(new URL('../../e2e/playwright.config.mjs', import.meta.url));
 const agents = readText(new URL('../../AGENTS.md', import.meta.url));
+const localRunPs1 = readText(new URL('../../e2e/run.ps1', import.meta.url));
 
 function block(source, start, end) {
   const begin = source.indexOf(start);
@@ -164,4 +165,15 @@ test('self-hosted nightly browser depth does not require host Python', () => {
   assert.notEqual(start, -1, 'missing browser-depth job');
   const browserDepth = nightly.slice(start);
   assert.doesNotMatch(browserDepth, /^\s*python(?:3)?\s/m);
+});
+
+
+test('Molehill local heavy qualification is machine-serialized to prevent publication overload', () => {
+  assert.match(localRunPs1, /ATLAS_E2E_LOCK_TIMEOUT_SECONDS/);
+  assert.match(localRunPs1, /oteryn-atlas-heavy-e2e\.lock/);
+  assert.match(localRunPs1, /FileShare\]::None/);
+  assert.match(localRunPs1, /Start-Sleep/);
+  assert.match(localRunPs1, /Dispose\(\)/);
+  assert.match(agents, /serializ/i);
+  assert.match(agents, /concurrent.*48-scenario|48-scenario.*concurrent/i);
 });
