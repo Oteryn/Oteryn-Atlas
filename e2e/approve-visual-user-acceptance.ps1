@@ -7,17 +7,12 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$RequiredScenarios = @(
-  'desktop.initial',
-  'desktop.search-inspector',
-  'desktop.layers',
-  'desktop.playback',
-  'mobile.initial',
-  'mobile.controls',
-  'mobile.search',
-  'mobile.inspector',
-  'mobile.landscape'
-)
+$VisualContractPath = Join-Path $PSScriptRoot 'user-visual-scenarios.json'
+$VisualContract = Get-Content $VisualContractPath -Raw | ConvertFrom-Json
+if ([int]$VisualContract.version -ne 1) { throw 'Unsupported visual user acceptance contract version.' }
+$RequiredScenarios = @($VisualContract.scenarios)
+if ($RequiredScenarios.Count -eq 0) { throw 'Visual user acceptance contract contains no scenarios.' }
+$visualContractSha256 = 'sha256:' + (Get-FileHash $VisualContractPath -Algorithm SHA256).Hash.ToLowerInvariant()
 
 if (-not $ConfirmReviewedAllScreenshots) {
   throw 'Visual approval requires -ConfirmReviewedAllScreenshots after opening and reviewing every required screenshot.'
@@ -47,11 +42,14 @@ $manifests = @($manifestFiles | ForEach-Object {
 })
 
 $reviewed = @()
-foreach ($scenarioId in $RequiredScenarios) {
+foreach ($required in $RequiredScenarios) {
+  $scenarioId = [string]$required.id
+  $requiredProject = [string]$required.project
   $matches = @($manifests | Where-Object { $_.Data.scenarioId -eq $scenarioId })
   if ($matches.Count -ne 1) { throw "Expected exactly one visual evidence manifest for $scenarioId; found $($matches.Count)." }
   $entry = $matches[0]
   if ($entry.Data.atlasRevision -ne $sha) { throw "Visual evidence $scenarioId revision mismatch." }
+  if ($entry.Data.browserProfile -ne $requiredProject) { throw "Visual evidence $scenarioId browser profile $($entry.Data.browserProfile) does not match required $requiredProject." }
   $manifestDir = Split-Path $entry.Path -Parent
   $screenshot = (Resolve-Path (Join-Path $manifestDir $entry.Data.screenshot)).Path
   $digest = 'sha256:' + (Get-FileHash $screenshot -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -62,6 +60,7 @@ foreach ($scenarioId in $RequiredScenarios) {
   if (-not $screenshot.StartsWith($artifactRootPrefix, [System.StringComparison]::OrdinalIgnoreCase)) { throw 'Screenshot escaped artifact root.' }
   $reviewed += [ordered]@{
     scenarioId = $scenarioId
+    browserProfile = [string]$entry.Data.browserProfile
     manifestPath = $entry.Path.Substring($artifactRootPrefix.Length).Replace('\', '/')
     screenshotPath = $screenshot.Substring($artifactRootPrefix.Length).Replace('\', '/')
     screenshotSha256 = $digest
@@ -76,7 +75,9 @@ $review = [ordered]@{
   reviewedBy = $Reviewer
   reviewedAtUtc = [DateTime]::UtcNow.ToString('o')
   summarySha256 = $summaryDigest
-  requiredScenarios = $RequiredScenarios
+  visualContractVersion = [int]$VisualContract.version
+  visualContractSha256 = $visualContractSha256
+  requiredScenarios = @($RequiredScenarios | ForEach-Object { [string]$_.id })
   evidence = $reviewed
 }
 

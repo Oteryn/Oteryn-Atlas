@@ -37,7 +37,7 @@ After the exact tested commit has been pushed to the PR branch, publish the veri
   -RemoteBranch agent/atlas-verify-ci-nightly-01
 ```
 
-Trusted local `run.ps1`/`run.sh` invocations enable successful full-frame user evidence. These frames remain in the local artifact directory and are not source baselines. Before publishing `atlas-local-e2e`, open and review every required full-frame screenshot under `user-visual-evidence/`, then create the exact-revision review manifest:
+Trusted local `run.ps1`/`run.sh` invocations enable successful full-frame user evidence. The authoritative required-frame census and primary browser profile are versioned in `e2e/user-visual-scenarios.json`. These frames remain in the local artifact directory and are not source baselines. Before publishing `atlas-local-e2e`, open and review every required full-frame screenshot under `user-visual-evidence/`, then create the exact-revision review manifest:
 
 ```powershell
 .\e2e\approve-visual-user-acceptance.ps1 `
@@ -76,7 +76,7 @@ The deterministic suite covers:
 - mobile drawers, backdrop/Escape behavior, search/floor controls and 390x844 plus 844x390 responsive transitions;
 - bounded failure injection for required publication failure, malformed semantic search data and unavailable optional creature index;
 - critical accessible names and truthful disabled/hidden states;
-- user-facing visual acceptance across desktop/mobile initial state, search/inspector, layer presentation, animation playback, mobile drawers and responsive landscape-like resize, with deterministic clipping/occlusion/hit-target checks plus reviewed exact-revision full-frame evidence.
+- user-facing visual acceptance across desktop/mobile initial state, search/inspector, layer presentation, animation playback, MINIMAP/CLASSIC/floor transitions, coordinate/zoom/pan navigation, degraded-search and fail-closed presentation, mobile drawers and responsive landscape-like resize, with deterministic clipping/occlusion/hit-target checks plus reviewed exact-revision full-frame evidence.
 
 ## Network/error policy
 
