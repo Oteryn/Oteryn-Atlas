@@ -44,3 +44,34 @@ test('local publication forwarder passes its executable relay self-test', () => 
   assert.equal(result.status, 0, result.stderr || result.stdout);
   assert.match(result.stdout, /SELF-TEST PASS/);
 });
+test('local publication forwarder accepts a bounded parallel connection burst', () => {
+  const script = String.raw`
+import importlib.util, socket, threading
+spec = importlib.util.spec_from_file_location('atlas_forwarder', r'${forwarderPath}')
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+clients = []
+results = []
+with module.ForwardingTCPServer(('127.0.0.1', 0), ('127.0.0.1', 9)) as server:
+    start = threading.Event()
+    def connect_one():
+        start.wait()
+        try:
+            client = socket.create_connection(server.server_address, timeout=1.0)
+            clients.append(client)
+            results.append(True)
+        except OSError:
+            results.append(False)
+    threads = [threading.Thread(target=connect_one) for _ in range(32)]
+    for thread in threads: thread.start()
+    start.set()
+    for thread in threads: thread.join()
+    for client in clients: client.close()
+if sum(results) < 32:
+    raise SystemExit(f'BURST FAIL: accepted {sum(results)}/32 connections')
+print('BURST PASS')
+`;
+  const result = spawnSync('python', ['-c', script], { encoding: 'utf8' });
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  assert.match(result.stdout, /BURST PASS/);
+});
