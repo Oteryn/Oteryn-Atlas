@@ -27,6 +27,7 @@ import { VerifiedContentCache } from '../src/browser/verified-content-cache.mjs'
 import { loadOverviewChunk, loadOverviewFloor, loadOverviewWorld } from '../src/layers/overview.mjs';
 import { LOD_POLICY, detailStreamWanted, lodBlend } from '../src/layers/minimap-lod.mjs';
 import { createWorldQueryApi } from '../src/browser/world-query.mjs';
+import { dispatchMapActivation } from '../src/browser/map-activation.mjs';
 
 const bootStartedMs = performance.now();
 const performanceProfile = resolvePerformanceProfile(location.search);
@@ -870,13 +871,26 @@ function wireInteraction() {
     canvas.classList.remove('dragging');
     if (!wasMoved) {
       const point = pointerWorld(event);
-      const blend = lodBlend(view.zoom, view.mode, detailReady);
-      const target = { floor: view.floor, x: Math.floor(point.x), y: Math.floor(point.y) };
-      view = clampView(blend.minimap >= 0.5 ? { ...view, x: point.x, y: point.y, selected: target } : { ...view, selected: target });
-      selected = view.selected ? { x: view.selected.x, y: view.selected.y } : null;
-      syncViewUi();
-      renderInspector();
-      updateSelectionBox();
+      const rect = canvas.getBoundingClientRect();
+      const claimed = dispatchMapActivation(window, {
+        cssX: event.clientX - rect.left,
+        cssY: event.clientY - rect.top,
+        worldX: point.x,
+        worldY: point.y,
+        floor: view.floor,
+        pointerType: event.pointerType || 'mouse',
+        rendererGeneration: globalThis.__OTERYN_ATLAS_RENDERER_DIAGNOSTICS__?.generation ?? null,
+        view,
+      });
+      if (!claimed) {
+        const blend = lodBlend(view.zoom, view.mode, detailReady);
+        const target = { floor: view.floor, x: Math.floor(point.x), y: Math.floor(point.y) };
+        view = clampView(blend.minimap >= 0.5 ? { ...view, x: point.x, y: point.y, selected: target } : { ...view, selected: target });
+        selected = view.selected ? { x: view.selected.x, y: view.selected.y } : null;
+        syncViewUi();
+        renderInspector();
+        updateSelectionBox();
+      }
     }
     scheduleRefresh(0);
   });

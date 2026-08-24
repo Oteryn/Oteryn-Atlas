@@ -104,6 +104,20 @@
           <div class="cursor-coordinate" id="cursor-coordinate">X — · Y — · F —</div>
           <div class="runtime-badge" id="runtime-badge">VERIFYING ROOTS</div>
           <div class="detail-badge" id="detail-badge">DETAIL STREAM</div>
+          <section id="creature-quick-card" class="creature-quick-card" role="dialog" aria-labelledby="creature-card-title" hidden>
+            <div class="creature-card-heading">
+              <div><span id="creature-card-kind" class="creature-card-kind"></span><h3 id="creature-card-title"></h3></div>
+              <button id="creature-card-close" type="button" aria-label="Close creature card">×</button>
+            </div>
+            <div id="creature-card-body" class="creature-card-body"></div>
+            <div id="creature-card-choices" class="creature-card-choices" hidden></div>
+            <div id="creature-card-actions" class="creature-card-actions">
+              <button id="creature-card-details" type="button">Details</button>
+              <button id="creature-card-copy" type="button">Copy link</button>
+            </div>
+            <p id="creature-card-copy-status" class="creature-card-copy-status" aria-live="polite"></p>
+            <input id="creature-card-link-fallback" class="creature-card-link-fallback" type="text" readonly hidden aria-label="Creature link for manual copy">
+          </section>
         </div>
         <div class="statusbar">
           <span id="status-source">Publication: verifying…</span>

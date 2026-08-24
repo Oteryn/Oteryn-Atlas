@@ -92,6 +92,10 @@ $('#mobile-search-form')?.addEventListener('submit', (event) => {
   setMobileDrawer(null);
 });
 
+window.addEventListener('oteryn-atlas-open-inspector', () => {
+  if (mobileLayout()) openDrawer('inspector');
+});
+
 window.addEventListener('resize', () => {
   setMobileDrawer(null, { restoreFocus: false, focusDrawer: false });
 });
