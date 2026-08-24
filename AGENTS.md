@@ -52,6 +52,8 @@ Before editing, inspect the current default-branch head, this file, the active I
 - Synology must not run the 50-scenario full PR matrix, broad stress matrices, soak, performance depth or visual-regression depth as a substitute for Molehill-PC capacity.
 - Nightly browser depth is additive to the exact-head PR gate and must not duplicate the generic full required matrix that already produced `atlas-local-e2e=success`.
 - If Molehill-PC is unavailable, the corresponding heavy browser proof remains blocked. Do not move that workload to Synology, reuse stale evidence, weaken timeouts/retries/tolerances or publish a copied `atlas-local-e2e` status.
+- Molehill GitHub Actions steps must use the Windows PowerShell shell actually installed on the runner (powershell), not assume PowerShell 7 (pwsh).
+- Nightly browser depth must not share Synology live-acceptance concurrency in a way that can cancel a pending deployment. It remains read-only and must fail closed unless X-Oteryn-Atlas-Revision equals the exact nightly SHA both before and after depth execution.
 
 ## Validation and merge
 

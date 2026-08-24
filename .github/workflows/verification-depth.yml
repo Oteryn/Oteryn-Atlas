@@ -71,9 +71,6 @@ jobs:
       group: atlas-runners
       labels: oteryn-atlas-pc
     timeout-minutes: 180
-    concurrency:
-      group: atlas-synology-live-acceptance
-      cancel-in-progress: false
     env:
       ATLAS_CODE_REVISION: ${{ github.sha }}
       ATLAS_EXPECTED_REVISION: ${{ github.sha }}
@@ -82,7 +79,7 @@ jobs:
       ATLAS_STRESS_LENGTH: '64'
     steps:
       - name: Verify immutable Molehill Atlas runner identity
-        shell: pwsh
+        shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'
           if ($env:GITHUB_REPOSITORY -ne 'Oteryn/Oteryn-Atlas') { throw 'Unexpected repository.' }
@@ -101,18 +98,21 @@ jobs:
           persist-credentials: false
 
       - name: Verify exact checkout and read-only publication origin
-        shell: pwsh
+        shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'
           if ((git rev-parse HEAD).Trim() -ne $env:ATLAS_CODE_REVISION) { throw 'Checkout revision mismatch.' }
           if ($env:GITHUB_EVENT_NAME -eq 'schedule' -and $env:GITHUB_REF -ne 'refs/heads/main') { throw 'Scheduled nightly must run on main.' }
           $response = Invoke-WebRequest -UseBasicParsing "$env:ATLAS_PUBLICATION_ORIGIN/fullworld/publication/publication.json"
           if ($response.StatusCode -ne 200 -or [string]::IsNullOrWhiteSpace($response.Content)) { throw 'Publication origin preflight failed.' }
+          $revisionResponse = Invoke-WebRequest -UseBasicParsing -Method Head "$env:ATLAS_PUBLICATION_ORIGIN/web/fullworld.html"
+          $servedRevision = [string]$revisionResponse.Headers['X-Oteryn-Atlas-Revision']
+          if ($servedRevision -ne $env:ATLAS_CODE_REVISION) { throw "Live publication revision $servedRevision does not match nightly revision $env:ATLAS_CODE_REVISION." }
           New-Item -ItemType Directory -Force artifacts/e2e/nightly | Out-Null
           $response.Content | Set-Content -Encoding utf8 artifacts/e2e/nightly/publication-preflight.json
 
       - name: Record optional depth applicability
-        shell: pwsh
+        shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'
           New-Item -ItemType Directory -Force artifacts/e2e/nightly | Out-Null
@@ -138,7 +138,7 @@ jobs:
             ConvertTo-Json -Depth 5 | Set-Content -Encoding utf8 artifacts/e2e/nightly/optional-depth-skips.json
 
       - name: Run bounded replayable browser depth
-        shell: pwsh
+        shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'
           $origin = [Uri]$env:ATLAS_PUBLICATION_ORIGIN
@@ -235,6 +235,14 @@ jobs:
             if ($forwarder -and -not $forwarder.HasExited) { Stop-Process -Id $forwarder.Id -Force }
             $ErrorActionPreference = $previous
           }
+
+      - name: Verify publication revision remained exact
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $revisionResponse = Invoke-WebRequest -UseBasicParsing -Method Head "$env:ATLAS_PUBLICATION_ORIGIN/web/fullworld.html"
+          $servedRevision = [string]$revisionResponse.Headers['X-Oteryn-Atlas-Revision']
+          if ($servedRevision -ne $env:ATLAS_CODE_REVISION) { throw "Live publication revision changed to $servedRevision during nightly depth; expected $env:ATLAS_CODE_REVISION." }
 
       - name: Publish bounded nightly browser evidence
         if: always()
