@@ -43,7 +43,7 @@ test('atlas-gate requires exact-head local Docker browser evidence', () => {
 
   assert.match(browserJob, /github\.event_name == 'pull_request'/);
   assert.match(browserJob, /github\.event\.pull_request\.head\.repo\.full_name == github\.repository/);
-  assert.match(browserJob, /needs: verification-node/);
+  assert.match(browserJob, /needs:\s*\[verification-node, verification-scope\]/);
   assert.match(browserJob, /runs-on: ubuntu-24\.04/);
   assert.match(browserJob, /statuses: read/);
   assert.match(browserJob, /ATLAS_CODE_REVISION: \$\{\{ github\.event\.pull_request\.head\.sha \}\}/);

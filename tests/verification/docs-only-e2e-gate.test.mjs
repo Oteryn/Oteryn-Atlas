@@ -20,7 +20,7 @@ test('safe docs-only PRs skip heavy exact-head local E2E while unknown paths fai
   assert.match(scope, /github\.event\.pull_request\.base\.sha/);
   assert.match(scope, /git diff --name-only/);
   assert.match(scope, /docs\/\*/);
-  assert.match(scope, /requires-e2e=true/);
+  assert.match(scope, /requires_e2e=true/);
   assert.match(scope, /requires-e2e=false/);
   assert.match(scope, /test -s/);
 
