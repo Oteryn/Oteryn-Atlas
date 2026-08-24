@@ -189,6 +189,51 @@ jobs:
             fi
           fi
 
+  verification-scope:
+    name: Classify heavy E2E requirement
+    runs-on: ubuntu-24.04
+    outputs:
+      requires-e2e: ${{ steps.classify.outputs.requires-e2e }}
+    env:
+      ATLAS_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      ATLAS_BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
+    steps:
+      - name: Check out exact Atlas candidate with history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Classify changed paths fail closed
+        id: classify
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_EVENT_NAME" != "pull_request" ]]; then
+            echo 'requires-e2e=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          test -n "$ATLAS_BASE_SHA"
+          test "$ATLAS_HEAD_SHA" = "$(git rev-parse HEAD)"
+          git cat-file -e "$ATLAS_BASE_SHA^{commit}"
+
+          changed_file="$(mktemp)"
+          trap 'rm -f "$changed_file"' EXIT
+          git diff --name-only --no-renames -z "$ATLAS_BASE_SHA" "$ATLAS_HEAD_SHA" > "$changed_file"
+          test -s "$changed_file"
+
+          requires_e2e=false
+          while IFS= read -r -d '' path; do
+            case "$path" in
+              docs/*) ;;
+              *) requires_e2e=true; break ;;
+            esac
+          done < "$changed_file"
+
+          echo "requires-e2e=$requires_e2e" >> "$GITHUB_OUTPUT"
+
   verification-node:
     name: Deterministic verification contracts
     runs-on: ubuntu-24.04
@@ -263,8 +308,8 @@ jobs:
 
   verification-browser:
     name: Local Docker Playwright evidence
-    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
-    needs: verification-node
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && needs.verification-scope.outputs.requires-e2e == 'true' }}
+    needs: [verification-node, verification-scope]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
@@ -291,6 +336,7 @@ jobs:
       - browser-semantic
       - browser-webgl-proof
       - project
+      - verification-scope
       - verification-node
       - verification-browser
     runs-on: ubuntu-24.04
@@ -303,16 +349,26 @@ jobs:
           BROWSER_SEMANTIC: ${{ needs.browser-semantic.result }}
           BROWSER_WEBGL_PROOF: ${{ needs.browser-webgl-proof.result }}
           PROJECT: ${{ needs.project.result }}
+          VERIFICATION_SCOPE: ${{ needs.verification-scope.result }}
+          REQUIRES_E2E: ${{ needs.verification-scope.outputs.requires-e2e }}
           VERIFICATION_NODE: ${{ needs.verification-node.result }}
           VERIFICATION_BROWSER: ${{ needs.verification-browser.result }}
           GITHUB_EVENT_NAME: ${{ github.event_name }}
         run: |
           set -euo pipefail
-          for result in "$REPOSITORY_CONTRACT" "$SEMANTIC_PROOF" "$BROWSER_SEMANTIC" "$BROWSER_WEBGL_PROOF" "$PROJECT" "$VERIFICATION_NODE"; do
+          for result in "$REPOSITORY_CONTRACT" "$SEMANTIC_PROOF" "$BROWSER_SEMANTIC" "$BROWSER_WEBGL_PROOF" "$PROJECT" "$VERIFICATION_SCOPE" "$VERIFICATION_NODE"; do
             test "$result" = success
           done
           if [[ "$GITHUB_EVENT_NAME" == pull_request ]]; then
-            test "$VERIFICATION_BROWSER" = success
+            if [[ "$REQUIRES_E2E" == true ]]; then
+              test "$VERIFICATION_BROWSER" = success
+            elif [[ "$REQUIRES_E2E" == false ]]; then
+              test "$VERIFICATION_BROWSER" = skipped
+            else
+              echo "Invalid verification scope output: $REQUIRES_E2E" >&2
+              exit 1
+            fi
           else
+            test "$REQUIRES_E2E" = false
             test "$VERIFICATION_BROWSER" = skipped
           fi
