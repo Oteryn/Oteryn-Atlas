@@ -60,6 +60,23 @@
           <div id="semantic-layer-list"></div>
         </section>
 
+        <section class="farm-explorer" id="farm-explorer">
+          <div class="farm-heading"><h2>Item &amp; Task Explorer</h2><span class="pill warn">UPSTREAM_BLOCKED</span></div>
+          <div class="farm-trust-block"><strong>VERIFIED FACTS</strong><p>Monster drop sources and authoritative tasks are unavailable until Oteryn-Game publishes an accepted farm-intelligence product.</p></div>
+          <div class="farm-trust-block"><strong>DEPENDENCY_BLOCKED</strong><p>Farm map interaction/detail stays disabled until canonical #113/#115 creature interaction and presentation seams are merged.</p></div>
+          <details class="farm-custom" open><summary>Custom kill target <span>ESTIMATE</span></summary>
+            <input id="farm-creature-search" type="search" placeholder="Search verified monsters" aria-label="Search verified monsters for a custom kill target">
+            <div id="farm-creature-results" class="farm-creature-results" hidden></div>
+            <p id="farm-selected-creature" class="rail-note">No resolved monster selected.</p>
+            <button id="farm-use-selected" type="button">Use selected map monster</button>
+            <div class="farm-input-grid"><label>Target kills<input id="farm-target-kills" type="number" min="1" max="100000" value="100"></label><label>Selected creature kills/hour<input id="farm-kph" type="number" min="0" step="any" placeholder="Manual assumption"></label></div>
+            <label class="farm-time-label">Time base<select id="farm-time-base"><option value="active_hunt">Active hunt</option><option value="hunt_wall">Hunt wall</option><option value="trip_wall">Trip wall</option></select></label>
+            <button id="farm-estimate-button" type="button">Update estimate</button>
+            <div id="farm-estimate-output" class="farm-estimate-output" aria-live="polite"></div>
+          </details>
+          <p class="rail-note"><strong>Monster drop sources</strong>: UPSTREAM_BLOCKED · no external/wiki fallback is used.</p>
+        </section>
+
         <section id="region-controls">
           <h2>Areas & Subareas</h2>
           <input id="region-search" type="search" placeholder="Search authenticated regions" disabled aria-label="Search Areas and Subareas">
@@ -154,5 +171,6 @@
   <script type="module" src="./fullworld-minimap.mjs"></script>
   <script type="module" src="./fullworld-mobile.mjs"></script>
   <script type="module" src="./fullworld-search.mjs"></script>
+  <script type="module" src="./fullworld-farm-explorer.mjs"></script>
 </body>
 </html>
