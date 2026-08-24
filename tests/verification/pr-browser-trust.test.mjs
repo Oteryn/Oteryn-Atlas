@@ -15,7 +15,7 @@ test('local browser evidence gate is limited to trusted same-repository pull req
   const browserJob = jobBlock('  verification-browser:\n', '  atlas-gate:\n');
   assert.match(ci, /permissions:\n  contents: read/);
   assert.match(browserJob, /github\.event_name == 'pull_request' && github\.event\.pull_request\.head\.repo\.full_name == github\.repository/);
-  assert.match(browserJob, /needs: verification-node/);
+  assert.match(browserJob, /needs:\s*\[verification-node, verification-scope\]/);
   assert.match(browserJob, /runs-on: ubuntu-24\.04/);
   assert.match(browserJob, /statuses: read/);
   assert.doesNotMatch(browserJob, /group: atlas-runners|labels: oteryn-atlas/);
