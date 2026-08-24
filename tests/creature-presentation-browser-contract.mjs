@@ -19,7 +19,7 @@ test('creature presentation uses a separate pointer-transparent controller canva
   assert.doesNotMatch(creatureSource, /fillText\(record\.name/);
   assert.match(controllerSource, /creature-presentation-overlay/);
   assert.match(controllerSource, /presentationCanvas/);
-  assert.match(controllerSource, /pointerEvents = 'none'/);
+  assert.match(controllerSource, /pointerEvents\s*:\s*'none'/);
   assert.match(controllerSource, /NPC_MARKER_STYLE = 'functional-icons-v2'/);
   assert.match(controllerSource, /LABEL_STYLE = 'creature-labels-v1'/);
 });
