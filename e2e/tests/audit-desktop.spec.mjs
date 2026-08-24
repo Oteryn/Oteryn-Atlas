@@ -119,7 +119,10 @@ test('audit coordinate Go, wheel zoom and drag pan', async ({ page }, testInfo) 
   await waitForAtlas(page);
 
   await page.locator('#search-input').fill('32380 32250 -7');
+  const coordinateResults = page.locator('#semantic-search-results-desktop');
+  await expect(coordinateResults).toBeVisible();
   await page.locator('#search-form button[type="submit"]').click();
+  await expect(coordinateResults).toBeHidden();
   await page.waitForTimeout(300);
   const afterGo = new URL(page.url());
   expect(afterGo.searchParams.get('x'), 'coordinate Go should navigate X').toBe('32380');
