@@ -7,11 +7,11 @@ const creatureSource = await readFile(new URL('../web/fullworld-creatures.mjs', 
 const controllerSource = await readFile(new URL('../src/browser/creature-presentation-controller.mjs', import.meta.url), 'utf8').catch(() => '');
 const overlayWorkflow = await readFile(new URL('../.github/workflows/creature-overlays.yml', import.meta.url), 'utf8');
 
-test('FullWorld publishes the canonical effective presentation signal without replacing the view seam', () => {
-  assert.match(appSource, /__OTERYN_ATLAS_EFFECTIVE_PRESENTATION__/);
-  assert.match(appSource, /effectivePresentation/);
-  assert.match(appSource, /lodBlend\(view\.zoom, view\.mode, detailReady\)/);
+test('creature runtime consumes canonical FullWorld LOD inputs without replacing the view seam', () => {
   assert.match(appSource, /__OTERYN_ATLAS_VIEW__ = snapshot/);
+  assert.match(appSource, /detail: \{ view: snapshot, detailReady, detailStreaming \}/);
+  assert.match(creatureSource, /detailReady/);
+  assert.match(controllerSource, /resolveCreatureEffectivePresentation/);
 });
 
 test('creature presentation uses a separate pointer-transparent controller canvas and versioned styles', () => {
