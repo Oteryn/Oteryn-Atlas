@@ -29,6 +29,18 @@ function targetEntry(record, zoom = 2) {
   return `/web/fullworld.html?${params.toString()}`;
 }
 
+const OVERLAP_MONSTER_FIXTURE = Object.freeze({
+  kind: 'monster',
+  label: 'Misguided Thief',
+  record_id: 'monster:014cc0368c5989dd788e2af63e087e83',
+  position: Object.freeze({ floor: -10, x: 32522, y: 32419 }),
+  record_ids: Object.freeze([
+    'monster:014cc0368c5989dd788e2af63e087e83',
+    'monster:6c316dffde0b35aa6a9165eb46694374',
+    'monster:7a7d419f84cf4eac5cad81f7cb266dae',
+  ]),
+});
+
 async function clickCommittedTarget(page, expectedRecordId, expectedLabel) {
   const state = await creatureState(page);
   expect(state.cardRecordId).toBe(expectedRecordId);
@@ -99,6 +111,27 @@ test('desktop monster activation opens Monster spawn card and survives canonical
   await waitForAtlas(page);
   await expect(page.locator('#creature-quick-card')).toBeVisible();
   expect((await creatureState(page)).cardRecordId).toBe(record.record_id);
+
+  await gotoAtlas(page, targetEntry(OVERLAP_MONSTER_FIXTURE));
+  await waitForAtlas(page);
+  const overlapState = await creatureState(page);
+  expect(overlapState.cardRecordId).toBe(OVERLAP_MONSTER_FIXTURE.record_id);
+  const overlapRect = overlapState.cardTargetRect;
+  expect(overlapRect).not.toBeNull();
+  const atlasBox = await page.locator('#atlas').boundingBox();
+  expect(atlasBox).not.toBeNull();
+  await page.locator('#creature-card-close').click();
+  await page.mouse.click(
+    atlasBox.x + overlapRect.x + overlapRect.width / 2,
+    atlasBox.y + overlapRect.y + overlapRect.height / 2,
+  );
+  await expect.poll(() => page.evaluate(() => globalThis.__OTERYN_ATLAS_CREATURES__?.cardState)).toBe('chooser');
+  const choices = page.locator('#creature-card-choices button');
+  expect(await choices.count()).toBeGreaterThanOrEqual(3);
+  await expect(choices.first()).toContainText('Misguided Thief');
+  await choices.first().click();
+  expect(OVERLAP_MONSTER_FIXTURE.record_ids).toContain((await creatureState(page)).cardRecordId);
+  await expect(page.locator('#creature-card-kind')).toHaveText('Monster spawn');
   assertNoRuntimeFailures(runtime);
 });
 
