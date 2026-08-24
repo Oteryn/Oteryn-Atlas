@@ -278,7 +278,9 @@ test('desktop selection, camera/floor changes and animation preserve layout-life
   expect(state.selectedRecordId).toBe(TWO_ROLE_NPC.record_id);
   expect(labelLayoutFor(state, TWO_ROLE_NPC.record_id)?.priority).toBe('selected');
 
+  state = await openScenario(page, '/web/fullworld.html?x=32831&y=32596&floor=-12&zoom=2&mode=map&animation=off&creatures=monster');
   render = assertPresentationContract(state);
+  expect(state.pixelDrawnRecords, 'animation layout probe requires factual pixel-rendered creatures').toBeGreaterThan(0);
   const stableLayoutGeneration = render.labelLayoutGeneration;
   const beforeFrames = state.animationRuntime?.frameUpdates ?? 0;
   const playback = page.getByRole('checkbox', { name: /Playback/ });
