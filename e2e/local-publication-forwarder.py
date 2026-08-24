@@ -12,6 +12,7 @@ import threading
 class ForwardingTCPServer(socketserver.ThreadingTCPServer):
     allow_reuse_address = True
     daemon_threads = True
+    request_queue_size = 64
 
     def __init__(self, server_address: tuple[str, int], upstream: tuple[str, int]):
         self.upstream = upstream
