@@ -52,6 +52,49 @@ export function npcPresentationRoles(record) {
   return record.role_resolution_state === 'RESOLVED' && roles.length ? roles : ['other'];
 }
 
+function npcBadgeRoleSlot(role) {
+  const definition = ROLE_INDEX.get(role);
+  requireValue(definition, `unsupported NPC role: ${String(role)}`);
+  return Object.freeze({ kind: 'role', role, glyph: definition.glyph });
+}
+
+function npcBadgeOverflowSlot(hiddenCount) {
+  requireValue(Number.isSafeInteger(hiddenCount) && hiddenCount > 0, 'NPC badge overflow count must be positive');
+  return Object.freeze({ kind: 'overflow', hiddenCount, text: `+${hiddenCount}` });
+}
+
+const NPC_BADGE_FALLBACK_SLOT = Object.freeze({ kind: 'fallback', role: 'other', glyph: 'npc' });
+
+export function npcBadgeSlots(record, activeFilter = 'all', maxSlots = 3) {
+  requireValue(
+    Number.isSafeInteger(maxSlots) && maxSlots >= 1 && maxSlots <= 3,
+    'NPC badge maxSlots must be an integer from 1 to 3',
+  );
+  const roles = validateNpcRoleMetadata(record);
+  if (record.role_resolution_state !== 'RESOLVED' || roles.length === 0) {
+    return Object.freeze([NPC_BADGE_FALLBACK_SLOT]);
+  }
+  if (roles.length <= maxSlots) {
+    return Object.freeze(roles.map((role) => npcBadgeRoleSlot(role)));
+  }
+
+  const explicitCapacity = maxSlots - 1;
+  let explicitRoles = roles.slice(0, explicitCapacity);
+  const normalizedFilter = npcRoleFilter(activeFilter);
+  const activeFactualRole = normalizedFilter !== 'all'
+    && normalizedFilter !== 'other'
+    && roles.includes(normalizedFilter);
+  if (activeFactualRole && !explicitRoles.includes(normalizedFilter)) {
+    if (explicitCapacity === 0) explicitRoles = [];
+    else if (explicitCapacity === 1) explicitRoles = [normalizedFilter];
+    else explicitRoles = [...roles.slice(0, explicitCapacity - 1), normalizedFilter];
+  }
+
+  const hiddenCount = roles.length - explicitRoles.length;
+  const slots = explicitRoles.map((role) => npcBadgeRoleSlot(role));
+  slots.push(npcBadgeOverflowSlot(hiddenCount));
+  return Object.freeze(slots);
+}
 export function npcMatchesRole(record, filter) {
   const normalized = npcRoleFilter(filter);
   if (normalized === 'all') return true;
