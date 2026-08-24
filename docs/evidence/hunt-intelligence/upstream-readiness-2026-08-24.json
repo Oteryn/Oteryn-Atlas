@@ -1,0 +1,36 @@
+﻿{
+  "schema_version": 1,
+  "checked_date": "2026-08-24",
+  "game": {
+    "repository": "Oteryn/Oteryn-Game",
+    "revision": "30c733c8c8cb4a1fbcf63010bcb6709a9109dde6",
+    "mutation": false
+  },
+  "capabilities": {
+    "hunt-catalog-v1": {
+      "state": "UPSTREAM_BLOCKED",
+      "trust_class": "UNKNOWN",
+      "reason": "No accepted Hunt Catalog producer/publication exists on the inspected Game main revision.",
+      "evidence": [
+        "git grep on exact Game revision returned no hunt-catalog-v1 or Hunt Catalog producer/publication",
+        "docs/contracts/OTERYN_GAME_ATLAS_EXPORT_CONTRACT_V1.md declares the general Atlas export runtime NOT_IMPLEMENTED and forbids Atlas fallback reconstruction"
+      ]
+    },
+    "hunt-performance-v1": {
+      "state": "UPSTREAM_BLOCKED",
+      "trust_class": "UNKNOWN",
+      "reason": "No accepted public-safe Hunt Performance producer/publication exists on the inspected Game main revision.",
+      "evidence": [
+        "git grep on exact Game revision returned no hunt-performance-v1 or Hunt Performance producer/publication",
+        "docs/architecture/ANL-02_GAMEPLAY_BALANCE_WORLD_ANALYTICS_CONTRACT_CANDIDATE.md has ImplementationStatus NOT_STARTED and no production authority"
+      ]
+    }
+  },
+  "atlas_effect": {
+    "verified_hunt_navigation": "UPSTREAM_BLOCKED",
+    "measured_panels": "UPSTREAM_BLOCKED",
+    "recommender": "UPSTREAM_BLOCKED",
+    "invented_production_hunts": false,
+    "invented_production_metrics": false
+  }
+}
