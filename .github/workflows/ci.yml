@@ -261,10 +261,60 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  change-classification:
+    name: Classify PR verification risk
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      docs_only: ${{ steps.classify.outputs.docs_only }}
+      requires_e2e: ${{ steps.classify.outputs.requires_e2e }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      ATLAS_CODE_REVISION: ${{ github.event.pull_request.head.sha }}
+      ATLAS_PR_NUMBER: ${{ github.event.pull_request.number }}
+      ATLAS_CHANGED_FILE_COUNT: ${{ github.event.pull_request.changed_files }}
+    steps:
+      - name: Check out exact Atlas candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+
+      - name: Classify exact PR changed paths
+        id: classify
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$ATLAS_CODE_REVISION"
+          rows="$(mktemp)"
+          paths="$(mktemp)"
+          trap 'rm -f "$rows" "$paths"' EXIT
+          gh api --paginate \
+            "repos/$GITHUB_REPOSITORY/pulls/$ATLAS_PR_NUMBER/files?per_page=100" \
+            --jq '.[] | [.filename, (.previous_filename // "")] | @tsv' > "$rows"
+          actual_count="$(wc -l < "$rows" | tr -d '[:space:]')"
+          test "$actual_count" = "$ATLAS_CHANGED_FILE_COUNT"
+          while IFS=$'\t' read -r filename previous_filename; do
+            test -n "$filename"
+            printf '%s\n' "$filename" >> "$paths"
+            if [[ -n "$previous_filename" ]]; then
+              printf '%s\n' "$previous_filename" >> "$paths"
+            fi
+          done < "$rows"
+          node tools/verification/classify-pr-changes.mjs < "$paths" | tee -a "$GITHUB_OUTPUT"
+
   verification-browser:
     name: Local Docker Playwright evidence
-    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
-    needs: verification-node
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      needs.change-classification.outputs.requires_e2e == 'true'
+    needs:
+      - verification-node
+      - change-classification
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
@@ -292,6 +342,7 @@ jobs:
       - browser-webgl-proof
       - project
       - verification-node
+      - change-classification
       - verification-browser
     runs-on: ubuntu-24.04
     steps:
@@ -304,6 +355,9 @@ jobs:
           BROWSER_WEBGL_PROOF: ${{ needs.browser-webgl-proof.result }}
           PROJECT: ${{ needs.project.result }}
           VERIFICATION_NODE: ${{ needs.verification-node.result }}
+          CHANGE_CLASSIFICATION: ${{ needs.change-classification.result }}
+          DOCS_ONLY: ${{ needs.change-classification.outputs.docs_only }}
+          REQUIRES_E2E: ${{ needs.change-classification.outputs.requires_e2e }}
           VERIFICATION_BROWSER: ${{ needs.verification-browser.result }}
           GITHUB_EVENT_NAME: ${{ github.event_name }}
         run: |
@@ -312,7 +366,20 @@ jobs:
             test "$result" = success
           done
           if [[ "$GITHUB_EVENT_NAME" == pull_request ]]; then
-            test "$VERIFICATION_BROWSER" = success
+            test "$CHANGE_CLASSIFICATION" = success
+            case "$REQUIRES_E2E:$DOCS_ONLY" in
+              false:true)
+                test "$VERIFICATION_BROWSER" = skipped
+                ;;
+              true:false)
+                test "$VERIFICATION_BROWSER" = success
+                ;;
+              *)
+                echo "Invalid PR verification classification: requires_e2e=$REQUIRES_E2E docs_only=$DOCS_ONLY" >&2
+                exit 1
+                ;;
+            esac
           else
+            test "$CHANGE_CLASSIFICATION" = skipped
             test "$VERIFICATION_BROWSER" = skipped
           fi
