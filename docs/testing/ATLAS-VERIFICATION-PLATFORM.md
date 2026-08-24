@@ -148,6 +148,16 @@ It must cover complete real-user journeys, including combinations rather than on
 
 A Playwright test should assert the user-observable result and relevant runtime invariant, not only that an action completed without throwing.
 
+### 5.3A Cross-browser compatibility depth
+
+Chromium is the primary required PR browser and the only engine for committed Atlas-owned pixel baselines. Firefox and WebKit are secondary compatibility engines exercised as scheduled/manual cross-browser depth on Molehill-PC; their success must never weaken or replace the exact-head Chromium gate.
+
+The canonical secondary matrix is `e2e/browser-matrix.json`: Firefox desktop, Firefox mobile-like, WebKit desktop and WebKit mobile-like. Mobile-like means the target viewport plus Playwright-supported `hasTouch`; `isMobile` emulation is intentionally not forced because support differs by engine. The pinned Playwright image must launch both engines and prove a touch tap before support is claimed.
+
+Cross-browser acceptance is behavioral and user-facing rather than cross-engine pixel equality. It must cover FullWorld qualification/WebGL2, map navigation and renderer evidence, modes/floors/zoom/pan, semantic search plus inspector and reload/history, creature playback where supported, and mobile drawer/touch-like layout. The same clipping/occlusion/hit-target assertions used by user-facing visual acceptance apply, but Game-derived raster pixels are not committed as Firefox/WebKit baselines.
+
+Firefox and WebKit profiles run sequentially with `workers=1`, `retries=0` in the bounded Molehill depth workflow. In the pinned Linux image Firefox 153 requires a headed Xvfb display for real WebGL2; WebKit remains explicitly headless. The launch probe verifies WebGL2 in the same execution mode before a Firefox/WebKit support claim is accepted. A genuine engine capability failure is a failed compatibility claim, not a silent skip; failure summaries retain exact Atlas revision, project/profile and browser engine. A limitation may be documented only when it is technically inherent and the affected support claim is correspondingly narrowed.
+
 ### 5.4 Read-only renderer observability
 
 The actual browser runtime needs a bounded diagnostic snapshot that is useful to tests and failure analysis without providing mutation powers.

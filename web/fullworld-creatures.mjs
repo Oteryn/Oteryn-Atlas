@@ -27,6 +27,8 @@ const initialParams = new URLSearchParams(location.search);
 const requested = new Set((initialParams.get('creatures') || '').split(',').filter(Boolean));
 const selectedParam = initialParams.get('creature') || null;
 const requestedNpcRole = npcRoleFilter(initialParams.get('npcRole'));
+let pageUnloading = false;
+
 const state = {
   index: null,
   view: null,
@@ -122,7 +124,15 @@ function publish(status = 'LOADING', error = null, extra = {}) {
   });
 }
 
+function markPageUnloading() {
+  pageUnloading = true;
+}
+
+addEventListener('beforeunload', markPageUnloading, { once: true });
+addEventListener('pagehide', markPageUnloading, { once: true });
+
 function fail(message) {
+  if (pageUnloading) return;
   const error = message instanceof Error ? message : new Error(String(message));
   console.error(`Creature overlay disabled: ${error.message}`);
   const status = document.querySelector('#creature-status');

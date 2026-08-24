@@ -148,6 +148,22 @@ jobs:
           $composeFile = 'e2e/compose.selfhosted.yml'
           $artifactRoot = Join-Path (Get-Location) 'artifacts/e2e/nightly'
           New-Item -ItemType Directory -Force $artifactRoot | Out-Null
+          $lockPath = Join-Path ([IO.Path]::GetTempPath()) 'oteryn-atlas-heavy-e2e.lock'
+          $lockDeadline = [DateTime]::UtcNow.AddSeconds(7200)
+          $lockStream = $null
+          while (-not $lockStream) {
+            try {
+              $lockStream = [IO.File]::Open($lockPath, [IO.FileMode]::OpenOrCreate, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+            } catch [IO.IOException] {
+              if ([DateTime]::UtcNow -ge $lockDeadline) { throw "Timed out waiting for the machine-wide Atlas heavy E2E lock: $lockPath" }
+              Start-Sleep -Seconds 2
+            }
+          }
+          $lockOwner = [Text.Encoding]::UTF8.GetBytes("pid=$PID project=$project revision=$env:ATLAS_CODE_REVISION`n")
+          $lockStream.SetLength(0)
+          $lockStream.Write($lockOwner, 0, $lockOwner.Length)
+          $lockStream.Flush()
+          Write-Output "Acquired machine-wide Atlas heavy E2E lock: $lockPath"
 
           try {
             $python = (Get-Command python -ErrorAction Stop).Source
@@ -208,6 +224,22 @@ jobs:
               '--project=nightly-desktop-dpr2', '--project=nightly-tablet'
             )
 
+            Invoke-DepthCase -Label 'cross-browser-browser-probe' -Environment @('ATLAS_E2E_DEPTH=cross-browser') -Command @(
+              'e2e', 'xvfb-run', '-a', 'node', 'support/browser-availability.mjs'
+            )
+            Invoke-DepthCase -Label 'cross-browser-firefox-desktop' -Environment @('ATLAS_E2E_DEPTH=cross-browser') -Command @(
+              'e2e', 'xvfb-run', '-a', 'npx', 'playwright', 'test', '--config=playwright.config.mjs', '--project=firefox-desktop'
+            )
+            Invoke-DepthCase -Label 'cross-browser-firefox-mobile-like' -Environment @('ATLAS_E2E_DEPTH=cross-browser') -Command @(
+              'e2e', 'xvfb-run', '-a', 'npx', 'playwright', 'test', '--config=playwright.config.mjs', '--project=firefox-mobile-like'
+            )
+            Invoke-DepthCase -Label 'cross-browser-webkit-desktop' -Environment @('ATLAS_E2E_DEPTH=cross-browser') -Command @(
+              'e2e', 'npx', 'playwright', 'test', '--config=playwright.config.mjs', '--project=webkit-desktop'
+            )
+            Invoke-DepthCase -Label 'cross-browser-webkit-mobile-like' -Environment @('ATLAS_E2E_DEPTH=cross-browser') -Command @(
+              'e2e', 'npx', 'playwright', 'test', '--config=playwright.config.mjs', '--project=webkit-mobile-like'
+            )
+
             $optional = [ordered]@{
               performance = @('tests/performance-desktop.spec.mjs')
               visual = @('tests/visual-desktop.spec.mjs')
@@ -233,6 +265,7 @@ jobs:
             }
             docker compose -p $project -f $composeFile down -v --remove-orphans | Out-Null
             if ($forwarder -and -not $forwarder.HasExited) { Stop-Process -Id $forwarder.Id -Force }
+            if ($lockStream) { $lockStream.Dispose(); $lockStream = $null }
             $ErrorActionPreference = $previous
           }
 

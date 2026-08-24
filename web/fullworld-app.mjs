@@ -71,6 +71,7 @@ let pixelTransport = 'stable-buckets';
 let refreshTimer = null;
 let refreshEpoch = 0;
 let refreshAbortController = null;
+let pageUnloading = false;
 let dragging = null;
 let frameScheduler = null;
 let animationRuntime = null;
@@ -772,7 +773,19 @@ function publishQualification(status, error = null) {
   globalThis.__OTERYN_ATLAS_FULLWORLD__ = result;
 }
 
+function markPageUnloading() {
+  pageUnloading = true;
+  clearTimeout(refreshTimer);
+  refreshTimer = null;
+  refreshAbortController?.abort();
+  stopAnimationLoop();
+}
+
+addEventListener('beforeunload', markPageUnloading, { once: true });
+addEventListener('pagehide', markPageUnloading, { once: true });
+
 function failClosed(error) {
+  if (pageUnloading) return;
   console.error(error);
   setBadge('FAIL-CLOSED', 'error');
   detailBadge.textContent = 'RUNTIME BLOCKED';
