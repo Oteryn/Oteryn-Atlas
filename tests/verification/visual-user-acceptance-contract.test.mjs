@@ -46,6 +46,8 @@ test('successful visual evidence is exact-revision qualified and must be reviewe
   assert.match(helper, /screenshot/);
   assert.match(approver, /ConfirmReviewedAllScreenshots/);
   assert.match(approver, /summarySha256/);
+  assert.match(approver, /artifactRootPrefix/);
+  assert.match(publisher, /reviewRootPrefix/);
   assert.match(publisher, /VisualReviewPath/);
   assert.match(publisher, /visual-review\.json/);
   assert.match(publisher, /approved/);
