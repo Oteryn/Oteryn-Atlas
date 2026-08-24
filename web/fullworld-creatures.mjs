@@ -2,6 +2,7 @@ import { sha256ContentId } from '../src/browser/loader.mjs';
 import { getAnimationRuntime } from '../src/browser/animation-runtime-service.mjs';
 import { FULLWORLD_PATHS } from '../src/browser/fullworld-trust.mjs';
 import { createCreatureRenderSnapshot } from '../src/browser/creature-render-diagnostics.mjs';
+import { creatureAnimationTransition } from '../src/browser/creature-view-transition.mjs';
 import { availableNpcFilters, npcMatchesRole, npcPresentationRoles, npcRoleFilter, npcRoleGlyph, npcRoleLabel, validateNpcRoleMetadata } from '../src/browser/npc-markers.mjs';
 
 const ROOT = new URL('../data/creatures/', location.href);
@@ -238,8 +239,10 @@ function syncNpcRoleControl() {
 
 function applyView(nextView) {
   requireValue(nextView && typeof nextView === 'object', 'invalid FullWorld view snapshot');
+  const transition = creatureAnimationTransition(state.view, nextView);
   state.view = nextView;
-  state.animationOn = nextView.animation === 'on';
+  state.animationOn = transition.animationOn;
+  return transition;
 }
 
 function consumePublishedView() {
@@ -279,6 +282,12 @@ async function waitForInitialView(timeoutMs = 30_000) {
 function repaintPreparedForCurrentState() {
   state.drawEpoch += 1;
   state.lastDrawnRecords = paintPrepared(state.lastPreparedRecords, state.view);
+}
+
+async function redrawPreparedForCurrentState() {
+  state.lastDrawnRecords = await draw(state.lastVisibleRecords, state.view);
+  publish('PASS');
+  return state.lastDrawnRecords;
 }
 
 function setup() {
@@ -344,9 +353,10 @@ function setup() {
   }
 
   window.addEventListener('oteryn-atlas-view', (event) => {
-    applyView(event.detail.view);
+    const { requiresReprepare } = applyView(event.detail.view);
     persist();
-    repaintPreparedForCurrentState();
+    const redraw = requiresReprepare ? redrawPreparedForCurrentState() : Promise.resolve(repaintPreparedForCurrentState());
+    redraw.catch(fail);
     refresh().catch(fail);
   });
   window.addEventListener('oteryn-atlas-render-committed', (event) => {
