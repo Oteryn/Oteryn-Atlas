@@ -250,6 +250,16 @@ Baseline policy:
 - failure emits expected, actual and diff artifacts;
 - broad full-page pixel gates are avoided when they are sensitive to irrelevant raster/font differences.
 
+#### 5.7.1 Creature animation completeness
+
+Creature animation is not proven by a working toggle, a non-zero frame counter, or one animated fixture. For a pinned animation publication, verification must combine a full published-program census with real-browser pixel evidence.
+
+The census must validate every advertised creature program: unique presentation identity; positive phase count and geometry; phase-content cardinality; content-addressed blob existence and geometry; and, for every multi-phase program, complete supported timing metadata. Multi-phase programs must also be classified by final rendered content identity so a presentation whose phases collapse to identical pixels cannot be silently counted as visibly animated.
+
+For the currently pinned `oteryn-atlas-animation-runtime-v1` publication (`rootContentId=sha256:413de22b245288da68153e2c0e9d4efe4ee011421b56a09532c8119829079540`), Issue #108 records the acceptance census: 1,377 creature programs; 101 multi-phase; 100 visually dynamic; and one authoritative static-equivalent multi-phase presentation, `outfit-presentation:sha256:b16bfc92e9d9e9c8f790507f987a11b25a169c4343c9d68471de76a5f3565c88`. Any change to this census requires an explicit publication/provenance update, not a relaxed assertion.
+
+Browser qualification must separately sample at least one verified multi-phase NPC and one verified multi-phase monster/spawn. With playback OFF, capture the deterministic static creature pixels; with playback ON, require an actual creature-overlay pixel change while factual creature anchors/identity stay unchanged; after playback is disabled, require exact restoration of the static creature pixels. Merged-main live acceptance must repeat this pixel-level proof against the deployed revision.
+
 ### 5.8 Seeded model-based interaction stress
 
 Atlas must be tested as a stateful application, not only as isolated scenarios.
@@ -369,7 +379,7 @@ The table below defines applicability. It is not a user-facing module status sys
 | Map camera/pan/zoom/floor | unit/property + browser geometry invariants + WebGL/render probe + E2E |
 | NPC/monster/POI/world overlay | data contract + E2E + geometry synchronization + stress; visual crop if appearance matters |
 | WebGL renderer/tile pipeline | deterministic browser/WebGL proof + geometry/render probes + failure handling + performance |
-| Animation | deterministic scheduler/state tests + browser frame/state evidence + stress + performance + visual/render sample where stable |
+| Animation | deterministic scheduler/state tests + full published-program census + independent NPC/monster pixel-change samples + browser frame/state evidence + stress + performance |
 | Search/inspector | logic/contract + E2E + invalid/no-result + persistence/history |
 | Cache/streaming/network | unit where possible + range/protocol contract + fault injection + boundedness/stress |
 | Performance-sensitive runtime | functional tests + deterministic performance workload + regression budget after baseline qualification |

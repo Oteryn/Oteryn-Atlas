@@ -12,11 +12,11 @@ Separate Atlas verification workloads by purpose and hardware capability: GitHub
 
 ## Runner responsibilities
 ### GitHub-hosted CI
-GitHub-hosted jobs own deterministic Node/contract/property verification, provenance verification, CodeQL/security, lightweight browser/WebGL contract checks and `atlas-gate` fan-in. They must not perform the expensive 48-scenario Docker Playwright qualification.
+GitHub-hosted jobs own deterministic Node/contract/property verification, provenance verification, CodeQL/security, lightweight browser/WebGL contract checks and `atlas-gate` fan-in. They must not perform the expensive 50-scenario Docker Playwright qualification.
 
 ### Molehill-PC
 The dedicated Windows runner `oteryn-molehill-atlas` in runner group `atlas-runners` with custom label `oteryn-atlas-pc` owns:
-- exact-head full local Docker Playwright qualification (currently 48 scenarios, workers=1, retries=0);
+- exact-head full local Docker Playwright qualification (currently 50 scenarios, workers=1, retries=0);
 - scheduled/manual browser-depth work: repeated critical geometry/render probes, fixed replayable stress seeds, extra viewport/DPR projects, and stable performance/visual/accessibility/race/soak depth;
 - generation of bounded machine-readable browser evidence.
 
@@ -30,7 +30,7 @@ The Synology runner `oteryn-synology-atlas` in runner group `atlas-runners` with
 - publication/product-root availability and integrity checks;
 - bounded desktop/mobile real-browser live smoke required to prove the deployed environment.
 
-Synology must not run the full 48-scenario PR matrix, stress matrices, soak, performance depth, broad visual regression or nightly browser-depth workloads.
+Synology must not run the full 50-scenario PR matrix, stress matrices, soak, performance depth, broad visual regression or nightly browser-depth workloads.
 
 ## Nightly semantics
 Nightly is additive to the exact-head PR gate, not a duplicate of it. The full required browser matrix is proven before merge through `atlas-local-e2e=success` on the exact PR SHA. Nightly therefore runs only additional depth categories.

@@ -162,6 +162,7 @@ jobs:
           creatures=json.loads(Path('animated-creatures-a.json').read_text())
           index=json.loads(Path('creature-index-a/index.json').read_text())
           animation=json.loads(Path('animation-runtime-a/manifest.json').read_text())
+          programs=json.loads(Path('animation-runtime-a/programs.json').read_text())
           assert creatures['capability']=='animated-creatures-v1'
           assert creatures['npc_role_schema_version']==1
           assert creatures['semantic_digest']=='sha256:7dc951874c95424279737eaaf51cf2d50940162ef4799daea39a187a581ef0e8'
@@ -176,8 +177,13 @@ jobs:
           assert role_counts=={'bank':25,'travel':51,'shop':313,'quest':432,'blessing':26,'trainer':54}
           assert sum(bool(r.get('roles')) for r in creatures['npcs'])==705
           assert sum(r.get('role_resolution_state')=='AMBIGUOUS' for r in creatures['npcs'])==10
-          npc_source=next(r for r in creatures['npcs'] if 'shop' in r.get('roles',[]) and r.get('presentation_resolution_state')=='RESOLVED' and r.get('outfit_presentation') and r['outfit_presentation'].get('static_projection',{}).get('phase_count',1)>1)
-          monster_source=next(r for r in creatures['monster_spawns'] if r.get('presentation_resolution_state')=='RESOLVED' and r.get('outfit_presentation') and r['outfit_presentation'].get('static_projection',{}).get('phase_count',1)>1)
+          dynamic_presentations={p['outfit_presentation_id'] for p in programs['creature_programs'] if p['phase_count']>1 and len(set(p['phase_content_ids']))>1}
+          assert len(dynamic_presentations)==100
+          def presentation_id(record):
+              presentation=record.get('outfit_presentation') or {}
+              return presentation.get('outfit_presentation_id')
+          npc_source=next(r for r in creatures['npcs'] if 'shop' in r.get('roles',[]) and r.get('presentation_resolution_state')=='RESOLVED' and presentation_id(r) in dynamic_presentations)
+          monster_source=next(r for r in creatures['monster_spawns'] if r.get('presentation_resolution_state')=='RESOLVED' and presentation_id(r) in dynamic_presentations)
           npc_item=by_id[npc_source['record_id']]; monster_item=by_id[monster_source['record_id']]
           targets={'npc':{'kind':'npc','label':npc_item['label'],'record_id':npc_item['record_id'],'position':npc_item['position'],'roles':npc_item['roles']},'monster':{'kind':'monster','label':monster_item['label'],'record_id':monster_item['record_id'],'position':monster_item['position']}}
           Path('e2e-targets.json').write_text(json.dumps(targets,indent=2,sort_keys=True)+chr(10))
