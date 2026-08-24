@@ -4,6 +4,7 @@ import {
   gotoAtlas,
   qualificationResult,
 } from './runtime.mjs';
+import { assertUserVisibleSurface, captureUserVisualEvidence } from '../support/user-acceptance.mjs';
 
 async function expectMapQualifiedSearchFailed(page, pattern) {
   const { status, result } = await qualificationResult(page);
@@ -15,7 +16,7 @@ async function expectMapQualifiedSearchFailed(page, pattern) {
   return search;
 }
 
-test('semantic search HTTP outage degrades search without invalidating map qualification', async ({ page }) => {
+test('semantic search HTTP outage degrades search without invalidating map qualification', async ({ page }, testInfo) => {
   await page.route('**/web/semantic-search/index.json', async (route) => {
     await route.fulfill({ status: 503, contentType: 'application/json', body: '{"injected":"semantic-index-outage"}' });
   });
@@ -23,6 +24,24 @@ test('semantic search HTTP outage degrades search without invalidating map quali
   const search = await expectMapQualifiedSearchFailed(page, /index\.json HTTP 503/i);
   expect(search.records).toBe(0);
   expect(search.lastResults).toBe(0);
+  await page.locator('#search-input').fill('Thais');
+  const degradedResults = page.locator('#semantic-search-results-desktop');
+  await expect(degradedResults).toBeVisible();
+  await expect(degradedResults).toContainText(/Search unavailable/i);
+  await expect(degradedResults.getByRole('option')).toHaveCount(0);
+  const degradedMetrics = await assertUserVisibleSurface(page, {
+    label: 'desktop degraded search',
+    minimumMapAreaRatio: 0.28,
+    elements: [
+      { selector: '#map-frame', label: 'still-qualified world map' },
+      { selector: '#runtime-badge', label: 'runtime qualification badge' },
+      { selector: '#search-input', label: 'degraded search control' },
+    ],
+  });
+  await captureUserVisualEvidence(page, testInfo, 'desktop.search-degraded', {
+    surfaceMetrics: degradedMetrics,
+    note: 'Search service outage while the world remains qualified and usable.',
+  });
 });
 
 test('creature search catalog outage fails the combined search surface closed only', async ({ page }) => {
@@ -33,6 +52,11 @@ test('creature search catalog outage fails the combined search surface closed on
   const search = await expectMapQualifiedSearchFailed(page, /creatures\.json HTTP 503/i);
   expect(search.records).toBeGreaterThan(0);
   expect(search.creatureSearchRecords).toBe(0);
+  await page.locator('#search-input').fill('Thais');
+  const degradedResults = page.locator('#semantic-search-results-desktop');
+  await expect(degradedResults).toBeVisible();
+  await expect(degradedResults).toContainText(/Search unavailable/i);
+  await expect(degradedResults.getByRole('option')).toHaveCount(0);
 });
 
 test('unsupported semantic API schema is rejected without stale browser search state', async ({ page }) => {

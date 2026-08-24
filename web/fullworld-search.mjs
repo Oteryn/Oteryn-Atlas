@@ -16,7 +16,7 @@ const MAX_INDEX_BYTES = 2 * 1024 * 1024;
 const EXPECTED_CREATURE_SEMANTIC_DIGEST = 'sha256:81505e91d7089f91e71813ec43f97118932db9cc7fd76d291fa399447ee2dfa4';
 const MAX_CREATURE_SEARCH_BYTES = 2 * 1024 * 1024;
 const MAX_RESULTS = 12;
-const state = { index: null, creatureSearch: [], active: null, lastQuery: '', lastResults: 0, status: 'LOADING' };
+const state = { index: null, creatureSearch: [], active: null, lastQuery: '', lastResults: 0, status: 'LOADING', error: null };
 
 function requireValue(condition, message) {
   if (!condition) throw new Error(message);
@@ -32,7 +32,7 @@ async function boundedJson(url, maxBytes) {
   return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
 }
 
-function publish(error = null) {
+function publish(error = state.error) {
   globalThis.__OTERYN_ATLAS_SEMANTIC_SEARCH__ = Object.freeze({
     status: error ? 'FAIL' : state.status,
     records: state.index?.records?.length ?? 0,
@@ -54,6 +54,7 @@ function injectStyle() {
     .semantic-search-result:hover,.semantic-search-result:focus-visible{background:#ffffff12;outline:1px solid #ffffff22}
     .semantic-search-result strong{font-size:13px}.semantic-search-result .kind{font-size:10px;letter-spacing:.08em;text-transform:uppercase;opacity:.72}
     .semantic-search-result small{grid-column:1/-1;opacity:.68;font-variant-numeric:tabular-nums}
+    .semantic-search-unavailable{display:block;padding:9px 10px;color:#e7ba78;line-height:1.4}
     .semantic-active-layer{outline:1px solid #ffffff20}
     @media(max-width:760px){.semantic-search-results{position:static;margin-top:6px;max-height:36vh}}
   `;
@@ -106,14 +107,35 @@ function navigate(record, rawQuery) {
   location.search = params.toString();
 }
 
+function hideResults(host) {
+  host.replaceChildren();
+  host.hidden = true;
+  state.lastResults = 0;
+  publish();
+}
+
+function renderUnavailable(host) {
+  host.replaceChildren();
+  const note = document.createElement('small');
+  note.className = 'semantic-search-unavailable';
+  note.setAttribute('role', 'status');
+  note.textContent = `Search unavailable: ${state.error?.message ?? 'verified search data unavailable.'}`;
+  host.append(note);
+  host.hidden = false;
+  state.lastResults = 0;
+  publish();
+}
+
 function renderResults(host, raw) {
   host.replaceChildren();
   const query = String(raw).trim();
   state.lastQuery = query;
-  if (!query || !state.index) {
-    host.hidden = true;
-    state.lastResults = 0;
-    publish();
+  if (!query) {
+    hideResults(host);
+    return;
+  }
+  if (state.status === 'FAIL' || !state.index) {
+    renderUnavailable(host);
     return;
   }
   let results;
@@ -168,7 +190,10 @@ function wireForm(formId, inputId, suffix) {
     if (state.index) {
       try {
         const primary = searchSemanticIndex(state.index, query, { limit: MAX_RESULTS, currentFloor: currentFloor() });
-        if (primary.mode === 'coordinate') return;
+        if (primary.mode === 'coordinate') {
+          hideResults(host);
+          return;
+        }
       } catch {}
     }
     event.preventDefault();
@@ -240,6 +265,7 @@ async function boot() {
   state.active = activeId ? state.index.records.find((record) => record.id === activeId) ?? findCreatureById(state.creatureSearch, activeId) : null;
   if (!state.active && creatureId) state.active = findCreatureById(state.creatureSearch, creatureId);
   state.status = 'PASS';
+  state.error = null;
   renderActiveInspector();
   window.addEventListener('oteryn-atlas-view', () => renderActiveInspector());
   window.addEventListener('oteryn-atlas-inspector-rendered', () => renderActiveInspector());
@@ -248,6 +274,7 @@ async function boot() {
 
 boot().catch((error) => {
   state.status = 'FAIL';
-  publish(error);
+  state.error = error;
+  publish();
   console.error(error);
 });

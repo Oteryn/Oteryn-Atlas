@@ -1,0 +1,66 @@
+{
+  "version": 1,
+  "primaryBrowser": "chromium",
+  "scenarios": [
+    {
+      "id": "desktop.initial",
+      "project": "desktop-chromium"
+    },
+    {
+      "id": "desktop.search-inspector",
+      "project": "desktop-chromium"
+    },
+    {
+      "id": "desktop.layers",
+      "project": "desktop-chromium"
+    },
+    {
+      "id": "desktop.playback",
+      "project": "desktop-chromium"
+    },
+    {
+      "id": "desktop.minimap",
+      "project": "desktop-chromium"
+    },
+    {
+      "id": "desktop.classic",
+      "project": "desktop-chromium"
+    },
+    {
+      "id": "desktop.floor-mode",
+      "project": "desktop-chromium"
+    },
+    {
+      "id": "desktop.coordinate-pan",
+      "project": "desktop-chromium"
+    },
+    {
+      "id": "desktop.search-degraded",
+      "project": "desktop-chromium"
+    },
+    {
+      "id": "desktop.fail-closed",
+      "project": "desktop-chromium"
+    },
+    {
+      "id": "mobile.initial",
+      "project": "mobile-chromium"
+    },
+    {
+      "id": "mobile.controls",
+      "project": "mobile-chromium"
+    },
+    {
+      "id": "mobile.search",
+      "project": "mobile-chromium"
+    },
+    {
+      "id": "mobile.inspector",
+      "project": "mobile-chromium"
+    },
+    {
+      "id": "mobile.landscape",
+      "project": "mobile-chromium"
+    }
+  ]
+}

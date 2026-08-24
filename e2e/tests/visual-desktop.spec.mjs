@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 import { assertNoRuntimeFailures, captureRuntimeFailures, gotoAtlas, waitForAtlas } from './runtime.mjs';
 import { canvasAlphaCount, comparePngOutsideRects } from '../support/visual-oracle.mjs';
 import { analyzeCreatureAnimationCoverage } from '../support/creature-animation-coverage.mjs';
-
+import { assertUserVisibleSurface, captureUserVisualEvidence } from '../support/user-acceptance.mjs';
 const ENTRY = '/web/fullworld.html?x=32361&y=32198&floor=-7&zoom=2&mode=map&creatures=npc,monster&animation=off';
 const VISUAL_ENTRY = '/web/fullworld.html?x=32369&y=32241&floor=-7&zoom=2&mode=map&animation=off';
 const CREATURE_ONLY_PLAYBACK_ENTRY = '/web/fullworld.html?x=32831&y=32596&floor=-12&zoom=2&mode=map&animation=off&creatures=monster';
@@ -90,20 +90,70 @@ async function assertCreatureFamilyPlaybackChangesPixels(page, entry, kind) {
   assertNoRuntimeFailures(runtime);
 }
 
-test('desktop Atlas-owned chrome retains reviewed visual contracts', async ({ page }) => {
-  const runtime = captureRuntimeFailures(page);
-  await gotoAtlas(page, VISUAL_ENTRY);
+test('desktop Atlas-owned chrome and user journey retain reviewed visual contracts', async ({ page }, testInfo) => {  const runtime = captureRuntimeFailures(page);
+  await gotoAtlas(page, `${VISUAL_ENTRY}&creatures=npc,monster`);
   await waitForAtlas(page);
+
+  const initialMetrics = await assertUserVisibleSurface(page, {
+    label: 'desktop initial Atlas',
+    minimumMapAreaRatio: 0.28,
+    elements: [
+      { selector: '.topbar', label: 'topbar' },
+      { selector: '#search-input', label: 'global search', interactive: true, minHeight: 30 },
+      { selector: '#zoom-out', label: 'zoom out', interactive: true },
+      { selector: '#zoom-in', label: 'zoom in', interactive: true },
+      { selector: '#mobile-controls-panel', label: 'desktop controls rail' },
+      { selector: '#map-frame', label: 'world map' },
+      { selector: '#mobile-inspector-panel', label: 'desktop inspector' },
+    ],
+  });
   await expect(page.locator('.topbar')).toHaveScreenshot('desktop-topbar.png', {
-    animations: 'disabled',
-    caret: 'hide',
-    scale: 'css',
+    animations: 'disabled', caret: 'hide', scale: 'css',
   });
   await expect(page.locator('#view-mode-control')).toHaveScreenshot('desktop-view-mode.png', {
-    animations: 'disabled',
-    caret: 'hide',
-    scale: 'css',
+    animations: 'disabled', caret: 'hide', scale: 'css',
   });
+  await captureUserVisualEvidence(page, testInfo, 'desktop.initial', {
+    surfaceMetrics: initialMetrics,
+    note: 'Initial desktop map, controls, inspector and chrome as seen by the user.',
+  });
+
+  const search = page.locator('#search-input');
+  await search.fill('Thais');
+  const results = page.locator('#semantic-search-results-desktop');
+  await expect(results).toBeVisible();
+  const thais = results.getByRole('option').filter({ hasText: 'Thais' }).first();
+  await expect(thais).toBeVisible();
+  await Promise.all([
+    page.waitForURL((url) => Boolean(url.searchParams.get('semantic'))),
+    thais.click(),
+  ]);
+  await waitForAtlas(page);
+  await expect(page.locator('#inspector-content')).toContainText('Thais');
+  const inspectorMetrics = await assertUserVisibleSurface(page, {
+    label: 'desktop search and inspector',
+    minimumMapAreaRatio: 0.28,
+    elements: [
+      { selector: '#map-frame', label: 'world map' },
+      { selector: '#mobile-inspector-panel', label: 'inspector' },
+      { selector: '#inspector-content', label: 'inspector facts' },
+      { selector: '#search-input', label: 'global search', interactive: true, minHeight: 30 },
+    ],
+  });
+  await expect(page.locator('#mobile-inspector-panel')).toHaveScreenshot('desktop-inspector.png', {
+    animations: 'disabled', caret: 'hide', scale: 'css',
+  });
+  await captureUserVisualEvidence(page, testInfo, 'desktop.search-inspector', {
+    surfaceMetrics: inspectorMetrics,
+    note: 'Semantic search selection with the resulting user-visible inspector and map state.',
+  });
+
+  await page.locator('#overview-toggle').check();
+  await expect(page.locator('#status-layer')).toContainText('Overview PROVEN');
+  await captureUserVisualEvidence(page, testInfo, 'desktop.layers', {
+    note: 'Desktop technical overview layer enabled over the same qualified world view.',
+  });
+  await page.locator('#overview-toggle').uncheck();
   assertNoRuntimeFailures(runtime);
 });
 
@@ -217,6 +267,21 @@ test('playback changes only verified animated presentation regions and restores 
     await testInfo.attach('world-outside-mask-diff.png', { body: Buffer.from(comparison.diffPng, 'base64'), contentType: 'image/png' });
   }
   expect(comparison.changedOutside, 'static world pixels changed outside verified animated presentation regions').toBe(0);
+  const playbackMetrics = await assertUserVisibleSurface(page, {
+    label: 'desktop animated world',
+    minimumMapAreaRatio: 0.28,
+    elements: [
+      { selector: '#map-frame', label: 'animated world map' },
+      { selector: 'label.layer:has(#animation-toggle)', label: 'playback toggle row', interactive: true },
+      { selector: '#mobile-controls-panel', label: 'desktop controls rail' },
+      { selector: '#mobile-inspector-panel', label: 'desktop inspector' },
+    ],
+  });
+  await captureUserVisualEvidence(page, testInfo, 'desktop.playback', {
+    surfaceMetrics: playbackMetrics,
+    note: 'Verified world and creature playback while the surrounding user-facing layout remains usable.',
+    animations: 'allow',
+  });
 
   await playback.uncheck();
   await expect.poll(() => new URL(page.url()).searchParams.get('animation')).toBe('off');

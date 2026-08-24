@@ -8,8 +8,9 @@ import {
   qualificationResult,
   waitForAtlas,
 } from './runtime.mjs';
+import { assertUserVisibleSurface, captureUserVisualEvidence } from '../support/user-acceptance.mjs';
 
-test('required FullWorld publication failure is deterministic and fail-closed', async ({ page }) => {
+test('required FullWorld publication failure is deterministic and fail-closed', async ({ page }, testInfo) => {
   await page.route('**/fullworld/publication/**', async (route) => {
     await route.fulfill({ status: 503, contentType: 'application/json', body: '{"injected":"required-publication-failure"}' });
   });
@@ -17,6 +18,20 @@ test('required FullWorld publication failure is deterministic and fail-closed', 
   const result = await expectQualificationFailure(page, /503|publication|fetch failed/i);
   expect(result.capabilities?.blockedOrUnknownEnabled ?? false).toBeFalsy();
   await expect(page.locator('#runtime-badge')).not.toContainText('VERIFIED FULL-WORLD');
+  const failureMetrics = await assertUserVisibleSurface(page, {
+    label: 'desktop required publication fail-closed',
+    minimumMapAreaRatio: 0.28,
+    elements: [
+      { selector: '#map-frame', label: 'world surface' },
+      { selector: '#runtime-badge', label: 'fail-closed runtime badge' },
+      { selector: '#mobile-controls-panel', label: 'controls remain structurally present' },
+      { selector: '#mobile-inspector-panel', label: 'inspector remains structurally present' },
+    ],
+  });
+  await captureUserVisualEvidence(page, testInfo, 'desktop.fail-closed', {
+    surfaceMetrics: failureMetrics,
+    note: 'Required publication outage in its deterministic fail-closed user-visible state.',
+  });
 });
 
 test('malformed semantic search product fails closed without corrupting map qualification', async ({ page }) => {

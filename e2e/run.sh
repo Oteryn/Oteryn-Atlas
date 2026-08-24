@@ -3,6 +3,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
+export ATLAS_USER_VISUAL_EVIDENCE=1
 mkdir -p artifacts/e2e
 
 if [[ -z "${ATLAS_BASE_URL:-}" && -z "${ATLAS_PUBLICATION_ORIGIN:-}" ]]; then
