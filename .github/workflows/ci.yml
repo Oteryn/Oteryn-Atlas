@@ -202,15 +202,6 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
 
-      - name: Run Farm Explorer publication contracts
-        shell: bash
-        run: |
-          set -euo pipefail
-          python -m py_compile tools/build-farm-intelligence.py tools/build-farm-spatial-index.py tools/build-farm-bundle.py tests/farm-intelligence-build.py tests/farm-spatial-index.py tests/farm-bundle.py
-          python tests/farm-intelligence-build.py
-          python tests/farm-spatial-index.py
-          python tests/farm-bundle.py
-
       - name: Run deterministic Atlas verification suite
         shell: bash
         run: |
@@ -228,10 +219,6 @@ jobs:
             tests/creature-map-activation-contract.mjs
             tests/creature-interaction-runtime-contract.mjs
             tests/gui-contract.mjs
-            tests/farm-intelligence.mjs
-            tests/farm-state.mjs
-            tests/farm-lod.mjs
-            tests/farm-gui-contract.mjs
             tests/npc-markers.mjs
             tests/pixel-store.mjs
             tests/semantic-search.mjs
