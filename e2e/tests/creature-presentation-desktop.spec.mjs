@@ -95,6 +95,7 @@ test('desktop factual role rows preserve canonical roles, overflow count and act
   const runtime = captureRuntimeFailures(page);
   let state = await openScenario(page, sceneEntry(TWO_ROLE_NPC, { creatures: 'npc' }));
   await revalidatePublicationRecord(page, TWO_ROLE_NPC);
+  await revalidatePublicationRecord(page, OVERFLOW_NPC);
   assertPresentationContract(state);
   let badge = badgeLayoutFor(state, TWO_ROLE_NPC.record_id);
   expect(slotSummary(badge)).toEqual([
