@@ -2,6 +2,7 @@ $ErrorActionPreference = 'Stop'
 
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 Set-Location $root
+$env:ATLAS_USER_VISUAL_EVIDENCE = '1'
 New-Item -ItemType Directory -Force -Path 'artifacts\e2e' | Out-Null
 
 if (-not $env:ATLAS_BASE_URL -and -not $env:ATLAS_PUBLICATION_ORIGIN) {

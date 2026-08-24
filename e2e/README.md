@@ -37,7 +37,17 @@ After the exact tested commit has been pushed to the PR branch, publish the veri
   -RemoteBranch agent/atlas-verify-ci-nightly-01
 ```
 
-The publisher writes only the `atlas-local-e2e` commit status; it does not merge, deploy or modify the publication.
+Trusted local `run.ps1`/`run.sh` invocations enable successful full-frame user evidence. These frames remain in the local artifact directory and are not source baselines. Before publishing `atlas-local-e2e`, open and review every required full-frame screenshot under `user-visual-evidence/`, then create the exact-revision review manifest:
+
+```powershell
+.\e2e\approve-visual-user-acceptance.ps1 `
+  -SummaryPath .\artifacts\e2e\<project>\summary.json `
+  -Reviewer '<reviewer-or-agent-id>' `
+  -ConfirmReviewedAllScreenshots
+```
+
+`publish-local-e2e-status.ps1` now requires the resulting `visual-review.json`, verifies the exact summary digest and re-hashes every reviewed screenshot before it can publish success. The publisher writes only the `atlas-local-e2e` commit status; it does not merge, deploy or modify the publication.
+
 ## Test a deployed preview directly
 
 Linux / WSL / Git Bash:
@@ -65,7 +75,8 @@ The deterministic suite covers:
 - shipped static NPC/monster toggles, search, deep links, inspector state and bounded creature diagnostics;
 - mobile drawers, backdrop/Escape behavior, search/floor controls and 390x844 plus 844x390 responsive transitions;
 - bounded failure injection for required publication failure, malformed semantic search data and unavailable optional creature index;
-- critical accessible names and truthful disabled/hidden states.
+- critical accessible names and truthful disabled/hidden states;
+- user-facing visual acceptance across desktop/mobile initial state, search/inspector, layer presentation, animation playback, mobile drawers and responsive landscape-like resize, with deterministic clipping/occlusion/hit-target checks plus reviewed exact-revision full-frame evidence.
 
 ## Network/error policy
 
@@ -81,7 +92,9 @@ Each run directory contains:
 - `failure.json` - bounded machine-readable failing-scenario manifest when the run fails;
 - `results.json` - Playwright JSON report;
 - `html-report/` - browsable report;
-- `test-results/` - retained trace, video, screenshot and error context on failures.
+- `test-results/` - retained trace, video, screenshot and error context on failures;
+- `user-visual-evidence/<project>/<scenario>/` - successful exact-revision viewport PNG plus machine-readable manifest for required user-facing states;
+- `visual-review.json` - explicit approved review bound to the exact `summary.json` and reviewed screenshot digests.
 
 Generated reports remain local/CI artifacts and are not intended for source-control commits.
 

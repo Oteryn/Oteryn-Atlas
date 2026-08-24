@@ -1,6 +1,6 @@
-﻿# Atlas targeted visual baselines
+# Atlas targeted visual baselines
 
-These baselines are deliberately narrow. They cover stable controls and do not replace geometry, framebuffer, or renderer-state oracles.
+These baselines are deliberately targeted. They cover stable controls plus selected composite user-visible surfaces such as the map frame, inspector and mobile drawers; they do not replace geometry, framebuffer, renderer-state or user-facing full-frame review oracles.
 
 Generation contract:
 - browser: repository-pinned Playwright Chromium image from `e2e/playwright.config.mjs`;
@@ -10,4 +10,4 @@ Generation contract:
 - animations: disabled for snapshot assertions;
 - update policy: baseline changes are reviewed source changes; CI never auto-accepts new pixels.
 
-Do not add broad full-page map snapshots. WebGL/world correctness belongs to geometry and framebuffer probes; visual baselines should remain small, stable, and high-signal.
+Do not turn broad full-page screenshots into fragile pixel-equality gates. WebGL/world correctness belongs to geometry and framebuffer probes. Full-frame evidence is captured separately for local user-facing visual acceptance and must be reviewed on the exact tested revision; it is not committed as a raster baseline. Blocking pixel baselines remain Atlas-owned, stable, bounded and high-signal.

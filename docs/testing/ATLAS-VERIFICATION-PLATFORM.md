@@ -260,6 +260,22 @@ For the currently pinned `oteryn-atlas-animation-runtime-v1` publication (`rootC
 
 Browser qualification must separately sample at least one verified multi-phase NPC and one verified multi-phase monster/spawn. With playback OFF, capture the deterministic static creature pixels; with playback ON, require an actual creature-overlay pixel change while factual creature anchors/identity stay unchanged; after playback is disabled, require exact restoration of the static creature pixels. Merged-main live acceptance must repeat this pixel-level proof against the deployed revision.
 
+### 5.7A User-facing visual acceptance
+
+Targeted pixel regression and geometry/render oracles do not by themselves answer whether Atlas is usable and visually coherent as a user actually sees it. Every materially user-visible Atlas change therefore has an additional user-facing visual acceptance layer in the real browser.
+
+Required acceptance combines two independent forms of evidence:
+
+- deterministic usability assertions for viewport overflow, clipping, occlusion/hit-testing, reachable controls, readable visible text and a meaningful map viewport;
+- exact-revision full-frame evidence captured after representative user actions and actually reviewed by a human or visual-capable agent.
+
+Representative states include, where applicable, the initial desktop/mobile view, map plus controls and inspector, semantic search/results, selected inspector content, enabled layers, NPC/monster presentation, animation playback, mobile controls drawer, mobile inspector drawer and portrait/landscape-like responsive transitions. Failure/degraded states should also leave visual evidence when the user-visible presentation is material to the defect.
+
+Full-frame evidence is not used as a fragile whole-page pixel-equality oracle. It exists so a reviewer can detect defects that technical assertions may miss: visually broken composition, awkward overlap, clipped text, bad z-order, unreadable density, blank/garbled regions, or a state that is technically valid but obviously wrong to a user. Stable component/map/inspector/drawer crops may still use `toHaveScreenshot` as blocking targeted baselines.
+
+Each successful evidence frame must record the exact Atlas revision, target mode, browser/project, viewport, DPR, URL, bounded runtime state and screenshot digest. Full-frame evidence containing Game-derived raster pixels is retained only in the trusted local acceptance directory used for review/status publication; it is not committed as a source baseline or uploaded as routine GitHub evidence. The local exact-head E2E status publisher must refuse success unless all required frames were reviewed and an approval manifest is cryptographically bound to the exact Playwright `summary.json` and screenshot digests.
+
+Review is an evidence step, not a checkbox loophole: the reviewer must open every required frame before approval. Automated code checks may verify the review manifest and digests, but they must not fabricate the perceptual review itself.
 ### 5.8 Seeded model-based interaction stress
 
 Atlas must be tested as a stateful application, not only as isolated scenarios.

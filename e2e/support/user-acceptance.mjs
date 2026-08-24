@@ -3,8 +3,6 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { expect } from '@playwright/test';
 
-const ENCODING_ARTIFACT = /(?:Ã|Â|â€¦|â€”|�)/;
-
 function safeId(value) {
   const normalized = String(value).trim().replace(/[^a-zA-Z0-9._-]+/g, '_');
   if (!normalized || normalized.length > 160) throw new TypeError('visual evidence id invalid');
@@ -30,6 +28,7 @@ export async function assertUserVisibleSurface(page, {
     const mapRect = map?.getBoundingClientRect() ?? null;
     const mapAreaRatio = mapRect ? (Math.max(0, mapRect.width) * Math.max(0, mapRect.height)) / (innerWidth * innerHeight) : 0;
     const bodyText = body?.innerText ?? '';
+    const encodingArtifact = /(?:Ã|Â|â€¦|â€”|�)/;
     const results = requested.map((item) => {
       const element = document.querySelector(item.selector);
       if (!element) return { ...item, exists: false };
@@ -62,7 +61,7 @@ export async function assertUserVisibleSurface(page, {
       viewport,
       documentOverflowX,
       mapAreaRatio,
-      textEncodingOk: !ENCODING_ARTIFACT.test(bodyText),
+      textEncodingOk: !encodingArtifact.test(bodyText),
       elements: results,
     };
   }, { requested: elements });
@@ -112,6 +111,9 @@ export async function captureUserVisualEvidence(page, testInfo, scenarioId, {
   note = null,
   animations = 'disabled',
 } = {}) {
+  if (process.env.ATLAS_USER_VISUAL_EVIDENCE !== '1') {
+    return Object.freeze({ status: 'not-captured', scenarioId, reason: 'ATLAS_USER_VISUAL_EVIDENCE is not enabled for this runner.' });
+  }
   const atlasRevision = process.env.ATLAS_EXPECTED_REVISION?.trim();
   expect(atlasRevision, 'user-facing visual acceptance requires ATLAS_EXPECTED_REVISION').toBeTruthy();
   const artifactsRoot = path.resolve(process.env.ATLAS_ARTIFACTS_DIR || testInfo.outputDir);

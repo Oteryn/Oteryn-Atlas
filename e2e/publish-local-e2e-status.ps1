@@ -3,12 +3,16 @@ param(
   [Parameter(Mandatory = $true)][string]$SummaryPath,
   [Parameter(Mandatory = $true)][string]$RemoteBranch,
   [string]$Repository = 'Oteryn/Oteryn-Atlas',
-  [string]$Context = 'atlas-local-e2e'
+  [string]$Context = 'atlas-local-e2e',
+  [string]$VisualReviewPath
 )
 
 $ErrorActionPreference = 'Stop'
 $ExpectedScenarioCount = 50
-$root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+$RequiredVisualScenarios = @(
+  'desktop.initial', 'desktop.search-inspector', 'desktop.layers', 'desktop.playback',
+  'mobile.initial', 'mobile.controls', 'mobile.search', 'mobile.inspector', 'mobile.landscape'
+)$root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 Set-Location $root
 
 $sha = (git rev-parse HEAD).Trim()
@@ -35,7 +39,29 @@ if ($notPassed.Count -ne 0) { throw "Playwright summary contains $($notPassed.Co
 $retried = @($scenarios | Where-Object { [int]$_.retry -ne 0 })
 if ($retried.Count -ne 0) { throw "Playwright summary contains $($retried.Count) retried scenarios." }
 
-$description = "Local Docker Playwright $($scenarios.Count)/$($scenarios.Count) PASS; retries=0"
+if (-not $VisualReviewPath) { $VisualReviewPath = Join-Path (Split-Path $resolvedSummary -Parent) 'visual-review.json' }
+$resolvedReview = (Resolve-Path $VisualReviewPath).Path
+$review = Get-Content $resolvedReview -Raw | ConvertFrom-Json
+if ($review.status -ne 'approved') { throw "Visual review status is $($review.status), not approved." }
+if ($review.atlasRevision -ne $sha) { throw 'Visual review revision does not match tested HEAD.' }
+if ([string]::IsNullOrWhiteSpace([string]$review.reviewedBy)) { throw 'Visual review has no reviewer identity.' }
+$summaryDigest = 'sha256:' + (Get-FileHash $resolvedSummary -Algorithm SHA256).Hash.ToLowerInvariant()
+if ($review.summarySha256 -ne $summaryDigest) { throw 'Visual review is not bound to this exact Playwright summary.' }
+$reviewScenarios = @($review.requiredScenarios)
+if ($reviewScenarios.Count -ne $RequiredVisualScenarios.Count) { throw 'Visual review required-scenario census mismatch.' }
+foreach ($scenarioId in $RequiredVisualScenarios) {
+  if ($reviewScenarios -notcontains $scenarioId) { throw "Visual review is missing required scenario $scenarioId." }
+  $entries = @($review.evidence | Where-Object { $_.scenarioId -eq $scenarioId })
+  if ($entries.Count -ne 1) { throw "Visual review evidence census for $scenarioId is $($entries.Count), expected 1." }
+  $reviewRoot = (Split-Path $resolvedReview -Parent).TrimEnd('\')
+  $relativeScreenshot = ([string]$entries[0].screenshotPath).Replace('/', '\')
+  $resolvedScreenshot = (Resolve-Path (Join-Path $reviewRoot $relativeScreenshot)).Path
+  if (-not $resolvedScreenshot.StartsWith($reviewRoot, [System.StringComparison]::OrdinalIgnoreCase)) { throw 'Visual review screenshot escaped review root.' }
+  $digest = 'sha256:' + (Get-FileHash $resolvedScreenshot -Algorithm SHA256).Hash.ToLowerInvariant()
+  if ($digest -ne $entries[0].screenshotSha256) { throw "Visual review screenshot changed after approval for $scenarioId." }
+}
+
+$description = "Local Docker Playwright $($scenarios.Count)/$($scenarios.Count) PASS; visual review approved"
 $targetUrl = "https://github.com/$Repository/commit/$sha"
 $payload = @{
   state = 'success'

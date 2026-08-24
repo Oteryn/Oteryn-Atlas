@@ -24,8 +24,8 @@ test('desktop and mobile visual specs exercise complete user-facing surfaces', a
     assert.match(source, /captureUserVisualEvidence/);
     assert.match(source, /assertUserVisibleSurface/);
   }
-  assert.match(desktop, /desktop-map-frame\.png/);
   assert.match(desktop, /desktop-inspector\.png/);
+  assert.doesNotMatch(desktop, /toHaveScreenshot\('desktop-map-frame\.png'/, 'Game-derived map pixels must not become committed visual baselines');
   assert.match(mobile, /mobile-controls-panel\.png/);
   assert.match(mobile, /mobile-inspector-panel\.png/);
 });
@@ -35,9 +35,17 @@ test('successful visual evidence is exact-revision qualified and must be reviewe
   assert.equal(existsSync(helperPath), true, 'visual user-acceptance helper must exist');
   const helper = await read('e2e/support/user-acceptance.mjs');
   const publisher = await read('e2e/publish-local-e2e-status.ps1');
+  const approver = await read('e2e/approve-visual-user-acceptance.ps1');
+  const runPs1 = await read('e2e/run.ps1');
+  const runSh = await read('e2e/run.sh');
   assert.match(helper, /ATLAS_EXPECTED_REVISION/);
+  assert.match(helper, /ATLAS_USER_VISUAL_EVIDENCE/);
+  assert.match(runPs1, /ATLAS_USER_VISUAL_EVIDENCE/);
+  assert.match(runSh, /ATLAS_USER_VISUAL_EVIDENCE/);
   assert.match(helper, /user-visual-evidence/);
   assert.match(helper, /screenshot/);
+  assert.match(approver, /ConfirmReviewedAllScreenshots/);
+  assert.match(approver, /summarySha256/);
   assert.match(publisher, /VisualReviewPath/);
   assert.match(publisher, /visual-review\.json/);
   assert.match(publisher, /approved/);
