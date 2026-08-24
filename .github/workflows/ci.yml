@@ -212,6 +212,12 @@ jobs:
             tests/animation-runtime.mjs
             tests/browser-semantic.mjs
             tests/deployment-policy.mjs
+            tests/creature-presentation-geometry.mjs
+            tests/creature-interaction.mjs
+            tests/creature-interaction-target.mjs
+            tests/map-activation.mjs
+            tests/creature-map-activation-contract.mjs
+            tests/creature-interaction-runtime-contract.mjs
             tests/gui-contract.mjs
             tests/npc-markers.mjs
             tests/pixel-store.mjs

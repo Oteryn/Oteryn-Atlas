@@ -2,6 +2,8 @@ import { sha256ContentId } from '../src/browser/loader.mjs';
 import { getAnimationRuntime } from '../src/browser/animation-runtime-service.mjs';
 import { FULLWORLD_PATHS } from '../src/browser/fullworld-trust.mjs';
 import { createCreatureRenderSnapshot } from '../src/browser/creature-render-diagnostics.mjs';
+import { buildCreatureInteractionIndex, createClosedCreatureCardState, placeCreatureCard, queryCreatureHits, reduceCreatureCardState } from '../src/browser/creature-interaction.mjs';
+import { createCreatureInteractionTarget } from '../src/browser/creature-interaction-target.mjs';
 import { availableNpcFilters, npcMatchesRole, npcPresentationRoles, npcRoleFilter, npcRoleGlyph, npcRoleLabel, validateNpcRoleMetadata } from '../src/browser/npc-markers.mjs';
 
 const ROOT = new URL('../data/creatures/', location.href);
@@ -17,6 +19,8 @@ const MAX_CACHE_CHUNKS = 96;
 const MAX_INDEX_BYTES = 4 * 1024 * 1024;
 const MAX_SEARCH_BYTES = 2 * 1024 * 1024;
 const MAX_CHUNK_BYTES = 2 * 1024 * 1024;
+const INTERACTION_CELL_SIZE = 64;
+const MAX_CHOOSER_CHOICES = 8;
 const RECORD_ID = /^(?:npc|monster):[0-9a-f]{32}$/;
 
 const initialParams = new URLSearchParams(location.search);
@@ -47,6 +51,15 @@ const state = {
   lastDrawnNpcIcons: 0,
   renderGeneration: 0,
   lastRender: null,
+  interactionIndex: null,
+  interactionGeneration: null,
+  interactionBaseGeneration: null,
+  interactionRecords: new Map(),
+  interactionTargets: new Map(),
+  hoveredId: null,
+  hoverFrame: null,
+  cardState: createClosedCreatureCardState(),
+  restoreCardFromDeepLink: Boolean(selectedParam),
 };
 
 function requireValue(condition, message) {
@@ -92,6 +105,18 @@ function publish(status = 'LOADING', error = null, extra = {}) {
     animationRuntime: state.animationRuntime?.stats?.() ?? null,
     render: state.lastRender,
     cacheChunks: state.cache.size,
+    interactionVersion: 'creature-interaction-v1',
+    interactionTargets: state.interactionIndex?.targetCount ?? 0,
+    interactionBaseGeneration: state.interactionBaseGeneration,
+    interactionCreatureGeneration: state.renderGeneration || null,
+    interactionBuckets: state.interactionIndex?.bucketCount ?? 0,
+    interactionCellSize: state.interactionIndex?.cellSize ?? INTERACTION_CELL_SIZE,
+    hoveredRecordId: state.hoveredId,
+    cardState: state.cardState.mode,
+    cardRecordId: state.cardState.recordId,
+    selectedTargetRect: state.selectedId ? state.interactionTargets.get(state.selectedId)?.presentationRect ?? null : null,
+    cardTargetRect: state.cardState.recordId ? state.interactionTargets.get(state.cardState.recordId)?.presentationRect ?? null : null,
+    cardTargetAssistRect: state.cardState.recordId ? state.interactionTargets.get(state.cardState.recordId)?.assistRect ?? null : null,
     error: error ? String(error.message ?? error) : null,
     ...extra,
   });
@@ -121,6 +146,44 @@ function persist() {
   else params.delete('creature');
   const next = `${location.pathname}?${params.toString()}${location.hash}`;
   if (`${location.pathname}${location.search}${location.hash}` !== next) history.replaceState(null, '', next);
+}
+
+function cardElement(id) {
+  return document.querySelector(`#${id}`);
+}
+
+function clearCardCopyFeedback() {
+  const status = cardElement('creature-card-copy-status');
+  const fallback = cardElement('creature-card-link-fallback');
+  if (status) status.textContent = '';
+  if (fallback) { fallback.hidden = true; fallback.value = ''; }
+}
+
+function closeCreatureCard({ publishState = true } = {}) {
+  state.cardState = reduceCreatureCardState(state.cardState, { type: 'close' });
+  const card = cardElement('creature-quick-card');
+  if (card) card.hidden = true;
+  clearCardCopyFeedback();
+  if (publishState) publish('PASS');
+}
+
+function suspendCreatureCard() {
+  if (state.cardState.mode === 'closed') return;
+  state.cardState = reduceCreatureCardState(state.cardState, { type: 'suspend' });
+  const card = cardElement('creature-quick-card');
+  if (card) card.hidden = true;
+}
+
+function invalidateInteraction({ closeCard = false } = {}) {
+  state.interactionIndex = null;
+  state.interactionGeneration = null;
+  state.interactionBaseGeneration = null;
+  state.interactionRecords = new Map();
+  state.interactionTargets = new Map();
+  state.hoveredId = null;
+  document.querySelector('#map-frame')?.classList.remove('creature-hovering');
+  if (closeCard) closeCreatureCard({ publishState: false });
+  else suspendCreatureCard();
 }
 
 function visibleBounds(view, canvas) {
@@ -220,6 +283,203 @@ function renderCreatureInspector(record) {
   );
 }
 
+function appendCardFact(container, label, value, { warning = false } = {}) {
+  const row = createTextRow(label, value);
+  if (warning) row.className = 'creature-card-warning';
+  container.append(row);
+}
+
+function reservedCardRects() {
+  const frame = document.querySelector('#map-frame');
+  if (!frame) return [];
+  const frameRect = frame.getBoundingClientRect();
+  return ['#runtime-badge', '#detail-badge', '#cursor-coordinate'].map((selector) => {
+    const node = document.querySelector(selector);
+    if (!node || node.hidden) return null;
+    const rect = node.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return null;
+    return { x: rect.left - frameRect.left, y: rect.top - frameRect.top, width: rect.width, height: rect.height };
+  }).filter(Boolean);
+}
+
+function positionCreatureCard(target) {
+  const card = cardElement('creature-quick-card');
+  const frame = document.querySelector('#map-frame');
+  if (!card || !frame || !target) return;
+  card.hidden = false;
+  card.style.visibility = 'hidden';
+  if (matchMedia('(max-width: 980px)').matches) {
+    card.style.left = '';
+    card.style.top = '';
+    card.style.visibility = '';
+    return;
+  }
+  const placement = placeCreatureCard(target.presentationRect,
+    { width: card.offsetWidth, height: card.offsetHeight },
+    { width: frame.clientWidth, height: frame.clientHeight }, reservedCardRects());
+  card.style.left = `${placement.x}px`;
+  card.style.top = `${placement.y}px`;
+  card.style.visibility = '';
+}
+
+function renderCreatureCardRecord(record, target) {
+  const card = cardElement('creature-quick-card');
+  const title = cardElement('creature-card-title');
+  const kind = cardElement('creature-card-kind');
+  const body = cardElement('creature-card-body');
+  const choices = cardElement('creature-card-choices');
+  const actions = cardElement('creature-card-actions');
+  if (!card || !title || !kind || !body || !choices || !actions) return;
+  clearCardCopyFeedback();
+  title.textContent = record.name;
+  kind.textContent = record.kind === 'npc' ? 'NPC' : 'Monster spawn';
+  body.textContent = '';
+  appendCardFact(body, 'Position', `X ${record.position.x} · Y ${record.position.y} · F ${record.position.floor}`);
+  if (record.kind === 'npc' && record.role_resolution_state === 'RESOLVED' && Array.isArray(record.roles) && record.roles.length) {
+    appendCardFact(body, 'NPC roles', record.roles.map(npcRoleLabel).join(', '));
+  }
+  if (record.spawn_area && Number.isFinite(record.spawn_area.radius)) appendCardFact(body, 'Spawn radius', record.spawn_area.radius);
+  if (record.kind === 'npc' && record.role_resolution_state === 'AMBIGUOUS') {
+    appendCardFact(body, 'Notice', 'NPC role information is ambiguous in the verified Game export.', { warning: true });
+  }
+  if (record.presentation_resolution_state && record.presentation_resolution_state !== 'RESOLVED') {
+    appendCardFact(body, 'Notice', 'Presentation detail is unresolved; Atlas is using the factual marker fallback.', { warning: true });
+  }
+  choices.hidden = true;
+  choices.textContent = '';
+  actions.hidden = false;
+  card.hidden = false;
+  positionCreatureCard(target);
+}
+
+function openCreatureRecord(recordId) {
+  const record = state.interactionRecords.get(recordId);
+  const target = state.interactionTargets.get(recordId);
+  if (!record || !target || !state.interactionGeneration) return false;
+  state.selectedId = recordId;
+  state.cardState = reduceCreatureCardState(state.cardState, {
+    type: 'open-record', generation: state.interactionGeneration, recordId,
+  });
+  state.restoreCardFromDeepLink = false;
+  persist();
+  renderCreatureInspector(record);
+  renderCreatureCardRecord(record, target);
+  publish('PASS');
+  return true;
+}
+
+function openCreatureChooser(hits) {
+  const bounded = hits.slice(0, MAX_CHOOSER_CHOICES);
+  if (bounded.length < 2 || !state.interactionGeneration) return false;
+  state.cardState = reduceCreatureCardState(state.cardState, {
+    type: 'open-chooser', generation: state.interactionGeneration,
+    choices: bounded.map((hit) => hit.recordId),
+  });
+  const card = cardElement('creature-quick-card');
+  const title = cardElement('creature-card-title');
+  const kind = cardElement('creature-card-kind');
+  const body = cardElement('creature-card-body');
+  const choices = cardElement('creature-card-choices');
+  const actions = cardElement('creature-card-actions');
+  if (!card || !title || !kind || !body || !choices || !actions) return false;
+  clearCardCopyFeedback();
+  kind.textContent = 'Overlapping placements';
+  title.textContent = 'Choose a creature';
+  body.textContent = '';
+  appendCardFact(body, 'Notice', 'Multiple verified creature placements overlap at this point.');
+  choices.textContent = '';
+  choices.hidden = false;
+  actions.hidden = true;
+  for (const hit of bounded) {
+    const record = state.interactionRecords.get(hit.recordId);
+    if (!record) continue;
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = `${record.name} · ${record.kind === 'npc' ? 'NPC' : 'Monster spawn'}`;
+    button.addEventListener('click', () => openCreatureRecord(hit.recordId));
+    choices.append(button);
+  }
+  card.hidden = false;
+  positionCreatureCard(bounded[0]);
+  publish('PASS');
+  return true;
+}
+
+function handleMapActivation(event) {
+  const detail = event.detail;
+  if (!state.interactionIndex || !state.interactionGeneration
+      || detail?.rendererGeneration !== state.interactionBaseGeneration
+      || detail?.floor !== state.view?.floor) {
+    closeCreatureCard({ publishState: false });
+    return;
+  }
+  const hits = queryCreatureHits(state.interactionIndex, {
+    x: detail.cssX, y: detail.cssY, pointerType: detail.pointerType,
+    generation: state.interactionGeneration,
+  });
+  if (!hits.length) {
+    closeCreatureCard({ publishState: false });
+    publish('PASS');
+    return;
+  }
+  event.preventDefault();
+  if (hits.length > 1 && hits[0].hitKind === 'direct') openCreatureChooser(hits);
+  else openCreatureRecord(hits[0].recordId);
+}
+
+async function copyCreatureLink() {
+  const status = cardElement('creature-card-copy-status');
+  const fallback = cardElement('creature-card-link-fallback');
+  if (!status || !fallback || state.cardState.mode !== 'record') return;
+  const canonicalUrl = location.href;
+  fallback.hidden = true;
+  fallback.value = '';
+  try {
+    if (typeof navigator.clipboard?.writeText !== 'function') throw new Error('clipboard API unavailable');
+    await navigator.clipboard.writeText(canonicalUrl);
+    status.textContent = 'Copied link.';
+  } catch {
+    fallback.value = canonicalUrl;
+    fallback.hidden = false;
+    status.textContent = 'Copy unavailable. Copy the link manually.';
+  }
+}
+
+function openCreatureDetails() {
+  const recordId = state.cardState.recordId;
+  const record = recordId ? state.interactionRecords.get(recordId) : null;
+  if (!record) return;
+  renderCreatureInspector(record);
+  window.dispatchEvent(new CustomEvent('oteryn-atlas-open-inspector', { detail: { recordId } }));
+  requestAnimationFrame(() => state.inspector?.scrollIntoView({ block: 'nearest' }));
+}
+
+function clearCreatureHover() {
+  if (state.hoveredId == null) return;
+  state.hoveredId = null;
+  document.querySelector('#map-frame')?.classList.remove('creature-hovering');
+  publish('PASS');
+}
+
+function scheduleCreatureHover(event, base) {
+  if (event.pointerType === 'touch') { clearCreatureHover(); return; }
+  const rect = base.getBoundingClientRect();
+  const x = event.clientX - rect.left;
+  const y = event.clientY - rect.top;
+  if (state.hoverFrame != null) cancelAnimationFrame(state.hoverFrame);
+  state.hoverFrame = requestAnimationFrame(() => {
+    state.hoverFrame = null;
+    const rendererGeneration = globalThis.__OTERYN_ATLAS_RENDERER_DIAGNOSTICS__?.generation ?? null;
+    const hits = state.interactionIndex && rendererGeneration === state.interactionBaseGeneration
+      ? queryCreatureHits(state.interactionIndex, { x, y, pointerType: 'mouse', generation: state.interactionGeneration }) : [];
+    const next = hits[0]?.recordId ?? null;
+    if (next === state.hoveredId) return;
+    state.hoveredId = next;
+    document.querySelector('#map-frame')?.classList.toggle('creature-hovering', Boolean(next));
+    publish('PASS');
+  });
+}
+
 function syncNpcRoleControl() {
   const select = document.querySelector('#npc-role-filter');
   if (!select) return;
@@ -312,6 +572,7 @@ function setup() {
       host.append(row);
       input.addEventListener('change', () => {
         state.enabled[kind] = input.checked;
+        invalidateInteraction({ closeCard: true });
         persist();
         repaintPreparedForCurrentState();
         refresh().catch(fail);
@@ -327,6 +588,7 @@ function setup() {
     section.querySelector('#creature-search').addEventListener('input', (event) => renderSearch(event.target.value));
     section.querySelector('#npc-role-filter').addEventListener('change', (event) => {
       state.npcRole = npcRoleFilter(event.target.value);
+      invalidateInteraction({ closeCard: true });
       persist();
       repaintPreparedForCurrentState();
       refresh().catch(fail);
@@ -343,7 +605,23 @@ function setup() {
     renderCreatureInspector(null);
   }
 
+  cardElement('creature-card-close')?.addEventListener('click', () => closeCreatureCard());
+  cardElement('creature-card-details')?.addEventListener('click', openCreatureDetails);
+  cardElement('creature-card-copy')?.addEventListener('click', () => copyCreatureLink().catch(fail));
+  base.addEventListener('pointermove', (event) => scheduleCreatureHover(event, base));
+  base.addEventListener('pointerleave', clearCreatureHover);
+  window.addEventListener('oteryn-atlas-map-activate', handleMapActivation);
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && state.cardState.mode !== 'closed') {
+      const backdrop = document.querySelector('#mobile-drawer-backdrop');
+      if (backdrop && !backdrop.hidden) return;
+      closeCreatureCard();
+    }
+  });
+
   window.addEventListener('oteryn-atlas-view', (event) => {
+    const floorChanged = state.view && event.detail.view.floor !== state.view.floor;
+    invalidateInteraction({ closeCard: Boolean(floorChanged) });
     applyView(event.detail.view);
     persist();
     repaintPreparedForCurrentState();
@@ -351,6 +629,7 @@ function setup() {
   });
   window.addEventListener('oteryn-atlas-render-committed', (event) => {
     if (!state.index || !state.canvas) return;
+    if (event.detail?.generation !== state.interactionBaseGeneration) invalidateInteraction();
     drawCommitted(state.lastVisibleRecords, event.detail).then((count) => {
       if (count != null) { state.lastDrawnRecords = count; publish('PASS'); }
     }).catch(fail);
@@ -359,7 +638,11 @@ function setup() {
     state.logicalTimeMs = event.detail.logicalTimeMs;
     if (state.animationOn && state.lastVisibleRecords.length) draw(state.lastVisibleRecords).then((count) => { state.lastDrawnRecords = count; publish('PASS'); }).catch(fail);
   });
-  window.addEventListener('resize', () => { repaintPreparedForCurrentState(); refresh().catch(fail); });
+  window.addEventListener('resize', () => {
+    invalidateInteraction();
+    repaintPreparedForCurrentState();
+    refresh().catch(fail);
+  });
 }
 
 function navigate(item) {
@@ -478,6 +761,26 @@ async function prepareDraw(records, view = state.view) {
   }));
 }
 
+function npcBadgeOffset(item, view) {
+  return item.marker ? 0 : Math.min(14, 8 + view.zoom * 3);
+}
+
+function monsterMarkerRadius(view) {
+  return Math.max(3, Math.min(7, view.zoom * 4));
+}
+
+function interactionPresentation(item, record, npcSize, view) {
+  if (!item.marker) {
+    return {
+      kind: 'pixel', bitmapWidth: item.bitmap.width, bitmapHeight: item.bitmap.height,
+      displacement: item.frame.program.displacement ?? { x: 0, y: 0 }, contentId: item.frame.contentId,
+    };
+  }
+  if (record.kind === 'npc') return { kind: 'marker', width: npcSize, height: npcSize, originRounding: 'nearest' };
+  const diameter = monsterMarkerRadius(view) * 2;
+  return { kind: 'marker', width: diameter, height: diameter };
+}
+
 function paintPrepared(prepared, view = state.view, committedBase = null) {
   const canvas = state.canvas;
   if (!canvas || !view) return 0;
@@ -500,6 +803,10 @@ function paintPrepared(prepared, view = state.view, committedBase = null) {
   let npcIcons = 0;
   let drawn = 0;
   const anchors = [];
+  const commitEligible = Boolean(committedBase && sameRendererCommit(committedBase));
+  const nextCreatureGeneration = commitEligible ? state.renderGeneration + 1 : null;
+  const interactionTargets = [];
+  const interactionRecords = new Map();
   for (const item of prepared) {
     const { record } = item;
     if (record.position.floor !== view.floor) continue;
@@ -518,24 +825,52 @@ function paintPrepared(prepared, view = state.view, committedBase = null) {
       context.drawImage(item.bitmap, x, y, item.bitmap.width * view.zoom, item.bitmap.height * view.zoom);
       pixelDrawn += 1;
     }
+    const auxiliaryRects = [];
     if (record.kind === 'npc') {
-      const badgeOffset = item.marker ? 0 : Math.min(14, 8 + view.zoom * 3);
-      drawNpcIcon(context, tileX + badgeOffset, tileY - badgeOffset, npcRoleGlyph(record, state.npcRole), npcSize);
+      const badgeOffset = npcBadgeOffset(item, view);
+      const badgeX = tileX + badgeOffset;
+      const badgeY = tileY - badgeOffset;
+      drawNpcIcon(context, badgeX, badgeY, npcRoleGlyph(record, state.npcRole), npcSize);
+      if (!item.marker) auxiliaryRects.push({
+        x: Math.round(badgeX - npcSize / 2), y: Math.round(badgeY - npcSize / 2),
+        width: npcSize, height: npcSize,
+      });
       npcIcons += 1;
     } else if (item.marker) {
-      const radius = Math.max(3, Math.min(7, view.zoom * 4));
+      const radius = monsterMarkerRadius(view);
       context.beginPath(); context.arc(tileX, tileY, radius, 0, Math.PI * 2);
       context.fillStyle = '#ef476f'; context.fill();
       context.strokeStyle = '#111827'; context.lineWidth = 1.5; context.stroke();
       markerDrawn += 1;
+    }
+    if (commitEligible) {
+      const target = createCreatureInteractionTarget({
+        record, view, viewport: { width: rect.width, height: rect.height },
+        presentation: interactionPresentation(item, record, npcSize, view),
+        auxiliaryRects, drawOrder: drawn,
+        baseGeneration: committedBase.generation,
+        creatureGeneration: nextCreatureGeneration,
+      });
+      if (target) {
+        interactionTargets.push(target);
+        interactionRecords.set(record.record_id, record);
+      }
     }
     if (view.zoom >= (record.kind === 'npc' ? 1.5 : 1)) {
       context.fillStyle = '#f8fafc'; context.fillText(record.name, tileX + 8, tileY);
     }
   }
   context.restore();
-  if (committedBase && sameRendererCommit(committedBase)) {
-    state.renderGeneration += 1;
+  if (commitEligible) {
+    state.renderGeneration = nextCreatureGeneration;
+    state.interactionGeneration = `${committedBase.generation}:${state.renderGeneration}`;
+    state.interactionBaseGeneration = committedBase.generation;
+    state.interactionRecords = interactionRecords;
+    state.interactionTargets = new Map(interactionTargets.map((target) => [target.recordId, target]));
+    state.interactionIndex = buildCreatureInteractionIndex(interactionTargets, {
+      width: rect.width, height: rect.height,
+      cellSize: INTERACTION_CELL_SIZE, generation: state.interactionGeneration,
+    });
     state.lastRender = createCreatureRenderSnapshot({
       generation: state.renderGeneration,
       baseGenerationAtStart: committedBase.generation,
@@ -545,6 +880,13 @@ function paintPrepared(prepared, view = state.view, committedBase = null) {
       anchors,
     });
     window.dispatchEvent(new CustomEvent('oteryn-atlas-creature-render-committed', { detail: state.lastRender }));
+    if (state.cardState.mode === 'chooser' && state.cardState.generation !== state.interactionGeneration) {
+      closeCreatureCard({ publishState: false });
+    }
+    const reopenId = state.cardState.recordId
+      ?? (state.restoreCardFromDeepLink ? state.selectedId : null);
+    if (reopenId && state.interactionTargets.has(reopenId)) openCreatureRecord(reopenId);
+    else if (state.cardState.mode === 'record') suspendCreatureCard();
   }
   state.pixelDrawnRecords = pixelDrawn;
   state.markerDrawnRecords = markerDrawn;
