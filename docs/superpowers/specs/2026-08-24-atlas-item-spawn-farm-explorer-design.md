@@ -4,7 +4,7 @@ Alias: `ATLAS-ITEM-SPAWN-FARM-EXPLORER`
 
 Lifecycle authorities:
 - Atlas delivery: `Oteryn/Oteryn-Atlas#114`.
-- Game producer dependency: `Oteryn/Oteryn-Game#75`.
+- Read-only upstream requirement: `Oteryn/Oteryn-Game#75`; this Atlas execution has no Game write authority.
 - Full-world programme: `Oteryn/Oteryn-Atlas#11`.
 - Verification policy: `Oteryn/Oteryn-Atlas#85`.
 
@@ -124,11 +124,13 @@ Legacy/reference content may be processed only inside an already accepted Game m
 
 ## 5. Game -> Atlas farm intelligence contract
 
-Game Issue #75 owns a new versioned public-safe producer contract. Recommended contract identity:
+The architecture requires a versioned public-safe Game-owned farm-intelligence publication. `Oteryn/Oteryn-Game#75` tracks that upstream requirement, but this Farm Explorer alias is **Atlas-only** and may not mutate Game. Atlas consumes such a publication only when already accepted and compatible; otherwise the affected capability is `UPSTREAM_BLOCKED` / `UNAVAILABLE`.
+
+Preferred upstream contract identity remains:
 
 `oteryn-game-atlas-farm-intelligence-v1`
 
-The exact name may change only if the implementation documents the replacement consistently in Game and Atlas.
+If an accepted successor exists, Atlas validates that exact identity instead of inventing or modifying a Game schema.
 
 ### 5.1 Snapshot metadata
 
@@ -168,7 +170,7 @@ Atlas must never manufacture a stable item ID from display text.
 
 Loot relations must refer to a stable creature entity identity that can be joined to the existing Game-owned static-creature/spawn export.
 
-If the Game producer cannot prove the identity join for a creature, Atlas may show the loot relation as unresolved but must not join spawns by case-insensitive name or visual similarity.
+If an accepted upstream farm publication does not prove the identity join for a creature, Atlas may show the loot relation as unresolved but must not join placements by case-insensitive name or visual similarity.
 
 ### 5.4 Probability representation
 
@@ -178,7 +180,7 @@ Probability must be exported losslessly, preferably as an integer rational:
 {"numerator":14640,"denominator":100000}
 ```
 
-The producer must prove the denominator and roll semantics from the accepted source/runtime contract before publishing exact probability. A legacy numeric `chance` field is not permission for Atlas to assume a denominator.
+An accepted upstream publication must prove the denominator and roll semantics from its source/runtime contract before Atlas accepts an exact probability. A legacy numeric `chance` field is not permission for Atlas to assume a denominator.
 
 ### 5.5 Quantity model
 
@@ -443,6 +445,7 @@ Recommended public state parameters:
 - `item=<stable-item-id>`;
 - `farmQty=<positive-int>`;
 - `farmKph=<positive-number>` only when user supplied;
+- `farmTimeBase=active_hunt|hunt_wall|trip_wall` whenever `farmKph` is present;
 - `farmTask=<stable-task-id>`;
 - `farmCreature=<stable-creature-id>` for a custom kill target;
 - `farmKills=<positive-int>`;
@@ -450,7 +453,7 @@ Recommended public state parameters:
 
 Normal FullWorld `floor`, camera, zoom, animation and creature-layer state remains owned by the existing view contracts.
 
-Parsing must reject malformed, non-finite, negative, over-limit and contradictory combinations rather than silently coercing them into misleading estimates.
+Parsing must reject malformed, non-finite, negative, over-limit and contradictory combinations rather than silently coercing them into misleading estimates. `farmKph` without a valid `farmTimeBase` is invalid; the active item/task state determines the progress scope of that KPH.
 
 ## 14. Failure / partial-data behavior
 
@@ -500,18 +503,12 @@ This future seam is also how solo versus party performance should be handled. Do
 
 ## 17. Delivery DAG
 
-### Phase A — Game farm-intelligence export
-Owner: `Oteryn/Oteryn-Game#75`.
+### Phase A — Read-only upstream capability preflight
+Owner: `Oteryn/Oteryn-Atlas#114`; `Oteryn/Oteryn-Game#75` is read-only upstream evidence.
 
-Deliver:
-- contract;
-- deterministic producer/validator;
-- truthful capability census;
-- exact probability/quantity/task semantics only where proven;
-- tests and exact-head Game gates;
-- squash merge.
+Deliver in Atlas lifecycle evidence: exact Game SHA/publications inspected read-only; `AVAILABLE|UPSTREAM_BLOCKED|MALFORMED|STALE|INCOMPATIBLE` capability classification; farm/spatial compatibility tuple; origin/activation and identity-scheme classification; explicit prohibition on Game mutation.
 
-Atlas may prepare pure estimator/URL/LOD modules against synthetic **schema fixtures** while Phase A is in progress, but it may not claim real item/drop/task facts before Phase A is accepted and pinned.
+Atlas may implement estimator/URL/LOD/loader/fail-closed behavior against synthetic **test-only schema fixtures** when real farm facts are upstream-blocked, but may never present those fixtures as product facts.
 
 ### Phase B — Atlas compiler/publication
 Owner: `Oteryn/Oteryn-Atlas#114`.
@@ -538,7 +535,7 @@ Deliver all applicable exact-head verification under #85/#111 policy, then prote
 
 ## 18. Parallelisation
 
-After Game contract shape is frozen, work may be split into three mostly independent Atlas lanes:
+After read-only upstream capability/compatibility is classified, work may be split into three mostly independent Atlas lanes:
 
 1. **Math/state lane** — estimator, URL state, validation/property tests.
 2. **Publication/index lane** — Game consumer, farm product, creature spatial secondary index.
@@ -550,18 +547,16 @@ Do not allow multiple agents to mutate the same shared FullWorld HTML/CSS/runtim
 
 ## 19. Verification contract
 
-### Game producer
+### Upstream compatibility / Atlas consumer
 
 Test at minimum:
-- deterministic canonical output/digest;
-- exact probability rational validation;
-- invalid denominator/numerator;
-- quantity-model variants;
-- duplicate/dangling item/creature/task references;
-- unsupported/partial capabilities;
-- provenance and hard byte/record bounds;
-- source change invalidates digest;
-- no legacy source path leakage in public output where prohibited.
+- accepted contract/publication identity and semantic digest validation;
+- compatibility tuple mismatch -> fail closed;
+- unavailable/malformed/stale/incompatible classification;
+- exact probability/process/quantity semantics accepted only when explicitly proven upstream;
+- placement origin/activation and identity-scheme scope preserved;
+- no Game mutation or browser-side legacy fallback;
+- no external site or mock-up data as authority.
 
 ### Atlas pure logic
 
@@ -640,6 +635,45 @@ The programme is complete only when all of the following are true:
 - malformed/missing/unsupported data fails closed by capability;
 - full applicable deterministic, geometry, renderer, visual, performance and real-browser tests pass on the exact final head with retries=0;
 - Atlas `atlas-gate` and `provenance-gate` are green;
-- Game required exact-head gates are green for its producer delivery;
-- both cross-repository delivery branches are squash-merged and cleaned;
+- every upstream Game artifact actually consumed is accepted, pinned and compatible, or the affected capability remains explicitly `UPSTREAM_BLOCKED`/`UNAVAILABLE`;
+- the Atlas delivery branch is exact-head verified, squash-merged and cleaned;
 - live deployment/acceptance occurs only from merged Atlas `main` under existing policy.
+
+
+## 22. Final execution hardening — normative
+
+This section overrides any earlier wording that could authorize Game mutation or weaker farm semantics.
+
+### 22.1 Atlas-only owner restriction
+The alias is Atlas-only. Game and Game #75 are read-only upstream authority/evidence. Missing upstream data is `UPSTREAM_REQUIREMENT` / `UPSTREAM_BLOCKED`; no Game mutation is authorized.
+
+### 22.2 Placement activation/origin
+Preserve origins such as `base-map`, `conditional-custom-map`, `runtime-world-change`, `annual-event-map`, `quest-map` and `UNKNOWN`. Treat a placement as ordinary default supply only when activation semantics are proven for the selected context.
+
+### 22.3 Compatibility tuple and identity scope
+Every farm/spatial join validates world/profile, content/ruleset revision, modifier context, creature identity scheme/revision and semantic/publication digests. Mismatch is `INCOMPATIBLE`. Migration-derived `monster-entity:*` IDs are export-scheme identities unless Game guarantees canonical continuity.
+
+### 22.4 Atomic farm bundle
+Publish one content-addressed farm bundle manifest pinning compatible farm-intelligence + farm-spatial roots and the compatibility tuple. Browser activation is all-or-nothing; mixed-generation roots fail closed.
+
+
+### 22.5 Stochastic process and numerical stability
+Binomial/PMF outputs require stationary IID per-qualifying-kill semantics or another explicitly supported exact process. Stateful/pity/first-kill/player-state/unknown dependence disables IID thresholds. Use stable bounded probability algorithms verified against an independent high-precision oracle; forbid naive factorials and silent underflow/overflow.
+
+### 22.6 Generated loot vs personal acquisition
+Static estimator output describes items generated by qualifying loot opportunities. `Personally acquired` requires a proven allocation model such as solo/all-loot-to-me. Party allocation is not inferred.
+
+### 22.7 KPH scope and time base
+Manual KPH encodes progress scope and time base. Item mode uses qualifying selected-source kills/hour; task mode credited target progress/hour. Time base is explicit (`active_hunt`, `hunt_wall`, `trip_wall` or accepted equivalent). Mixed-source time requires explicit per-source semantics.
+
+### 22.8 Heatmap/floor metric contract
+Every heatmap/cluster has explicit `metric_id`, unit and legend. Default is verified placement density for the current floor. Cross-floor totals are summary/list only; yield/capacity stays unavailable when activation/weight/group semantics are insufficient.
+
+### 22.9 Acquisition-source completeness
+Unless a complete acquisition graph is proven upstream, use wording such as `Monster drop sources`; do not imply other item-acquisition routes do not exist.
+
+### 22.10 Shared FullWorld dependency gate
+#113 owns interaction/hit-testing/selection and #115 canonical presentation bounds/label geometry. If those seams are not merged/stable, continue disjoint compiler/math/state/failure work but do not create a competing UI geometry system.
+
+### 22.11 Hunt Intelligence integration
+Future measured KPH/performance consumes accepted Hunt Intelligence/Game Intelligence trust, cohort/world/revision/modifier/time-base/sample/quality/privacy semantics. Farm Explorer defines no second measured analytics model.

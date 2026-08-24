@@ -4,7 +4,7 @@ Alias: `ATLAS-ITEM-SPAWN-FARM-EXPLORER`
 
 Lifecycle authorities:
 - Atlas implementation: `Oteryn/Oteryn-Atlas#114`.
-- Game producer: `Oteryn/Oteryn-Game#75`.
+- Read-only upstream requirement: `Oteryn/Oteryn-Game#75`; this execution must not mutate Game.
 - Related Hunt Intelligence / measured KPH provider: `Oteryn/Oteryn-Atlas#117`.
 - Related creature interaction geometry: `Oteryn/Oteryn-Atlas#113`.
 - Related creature label/presentation geometry: `Oteryn/Oteryn-Atlas#115`.
@@ -19,6 +19,8 @@ Observed during review on 2026-08-24:
 - Game `main` advanced to `6945e962035bac83d1f19b00984df5b82719ebb9` while design work was in progress.
 
 These SHAs are evidence only. Execution must refresh GitHub before mutation.
+
+Final hardening refresh inspected Atlas `main@42d268aa98a7d48e8a7a9ed2e95e4a9c14753909` and Game read-only `main@55e30e23c3d5775ce760c6b210ea77f152b359ae`; these are also evidence only.
 
 ## Verdict
 
@@ -91,7 +93,7 @@ For that model:
 - `E[K] = r / p`;
 - completion after `k` kills: `P(Binomial(k,p) >= r)`.
 
-If the same item can be produced by multiple independent rolls in one kill, or the source runtime has another roll algorithm, the producer must expose enough semantics to normalize to an exact **per-kill quantity distribution**. Atlas must not force such a model into one Bernoulli relation.
+If the same item can be produced by multiple independent rolls in one kill, or the source runtime has another roll algorithm, the accepted upstream publication must expose enough semantics to normalize to an exact **per-kill quantity distribution**. Atlas must not force such a model into one Bernoulli relation.
 
 For an exact per-kill discrete PMF, Atlas may use bounded deterministic DP/convolution. If an exact PMF cannot be proven, probability-aware target completion stays unavailable.
 
@@ -165,7 +167,7 @@ Only an analytics-backed observed farm-rate metric may support a user-facing `Be
 
 It is currently UNKNOWN whether refreshed Game sources can prove all loot probabilities, exact quantity distributions, delivery-task definitions and weekly-task semantics for the desired catalogue.
 
-That uncertainty does not block the architecture. The Game producer must publish capability/completeness states and unresolved relations truthfully.
+That uncertainty does not block Atlas-side architecture. Atlas consumes capability/completeness states only when an accepted upstream publication supplies them; otherwise it records the exact affected capability as `UPSTREAM_BLOCKED` rather than mutating Game.
 
 Atlas can ship a partially populated explorer only when:
 - supported facts are explicitly marked factual;
@@ -189,7 +191,7 @@ Add deterministic tests for:
 
 ## Final design decision
 
-Proceed with the original native FullWorld Item & Spawn Explorer architecture, with this review addendum treated as normative where it tightens or clarifies the original design.
+Proceed with the native FullWorld Item & Spawn Explorer architecture as an **Atlas-only execution**. This review addendum is normative wherever it tightens or overrides original cross-repository wording; Game #75 remains read-only upstream requirement/evidence.
 
 ## 13. Effective KPH must be scoped to qualifying/credited kills
 
@@ -239,7 +241,7 @@ The fixed-quantity Bernoulli case remains the simpler `ceil(N/q) / p` model. Cal
 
 The design's singular `required item` / `required creature` is a minimum v1 case, not permission to corrupt a richer authoritative task.
 
-If Game proves a task with multiple item requirements, multiple eligible creatures, substitution rules, shared-credit rules or other progress semantics, the producer must preserve the exact requirement/credit structure or classify that task form as unsupported for v1. Atlas must not choose one member and present it as the whole task.
+If an accepted upstream task publication proves multiple item requirements, eligible creatures, substitution rules, shared-credit rules or other progress semantics, Atlas must require that exact structure or classify that task form unsupported for v1. Atlas must not choose one member and present it as the whole task.
 
 Weekly classification also does not prove reset schedule/time. Do not display a reset countdown unless Game publishes an explicit schedule contract.
 
@@ -279,3 +281,35 @@ Therefore Farm Explorer's future measured-KPH provider seam must align with the 
 V1 manual KPH remains a user assumption. When measured data arrives, Atlas must keep `VERIFIED`, `MEASURED`, `ESTIMATE` and `UNAVAILABLE` classes distinct and must not silently replace manual input with an incomparable measured cohort.
 
 PR #119 is now part of the implementation base. Executors must read both merged Hunt Intelligence files before designing the measured-provider interface.
+
+
+## 20. Atlas-only execution boundary
+The implementation alias has no write authority in Game. Inspect Game main/contracts/publications read-only. Missing data is recorded only in Atlas as `UPSTREAM_REQUIREMENT` / `UPSTREAM_BLOCKED`; do not create/update/close Game issues, branches, files, commits, PRs, comments, reviews, contracts or workflows.
+
+## 21. Placement origin/activation is first-class
+Preserve static-creature origins such as `base-map`, `conditional-custom-map`, `runtime-world-change`, `annual-event-map`, `quest-map` and `UNKNOWN`. Default farm density/ranking does not treat conditional/event/quest/world-change/unknown placements as ordinary always-active supply.
+
+## 22. Farm/spatial compatibility is atomic
+Join farm facts to spatial facts only when world/profile, content/ruleset revision, modifier context, creature identity scheme/revision and source/publication digests are compatible. Migration-derived `monster-entity:*` identities are export-scheme identities unless Game guarantees cross-revision continuity. Publish one atomic content-addressed farm bundle manifest pinning compatible roots.
+
+## 23. IID/stationarity and numeric envelope
+Binomial/PMF thresholds require stationary IID per-qualifying-kill semantics or another exact supported process. Pity/stateful/first-kill/player-dependent/unknown dependence disables IID thresholds. Use numerically stable bounded methods verified against an independent high-precision oracle for extreme probabilities/targets.
+
+
+## 24. Generated drops are not automatically personal loot
+Static farm math estimates items generated by qualifying loot opportunities. `Time to personally acquire N` requires an explicit allocation model such as solo/all-loot-to-me. Party loot division is never assumed.
+
+## 25. KPH needs progress scope and time base
+Manual KPH stores what is counted and the time base. Item mode counts qualifying selected-source kills; task mode credited progress. Require `active_hunt`, `hunt_wall`, `trip_wall` or accepted equivalent. P50/P80/P95 time is conditional on that fixed KPH, not a variable-speed distribution.
+
+## 26. Heatmap/floor semantics
+Every heatmap/cluster exposes `metric_id`, unit and legend. Default is current-floor verified placement density. All-floor information is summary/list only. Yield/capacity remains unavailable if origin/weight/activation/group semantics are insufficient.
+
+## 27. Acquisition-source completeness wording
+If upstream covers monster loot only, call the list `Monster drop sources`. Do not imply NPC/quest/container/crafting/reward/other acquisition paths do not exist unless a complete acquisition graph proves that.
+
+## 28. Hard dependency gate for #113/#115
+If canonical creature interaction/hit-testing or presentation-bounds seams are not merged/stable, Farm Explorer must not duplicate them. Continue only disjoint compiler/index/math/state/failure work until owner seams exist.
+
+## 29. Additional acceptance requirements
+Test conditional-origin exclusion/activation, compatibility mismatch, export-scoped identity, atomic mixed-root rejection, floor isolation, explicit heatmap metric, IID refusal, extreme numeric cases against an independent oracle, generated-vs-personal scope, KPH time-base round-trip, acquisition-completeness copy and dependency-gate behavior.
