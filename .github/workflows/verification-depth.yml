@@ -1,4 +1,4 @@
-name: Verification Nightly Depth
+﻿name: Verification Nightly Depth
 
 on:
   schedule:
@@ -206,6 +206,15 @@ jobs:
             Invoke-DepthCase -Label 'extra-profiles' -Environment @('ATLAS_E2E_DEPTH=nightly') -Command @(
               'e2e', 'npx', 'playwright', 'test', '--config=playwright.config.mjs',
               '--project=nightly-desktop-dpr2', '--project=nightly-tablet'
+            )
+
+            Invoke-DepthCase -Label 'cross-browser-launch' -Environment @('ATLAS_E2E_DEPTH=nightly') -Command @(
+              'e2e', 'node', 'support/cross-browser-launch-proof.mjs'
+            )
+            Invoke-DepthCase -Label 'cross-browser' -Environment @('ATLAS_E2E_DEPTH=nightly') -Command @(
+              'e2e', 'npx', 'playwright', 'test', '--config=playwright.config.mjs',
+              '--project=nightly-firefox-desktop', '--project=nightly-firefox-mobile-like',
+              '--project=nightly-webkit-desktop', '--project=nightly-webkit-mobile-like'
             )
 
             $optional = [ordered]@{

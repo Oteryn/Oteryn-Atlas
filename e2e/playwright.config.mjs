@@ -57,6 +57,26 @@ if (depth === 'nightly') {
         deviceScaleFactor: 1.5,
       },
     },
+    {
+      name: 'nightly-firefox-desktop',
+      testMatch: /cross-browser-desktop\.spec\.mjs$/,
+      use: { browserName: 'firefox', viewport: { width: 1440, height: 900 } },
+    },
+    {
+      name: 'nightly-firefox-mobile-like',
+      testMatch: /cross-browser-mobile\.spec\.mjs$/,
+      use: { browserName: 'firefox', viewport: { width: 390, height: 844 }, hasTouch: true, deviceScaleFactor: 2 },
+    },
+    {
+      name: 'nightly-webkit-desktop',
+      testMatch: /cross-browser-desktop\.spec\.mjs$/,
+      use: { browserName: 'webkit', viewport: { width: 1440, height: 900 } },
+    },
+    {
+      name: 'nightly-webkit-mobile-like',
+      testMatch: /cross-browser-mobile\.spec\.mjs$/,
+      use: { browserName: 'webkit', viewport: { width: 390, height: 844 }, hasTouch: true, deviceScaleFactor: 2 },
+    },
   );
 }
 

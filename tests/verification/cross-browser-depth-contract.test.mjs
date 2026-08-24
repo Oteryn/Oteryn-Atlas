@@ -1,4 +1,4 @@
-﻿import assert from 'node:assert/strict';
+import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
@@ -23,7 +23,8 @@ test('nightly depth defines bounded Firefox and WebKit desktop/mobile-like proje
   ]) {
     const block = projectBlock(name);
     assert.match(block, new RegExp(`browserName: '${engine}'`));
-    assert.match(block, /cross-browser-(desktop|mobile)\.spec\.mjs/);
+    const expectedSpec = name.includes('mobile-like') ? String.raw`cross-browser-mobile\.spec\.mjs` : String.raw`cross-browser-desktop\.spec\.mjs`;
+    assert.ok(block.includes(expectedSpec), `missing ${expectedSpec} in ${name}`);
     if (name.includes('mobile-like')) assert.doesNotMatch(block, /isMobile\s*:/);
   }
   assert.match(config, /retries:\s*0/);

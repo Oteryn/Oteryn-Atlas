@@ -657,3 +657,12 @@ The platform implementation is complete only when:
 - merged-main/live acceptance is performed only against the exact served merged revision.
 
 The long-term rule is simple: Atlas behavior that ships must remain executable, reproducibly tested behavior.
+## 16. Cross-engine real-browser acceptance
+
+Chromium remains the primary exact-head PR renderer and the only browser whose stable Atlas-owned pixel baselines are merge-blocking. Firefox and WebKit are compatibility-depth engines, not alternate pixel authorities.
+
+The repository-pinned Playwright image must launch both Firefox and WebKit before cross-engine support is claimed. Scheduled/manual Molehill depth runs desktop and mobile-like profiles for each engine with one worker and retries=0. Mobile-like profiles use supported viewport/touch context options and intentionally do not force Chromium-only mobile emulation semantics.
+
+Cross-engine acceptance is behavioral and user-facing: qualification/WebGL runtime, navigation, zoom/floor/mode state, semantic search and inspector, creature/playback controls, responsive drawers, reload/history, clipping, overflow, hit targets, readable text, and strict runtime/network failures. It does not commit Game-derived Firefox/WebKit raster baselines.
+
+Failure evidence must retain exact Atlas revision, engine/project identity, trace/video/screenshot context and the normal machine-readable Playwright summary. Engine-specific capability limitations must be explicit failures or documented classifications, never silent skips or weakened tolerances.
