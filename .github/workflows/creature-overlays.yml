@@ -5,24 +5,42 @@ on:
     paths:
       - tools/build-creature-index.py
       - src/browser/npc-markers.mjs
+      - src/browser/npc-badge-primitives.mjs
+      - src/browser/creature-presentation-controller.mjs
+      - src/browser/creature-presentation-layout.mjs
+      - src/browser/creature-presentation-lod.mjs
+      - src/browser/creature-presentation-runtime.mjs
+      - src/browser/creature-render-diagnostics.mjs
       - tests/npc-markers.mjs
+      - tests/npc-badge-primitives.mjs
+      - tests/creature-presentation-*.mjs
       - tests/creature-index-roles.py
       - web/fullworld-creatures.mjs
       - web/fullworld.css
       - web/fullworld-minimap.mjs
       - e2e/tests/creatures-desktop.spec.mjs
+      - e2e/tests/creature-presentation-*.spec.mjs
       - .github/workflows/creature-overlays.yml
   push:
     branches: [main]
     paths:
       - tools/build-creature-index.py
       - src/browser/npc-markers.mjs
+      - src/browser/npc-badge-primitives.mjs
+      - src/browser/creature-presentation-controller.mjs
+      - src/browser/creature-presentation-layout.mjs
+      - src/browser/creature-presentation-lod.mjs
+      - src/browser/creature-presentation-runtime.mjs
+      - src/browser/creature-render-diagnostics.mjs
       - tests/npc-markers.mjs
+      - tests/npc-badge-primitives.mjs
+      - tests/creature-presentation-*.mjs
       - tests/creature-index-roles.py
       - web/fullworld-creatures.mjs
       - web/fullworld.css
       - web/fullworld-minimap.mjs
       - e2e/tests/creatures-desktop.spec.mjs
+      - e2e/tests/creature-presentation-*.spec.mjs
       - .github/workflows/creature-overlays.yml
 
 permissions:
@@ -42,8 +60,14 @@ jobs:
           python -m py_compile tools/build-creature-index.py tests/creature-index-roles.py
           python tests/creature-index-roles.py
           node --check src/browser/npc-markers.mjs
+          node --check src/browser/npc-badge-primitives.mjs
+          node --check src/browser/creature-presentation-controller.mjs
+          node --check src/browser/creature-presentation-layout.mjs
+          node --check src/browser/creature-presentation-lod.mjs
+          node --check src/browser/creature-presentation-runtime.mjs
+          node --check src/browser/creature-render-diagnostics.mjs
           node --check web/fullworld-creatures.mjs
-          node --test tests/npc-markers.mjs
+          node --test tests/npc-markers.mjs tests/npc-badge-primitives.mjs tests/creature-presentation-layout.mjs tests/creature-presentation-lod.mjs tests/creature-presentation-runtime.mjs
 
       - name: Run deterministic creature-index fixture
         shell: bash
@@ -135,7 +159,8 @@ jobs:
           grep -q "EXPECTED_CAPABILITY = 'animated-creatures-v1'" web/fullworld-creatures.mjs
           grep -q 'getAnimationRuntime' web/fullworld-creatures.mjs
           grep -q "EXPECTED_NPC_ROLE_SCHEMA = 1" web/fullworld-creatures.mjs
-          grep -q "NPC_MARKER_STYLE = 'functional-icons-v1'" web/fullworld-creatures.mjs
+          grep -q "NPC_BADGE_STYLE = 'functional-icons-v2'" src/browser/npc-badge-primitives.mjs
+          grep -q 'createCreaturePresentationController' web/fullworld-creatures.mjs
           grep -q "id=\"npc-role-filter\"" web/fullworld-creatures.mjs
           grep -q '__OTERYN_ATLAS_CREATURES__' web/fullworld-creatures.mjs
           grep -q "panel.id = 'creature-inspector'" web/fullworld-creatures.mjs
