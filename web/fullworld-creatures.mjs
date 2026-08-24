@@ -114,6 +114,7 @@ function publish(status = 'LOADING', error = null, extra = {}) {
     hoveredRecordId: state.hoveredId,
     cardState: state.cardState.mode,
     cardRecordId: state.cardState.recordId,
+    selectedTargetRect: state.selectedId ? state.interactionTargets.get(state.selectedId)?.presentationRect ?? null : null,
     cardTargetRect: state.cardState.recordId ? state.interactionTargets.get(state.cardState.recordId)?.presentationRect ?? null : null,
     cardTargetAssistRect: state.cardState.recordId ? state.interactionTargets.get(state.cardState.recordId)?.assistRect ?? null : null,
     error: error ? String(error.message ?? error) : null,

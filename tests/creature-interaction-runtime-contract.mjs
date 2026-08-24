@@ -25,6 +25,7 @@ test('creature runtime builds committed targets and claims only valid map activa
   assert.match(creatures, /event\.preventDefault\(\)/);
   assert.match(creatures, /interactionVersion: 'creature-interaction-v1'/);
   assert.match(creatures, /rendererGeneration/);
+  assert.match(creatures, /selectedTargetRect:/);
 });
 test('quick card actions are truthful and mobile inspector opens through an event seam', () => {
   assert.match(creatures, /navigator\.clipboard\?\.writeText/);

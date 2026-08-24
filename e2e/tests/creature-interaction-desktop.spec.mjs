@@ -116,15 +116,26 @@ test('desktop monster activation opens Monster spawn card and survives canonical
   await waitForAtlas(page);
   const overlapState = await creatureState(page);
   expect(overlapState.cardRecordId).toBe(OVERLAP_MONSTER_FIXTURE.record_id);
-  const overlapRect = overlapState.cardTargetRect;
-  expect(overlapRect).not.toBeNull();
+  expect(overlapState.cardTargetRect).not.toBeNull();
   const atlasBox = await page.locator('#atlas').boundingBox();
   expect(atlasBox).not.toBeNull();
   await page.locator('#creature-card-close').click();
-  await page.mouse.click(
-    atlasBox.x + overlapRect.x + overlapRect.width / 2,
-    atlasBox.y + overlapRect.y + overlapRect.height / 2,
-  );
+  await expect(page.locator('#creature-quick-card')).toBeHidden();
+  await expect.poll(() => page.evaluate(() => {
+    const creatures = globalThis.__OTERYN_ATLAS_CREATURES__;
+    const renderer = globalThis.__OTERYN_ATLAS_RENDERER_DIAGNOSTICS__;
+    return Boolean(creatures?.selectedTargetRect
+      && creatures.interactionBaseGeneration === renderer?.generation);
+  })).toBe(true);
+  const freshOverlap = await creatureState(page);
+  const overlapRect = freshOverlap.selectedTargetRect;
+  const overlapX = atlasBox.x + overlapRect.x + overlapRect.width / 2;
+  const overlapY = atlasBox.y + overlapRect.y + overlapRect.height / 2;
+  await page.mouse.move(overlapX, overlapY);
+  await expect.poll(() => page.evaluate((recordIds) => recordIds.includes(
+    globalThis.__OTERYN_ATLAS_CREATURES__?.hoveredRecordId,
+  ), OVERLAP_MONSTER_FIXTURE.record_ids)).toBe(true);
+  await page.mouse.click(overlapX, overlapY);
   await expect.poll(() => page.evaluate(() => globalThis.__OTERYN_ATLAS_CREATURES__?.cardState)).toBe('chooser');
   const choices = page.locator('#creature-card-choices button');
   expect(await choices.count()).toBeGreaterThanOrEqual(3);

@@ -11,6 +11,9 @@ test('map pointer-up exposes the cancelable creature activation seam before tile
   assert.match(app, /worldX:/);
   assert.match(app, /rendererGeneration:/);
   assert.match(app, /if \(!claimed\) \{/);
+  assert.match(app, /let shouldRefresh = wasMoved/);
+  assert.match(app, /if \(!claimed\) \{\s+shouldRefresh = true/);
+  assert.match(app, /if \(shouldRefresh\) scheduleRefresh\(0\)/);
   const dispatchAt = app.indexOf('dispatchMapActivation(window, {');
   const tileSelectionAt = app.indexOf('const target = { floor:', dispatchAt);
   assert(dispatchAt >= 0 && tileSelectionAt > dispatchAt);

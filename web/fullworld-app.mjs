@@ -869,6 +869,7 @@ function wireInteraction() {
     const wasMoved = dragging.moved;
     dragging = null;
     canvas.classList.remove('dragging');
+    let shouldRefresh = wasMoved;
     if (!wasMoved) {
       const point = pointerWorld(event);
       const rect = canvas.getBoundingClientRect();
@@ -883,6 +884,7 @@ function wireInteraction() {
         view,
       });
       if (!claimed) {
+        shouldRefresh = true;
         const blend = lodBlend(view.zoom, view.mode, detailReady);
         const target = { floor: view.floor, x: Math.floor(point.x), y: Math.floor(point.y) };
         view = clampView(blend.minimap >= 0.5 ? { ...view, x: point.x, y: point.y, selected: target } : { ...view, selected: target });
@@ -892,7 +894,7 @@ function wireInteraction() {
         updateSelectionBox();
       }
     }
-    scheduleRefresh(0);
+    if (shouldRefresh) scheduleRefresh(0);
   });
   canvas.addEventListener('pointercancel', () => { dragging = null; canvas.classList.remove('dragging'); });
   window.addEventListener('resize', () => { scheduleRender('resize'); scheduleRefresh(100); if (view?.animation === 'on') drawWorldAnimation(animationLogicalMs).catch(failClosed); });
