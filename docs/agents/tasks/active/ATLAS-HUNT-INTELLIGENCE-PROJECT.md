@@ -1,6 +1,6 @@
 # Oteryn Atlas — Hunt Intelligence implementation project
 
-Status: DESIGN / EXECUTION CONTRACT
+Status: DESIGN / EXECUTION CONTRACT v2 — HARDENED ATLAS-ONLY PROGRAMME
 
 Lifecycle authority: `Oteryn/Oteryn-Atlas#117`
 
@@ -8,952 +8,1069 @@ Parent programme: `Oteryn/Oteryn-Atlas#11`
 
 Verification policy: `Oteryn/Oteryn-Atlas#85`
 
-Related capability: `Oteryn/Oteryn-Atlas#114` (`ATLAS-ITEM-SPAWN-FARM-EXPLORER`)
+Related capabilities:
+
+- `Oteryn/Oteryn-Atlas#113` — creature click/tap, hit testing, selection and contextual cards;
+- `Oteryn/Oteryn-Atlas#114` — Item & Spawn Explorer / farm estimates;
+- `Oteryn/Oteryn-Atlas#115` — canonical creature presentation bounds, labels and NPC badges.
 
 Execution alias: `ATLAS-HUNT-INTELLIGENCE-IMPLEMENTATION`
 
-Design baseline inspected on 2026-08-24:
+Hardened design baseline: Atlas `main@3618bf5614c31b91e6846083066be8d77385eea2`.
 
-- Atlas `main`: `db5de3938ef815fb467dd2ad911a1ed92b13dccf`;
-- Game `main`: `1f69677b40851551953caf853c08b37ce7b29c68`;
-- Game world/content authority: `docs/architecture/ADR-0005-native-world-format-and-oteryn-studio.md`;
-- Game Intelligence authority: `docs/architecture/ADR-0006-game-intelligence-analytics-and-audit.md`;
-- Atlas authority/testing rules: root `AGENTS.md` and `docs/testing/ATLAS-VERIFICATION-PLATFORM.md`.
+`Oteryn-Game` remains canonical World/Content authority and the architectural source for Game Intelligence. For this programme it is **READ-ONLY**. This document may describe required future upstream semantics, but it does not authorize any mutation of `Oteryn/Oteryn-Game`.
 
-Issue #117 is the mutable lifecycle/status authority. This document is the technical design and execution contract and must not become a second task-status database.
+Issue #117 is the mutable lifecycle/status authority. This document is the technical design and execution contract and must not become a second mutable status database.
 
 ---
 
 ## 1. Product decision
 
-Oteryn Atlas will implement **Hunt Intelligence** as a first-class FullWorld capability rather than a static list of hunting places.
+Oteryn Atlas will implement **Hunt Intelligence** as a first-class FullWorld capability rather than a static hunting-place directory.
 
-The product must answer four progressively richer questions:
+The target answers four questions:
 
-1. **Where can I hunt?** — authoritative world/content facts and Hunt Area geometry.
-2. **How do I use this hunt?** — entrances, floors, monsters/spawns, requirements and authoritative route guides where published by Game.
-3. **How does this hunt actually perform?** — privacy-safe measured aggregates from Oteryn Game Intelligence.
-4. **How is it likely to perform for me or my party?** — Atlas-derived recommendations/ranges based only on comparable measured cohorts, with explicit uncertainty.
+1. **Where can I hunt?** — authoritative Hunt Areas, floors, entrances, requirements and creature/spawn relations when Game publishes them.
+2. **How do I use the hunt?** — authoritative route/access guidance, shared FullWorld creature/item/spawn primitives and floor-aware navigation.
+3. **How does the hunt actually perform?** — privacy-safe measured aggregates only when an accepted Game Intelligence publication exists.
+4. **How is it likely to perform for my selected profile/party?** — deterministic Atlas estimates based on compatible measured cohorts, with explicit uncertainty.
 
-The central rule is that there is no single universal `EXP/h` or `profit/h` number for a hunt. Solo, duo and party play generate materially different outcomes. Hunt Intelligence therefore models **PLAYER**, **PARTY** and **HUNT AREA** performance separately and preserves the cohort context required to compare them truthfully.
+There is no single universal `EXP/h`, `profit/h`, `best party size` or `best hunt` fact. The product models three scopes independently:
+
+- **PLAYER** — what one participant actually receives, spends and risks;
+- **PARTY** — what the team collectively produces and consumes;
+- **HUNT AREA** — how the area/spawn is utilized and where additional load stops producing proportional benefit.
+
+The feature must remain useful before measured analytics exists: VERIFIED hunt navigation may ship independently, while MEASURED / ESTIMATE panels remain `UNAVAILABLE` until the required accepted upstream evidence exists.
 
 ---
 
-## 2. Authority boundary
+## 2. Owner restriction: no Oteryn-Game mutation
 
-### 2.1 Oteryn-Game owns world/content facts
+This is a hard programme rule.
 
-`Oteryn/Oteryn-Game` is the only authority for Game-owned facts, including where implemented:
+### Allowed against `Oteryn/Oteryn-Game`
 
-- Hunt Area identity and authored metadata;
-- world geometry, coordinates, floors and transitions;
-- Area/Subarea/Zone/EncounterZone relations;
-- entrances and access anchors;
+- read repository metadata, current `main`, ADRs, contracts and source;
+- inspect existing accepted public-safe Game -> Atlas exports;
+- inspect existing Game Intelligence architecture/status/publications;
+- cite exact Game revisions as provenance;
+- record an **Atlas-side** `UPSTREAM_REQUIREMENT` or `UPSTREAM_BLOCKED` note describing what Atlas needs in the future.
+
+### Forbidden against `Oteryn/Oteryn-Game`
+
+- create/update/close Issue;
+- create/update/delete branch or tag;
+- create/update file;
+- create commit;
+- create/update/merge PR;
+- add a comment/review/reaction;
+- alter workflow, contract, code, schema or docs;
+- push local changes;
+- activate or allocate `OTV2-IMPL-ANALYTICS` or any other Game lane.
+
+If the required upstream capability does not exist, Atlas must remain fail-closed for that capability. The implementation must not invent a Game contract merely to populate UI.
+
+The only durable notes created by this programme belong in `Oteryn/Oteryn-Atlas`.
+
+---
+
+## 3. Authority and trust boundaries
+
+### 3.1 Oteryn-Game — external read-only authority
+
+Game is the only authority for Game-owned facts, including where published:
+
+- stable world/content identities;
+- world/profile/revision identity;
+- coordinates, floors, transitions and geometry;
+- Area/Subarea/Zone/EncounterZone semantics;
 - spawn definitions and creature identity;
-- items, loot definitions, NPC value and content relationships;
-- quests/access requirements;
-- official/authored hunt route nodes and floor transitions;
-- `content_revision`, ruleset identifiers and other Game revisions.
+- items, loot definitions and NPC value;
+- access/quest requirements;
+- authored route nodes/segments;
+- gameplay event semantics;
+- server-awarded XP and authoritative economy mutations.
 
-Atlas must not invent or repair missing Game-owned coordinates, floor geometry, creature placement, access requirements or content semantics.
+Atlas cannot repair missing upstream facts.
 
-### 2.2 Oteryn Game Intelligence owns measured analytics
+### 3.2 Oteryn Game Intelligence — future/optional measured source
 
-The analytics source is the accepted Oteryn Game Intelligence architecture from ADR-0006. It remains observational and must not become gameplay authority.
+Game Intelligence is observational/analytical and must not become gameplay authority. Atlas may consume its public-safe aggregates only when an accepted producer/publication exists.
 
-Game Intelligence owns the production and aggregation semantics for measured facts such as:
+This Atlas design records the **consumer requirements** for such a publication. These requirements are not themselves a Game contract.
 
-- experience actually awarded;
-- monster kills and kill attribution;
-- damage/healing/deaths where relevant;
-- consumable/supply use;
-- loot/value/economy measurements;
-- party composition/shared-experience context;
-- Area/Subarea/EncounterZone activity and spawn utilization;
-- revision-aware statistical aggregates;
-- quality/privacy release policy for public-safe aggregates.
-
-Atlas must not consume raw private telemetry when a privacy-safe aggregate can answer the product question.
-
-### 2.3 Oteryn-Atlas owns projection, presentation and labelled estimates
+### 3.3 Oteryn-Atlas — projection, presentation and estimates
 
 Atlas may:
 
-- validate and project accepted Game exports;
+- validate accepted upstream publications;
 - build deterministic search/spatial indexes;
-- render hunt geometry/routes/creature and item relations;
-- compare compatible measured cohorts;
-- derive explicitly labelled estimates or recommendation scores from accepted inputs;
-- expose provenance, quality and uncertainty.
+- render Hunt Areas/routes using accepted coordinates;
+- reuse creature/item/spawn primitives;
+- compare semantically compatible measured cohorts;
+- derive labelled estimates/recommendations;
+- expose provenance, statistical quality, freshness and uncertainty.
 
-Atlas may not transform an estimate into a fact by presentation.
-
----
-
-## 3. User-facing trust classes
-
-Every hunt datum shown to a user must resolve to one of these classes:
-
-| Class | Meaning | Example |
-| --- | --- | --- |
-| `VERIFIED` | Authoritative Game-owned fact or accepted factual Game export | geometry, entrance, creature/spawn relation, access requirement |
-| `MEASURED` | Aggregate observed by Game Intelligence | median player XP/h for a defined cohort |
-| `ESTIMATE` | Atlas-derived calculation from verified/measured inputs | expected range for the user's profile, equal-share loot scenario |
-| `UNKNOWN` / `UNAVAILABLE` | Insufficient, absent, blocked or incompatible evidence | no current-revision cohort with enough publishable data |
-
-`MEASURED` values must always carry enough context to prevent false precision: cohort, time base, sample evidence, revision scope, time window and quality/confidence state.
+Atlas may not transform `ESTIMATE`, test fixtures or illustrative values into a factual Game or measured claim.
 
 ---
 
-## 4. Domain model
+## 4. User-facing state vocabulary
 
-### 4.1 Hunt Area
+Every user-visible field must resolve to both a **trust class** and an **availability state**.
 
-Hunt Intelligence requires an explicit Game-owned hunt catalog concept. The implementation may name the source object `HuntArea`, `HuntDefinition` or another accepted schema name, but it must not redefine the existing spatial hierarchy from ADR-0005.
+### Trust class
 
-A hunt object references authoritative spatial/content primitives rather than replacing them:
+| Class | Meaning |
+| --- | --- |
+| `VERIFIED` | accepted Game-owned fact / accepted factual Game export |
+| `MEASURED` | accepted Game Intelligence aggregate with sample/time/revision/quality context |
+| `ESTIMATE` | deterministic Atlas-derived calculation from accepted inputs |
+| `UNKNOWN` | semantic truth is not known |
 
-```text
-World
-  Area / Subarea / EncounterZone / Zone
-        ^
-        | referenced by
-        |
-  HuntDefinition
-        +-- floor geometry refs
-        +-- entrance/access refs
-        +-- spawn-group refs
-        +-- creature refs
-        +-- requirement refs
-        `-- authored route refs
+### Availability state
 
-World
-  Region -> Chunk              (technical partitioning)
-```
+| State | Meaning |
+| --- | --- |
+| `AVAILABLE` | usable for the requested presentation |
+| `UPSTREAM_BLOCKED` | required Game/Game Intelligence publication does not exist or is not accepted |
+| `INSUFFICIENT` | data exists but statistical evidence is insufficient |
+| `SUPPRESSED` | privacy/release policy forbids publication |
+| `INCOMPATIBLE` | revisions/cohorts/valuation/time bases cannot be compared truthfully |
+| `MALFORMED` | publication exists but fails schema/integrity bounds |
+| `STALE` | publication is outside the accepted freshness policy |
 
-The first accepted contract should support at least:
+`0` is a numeric value, never a substitute for any unavailable state.
 
-```text
-hunt_id                 stable namespaced identity
-name / localization key
-area_refs
-subarea_refs
-encounter_zone_refs     optional
-floor_geometry_refs
-entrance_refs
-spawn_group_refs
-creature_refs
-requirement_refs
-route_refs              optional
-content_revision
-publication/provenance metadata
-```
+---
 
-A hunt may span multiple floors and may intersect multiple technical chunks.
+## 5. Shared Atlas primitive ownership
 
-### 4.2 Route guides
+Hunt Intelligence must not fork or duplicate existing FullWorld interaction/presentation infrastructure.
 
-Route coordinates are Game-owned coordinates. Repository-published route geometry must therefore come from an accepted Game export or another explicitly accepted source contract; Atlas must not silently author world coordinates as if they were Game facts.
+### #115 owns canonical creature presentation geometry
 
-A route should support:
+When available, Hunt Intelligence reuses:
 
-- stable route identity;
-- objective/type (`rotation`, `access`, `refill`, or another accepted vocabulary);
-- ordered nodes/segments;
-- explicit floor transition edges;
-- optional pull/box/waypoint semantics only when authored;
-- source/provenance class;
-- content revision compatibility.
+- canonical CSS-pixel creature presentation bounds;
+- committed transform linkage;
+- DPR-correct geometry;
+- label/badge layout diagnostics.
 
-User-local routes can be a later feature, but must remain user annotations rather than Game truth.
+It must not create a second creature-bounds calculation.
 
-### 4.3 Hunt cohort
+### #113 owns interaction and selection
 
-A measured result is meaningful only inside a sufficiently specific cohort. The analytics contract must preserve at least the dimensions that materially affect outcome when available:
+When available, Hunt Intelligence reuses:
+
+- creature hit testing;
+- hover/selection state;
+- `creature=` URL identity;
+- contextual creature card anchoring;
+- overlap resolution;
+- inspector synchronization.
+
+Hunt Intelligence must not create a second creature selection model or independent click handlers.
+
+### #114 owns Item & Spawn Explorer primitives
+
+Hunt Intelligence reuses:
+
+- item identity;
+- creature -> item/drop-source relations;
+- spawn position/area identity;
+- drop probability/quantity semantics where authoritative;
+- map LOD/cluster primitives;
+- item/spawn inspector/deep-link conventions;
+- static farm-estimator semantics.
+
+Measured KPH / player-party-hunt performance belongs to #117 and must not be copied back into #114 as a competing analytics stack.
+
+### Dependency gate
+
+Before Hunt UI work touches shared surfaces, the implementation must resolve live #113/#114/#115 status and exact merged seams.
+
+If a required seam is still in-flight:
+
+- continue only on disjoint Hunt data/contract/index work;
+- do not duplicate the missing seam;
+- integrate after the owning capability is merged or after an explicit shared contract is available.
+
+---
+
+## 6. Hunt domain consumer model
+
+Hunt Intelligence requires a stable Game-owned hunt identity when Game eventually publishes it. Atlas must not invent production Hunt Areas from pixels, arbitrary polygons or community pages.
+
+A consumer-visible hunt record should be capable of referencing:
 
 ```text
 hunt_id
+name/localization identity
+world/profile compatibility
+area_refs
+subarea_refs
+encounter_zone_refs       optional
+floor_geometry_refs
+entrance/access_refs
+spawn_group_refs
+creature_refs
+requirement_refs
+route_refs                 optional
+content_revision
+source/provenance
+```
+
+A hunt can span multiple floors/chunks. It must not be forced into the technical `Region -> Chunk` hierarchy.
+
+If no accepted upstream Hunt Catalog exists, production Atlas must classify the catalog `UPSTREAM_BLOCKED`; deterministic fixtures may exercise loaders/UI only in tests.
+
+---
+
+## 7. World, profile, channel and instance scope
+
+Analytics and valuation must never silently pool incompatible worlds.
+
+Every measured performance identity must preserve, as applicable:
+
+```text
+world_id
+world_profile_revision / profile_family
 content_revision
 ruleset_revision
-server_build or compatible release bucket
-window_start / window_end
+channel_aggregation_scope
+instance_scope / instance_kind
+server_build_or_compatibility_bucket
+```
+
+Rules:
+
+1. reference/evolved or otherwise incompatible profile families never share headline cohorts;
+2. multiple channels of the same logical world may be aggregated only under an explicit channel aggregation policy;
+3. instanced and non-instanced hunts are not pooled unless an accepted compatibility policy says they are equivalent;
+4. valuation is world-scoped when market prices are world-scoped;
+5. historical revision data is never silently substituted for current revision evidence.
+
+---
+
+## 8. Hunt attribution and exposure segmentation
+
+A full login/session is not automatically one hunt sample.
+
+### 8.1 Hunt attribution policy
+
+Game Intelligence, when implemented by its owning programme, must have a versioned policy that determines when gameplay exposure belongs to a Hunt Area. Atlas consumes only the resulting aggregate identity.
+
+The policy may consider authoritative facts such as:
+
+- Hunt Area membership;
+- dwell/exposure time;
+- monster kills/attribution;
+- combat activity;
+- floor/geometry membership;
+- transitions between hunts.
+
+Atlas must not invent fixed grace periods or classify raw movement itself.
+
+Required aggregate provenance field:
+
+`hunt_attribution_policy_revision`
+
+### 8.2 HuntExposureSegment concept
+
+One outing can contain multiple analytically distinct segments. A future upstream aggregate should be able to split exposure when a material cohort dimension changes, including:
+
+- hunt identity;
+- party membership/size/composition;
+- shared-experience state;
+- world/channel/instance scope;
+- content/ruleset revision;
+- material temporary modifiers;
+- player role/vocation where mutable;
+- level/power bucket when a bucket boundary is crossed and policy requires it.
+
+Conceptual consumer identity:
+
+```text
+exposure_segment_id       never public raw identity
+cohort_signature
+segment_start/end
+segment_duration
+segment policy revision
+```
+
+Raw segment/session IDs do not reach the public browser publication.
+
+---
+
+## 9. Cohort identity
+
+A measured result is meaningful only inside a sufficiently specific cohort.
+
+Conceptual material dimensions:
+
+```text
+hunt_id
+world_id
+world_profile_revision
+content_revision
+ruleset_revision
+server/release compatibility bucket
+window_start/window_end
 party_size
 party_composition
 shared_experience_state
-player_vocation_or_class
-player_role where distinct
+player_vocation/class/role
 player_level_band
 party_level_distribution/band
-equipment_power_band where privacy/quality permit
-skill/power band where privacy/quality permit
-active modifiers/bonuses/events when authoritative
+equipment_power_band          if privacy/quality permit
+skill/power_band              if privacy/quality permit
+modifier_bucket
+channel_aggregation_scope
+instance_scope
+hunt_attribution_policy_revision
 sessionization_policy_revision
+aggregation_policy_revision
 valuation_policy_revision
 quality_policy_revision
+privacy_policy_revision
 ```
 
-Do not collapse dimensions merely to make the UI populated. Cohort widening is allowed only through an explicit, reproducible fallback policy and must reduce the displayed confidence/quality.
+Use a versioned canonical `cohort_signature`/identity over accepted dimensions so equal cohorts are deterministic.
 
-### 4.4 Three performance scopes
-
-#### PLAYER
-
-Answers: *what does a participant actually receive, spend and risk?*
-
-Candidate measures:
-
-- player awarded XP/hour;
-- personal supply cost/hour;
-- personal realized/allocated loot value/hour when attribution is authoritative;
-- personal net profit/hour when the allocation semantics are proven;
-- deaths per player-hour;
-- damage/healing/consumable pressure where product-relevant.
-
-#### PARTY
-
-Answers: *how much does the whole team produce and consume?*
-
-Candidate measures:
-
-- sum of XP actually awarded to party members/hour;
-- base creature XP defeated/hour when separately useful for spawn throughput;
-- team gross loot value/hour;
-- team supply cost/hour;
-- team net value/profit/hour under a named valuation policy;
-- kills/hour and creature mix;
-- wipe/team-death metrics;
-- party composition and shared-experience state.
-
-#### HUNT AREA
-
-Answers: *how is the spawn being utilized and where does additional party size stop helping?*
-
-Candidate measures:
-
-- kill throughput by comparable party cohort;
-- spawn utilization and monster lifetime/kill rate where Game Intelligence exposes them;
-- area occupancy/load distribution;
-- team throughput curve by party size/composition;
-- per-player yield curve by party size/composition;
-- objective-specific saturation/marginal-gain estimates;
-- objective-specific optimal party-size recommendation when statistically supportable.
-
-There is no context-free `optimal party size`. The objective must be named, for example `max player XP/h`, `max player profit/h`, or `max team throughput`.
+Cohort widening is allowed only through an explicit ordered policy. Every widening step must be recorded and reduce recommendation confidence/quality. Incompatible dimensions may never be widened.
 
 ---
 
-## 5. Time-base semantics
+## 10. Time semantics
 
-Time-base ambiguity can distort hunt comparisons as much as party size. The analytics contract should retain distinct durations where deterministically available:
+Preserve distinct denominators where the accepted upstream aggregate provides them:
 
 ```text
-trip_wall_seconds       end-to-end outing including travel/refill where defined
-hunt_wall_seconds       wall-clock interval attributed to the Hunt Area
-active_hunt_seconds     qualifying active hunting time
-combat_seconds          time classified as combat by a versioned policy
-travel_seconds          attributable travel time where defined
-refill_seconds          attributable refill time where defined
-downtime_seconds        remaining classified idle/down time where defined
+trip_wall_seconds
+hunt_wall_seconds
+active_hunt_seconds
+combat_seconds
+travel_seconds
+refill_seconds
+downtime_seconds
+player_exposure_seconds
+team_exposure_seconds
 ```
 
-The exact sessionization rules belong to Game Intelligence and must be versioned (`sessionization_policy_revision`). Do not hard-code undocumented grace periods in Atlas.
+Atlas should distinguish at least:
 
-Atlas should prefer two clearly named rates when both exist:
+- **Active hunt rate** — output / qualifying active hunt time;
+- **End-to-end rate** — output / broader trip/session wall time;
+- **Exposure-weighted rate** — pooled output / pooled exposure over a cohort.
 
-- **Active hunt rate** — output divided by `active_hunt_seconds`;
-- **End-to-end/session rate** — output divided by a broader wall-clock denominator.
-
-A user must not be shown a combat-only rate as if it represented the complete session.
+A combat-only rate must never be labelled as a full-session rate.
 
 ---
 
-## 6. Experience semantics: solo versus party
+## 11. XP semantics
 
-Party experience must never be normalized by blindly dividing one team number by player count.
-
-The authoritative event/aggregate model should distinguish, where available:
+Future accepted aggregates should distinguish where available:
 
 ```text
 player_awarded_xp
 party_awarded_xp_sum
 base_creature_xp_defeated
 shared_experience_state
+xp_modifier_bucket
 party_bonus/modifier identity
 ```
 
-Rules:
+Hard rules:
 
-1. **Player XP/h** uses XP actually awarded by the authoritative server to that player.
-2. **Party awarded XP/h** is the sum of actual awarded XP for included members over the same defined denominator.
-3. **Base creature XP defeated/h** is a separate spawn-throughput measure and must not be labelled as awarded player/team XP.
-4. Shared-experience bonuses remain part of the actual server-award path; Atlas must not reverse-engineer them by division.
-5. Cross-mode ranking should compare the user's relevant player metric against compatible player cohorts, not raw team throughput.
-6. `XP/player-hour` may be published as an efficiency aggregate when analytically useful, but it is not a substitute for the actual per-player distribution.
-
-Example interpretation:
-
-```text
-Solo RP cohort:
-  median player XP/h = 6.0m
-
-Four-player cohort:
-  median party awarded XP/h = 30.0m
-  median RP player XP/h = 7.4m
-```
-
-The fact that `30.0m > 6.0m` is not a valid reason by itself to rank the party mode as five times better for one player.
+1. player XP uses XP actually awarded by the authoritative server;
+2. team XP uses a separately defined team aggregate;
+3. base creature XP is spawn throughput, not awarded XP;
+4. never derive player XP by dividing team XP by party size;
+5. `XP/player-hour` is an additional efficiency measure, not a replacement for player distributions;
+6. baseline results do not silently include temporary XP events/boosts.
 
 ---
 
-## 7. Loot, supply cost and profit semantics
+## 12. Temporary modifiers and event segregation
 
-Profit is only meaningful when valuation and allocation semantics are explicit.
+Time-limited effects can materially bias observed performance and therefore are first-class cohort dimensions.
 
-### 7.1 Valuation
+Examples include accepted future equivalents of:
 
-Every value-bearing aggregate must identify a valuation policy/revision, for example:
+- global XP event;
+- personal XP boost;
+- creature-specific modifier;
+- party/shared-experience modifier;
+- temporary loot modifier;
+- ruleset/event state.
 
-- NPC sell value;
-- trusted market value;
-- accepted mixed policy.
+Default headline behavior:
 
-Atlas must not silently mix valuation policies across cohorts.
+- use the normal/current baseline modifier bucket;
+- never allow past boosted/event samples to inflate normal future recommendations;
+- when the user's selected/current context includes an authoritative modifier, prefer a compatible modifier cohort;
+- missing modifier provenance degrades or blocks comparability.
 
-### 7.2 Team value
+---
 
-When authoritative inputs exist:
+## 13. Loot, value and profit semantics
+
+### 13.1 Valuation scope
+
+Every value metric must preserve:
+
+```text
+valuation_policy_revision
+valuation_type               NPC / MARKET / MIXED / other accepted
+world_id                      when market-scoped
+price_window
+price_as_of / generated_at
+price_quality_state
+liquidity_quality             when available
+```
+
+Do not silently mix NPC and market valuation.
+
+### 13.2 Team values
+
+When accepted evidence exists:
 
 ```text
 team_gross_loot_value
 team_supply_cost
 team_other_explicit_cost
-team_net_value = team_gross_loot_value - team_supply_cost - team_other_explicit_cost
+team_net_value
 ```
 
-### 7.3 Player value
+### 13.3 Player values
 
-`player_net_profit` is `MEASURED` only when Game/analytics can establish the player's actual allocated/realized share with sufficient semantics.
+`player_net_profit` is `MEASURED` only when the actual allocation/realization semantics are accepted and attributable.
 
-If only team loot is known, Atlas may show:
+If only team loot is measured:
 
-- verified/measured `team_net_value`;
-- an **ESTIMATE** such as an equal-share scenario;
-- personal supply cost when measured.
+- show team measured value;
+- show measured personal costs if available;
+- equal-share or another split scenario is `ESTIMATE`;
+- never label the split as measured personal profit.
 
-It must not label an assumed equal split as measured personal profit.
+### 13.4 Rare-loot heavy tails
+
+Profit must distinguish short-run realized outcomes from long-run modeled value.
+
+Useful separate concepts:
+
+- `realized_profit_distribution`;
+- median/IQR/P10-P90 realized profit where publishable;
+- `expected_long_run_loot_value` only when a proven drop model exists (shared with #114);
+- `rare_drop_contribution` where a policy can publish it safely.
+
+Atlas should be able to present both:
+
+```text
+Measured realized median
+Expected long-run value
+```
+
+without implying they are the same statistic.
 
 ---
 
-## 8. Statistical publication contract
+## 14. Statistical estimators and weighting
 
-A headline metric is a distribution summary, not one cherry-picked session.
+One ten-minute session and one three-hour session must not necessarily carry identical analytical weight.
 
-For every publishable measured cohort, the aggregate should carry where applicable:
+Where accepted upstream data permits, preserve both:
+
+### Session/segment distribution
+
+```text
+median(rate_per_segment_or_session)
+p25/p75
+p10/p90 when publishable
+sample_segments
+sample_sessions
+```
+
+### Exposure-weighted evidence
+
+```text
+pooled_player_rate = sum(player_output) / sum(player_exposure_time)
+pooled_team_rate   = sum(team_output) / sum(team_exposure_time)
+sample_player_hours
+sample_team_hours
+```
+
+The UI should not hide which estimator is being shown.
+
+Quality policy should be able to reject trivially short/noisy segments rather than letting them dominate the distribution; exact thresholds belong to the future upstream policy, not Atlas invention.
+
+---
+
+## 15. Telemetry completeness and publication watermarks
+
+Large sample size does not imply high quality if telemetry is incomplete.
+
+A future accepted measured publication should be able to carry quality inputs such as:
+
+```text
+complete_through
+aggregation_generated_at
+ingestion_lag
+coverage_state
+event_loss_or_drop_state
+replay/reconciliation_state
+aggregation_policy_revision
+```
+
+Hard rule: Atlas must not display `HIGH` quality if completeness is unknown or outside the accepted policy.
+
+A temporarily unhealthy analytics pipeline must degrade measured panels independently from VERIFIED map navigation.
+
+---
+
+## 16. Statistical publication contract
+
+A publishable cohort should carry where applicable:
 
 ```text
 sample_sessions
+sample_segments
 sample_player_hours
 sample_team_hours
-window_start
-window_end
+window_start/window_end
 median
-p25 / p75
-p10 / p90 when quality permits
+p25/p75
+p10/p90
+exposure_weighted_rate
 quality_state
 quality_policy_revision
-suppression_reason when unavailable
+privacy_policy_revision
+suppression_reason
+freshness_state
+complete_through
 revision scope
-```
-
-Recommended presentation:
-
-```text
-6.2–6.8m XP/h expected observed range
-median 6.5m
-1,842 sessions
-RP 450–550 · solo
-current content/ruleset revision
-last 30 days
-quality HIGH
-```
-
-The exact release thresholds for `LOW/MEDIUM/HIGH`, minimum cell size, minimum player-hours and outlier handling must be owned by a versioned Game Intelligence/publication policy. This design intentionally does **not** invent arbitrary thresholds.
-
-### 8.1 Required statistical safeguards
-
-- default to robust summaries such as median/IQR instead of mean-only reporting;
-- retain sample size and exposure time;
-- retain current revision scope;
-- avoid combining incompatible party compositions;
-- prevent duplicate counting of the same hunt session/member observation;
-- document any winsorization/outlier filtering in a policy revision;
-- small/private cells must be suppressed rather than exposed;
-- no recommendation should imply more precision than the input cohort supports.
-
----
-
-## 9. Revision and freshness model
-
-Measured results must be revision-aware because a balance/content change can invalidate historical comparability.
-
-Default Atlas behavior:
-
-1. current `content_revision` + current `ruleset_revision` first;
-2. do not mix historical revisions into the headline current metric by default;
-3. preserve historical cohorts for explicit `before / after` analysis;
-4. show the data window and freshness;
-5. if intentional cross-revision pooling is ever supported, disclose it and use an accepted compatibility policy.
-
-This enables truthful views such as:
-
-```text
-Revision 147 -> 148
-player XP/h      +11.8%
-player profit/h   -4.1%
-deaths/100h      +23.0%
-```
-
-Only statistically supportable deltas should be published.
-
----
-
-## 10. Spawn saturation and party-size analysis
-
-Hunt Intelligence should eventually measure the point at which adding players stops producing proportional benefit.
-
-The first implementation should remain empirical and explainable:
-
-1. form comparable cohorts by hunt/revision/composition/level/power dimensions;
-2. calculate team throughput distributions by party size;
-3. calculate per-player yield distributions by party size;
-4. compare adjacent, sufficiently compatible cohorts;
-5. expose marginal gain only when quality policy allows publication.
-
-Example output:
-
-```text
-Team throughput (comparable cohort)
-1 player   6.0m awarded XP/h
-2 players 13.0m
-3 players 19.0m
-4 players 20.0m
-
-4th-member marginal team gain: ~5% (MEASURED/DERIVED, quality HIGH)
-```
-
-Do not infer that the fourth member is globally useless: profit, safety, task completion or a different composition may have a different optimum.
-
-A more advanced regression/model may be introduced later only with reproducible training/evaluation, revision-awareness and explainable uncertainty. It is not required for the first version.
-
----
-
-## 11. “Best Hunt for Me” recommendation model
-
-### 11.1 Inputs
-
-Initial user inputs can be manual and local:
-
-```text
-vocation/class
-level
-solo/duo/party plan
-party composition when known
-equipment/power band when available
-objective: EXP / PROFIT / BALANCED / BESTIARY / another accepted objective
-minimum profit or safety preference
-location/access constraints
-```
-
-Future account-linked values may come from an explicit authorized Game/Platform contract. Atlas must not guess private character state.
-
-### 11.2 Candidate selection
-
-The recommender must:
-
-1. filter to authoritative Hunt Areas compatible with access/content constraints;
-2. select measured cohorts matching current revisions;
-3. prefer exact party size/composition and player role/vocation;
-4. apply deterministic cohort widening only when exact data is insufficient;
-5. reduce confidence for every material widening step;
-6. return `UNAVAILABLE` rather than fabricate a precise estimate when evidence is inadequate.
-
-### 11.3 Output
-
-Prefer ranges and explanations over a fake-precise score:
-
-```text
-Expected for your RP profile
-XP/h: 6.1–6.7m
-profit/h: 620–790k
-risk: LOW–MEDIUM
-quality: HIGH
-basis: 1,842 comparable sessions, current revision
-```
-
-A ranking/match score may be shown, but it must be deterministic, versioned, explainable and subordinate to the underlying metrics/uncertainty.
-
----
-
-## 12. Privacy and public-release rules
-
-Atlas receives public-safe aggregates, not a player-tracking feed.
-
-Mandatory rules:
-
-- no character names, raw player GUIDs, item-instance IDs or session identifiers in browser publications;
-- no unnecessary precise movement history;
-- use aggregate Area/Subarea/HuntArea geography by default;
-- suppress small cohorts under the accepted privacy-release policy;
-- ensure a single player's session cannot be reconstructed from public shards;
-- separate operational observability from player-linked analytics as required by ADR-0006;
-- public analytics output must be reproducible from a versioned aggregate/release pipeline and carry privacy/quality policy identity.
-
-Security/investigation telemetry is not an Atlas data source.
-
----
-
-## 13. Proposed cross-repository contracts
-
-Names below are design candidates. The implementing agent must reconcile them with current repository conventions before freezing schemas.
-
-### 13.1 Game -> Atlas Hunt Catalog
-
-Logical capability: `hunt-catalog-v1`.
-
-Illustrative shape:
-
-```json
-{
-  "schema": "oteryn-game-atlas-hunt-catalog-v1",
-  "content_revision": "...",
-  "hunts": [
-    {
-      "hunt_id": "oteryn:hunt.example",
-      "name_key": "hunt.example.name",
-      "area_refs": ["..."],
-      "subarea_refs": ["..."],
-      "floor_geometry_refs": ["..."],
-      "entrance_refs": ["..."],
-      "spawn_group_refs": ["..."],
-      "creature_refs": ["..."],
-      "requirement_refs": ["..."],
-      "route_refs": ["..."]
-    }
-  ]
-}
-```
-
-Do not duplicate creature/item/spawn facts already owned by a shared projection contract. Prefer stable references.
-
-### 13.2 Game Intelligence -> Atlas Hunt Performance
-
-Logical capability: `hunt-performance-v1`.
-
-Illustrative shape:
-
-```json
-{
-  "schema": "oteryn-game-atlas-hunt-performance-v1",
-  "generated_at": "...",
-  "quality_policy_revision": "...",
-  "privacy_policy_revision": "...",
-  "cohorts": [
-    {
-      "hunt_id": "oteryn:hunt.example",
-      "content_revision": "...",
-      "ruleset_revision": "...",
-      "window": {"start": "...", "end": "..."},
-      "cohort": {
-        "party_size": 4,
-        "party_composition": ["..."],
-        "player_vocation": "...",
-        "player_level_band": "...",
-        "shared_experience_state": "..."
-      },
-      "sample": {
-        "sessions": 0,
-        "player_hours": 0,
-        "team_hours": 0,
-        "quality_state": "INSUFFICIENT"
-      },
-      "player_metrics": {},
-      "party_metrics": {},
-      "area_metrics": {}
-    }
-  ]
-}
-```
-
-The producer must omit/suppress private or insufficient cells rather than publish zeros that can be mistaken for measured performance.
-
-### 13.3 Atlas publication
-
-Atlas should compile accepted upstream data into bounded, integrity-checked browser publications such as:
-
-```text
-data/hunts/index.json
-  -> summary/search index
-  -> per-hunt detail shards
-  -> spatial/floor geometry refs
-  -> route refs
-  -> performance summary shards
-```
-
-Exact paths/formats remain an implementation decision. Follow current Atlas content-addressing, size bounds, hash/digest and fail-closed loader conventions.
-
----
-
-## 14. Integration with Item & Spawn Explorer (#114)
-
-Hunt Intelligence must reuse shared primitives rather than create a second creature/item/spawn stack.
-
-Shared concerns should include:
-
-- creature identity and presentations;
-- spawn positions/areas and map LOD;
-- item identity and loot-source relations;
-- drop probability/quantity contracts where authoritative;
-- map camera/floor transforms;
-- inspector/deep-link conventions;
-- provenance/trust labels.
-
-#114 answers *what drops this and where are its sources?* Hunt Intelligence answers *how does a defined hunt perform for this player/party and how should it be navigated?*
-
-The two features should deep-link to one another.
-
----
-
-## 15. Atlas UX design
-
-### 15.1 Entry point
-
-Add a first-class `Hunts` / `Hunt Intelligence` mode integrated with FullWorld rather than a disconnected static page.
-
-### 15.2 Hunt Finder
-
-Filter dimensions should be backed by authoritative or measured data and may include:
-
-- level/profile band;
-- vocation/class;
-- solo / duo / party size;
-- party composition;
-- EXP target;
-- profit target;
-- risk preference;
-- monster/content preference;
-- access requirement state when known;
-- location/region;
-- objective (`EXP`, `PROFIT`, `BALANCED`, `BESTIARY`, etc.).
-
-Unavailable dimensions remain disabled/omitted instead of guessed.
-
-### 15.3 Result card
-
-A compact card should separate scopes visually:
-
-```text
-HUNT NAME
-Area · floors · access
-
-For your profile     6.1–6.7m XP/h   ESTIMATE · HIGH
-Measured cohort      median 6.5m      1,842 sessions
-Profit/player        620–790k/h       ESTIMATE/MEASURED as applicable
-Party throughput     29–32m/h         MEASURED
-Risk                 deaths/100 player-hours + qualitative band
-```
-
-Do not put team loot next to a per-player XP number without scope labels.
-
-### 15.4 Hunt detail
-
-Recommended tabs/sections:
-
-- **Overview** — suitability, profile match, summary metrics and provenance;
-- **Map** — authoritative geometry, entrances, floors and route;
-- **Monsters** — shared creature/spawn details;
-- **Loot / Economy** — valuation policy, team/player scope and #114 links;
-- **Route** — floor-aware ordered route/rotation if authoritative;
-- **Requirements** — access/quest/item requirements;
-- **Performance** — cohort distributions, player/party/area scopes, revision/time window;
-- **History / Reports** — before/after revision comparisons when available.
-
-### 15.5 Map behavior
-
-- selecting a hunt zooms to authoritative geometry;
-- floor-aware route nodes switch/indicate floors predictably;
-- far zoom uses area/heat/cluster presentation rather than hundreds of equal-size sprites;
-- medium zoom may show route/entrance/spawn clusters;
-- near zoom reuses verified creature/spawn presentations;
-- all overlays share the exact FullWorld camera/floor transform;
-- pan/zoom/floor/resize/history interactions must not drift.
-
-### 15.6 Compare Hunts
-
-Comparison must compare compatible scope/cohort/time/revision semantics. If two cards are not directly comparable, Atlas must say why.
-
-Candidate rows:
-
-```text
-player XP/h
-player profit/h
-team throughput
-team net value
-risk/deaths
-travel/refill overhead
-sample quality
-freshness
-```
-
----
-
-## 16. Runtime and performance architecture
-
-Do not ship raw telemetry to the browser.
-
-Preferred pipeline:
-
-```text
-Oteryn authoritative runtime
-        |
-        +--> Game world/content exporter -------------------+
-        |                                                   |
-        `--> Game Intelligence aggregate/release pipeline --+
-                                                            |
-                                                            v
-                                              Atlas verifier/compiler
-                                                            |
-                                     content-addressed bounded shards
-                                                            |
-                                                            v
-                                               FullWorld browser runtime
 ```
 
 Requirements:
 
-- summary index remains bounded and lazy;
-- detail/performance data loads by selected hunt/cohort/window;
-- spatial data uses existing floor/chunk/viewport indexing where possible;
-- route/geometry payloads have explicit count/byte bounds;
-- all upstream publications have schema/revision/digest validation;
-- malformed, incompatible or oversized resources fail closed;
-- unavailable analytics must not disable authoritative Hunt Area navigation;
-- performance-panel failure must degrade independently from the base map and creature/item layers.
+- robust summaries before mean-only headlines;
+- no hidden cross-revision pooling;
+- no duplicate counting of the same exposure;
+- outlier handling/winsorization only under a versioned reproducible policy;
+- small/private cells are suppressed, not zeroed;
+- a recommendation may not imply more precision than the cohort supports.
 
 ---
 
-## 17. Implementation phases
+## 17. Privacy and differencing resistance
 
-### Phase 0 — live preflight and contract reconciliation
+Small-cell suppression alone is insufficient.
 
-- refresh Atlas and Game `main` from GitHub;
-- read root/near-path `AGENTS.md`;
-- inspect Issue #117, #114, #85 and material open PRs;
-- inspect current world/content and analytics implementation status;
-- create/update the required Game lifecycle Issue if Game mutations are needed;
-- freeze exact base SHAs before mutation.
+The public browser must not receive an arbitrary high-dimensional analytics cube that permits repeated differencing to isolate individuals.
 
-### Phase 1 — source contracts
+A future Game Intelligence public-release surface should provide only pre-approved/bounded cohort buckets under an accepted policy.
 
-- define/finalize Game-owned Hunt Area/catalog model without duplicating ADR-0005 geography;
-- define authoritative route/access references;
-- define Game Intelligence public-safe cohort/metric contract;
-- define privacy/quality/suppression/revision semantics;
-- add schema/contract fixtures and negative cases.
+Atlas consumer requirements include:
 
-Checkpoint: no Atlas UI implementation may assume fields that the accepted producer contract does not publish.
+- no character names or raw player GUIDs;
+- no item-instance or raw session/segment IDs;
+- no unnecessary precise movement trails;
+- fixed/versioned bucket definitions;
+- per-actor/per-session contribution limits where required by policy;
+- suppression rules that consider neighboring/overlapping slices;
+- forbidden unsafe dimension combinations;
+- release policy identity;
+- public shards that do not permit reconstruction of a single session.
 
-### Phase 2 — Game producers
-
-- implement canonical Hunt Area/content export where missing;
-- implement public-safe analytics aggregate release where the Game Intelligence foundation supports it;
-- emit explicit `UNAVAILABLE`/absence rather than synthetic measured data before sufficient telemetry exists;
-- make output deterministic, versioned, bounded and testable.
-
-### Phase 3 — Atlas compiler/projection
-
-- validate Game publications;
-- create summary/search/spatial/detail/performance indexes;
-- reuse #114 creature/item/spawn primitives;
-- preserve provenance, revision, sample and trust class;
-- add corruption/incompatibility/suppression tests.
-
-### Phase 4 — Hunt Finder and map UX
-
-- implement Hunt mode/search/filtering;
-- hunt result cards and detail inspector;
-- authoritative map geometry/entrances/floors/routes;
-- monster/item/spawn cross-links;
-- URL/deep-link/history/reload/mobile behavior.
-
-### Phase 5 — measured performance UI
-
-- player/party/area scoped metrics;
-- robust distributions and quality context;
-- current vs historical revision views;
-- compare compatible cohorts;
-- independent fail-closed unavailable state.
-
-### Phase 6 — personalized recommendation
-
-- deterministic cohort matching and widening policy;
-- `Best Hunt for Me` ranges and reason/explanation surface;
-- objective-based ranking;
-- explicit confidence downgrade and `UNAVAILABLE` path;
-- no ML requirement for v1.
-
-### Phase 7 — saturation intelligence
-
-- empirical comparable-cohort curves;
-- marginal gain and objective-specific optimum only when quality permits;
-- no global party-size claim from incompatible samples.
-
-### Phase 8 — verification, integration and closeout
-
-- applicable unit/contract/property tests;
-- Game -> Atlas integration tests;
-- real Chromium desktop/mobile E2E;
-- geometry/transform/render synchronization verification;
-- malformed/missing/partial/suppressed-data cases;
-- URL/history/reload cases;
-- performance/stress limits;
-- targeted visual/accessibility acceptance;
-- exact-head protected gates;
-- full diff review;
-- squash merge and branch cleanup;
-- live deployment/acceptance only from merged Atlas `main` under existing policy.
+Differential privacy or another formal privacy mechanism can be considered later; v1 does not invent one without a dedicated accepted policy.
 
 ---
 
-## 18. Parallel execution model
+## 18. Revision and freshness
 
-The programme may use parallel agents **only after the shared source/data contract checkpoint is stable**.
+Default current view:
 
-Safe post-contract workstreams:
+1. current `world/profile/content/ruleset` compatibility first;
+2. current baseline modifier bucket first;
+3. accepted fresh time window first;
+4. no silent historical backfill;
+5. no silent stale price/valuation reuse.
 
-1. **Game World/Content** — Hunt Area/catalog/route producer.
-2. **Game Intelligence** — session/cohort/aggregate/public-release producer.
-3. **Atlas Projection** — validation/compiler/index/shards.
-4. **Atlas UX** — Finder/detail/map/compare/recommendation UI against frozen fixtures/contracts.
-5. **Verification** — independent contract/geometry/E2E/performance/visual depth.
-
-Each repository mutation still follows its own Issue -> branch -> PR lifecycle. Cross-repository coordination may not collapse two authorities into one branch or one mutable task packet.
+Historical data belongs in explicit history/before-after views and must state revision/time boundaries.
 
 ---
 
-## 19. Verification matrix
+## 19. Hunt Area saturation and party-size intelligence
 
-### Logic / unit
+Saturation is empirical and objective-specific.
 
-Must cover at least:
+Only compare compatible cohorts and publish when quality policy permits.
 
-- player versus party rate calculations;
-- no naive XP division path;
-- active versus wall-clock denominators;
-- profit/value policies and missing allocation semantics;
-- cohort identity/canonicalization;
-- cohort compatibility/widening;
-- revision compatibility;
-- robust range/percentile presentation logic;
-- saturation marginal-gain calculations;
-- recommendation scoring/ordering/ties;
-- `INSUFFICIENT`/suppressed/missing data;
-- invalid/zero/negative duration and numeric bounds.
+Candidate curves:
 
-### Contract / provenance
+- team awarded XP throughput by party size;
+- base creature XP / kills throughput by party size;
+- per-player XP yield by party size;
+- team/personal value outcomes by party size;
+- safety/death exposure by party size.
 
-Must cover:
+`optimal party size` is invalid without naming the optimization objective.
 
-- Game Hunt Catalog schema and stable references;
-- Game Intelligence performance schema;
-- privacy-suppressed cells;
-- digest/root/revision validation;
-- corrupt, missing, oversized and incompatible resources;
-- no TibiaRoute/wiki/legacy runtime fallback;
-- no duplicate creature/item/spawn authority relative to #114.
-
-### Browser / E2E
-
-Must cover desktop and mobile workflows for:
-
-- entering Hunt mode;
-- filtering by profile/party/objective;
-- selecting a hunt and zooming to geometry;
-- floor-aware route navigation;
-- opening monsters/items/shared inspector data;
-- comparing hunts;
-- changing recommendation profile;
-- unavailable/suppressed analytics;
-- revision-history view where implemented;
-- URL/deep-link/history/reload persistence;
-- strict console/page/network error handling.
-
-### Geometry / renderer
-
-Must prove map overlays remain world-anchored under:
-
-- pan;
-- zoom/button/wheel/anchor zoom;
-- resize and DPR changes;
-- floor switches;
-- view-mode transitions;
-- route and creature/spawn layer toggles;
-- mobile drawer transitions.
-
-### Performance / stability
-
-Measure and bound:
-
-- hunt summary index size/load;
-- detail/performance shard size/load;
-- filter/search latency under representative catalog size;
-- route/area overlay render cost;
-- cache growth/eviction;
-- repeated hunt switching;
-- stress sequences integrated with #85 infrastructure.
+Marginal gains must not be computed across incompatible composition/modifier/revision cohorts.
 
 ---
 
-## 20. Explicit non-goals
+## 20. Recommender: observational, explainable, deterministic
 
-- no runtime scraping of TibiaRoute, wikis or community sites;
-- no copying another site's static hunting-place database as product authority;
-- no inference of XP/profit from map pixels or geometry;
-- no raw player telemetry in Atlas browser publications;
-- no automatic game-balance mutation from analytics;
-- no pretending team loot is personal profit;
-- no pretending raw team XP is player XP;
-- no mixing incompatible solo/duo/party cohorts to improve sample size silently;
-- no cross-revision headline metric without an explicit compatibility policy;
-- no fabricated live occupancy, boosted creature, event or spawn state;
-- no model/AI recommendation whose training/evaluation/provenance cannot be reproduced.
+`Best Hunt for Me` v1 is not a causal engine and not a guarantee.
+
+Its semantic class is:
+
+`OBSERVATIONAL_PREDICTION_FROM_COMPARABLE_COHORTS`
+
+### Inputs
+
+When available/selected:
+
+```text
+world/profile
+vocation/class/role
+level
+solo/duo/party plan
+party composition
+equipment/power band
+objective: EXP / PROFIT / BALANCED / BESTIARY / accepted alternatives
+risk preference
+minimum profit preference
+location/access constraints
+current modifier context
+```
+
+### Candidate algorithm
+
+1. start from VERIFIED hunts compatible with authoritative constraints;
+2. select current-revision/current-world measured cohorts;
+3. require compatible time base and valuation policy for the objective;
+4. prefer exact party/composition/role/modifier matches;
+5. widen only through a versioned deterministic policy;
+6. reduce confidence for widening, stale data or weaker completeness;
+7. rank using an explicit objective-policy revision;
+8. return range + evidence basis + reasons;
+9. return `INSUFFICIENT`/`UPSTREAM_BLOCKED` instead of fake precision.
+
+### Language
+
+Prefer:
+
+> Estimated from comparable observed cohorts
+
+rather than language implying causal certainty or guaranteed player outcome.
+
+A numerical match score may be secondary only if deterministic, versioned and explainable.
 
 ---
 
-## 21. Definition of Done
+## 21. Historical contention versus live occupancy
 
-The implementation programme is complete only when all applicable items are true:
+These are distinct products.
 
-- Game owns and publishes the required Hunt Area/content facts through an accepted contract;
-- analytics ownership and public-safe aggregate release are explicit and revision-aware;
-- Atlas consumes only accepted derived publications;
-- PLAYER/PARTY/HUNT AREA scopes are separate in contracts, calculations and UI;
-- solo/duo/party comparisons use compatible cohorts and actual server-awarded XP semantics;
-- profit semantics distinguish team value, personal cost and actual versus estimated allocation;
-- measured values carry sample, time, revision and quality context;
-- small/unsafe cohorts are suppressed;
-- Hunt Finder, map, detail, route, compare and recommendation workflows function on desktop/mobile for the data that actually exists;
-- #114 primitives are reused rather than duplicated;
-- missing analytics degrades to `UNAVAILABLE` without breaking verified hunt navigation;
-- all shipped behavior has the deep applicable verification required by #85 and `AGENTS.md`;
-- exact final heads are reviewed and protected gates pass;
-- merged branches are cleaned up;
-- live Atlas acceptance, if part of the implementation delivery, is performed only from the exact merged `main` revision.
+### Historical contention
+
+A privacy-safe future aggregate may describe that a Hunt Area is historically more/less occupied for a coarse time bucket.
+
+### Live occupancy
+
+Live presence/availability is forbidden unless a future explicit authoritative and privacy-safe contract is accepted.
+
+Historical occupancy may never be rendered as "free now" / "occupied now".
 
 ---
 
-## 22. Execution alias
+## 22. Atlas-side expected input interfaces
 
-Run the implementation prompt stored at:
+The names below are **Atlas consumer candidates**, not Game contracts.
+
+### 22.1 Hunt catalog capability
+
+Logical candidate: `hunt-catalog-v1`.
+
+Atlas should validate a future accepted publication for:
+
+- schema/capability identity;
+- world/profile/content revision;
+- stable Hunt IDs;
+- spatial/content references;
+- bounds/counts/byte limits;
+- provenance/digests;
+- deterministic cross references.
+
+If the producer does not exist, classification is `UPSTREAM_BLOCKED`.
+
+### 22.2 Hunt performance capability
+
+Logical candidate: `hunt-performance-v1`.
+
+A future accepted publication should be sufficient to express:
+
+```text
+world/profile/revisions
+hunt/cohort signature
+time window + time base
+party/player dimensions
+modifier bucket
+sample exposures
+PLAYER metrics
+PARTY metrics
+HUNT AREA metrics
+valuation identity
+quality/privacy policy
+completeness/watermark
+suppression/incompatibility state
+```
+
+Atlas may implement bounded parsing/validation interfaces and test fixtures, but must not treat those fixtures as proof that Game publishes the capability.
+
+---
+
+## 23. Runtime publication architecture
+
+No raw telemetry reaches the browser.
+
+Preferred logical path:
+
+```text
+existing accepted Game / Game Intelligence publications (read-only)
+                         |
+                         v
+              Atlas verifier/compiler
+                         |
+           bounded content-addressed shards
+                         |
+                         v
+              FullWorld browser runtime
+```
+
+Requirements:
+
+- bounded summary/search index;
+- lazy per-hunt/per-performance shards;
+- schema/capability/revision/digest validation;
+- route/geometry count and byte bounds;
+- bounded cache/eviction;
+- malformed/oversized resources fail closed;
+- analytics failure never disables VERIFIED map navigation;
+- test fixtures are test-only and never copied into production publication paths as measured data.
+
+---
+
+## 24. Atlas UX
+
+### Hunt Finder
+
+Filters appear only when backed by real accepted data.
+
+Candidate filters:
+
+- level/profile band;
+- vocation/class/role;
+- solo/duo/party;
+- composition;
+- EXP/profit/risk objective;
+- monster/content preference;
+- access state;
+- location/world;
+- modifier context.
+
+### Hunt card
+
+Keep scopes and statistics explicit:
+
+```text
+HUNT NAME
+world / area / floors / access
+
+For selected profile       ESTIMATE or UNAVAILABLE
+Observed comparable cohort MEASURED + sample + freshness
+Party throughput           MEASURED (PARTY)
+Player profit               MEASURED or ESTIMATE, explicitly labelled
+Risk                        exposure-based metric + qualitative band
+```
+
+### Hunt detail
+
+Recommended sections:
+
+- Overview;
+- Map;
+- Monsters;
+- Loot / Economy;
+- Route;
+- Requirements;
+- Performance;
+- History / Reports;
+- Provenance / quality.
+
+### Map
+
+- authoritative geometry only;
+- floor-aware routes only when upstream publishes them;
+- far LOD: area/cluster/heat presentation;
+- medium LOD: route/entrance/spawn grouping;
+- near LOD: shared creature/spawn presentation;
+- exact FullWorld transform synchronization;
+- reuse #113/#115 hit/geometry seams;
+- reuse #114 item/spawn LOD where applicable.
+
+### Compare
+
+Compare only compatible:
+
+- trust/scope;
+- world/profile/revision;
+- time base;
+- valuation policy;
+- modifier bucket;
+- cohort semantics.
+
+If incompatible, explain the reason instead of forcing a ranking.
+
+---
+
+## 25. Implementation order — Atlas-only and dependency-safe
+
+### Phase 0 — GitHub-first preflight
+
+- refresh Atlas `main` and Issue #117;
+- inspect #113/#114/#115/#85/#11 and overlapping PRs;
+- inspect Game `main` and relevant architecture/publications **read-only**;
+- record exact read-only upstream provenance;
+- classify each upstream capability `AVAILABLE` or `UPSTREAM_BLOCKED`.
+
+### Phase 1 — shared primitive checkpoint
+
+Resolve the actual merged seams from #113/#114/#115.
+
+Do not duplicate unmerged interaction/presentation/item-spawn infrastructure.
+
+### Phase 2 — Atlas Hunt consumer contracts
+
+Implement/test Atlas-side bounded schemas/parsers/state models for data that already exists or for explicit future capability readiness.
+
+No Game mutation.
+
+No production fake data.
+
+### Phase 3 — VERIFIED Hunt catalog integration
+
+Only if an accepted upstream Hunt Catalog exists:
+
+- compile/index it;
+- publish Hunt Finder/search/detail/map/route surfaces supported by real data.
+
+If absent:
+
+- keep product capability `UPSTREAM_BLOCKED`;
+- retain test-only contract/UX fixtures;
+- do not ship invented hunts.
+
+### Phase 4 — static FullWorld Hunt UX
+
+Implement only the VERIFIED subset actually supported, reusing shared primitives and deep links.
+
+### Phase 5 — analytics readiness
+
+Inspect whether an accepted public-safe Hunt Performance publication exists.
+
+If absent:
+
+- MEASURED panels remain unavailable;
+- recommender/saturation remain unavailable;
+- record the upstream requirement in Atlas #117/evidence only;
+- do not create Game work.
+
+### Phase 6 — MEASURED integration
+
+Only when an accepted upstream publication exists:
+
+- integrate PLAYER/PARTY/HUNT AREA metrics;
+- enforce world/revision/time/valuation/modifier compatibility;
+- expose completeness/quality/privacy state.
+
+### Phase 7 — recommender
+
+Only when sufficient current comparable measured cohorts exist.
+
+### Phase 8 — saturation/history
+
+Only when sufficient compatible evidence exists.
+
+### Phase 9 — verification and closeout
+
+- exact final diff review;
+- unit/contract/property tests;
+- real Chromium desktop/mobile;
+- geometry/render synchronization;
+- malformed/missing/suppressed/incompatible/stale cases;
+- performance/stress;
+- `atlas-local-e2e`, `atlas-gate`, `provenance-gate`;
+- squash merge / branch cleanup.
+
+Atlas deployment remains merged-main-only under existing policy.
+
+---
+
+## 26. Parallel execution model
+
+Parallelize only after the shared primitive/consumer contract checkpoint.
+
+Safe Atlas-only workstreams:
+
+1. **HUNT-ATLAS-CONTRACTS** — schemas/loaders/provenance/failure states;
+2. **HUNT-ATLAS-PROJECTION** — compiler/index/shards for real accepted inputs;
+3. **HUNT-ATLAS-UX** — Finder/detail/map against frozen interfaces and shared #113/#114/#115 seams;
+4. **HUNT-ATLAS-ANALYTICS-CONSUMER** — only if a real accepted measured publication exists;
+5. **HUNT-VERIFICATION** — independent logic/geometry/browser/performance/privacy-surface checks.
+
+No workstream may mutate `Oteryn-Game`.
+
+---
+
+## 27. Verification matrix
+
+### Ownership/safety
+
+- any attempted Game write is a programme failure;
+- no production test fixture masquerades as Game/measured data;
+- no duplicate #113/#114/#115 authority.
+
+### Domain/contract
+
+- world/profile/revision compatibility;
+- stable Hunt/cohort identity;
+- malformed/missing/oversized/digest mismatch;
+- unavailable vs zero;
+- suppression vs insufficient vs incompatible;
+- route/floor reference validity.
+
+### Exposure/analytics semantics
+
+- party join/leave splits cohort exposure conceptually;
+- shared-XP state change splits cohort compatibility;
+- modifier change prevents baseline pooling;
+- no naive team-XP division;
+- active vs end-to-end denominator distinction;
+- session-distribution vs exposure-weighted estimator distinction;
+- incomplete telemetry cannot qualify as HIGH;
+- current vs historical revision selection;
+- world-aware market valuation;
+- rare-loot realized vs expected-value distinction.
+
+### Privacy
+
+- no raw actor/session IDs in public shards;
+- bounded pre-approved cohort dimensions only;
+- suppressed cells do not become zeros;
+- unsafe adjacent/differencing-prone slices are not exposed by arbitrary client queries.
+
+### Recommender
+
+- observational language/state;
+- deterministic widening order;
+- confidence degrades with widening/staleness/completeness;
+- incompatible cohorts rejected;
+- insufficient evidence returns unavailable;
+- objective policy/version visible in diagnostics/evidence.
+
+### Browser/E2E
+
+- Hunt entry/filter/select/deep-link/history/reload;
+- floor-aware map/route when real data exists;
+- creature/item cross links via shared seams;
+- unavailable analytics state without breaking map;
+- compare incompatibility explanation;
+- desktop/mobile/DPR;
+- no console/page/network errors beyond narrow expected failure cases.
+
+### Geometry/performance
+
+- pan/zoom/floor/resize/mode synchronization;
+- route/area/creature overlay alignment;
+- bounded index/shard/cache sizes;
+- repeated Hunt switching;
+- seeded stress integration with #85.
+
+---
+
+## 28. Explicit non-goals
+
+- no `Oteryn-Game` mutation under this programme;
+- no activation/allocation of Game analytics;
+- no runtime scraping of TibiaRoute/wiki/community sites;
+- no invented Hunt Areas or routes;
+- no raw telemetry in browser;
+- no inferred live occupancy;
+- no automatic balance changes;
+- no team-loot-as-player-profit claim;
+- no team-XP-as-player-XP claim;
+- no silent cross-world/profile/revision/modifier pooling;
+- no causal claim from observational recommendations;
+- no arbitrary client-side analytics cube;
+- no opaque ML requirement for v1.
+
+---
+
+## 29. Definition of Done
+
+The Atlas-side programme is complete only to the extent supported by real accepted upstream capabilities.
+
+Required terminal truths:
+
+- no Game mutation occurred;
+- current #113/#114/#115 seams were reused rather than duplicated;
+- Atlas consumer contracts distinguish VERIFIED / MEASURED / ESTIMATE and all availability states;
+- world/profile/channel/instance scope is explicit;
+- exposure segmentation / hunt attribution requirements are explicit;
+- PLAYER/PARTY/HUNT AREA remain separate;
+- time bases and estimator weighting are explicit;
+- modifiers cannot contaminate baseline cohorts silently;
+- valuation is world/time/policy-aware;
+- rare-loot realized versus long-run expected value is distinct;
+- telemetry completeness can gate quality;
+- privacy surface is differencing-aware and bounded;
+- recommender is explicitly observational and evidence-gated;
+- unavailable upstream capability remains `UPSTREAM_BLOCKED`, never fabricated;
+- supported Hunt UX passes deep exact-head verification;
+- final Atlas PR is squash-merged and branch-cleaned.
+
+A terminal Atlas report must list upstream capabilities individually as `AVAILABLE`, `UPSTREAM_BLOCKED`, `INSUFFICIENT`, `SUPPRESSED`, `INCOMPATIBLE`, `STALE` or `MALFORMED`. It must not claim full measured Hunt Intelligence if the required producer is absent.
+
+---
+
+## 30. Atlas-side upstream requirements note
+
+The following are **suggestions/consumer requirements only**, recorded here so a future separately authorized Game programme can evaluate them without this Atlas task modifying Game:
+
+- accepted Hunt Catalog / route/access publication;
+- public-safe Hunt Performance aggregate;
+- `world_id`/profile/revision scoping;
+- hunt attribution policy revision;
+- exposure segmentation/cohort signature;
+- awarded-player XP versus team/base throughput separation;
+- time-base and exposure semantics;
+- modifier/event segregation;
+- world/time-aware valuation identity;
+- completeness/watermark quality inputs;
+- privacy-safe pre-approved cohorts with differencing resistance.
+
+No item in this section is authority for Oteryn-Game until separately accepted by its own lifecycle.
+
+---
+
+## 31. Execution alias
+
+Prompt:
 
 `docs/agents/prompts/ATLAS-HUNT-INTELLIGENCE-IMPLEMENTATION.md`
 
