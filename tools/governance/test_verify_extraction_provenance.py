@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import subprocess
 import tempfile
 import unittest
@@ -64,6 +65,31 @@ class PinnedSourceVerificationTest(unittest.TestCase):
     def test_wrong_source_commit_is_rejected(self) -> None:
         with self.assertRaises(AssertionError):
             m.verify_source_repository(self.repo, "0" * 40)
+
+    def test_source_coverage_rejects_unmapped_selected_blob(self) -> None:
+        extra = self.repo / "tools/otbm_atlas/extra.py"
+        extra.write_text("print('extra')\n", encoding="utf-8")
+        git(self.repo, "add", ".")
+        git(self.repo, "commit", "-m", "add extra selected source")
+        source_sha = git(self.repo, "rev-parse", "HEAD")
+        verifier = getattr(m, "verify_source_coverage", None)
+        self.assertIsNotNone(verifier, "source coverage verifier must exist")
+        with self.assertRaises(AssertionError):
+            verifier([self.row], self.repo, source_sha)
+
+    def test_current_manifest_has_terminal_lifecycle_metadata(self) -> None:
+        data = json.loads(m.MAP.read_text(encoding="utf-8"))
+        verifier = getattr(m, "verify_terminal_lifecycle", None)
+        self.assertIsNotNone(verifier, "terminal lifecycle verifier must exist")
+        verifier(data)
+
+    def test_precloseout_source_work_disposition_is_rejected(self) -> None:
+        data = json.loads(m.MAP.read_text(encoding="utf-8"))
+        data["source_work"]["disposition"] = "SUPERSEDE_AFTER_THIS_TARGET_CLOSEOUT_MERGES"
+        verifier = getattr(m, "verify_terminal_lifecycle", None)
+        self.assertIsNotNone(verifier, "terminal lifecycle verifier must exist")
+        with self.assertRaises(AssertionError):
+            verifier(data)
 
 
 if __name__ == "__main__":
