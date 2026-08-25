@@ -28,6 +28,8 @@ jobs:
       PREVIEW_URL: http://192.168.1.2:8097
       PYTHON_IMAGE: docker.io/library/python@sha256:2c941e860699f878900b0edc2403613c234d4b32eda3cc9fa7036991a2a63c4a
       CREATURE_SEMANTIC_DIGEST: sha256:7dc951874c95424279737eaaf51cf2d50940162ef4799daea39a187a581ef0e8
+      GAMEPLAY_GAME_REV: b56ce339281d252a9e01a5a2bed583582bf29e68
+      CREATURE_GAMEPLAY_DIGEST: sha256:7ac7c08949aa498cb843ca26e3417e537b3409d89e4f265861f3f94855b96d28
       PUBLICATION_ROOT: sha256:9d0d2f3bb16a5a90f9b51a21366e4ed42963f5cb12366c404a20d9502ec4857f
       SEMANTIC_ROOT: sha256:27d7a83a7d9f498ea614b440ab4216cae5e6d11ea0527482410e40948cade5a9
       PIXEL_ROOT: sha256:8b8228fcc4574903e547cb7d65b96f3d45e5a9e67045091c1bceb6e54d3690ad
@@ -245,6 +247,12 @@ jobs:
           for _ in $(seq 1 30); do curl -fsS -D /tmp/candidate.headers http://192.168.1.2:18098/web/fullworld.html -o /tmp/candidate.html && break; sleep 1; done
           grep -qi "X-Oteryn-Atlas-Revision: $ATLAS_REV" /tmp/candidate.headers
           cmp web/fullworld.html /tmp/candidate.html
+          curl -fsS http://192.168.1.2:18098/web/creature-gameplay/manifest.json -o /tmp/candidate-gameplay.json
+          cmp web/creature-gameplay/manifest.json /tmp/candidate-gameplay.json
+          grep -F "$GAMEPLAY_GAME_REV" /tmp/candidate-gameplay.json >/dev/null
+          grep -F "$CREATURE_GAMEPLAY_DIGEST" /tmp/candidate-gameplay.json >/dev/null
+          grep -F '"npc_profiles":1049' /tmp/candidate-gameplay.json >/dev/null
+          grep -F '"monster_profiles":1800' /tmp/candidate-gameplay.json >/dev/null
           curl -fsS http://192.168.1.2:18098/data/creatures/index.json -o /tmp/candidate-creatures.json
           curl -fsS http://192.168.1.2:18098/fullworld/animation/manifest.json -o /tmp/candidate-animation.json
           curl -fsS http://192.168.1.2:18098/fullworld/animation/programs.json -o /tmp/candidate-programs.json
@@ -287,6 +295,12 @@ jobs:
           for _ in $(seq 1 30); do curl -fsS -D /tmp/live-new.headers "$PREVIEW_URL/web/fullworld.html" -o /tmp/live-new.html && break; sleep 1; done
           grep -qi "X-Oteryn-Atlas-Revision: $ATLAS_REV" /tmp/live-new.headers
           cmp web/fullworld.html /tmp/live-new.html
+          curl -fsS "$PREVIEW_URL"/web/creature-gameplay/manifest.json -o /tmp/live-gameplay.json
+          cmp web/creature-gameplay/manifest.json /tmp/live-gameplay.json
+          grep -F "$GAMEPLAY_GAME_REV" /tmp/live-gameplay.json >/dev/null
+          grep -F "$CREATURE_GAMEPLAY_DIGEST" /tmp/live-gameplay.json >/dev/null
+          grep -F '"npc_profiles":1049' /tmp/live-gameplay.json >/dev/null
+          grep -F '"monster_profiles":1800' /tmp/live-gameplay.json >/dev/null
           test "$(docker inspect --format '{{ index .Config.Labels "org.oteryn.revision" }}' "$C")" = "$ATLAS_REV"
           curl -fsS "$PREVIEW_URL/data/creatures/index.json" -o /tmp/live-creatures.json
           curl -fsS "$PREVIEW_URL/fullworld/animation/manifest.json" -o /tmp/live-animation.json
@@ -346,6 +360,8 @@ jobs:
             -e "PREVIEW_URL=$PREVIEW_URL" \
             -e "ATLAS_REV=$ATLAS_REV" \
             -e "CREATURE_SEMANTIC_DIGEST=$CREATURE_SEMANTIC_DIGEST" \
+            -e "CREATURE_GAMEPLAY_DIGEST=$CREATURE_GAMEPLAY_DIGEST" \
+            -e "GAMEPLAY_GAME_REV=$GAMEPLAY_GAME_REV" \
             "$BROWSER_IMAGE" tests/live-creature-preview.cjs >/dev/null
           docker cp e2e-targets.json "$container:/targets.json"
 
@@ -364,6 +380,8 @@ jobs:
           grep -F '"status": "PASS"' e2e-evidence/result.json
           grep -F "$ATLAS_REV" e2e-evidence/result.json
           grep -F "$CREATURE_SEMANTIC_DIGEST" e2e-evidence/result.json
+          grep -F "$CREATURE_GAMEPLAY_DIGEST" e2e-evidence/result.json
+          grep -F "$GAMEPLAY_GAME_REV" e2e-evidence/result.json
           echo 'live-e2e=PASS'
 
       - name: Publish bounded browser evidence
