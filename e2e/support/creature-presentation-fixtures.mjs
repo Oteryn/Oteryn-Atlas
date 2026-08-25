@@ -1,4 +1,4 @@
-export const FIXTURE_ATLAS_MAIN = '9e9c1a32360be5834641ece554f0528eed8754e8';
+export const FIXTURE_ATLAS_MAIN = 'f4826c0abd0a07a2539f7b7027bd779c453f431a';
 
 function record(value) {
   return Object.freeze({
