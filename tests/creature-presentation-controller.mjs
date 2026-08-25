@@ -12,6 +12,7 @@ test('identical presentation commits reuse cached text measurement and collision
   };
 
   let measureTextCalls = 0;
+  const fillTextValues = [];
   const context = {
     save() {},
     restore() {},
@@ -19,7 +20,7 @@ test('identical presentation commits reuse cached text measurement and collision
     clearRect() {},
     fillRect() {},
     strokeRect() {},
-    fillText() {},
+    fillText(value) { fillTextValues.push(value); },
     measureText(value) {
       measureTextCalls += 1;
       return { width: Array.from(value).length * 6 };
@@ -82,6 +83,7 @@ test('identical presentation commits reuse cached text measurement and collision
 
     const first = controller.commit(input);
     assert.equal(first.labelLayouts[0]?.priority, 'monster');
+    assert.deepEqual(fillTextValues, ['Test Creature'], 'visible labels must draw their factual display text');
     assert(measureTextCalls > 0, 'first layout commit must measure visible label text');
     const afterFirst = measureTextCalls;
     const second = controller.commit(input);

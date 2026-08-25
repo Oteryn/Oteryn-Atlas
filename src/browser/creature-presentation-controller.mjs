@@ -154,7 +154,7 @@ function drawLabel(context, item, rect) {
   context.fillStyle = '#f8fafc';
   context.shadowColor = 'rgba(0, 0, 0, .8)';
   context.shadowBlur = 1;
-  context.fillText(item.displayText, rect.x + LABEL_PAD_X, rect.y + LABEL_HEIGHT / 2 + 0.5);
+  context.fillText(item.label.displayText, rect.x + LABEL_PAD_X, rect.y + LABEL_HEIGHT / 2 + 0.5);
   context.shadowBlur = 0;
 }
 
