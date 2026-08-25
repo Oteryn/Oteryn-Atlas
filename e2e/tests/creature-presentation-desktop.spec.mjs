@@ -149,20 +149,28 @@ test('desktop factual role rows preserve canonical roles, overflow count and act
   assertNoRuntimeFailures(runtime);
 });
 
-test('desktop dense collisions are deterministic and long factual names stay bounded at edges', async ({ page }, testInfo) => {
+test('desktop dense occupancy is deterministic and long factual names stay bounded at edges', async ({ page }, testInfo) => {
   const runtime = captureRuntimeFailures(page);
   let state = await openScenario(page, sceneEntry(DENSE_MONSTER_SCENE, { creatures: 'monster', zoom: 1 }));
   await assertRecordIdsPublished(page, DENSE_MONSTER_SCENE.recordIds);
   await captureUserVisualEvidence(page, testInfo, 'creature-presentation.dense-monsters', {
-    note: 'Five factual monsters occupy a two-tile cluster; lower-priority labels must suppress deterministically.',
+    note: 'Five factual monsters occupy a two-tile cluster; label placement must stay deterministic and non-overlapping.',
   });
   let render = assertPresentationContract(state);
-  expect(render.labelsSuppressed).toBeGreaterThan(0);
   const denseSet = new Set(DENSE_MONSTER_SCENE.recordIds);
   const signature = render.labelLayouts.filter((entry) => denseSet.has(entry.recordId))
     .map(({ recordId, displayText, suppressed, rect }) => ({ recordId, displayText, suppressed, rect }))
     .sort((a, b) => a.recordId.localeCompare(b.recordId));
   expect(signature.length).toBeGreaterThan(0);
+  const drawnDense = signature.filter((entry) => !entry.suppressed && entry.rect);
+  for (let left = 0; left < drawnDense.length; left += 1) {
+    for (let right = left + 1; right < drawnDense.length; right += 1) {
+      expect(
+        overlaps(drawnDense[left].rect, drawnDense[right].rect),
+        `dense labels ${drawnDense[left].recordId} and ${drawnDense[right].recordId} must not overlap`,
+      ).toBeFalsy();
+    }
+  }
   await page.reload({ waitUntil: 'domcontentloaded' });
   await waitForAtlas(page);
   state = await waitForPresentationCommit(page);
