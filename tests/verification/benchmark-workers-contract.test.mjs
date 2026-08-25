@@ -20,6 +20,7 @@ test('worker benchmark is measurement-only, repeatable and uses non-null telemet
   assert.match(script, /dockerContainerCount/);
   assert.match(script, /Start-Process/);
   assert.match(script, /resourceSamples/);
+  assert.match(script, /New-Item -ItemType Directory -Force -Path \(Split-Path -LiteralPath \$OutputPath -Parent\)/);
   assert.doesNotMatch(script, /PhysicalDisk\(_Total\)/);
   assert.doesNotMatch(script, /\$values\['\\\\Processor Information/);
   assert.match(script, /ATLAS_E2E_WORKERS/);

@@ -91,6 +91,7 @@ if (-not $OutputPath) {
   $stamp = [DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss')
   $OutputPath = Join-Path $root "artifacts\e2e\worker-benchmark-$stamp.json"
 }
+New-Item -ItemType Directory -Force -Path (Split-Path -LiteralPath $OutputPath -Parent) | Out-Null
 
 $fingerprint = Get-EnvironmentFingerprint
 if ($SelfTest) {
