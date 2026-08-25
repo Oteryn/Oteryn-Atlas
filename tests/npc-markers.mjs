@@ -139,3 +139,17 @@ test('badge slot bounds fail closed and overflow is not a factual role descripto
   assert.equal(overflow.kind, 'overflow');
   assert.equal(Object.hasOwn(overflow, 'role'), false);
 });
+
+test('sparse single-slot badges retain a factual role and active filter visibility', () => {
+  const record = {
+    kind: 'npc',
+    roles: ['bank', 'travel', 'shop', 'quest'],
+    role_resolution_state: 'RESOLVED',
+  };
+  assert.deepEqual(npcBadgeSlots(record, 'all', 1), [
+    { kind: 'role', role: 'bank', glyph: 'coin' },
+  ]);
+  assert.deepEqual(npcBadgeSlots(record, 'quest', 1), [
+    { kind: 'role', role: 'quest', glyph: 'quest' },
+  ]);
+});

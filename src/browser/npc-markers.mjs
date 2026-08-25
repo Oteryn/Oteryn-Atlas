@@ -74,16 +74,19 @@ export function npcBadgeSlots(record, activeFilter = 'all', maxSlots = 3) {
   if (record.role_resolution_state !== 'RESOLVED' || roles.length === 0) {
     return Object.freeze([NPC_BADGE_FALLBACK_SLOT]);
   }
+  const normalizedFilter = npcRoleFilter(activeFilter);
+  const activeFactualRole = normalizedFilter !== 'all'
+    && normalizedFilter !== 'other'
+    && roles.includes(normalizedFilter);
+  if (maxSlots === 1) {
+    return Object.freeze([npcBadgeRoleSlot(activeFactualRole ? normalizedFilter : roles[0])]);
+  }
   if (roles.length <= maxSlots) {
     return Object.freeze(roles.map((role) => npcBadgeRoleSlot(role)));
   }
 
   const explicitCapacity = maxSlots - 1;
   let explicitRoles = roles.slice(0, explicitCapacity);
-  const normalizedFilter = npcRoleFilter(activeFilter);
-  const activeFactualRole = normalizedFilter !== 'all'
-    && normalizedFilter !== 'other'
-    && roles.includes(normalizedFilter);
   if (activeFactualRole && !explicitRoles.includes(normalizedFilter)) {
     if (explicitCapacity === 0) explicitRoles = [];
     else if (explicitCapacity === 1) explicitRoles = [normalizedFilter];
