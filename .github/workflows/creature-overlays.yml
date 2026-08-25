@@ -1,4 +1,4 @@
-﻿name: Creature overlays
+name: Creature overlays
 
 on:
   pull_request:

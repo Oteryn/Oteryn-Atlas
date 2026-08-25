@@ -1,4 +1,4 @@
-﻿name: Creature walking in place
+name: Creature walking in place
 
 on:
   pull_request:
