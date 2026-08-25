@@ -11,6 +11,9 @@ test('Synology product validation uses the pinned Python container', () => {
 
 test('live creature fixtures are selected from visually dynamic published programs', () => {
   assert.match(workflow, /programs=json\.loads\(Path\('animation-runtime-a\/programs\.json'\)\.read_text\(\)\)/);
-  assert.match(workflow, /dynamic_presentations=\{p\['outfit_presentation_id'\] for p in programs\['creature_programs'\] if p\['phase_count'\]>1 and len\(set\(p\['phase_content_ids'\]\)\)>1\}/);
+  assert.match(workflow, /dynamic_presentations=\{/);
+  assert.match(workflow, /if p\.get\('walking_program'\) is not None/);
+  assert.match(workflow, /p\['walking_program'\]\['phase_count'\]>1/);
+  assert.match(workflow, /len\(set\(p\['walking_program'\]\['phase_content_ids'\]\)\)>1/);
   assert.match(workflow, /presentation_id\(r\) in dynamic_presentations/);
 });
