@@ -68,8 +68,8 @@ function Acquire-AtlasArtifactLock {
 }
 
 function Acquire-AtlasLegacyFence {
-  param([int]$TimeoutSeconds, [string]$Project, [string]$Revision)
-  $path = Join-Path ([IO.Path]::GetTempPath()) 'oteryn-atlas-heavy-e2e.lock'
+  param([int]$TimeoutSeconds, [string]$Project, [string]$Revision, [string]$LockPath = '')
+  $path = if ($LockPath) { [IO.Path]::GetFullPath($LockPath) } else { Join-Path ([IO.Path]::GetTempPath()) 'oteryn-atlas-heavy-e2e.lock' }
   $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
   while ($true) {
     try {
@@ -88,13 +88,14 @@ function Acquire-AtlasHeavySlot {
     [Nullable[int]]$RequestedSlot,
     [int]$TimeoutSeconds,
     [string]$Project,
-    [string]$Revision
+    [string]$Revision,
+    [string]$SlotPrefix = 'oteryn-atlas-heavy-e2e-slot-'
   )
   $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
   while ($true) {
     $candidates = if ($null -ne $RequestedSlot) { @([int]$RequestedSlot) } else { @(1..$SlotCount) }
     foreach ($slotId in $candidates) {
-      $slotPath = Join-Path ([IO.Path]::GetTempPath()) "oteryn-atlas-heavy-e2e-slot-$slotId.lock"
+      $slotPath = Join-Path ([IO.Path]::GetTempPath()) "$SlotPrefix$slotId.lock"
       try {
         $slotStream = [IO.File]::Open($slotPath, [IO.FileMode]::OpenOrCreate, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
         Write-AtlasLeaseOwner $slotStream "pid=$PID slot=$slotId/$SlotCount project=$Project revision=$Revision"

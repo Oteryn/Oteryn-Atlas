@@ -56,3 +56,10 @@ test('parallel slot benchmark is reproducible and keeps each full gate single-wo
   assert.match(benchmark, /publicationRevisionAfter/i);
   assert.match(benchmark, /ConvertTo-Json/);
 });
+
+test('slot-pool self-test cannot contend with production heavy E2E locks', () => {
+  const selfTest = fs.readFileSync('e2e/test-heavy-slot-pool.ps1', 'utf8');
+  assert.match(selfTest, /slot-selftest-.*legacy/i);
+  assert.match(selfTest, /-LockPath/);
+  assert.match(selfTest, /-SlotPrefix/);
+});

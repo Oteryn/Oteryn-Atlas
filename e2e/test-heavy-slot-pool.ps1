@@ -9,6 +9,8 @@ $oldCount = $env:ATLAS_E2E_SLOT_COUNT
 $oldSlot = $env:ATLAS_E2E_SLOT
 $projectA = "slot-selftest-a-$PID"
 $projectB = "slot-selftest-b-$PID"
+$legacyLockPath = Join-Path ([IO.Path]::GetTempPath()) "slot-selftest-$PID-legacy.lock"
+$slotPrefix = "slot-selftest-$PID-slot-"
 $projectLease = $null
 $artifactLease = $null
 $fence1 = $null
@@ -45,22 +47,22 @@ try {
     Assert-True ($_.Exception.Message -match 'artifact namespace is already active') 'wrong duplicate-artifact failure'
   }
 
-  $fence1 = Acquire-AtlasLegacyFence -TimeoutSeconds 2 -Project $projectA -Revision 'selftest'
-  $fence2 = Acquire-AtlasLegacyFence -TimeoutSeconds 2 -Project $projectB -Revision 'selftest'
+  $fence1 = Acquire-AtlasLegacyFence -TimeoutSeconds 2 -Project $projectA -Revision 'selftest' -LockPath $legacyLockPath
+  $fence2 = Acquire-AtlasLegacyFence -TimeoutSeconds 2 -Project $projectB -Revision 'selftest' -LockPath $legacyLockPath
   try {
     $legacyExclusive = [IO.File]::Open($fence1.Path, [IO.FileMode]::OpenOrCreate, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
     $legacyExclusive.Dispose()
     throw 'legacy exclusive runner entered while shared slot fences were active'
   } catch [IO.IOException] { }
 
-  $slot1 = Acquire-AtlasHeavySlot -SlotCount 2 -RequestedSlot $null -TimeoutSeconds 2 -Project $projectA -Revision 'selftest'
-  $slot2 = Acquire-AtlasHeavySlot -SlotCount 2 -RequestedSlot $null -TimeoutSeconds 2 -Project $projectB -Revision 'selftest'
+  $slot1 = Acquire-AtlasHeavySlot -SlotCount 2 -RequestedSlot $null -TimeoutSeconds 2 -Project $projectA -Revision 'selftest' -SlotPrefix $slotPrefix
+  $slot2 = Acquire-AtlasHeavySlot -SlotCount 2 -RequestedSlot $null -TimeoutSeconds 2 -Project $projectB -Revision 'selftest' -SlotPrefix $slotPrefix
   Assert-True ($slot1.SlotId -ne $slot2.SlotId) 'two active leases received the same slot'
   Assert-True (@($slot1.SlotId, $slot2.SlotId).Contains(1)) 'slot 1 was not allocated'
   Assert-True (@($slot1.SlotId, $slot2.SlotId).Contains(2)) 'slot 2 was not allocated'
 
   try {
-    Acquire-AtlasHeavySlot -SlotCount 2 -RequestedSlot $null -TimeoutSeconds 1 -Project 'slot-selftest-c' -Revision 'selftest' | Out-Null
+    Acquire-AtlasHeavySlot -SlotCount 2 -RequestedSlot $null -TimeoutSeconds 1 -Project 'slot-selftest-c' -Revision 'selftest' -SlotPrefix $slotPrefix | Out-Null
     throw 'third lease entered a two-slot pool'
   } catch {
     Assert-True ($_.Exception.Message -match 'Timed out') 'wrong exhausted-pool failure'
@@ -68,7 +70,7 @@ try {
   $releasedId = $slot1.SlotId
   $slot1.Stream.Dispose()
   $slot1 = $null
-  $slot3 = Acquire-AtlasHeavySlot -SlotCount 2 -RequestedSlot $releasedId -TimeoutSeconds 2 -Project 'slot-selftest-c' -Revision 'selftest'
+  $slot3 = Acquire-AtlasHeavySlot -SlotCount 2 -RequestedSlot $releasedId -TimeoutSeconds 2 -Project 'slot-selftest-c' -Revision 'selftest' -SlotPrefix $slotPrefix
   Assert-True ($slot3.SlotId -eq $releasedId) 'released slot was not reusable'
 
   Write-Output 'heavy-e2e-slot-pool-self-test=PASS'
