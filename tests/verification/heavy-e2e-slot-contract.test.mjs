@@ -45,5 +45,8 @@ test('parallel slot benchmark is reproducible and keeps each full gate single-wo
   assert.match(benchmark, /summary\.json/);
   assert.match(benchmark, /Win32_Processor|LoadPercentage/);
   assert.match(benchmark, /FreePhysicalMemory/);
+  assert.match(benchmark, /\[pscustomobject\]/i);
+  assert.match(benchmark, /SelfTest/);
+  assert.match(benchmark, /Measure-Object[^\n]*cpuPercent/i);
   assert.match(benchmark, /ConvertTo-Json/);
 });

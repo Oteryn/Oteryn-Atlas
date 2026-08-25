@@ -3,7 +3,8 @@ param(
   [Parameter(Mandatory = $true)][string]$PublicationOrigin,
   [ValidateRange(1, 3)][int]$MaxSlots = 3,
   [string]$OutputPath,
-  [string]$Prefix = "atlas-slot-benchmark-$([DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss'))"
+  [string]$Prefix = "atlas-slot-benchmark-$([DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss'))",
+  [switch]$SelfTest
 )
 
 $ErrorActionPreference = 'Stop'
@@ -17,11 +18,22 @@ New-Item -ItemType Directory -Force -Path $benchmarkDir | Out-Null
 function Get-SystemSample {
   $cpu = (Get-CimInstance Win32_Processor | Measure-Object -Property LoadPercentage -Average).Average
   $os = Get-CimInstance Win32_OperatingSystem
-  [ordered]@{
+  [pscustomobject][ordered]@{
     atUtc = [DateTime]::UtcNow.ToString('o')
     cpuPercent = [double]$cpu
     freeMemoryGiB = [math]::Round(([double]$os.FreePhysicalMemory / 1MB), 2)
   }
+}
+
+if ($SelfTest) {
+  $samples = @(Get-SystemSample; Get-SystemSample)
+  $maxCpu = ($samples | Measure-Object -Property cpuPercent -Maximum).Maximum
+  $minFree = ($samples | Measure-Object -Property freeMemoryGiB -Minimum).Minimum
+  if ($samples.Count -ne 2 -or $null -eq $maxCpu -or $null -eq $minFree) {
+    throw 'Benchmark system-sample aggregation self-test failed.'
+  }
+  Write-Output "benchmark-heavy-slots-self-test=PASS samples=$($samples.Count)"
+  exit 0
 }
 
 $cpuInfo = Get-CimInstance Win32_Processor | Select-Object -First 1
