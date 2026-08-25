@@ -41,6 +41,24 @@ test('summary scenario preserves seed, first failure and explicit skip reason', 
   assert(Object.isFrozen(scenario));
 });
 
+test('summary scenario emits a path-normalized stable test identity', () => {
+  const scenario = normalizeSummaryScenario({
+    project: 'desktop-chromium',
+    file: 'C:\\work\\Oteryn-Atlas\\e2e\\tests\\geometry-desktop.spec.mjs',
+    title: 'geometry stays synchronized',
+    status: 'passed',
+    durationMs: 12,
+    retry: 0,
+  });
+
+  assert.equal(scenario.specPath, 'e2e/tests/geometry-desktop.spec.mjs');
+  assert.equal(
+    scenario.stableTestId,
+    'desktop-chromium::e2e/tests/geometry-desktop.spec.mjs::geometry stays synchronized',
+  );
+  assert(Object.isFrozen(scenario));
+});
+
 test('failed browser runs produce a bounded machine-readable failure manifest', () => {
   const failed = normalizeSummaryScenario({
     project: 'desktop-chromium',
@@ -76,6 +94,10 @@ test('failed browser runs produce a bounded machine-readable failure manifest', 
   assert.equal(manifest.atlasRevision, 'abc123');
   assert.equal(manifest.failures.length, 1);
   assert.equal(manifest.failures[0].seed, 133);
+  assert.equal(
+    manifest.failures[0].stableTestId,
+    'desktop-chromium::e2e/tests/stress-desktop.spec.mjs::seeded stress',
+  );
   assert.equal(manifest.failures[0].firstFailingActionIndex, 7);
   assert.deepEqual(manifest.failures[0].evidence, ['test-results/stress/trace.zip', 'action-log.json']);
   assert(Object.isFrozen(manifest));

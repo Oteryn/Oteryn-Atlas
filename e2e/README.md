@@ -64,6 +64,24 @@ Direct mode exercises deployed code and data together. `ATLAS_EXPECTED_REVISION`
 
 Set `ATLAS_E2E_WORKERS=1` for a low-resource machine. The suite has no retries, so first-run failures remain visible.
 
+## Worker calibration (Molehill-PC only)
+
+Do not change the accepted worker policy from hardware intuition. The measurement-only harness runs the required baseline/candidates (`1`, `2`, `4`, `6`, `8`) in counterbalanced order with at least three repetitions and records Windows performance-counter, Docker, disk, runner, environment, summary and zero-retry evidence. It does not change Playwright configuration, runner slots, branch policy, or status publication.
+
+First validate the harness on Molehill-PC:
+
+```powershell
+.\e2e\benchmark-workers.ps1 -SelfTest
+```
+
+Then run it only when the current checkout is the intended exact revision and no exclusive performance, soak, native-GPU, deployment, or conflicting calibration work is active:
+
+```powershell
+.\e2e\benchmark-workers.ps1 -PublicationOrigin http://192.168.1.2:8097 -Repetitions 3
+```
+
+Review the generated JSON before proposing any worker or concurrency default. A nonzero test exit, nonzero retry, missing summary, browser/container instability, or incomplete telemetry invalidates that measurement set.
+
 ## Coverage
 
 The deterministic suite covers:

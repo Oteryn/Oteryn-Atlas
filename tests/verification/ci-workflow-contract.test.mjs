@@ -211,3 +211,20 @@ test('docs-only PR classification skips heavy browser proof only when proven saf
   assert.match(gate, /false:true[\s\S]*VERIFICATION_BROWSER[\s\S]*skipped/);
   assert.match(gate, /true:false[\s\S]*VERIFICATION_BROWSER[\s\S]*success/);
 });
+
+test('classification emits a trusted-base shadow plan without changing legacy gating', () => {
+  const classifierJob = block(ci, '  change-classification:\n', '  verification-browser:\n');
+
+  assert.match(classifierJob, /shadow_plan_digest:.*steps\.classify\.outputs\.shadow_plan_digest/);
+  assert.match(classifierJob, /ATLAS_INTEGRATION_BASE_SHA: \$\{\{ github\.event\.pull_request\.base\.sha \}\}/);
+  assert.match(classifierJob, /git fetch --no-tags --depth=1 origin "\$ATLAS_INTEGRATION_BASE_SHA"/);
+  assert.match(classifierJob, /git cat-file -e "\$ATLAS_INTEGRATION_BASE_SHA:tools\/verification\/impact-manifest\.json"/);
+  assert.match(classifierJob, /Initial bootstrap policy has no path exemptions/);
+  assert.match(classifierJob, /git show "\$ATLAS_INTEGRATION_BASE_SHA:tools\/verification\/impact-manifest\.json"/);
+  assert.match(classifierJob, /--trusted-impact/);
+  assert.match(classifierJob, /--candidate-impact/);
+  assert.match(classifierJob, /--trusted-catalog/);
+  assert.match(classifierJob, /--candidate-catalog/);
+  assert.match(classifierJob, /shadow_plan_digest=/);
+  assert.match(classifierJob, /node tools\/verification\/classify-pr-changes\.mjs < "\$paths"/);
+});

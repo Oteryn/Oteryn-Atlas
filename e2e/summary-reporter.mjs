@@ -30,6 +30,19 @@ function optionalInteger(value) {
   return Number.isSafeInteger(parsed) ? parsed : null;
 }
 
+export function normalizeSpecPath(file) {
+  const normalized = String(file ?? '').replaceAll('\\', '/');
+  for (const marker of ['e2e/tests/', 'tests/']) {
+    const index = normalized.indexOf(marker);
+    if (index >= 0) return normalized.slice(index);
+  }
+  return normalized.replace(/^\.\//, '') || 'unknown';
+}
+
+export function stableTestId(project, specPath, scenario) {
+  return `${String(project ?? 'unknown').slice(0, 128)}::${String(specPath ?? 'unknown').slice(0, 512)}::${String(scenario ?? 'unknown').slice(0, 512)}`;
+}
+
 export function normalizeSummaryScenario(input) {
   const annotations = input.annotations ?? [];
   const seed = optionalInteger(annotationValue(annotations, 'seed'));
@@ -37,9 +50,13 @@ export function normalizeSummaryScenario(input) {
   const skipReason = annotationValue(annotations, 'skip-reason')
     ?? annotationValue(annotations, 'skip')
     ?? null;
+  const specPath = normalizeSpecPath(input.file);
+  const scenario = input.title;
   return Object.freeze({
     project: input.project,
-    scenario: input.title,
+    specPath,
+    scenario,
+    stableTestId: stableTestId(input.project, specPath, scenario),
     category: classifyScenario(input.file, annotations),
     status: input.status,
     durationMs: input.durationMs,
@@ -58,7 +75,9 @@ export function buildFailureManifest(summary) {
     .slice(0, 64)
     .map((scenario) => Object.freeze({
       project: String(scenario.project ?? 'unknown').slice(0, 128),
+      specPath: String(scenario.specPath ?? 'unknown').slice(0, 512),
       scenario: String(scenario.scenario ?? 'unknown').slice(0, 512),
+      stableTestId: String(scenario.stableTestId ?? 'unknown').slice(0, 1152),
       category: scenario.category ?? 'e2e',
       status: scenario.status ?? 'unknown',
       durationMs: scenario.durationMs ?? null,
