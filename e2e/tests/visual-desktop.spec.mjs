@@ -219,7 +219,7 @@ test('playback changes only verified animated presentation regions and restores 
   });
   await gotoAtlas(page, CREATURE_ONLY_PLAYBACK_ENTRY);
   await waitForAtlas(page);
-  await page.addStyleTag({ content: '#map-frame.visual-world-only #creature-overlay, #map-frame.visual-world-only #minimap-layer, #map-frame.visual-world-only #overview-overlay, #map-frame.visual-world-only #selection-box, #map-frame.visual-world-only #cursor-coordinate, #map-frame.visual-world-only #runtime-badge, #map-frame.visual-world-only #detail-badge { visibility: hidden !important; }' });
+  await page.addStyleTag({ content: '#map-frame.visual-world-only #creature-overlay, #map-frame.visual-world-only #creature-presentation-overlay, #map-frame.visual-world-only #minimap-layer, #map-frame.visual-world-only #overview-overlay, #map-frame.visual-world-only #selection-box, #map-frame.visual-world-only #cursor-coordinate, #map-frame.visual-world-only #runtime-badge, #map-frame.visual-world-only #detail-badge { visibility: hidden !important; }' });
   await page.waitForFunction(() => globalThis.__OTERYN_ATLAS_CREATURES__?.status === 'PASS'
     && globalThis.__OTERYN_ATLAS_CREATURES__?.pixelDrawnRecords > 0
     && globalThis.__OTERYN_ATLAS_CREATURES__?.render?.anchors?.length > 0, null, { timeout: 30_000 });
