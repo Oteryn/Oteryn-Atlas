@@ -8,7 +8,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$ExpectedScenarioCount = 67
+$ExpectedScenarioCount = 71
 $VisualContractPath = Join-Path $PSScriptRoot 'user-visual-scenarios.json'
 $VisualContract = Get-Content $VisualContractPath -Raw | ConvertFrom-Json
 if ([int]$VisualContract.version -ne 1) { throw 'Unsupported visual user acceptance contract version.' }
