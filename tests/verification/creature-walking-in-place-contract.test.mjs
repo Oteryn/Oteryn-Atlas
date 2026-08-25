@@ -39,7 +39,7 @@ test('walking presentation remains on the shared clock without per-creature time
   assert.ok(web.includes('oteryn-atlas-animation-frame'), 'creature overlay must consume the shared logical animation clock');
   assert.ok(web.includes('logicalTimeMs'), 'creature overlay must advance presentation from shared logical time');
   const prepareStart = web.indexOf('async function prepareDraw');
-  const prepareEnd = web.indexOf('function npcBadgeOffset', prepareStart);
+  const prepareEnd = web.indexOf('async function draw(records', prepareStart);
   assert.ok(prepareStart >= 0 && prepareEnd > prepareStart, 'creature draw loop must remain inspectable');
   const prepareDraw = web.slice(prepareStart, prepareEnd);
   assert.doesNotMatch(prepareDraw, /\bsetInterval\s*\(/u, 'creature draw loop must not allocate per-creature intervals');
