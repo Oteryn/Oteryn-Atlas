@@ -70,7 +70,7 @@ test('local Docker status publisher only accepts exact clean all-pass evidence',
   assert.match(publisher, /git status --porcelain/);
   assert.match(publisher, /git ls-remote --heads origin/);
   assert.match(publisher, /metadata\.expectedRevision/);
-  assert.match(publisher, /^\$ExpectedScenarioCount = 64$/m);
+  assert.match(publisher, /^\$ExpectedScenarioCount = 71$/m);
   assert.match(publisher, /targetMode -ne 'checkout-overlay'/);
   assert.match(publisher, /metadata\.workers -ne 1/);
   assert.match(playwrightConfig, /metadata:\s*\{[\s\S]*workers,/);
@@ -140,7 +140,7 @@ test('heavy browser verification is pinned to Molehill while Synology remains li
   assert.match(agents, /Molehill-PC/);
   assert.match(agents, /heavy.*browser/i);
   assert.match(agents, /Synology.*live acceptance/i);
-  assert.match(agents, /must not.*64-scenario/i);
+  assert.match(agents, /must not.*71-scenario/i);
 });
 
 test('nightly Molehill identity avoids pre-scheduling runner context expressions', () => {
@@ -187,8 +187,10 @@ test('Molehill local heavy qualification uses a bounded isolated slot pool', () 
   assert.match(heavySlotPool, /FileShare\]::None/);
   assert.match(heavySlotPool, /FileShare\]::ReadWrite/);
   assert.match(heavySlotPool, /oteryn-atlas-e2e-project-/);
+  assert.match(heavySlotPool, /oteryn-atlas-e2e-artifacts-/);
   assert.match(agents, /bounded.*concurrent|concurrent.*bounded/i);
   assert.match(agents, /isolat/i);
+  assert.match(agents, /71-scenario/i);
 });
 
 test('docs-only PR classification skips heavy browser proof only when proven safe', () => {
