@@ -61,6 +61,31 @@ if ($env:ATLAS_PUBLICATION_ORIGIN) {
   $env:ATLAS_PUBLICATION_SCHEME = $origin.Scheme
   $env:ATLAS_PUBLICATION_HOST = $origin.Host
   $env:ATLAS_PUBLICATION_HOST_HEADER = $origin.Authority
+  $publicationPreflightPaths = @(
+    '/fullworld/publication/publication.json',
+    '/fullworld/animation/manifest.json',
+    '/fullworld/minimap/world.json'
+  )
+  $publicationPreflightDeadline = [DateTime]::UtcNow.AddSeconds(60)
+  $publicationPreflightFailures = @()
+  do {
+    $publicationPreflightFailures = @()
+    foreach ($path in $publicationPreflightPaths) {
+      try {
+        $response = Invoke-WebRequest -UseBasicParsing -Uri "$($origin.AbsoluteUri.TrimEnd('/'))$path" -TimeoutSec 10
+        if ($response.StatusCode -ne 200 -or [string]::IsNullOrWhiteSpace($response.Content)) {
+          $publicationPreflightFailures += "$path status=$($response.StatusCode)"
+        }
+      } catch {
+        $publicationPreflightFailures += "$path error=$($_.Exception.Message)"
+      }
+    }
+    if ($publicationPreflightFailures.Count -eq 0) { break }
+    Start-Sleep -Seconds 2
+  } while ([DateTime]::UtcNow -lt $publicationPreflightDeadline)
+  if ($publicationPreflightFailures.Count -ne 0) {
+    throw "Publication origin preflight did not become healthy: $($publicationPreflightFailures -join '; ')"
+  }
 
   if (-not $env:ATLAS_BASE_URL) {
     $python = (Get-Command python -ErrorAction Stop).Source
