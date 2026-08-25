@@ -120,6 +120,16 @@ function unionStrings(...values) {
   return [...new Set(values.flat())].sort();
 }
 
+function suppliedStableTestIds(value) {
+  if (value == null) return null;
+  if (!Array.isArray(value) || value.length === 0 || value.some((id) => typeof id !== 'string' || !id.includes('::'))) {
+    throw new TypeError('stableTestIds must be a non-empty array of stable Playwright IDs');
+  }
+  const ids = unionStrings(value);
+  if (ids.length !== value.length) throw new TypeError('stableTestIds must not contain duplicates');
+  return ids;
+}
+
 function mergeCatalogs(trusted, candidate) {
   const groups = {};
   for (const id of unionStrings(Object.keys(trusted.groups), Object.keys(candidate.groups))) {
@@ -169,7 +179,8 @@ export function buildVerificationPlan(input) {
   const groups = selectedGroups(result.groups, verificationCatalog);
   const visualGroupIds = groups.filter((group) => group.evidence === 'restricted-visual-review').map((group) => group.id);
   const resourceClasses = [...new Set(groups.map((group) => group.resourceClass))].sort();
-  const stableTestIds = groups.flatMap((group) => group.stableTestIds).sort();
+  const stableTestIds = suppliedStableTestIds(input.stableTestIds)
+    ?? groups.flatMap((group) => group.stableTestIds).sort();
   const headSha = sha(input.headSha, 'headSha');
   const integrationBaseSha = sha(input.integrationBaseSha, 'integrationBaseSha');
   const mergeBaseSha = sha(input.mergeBaseSha, 'mergeBaseSha');
@@ -238,6 +249,7 @@ function runCli() {
     headSha: args['--head-sha'],
     integrationBaseSha: args['--integration-base-sha'],
     mergeBaseSha: args['--merge-base-sha'],
+    stableTestIds: Object.hasOwn(args, '--stable-test-ids') ? readJson(args['--stable-test-ids'], 'stable test IDs') : undefined,
     changedFiles: readJson(args['--changed-files'], 'changed files'),
     trustedImpactManifest: readJson(args['--trusted-impact'], 'trusted impact manifest'),
     candidateImpactManifest: readJson(args['--candidate-impact'], 'candidate impact manifest'),

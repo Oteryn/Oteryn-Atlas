@@ -15,6 +15,12 @@ if ($env:ATLAS_PUBLICATION_ORIGIN -and $env:ATLAS_PUBLICATION_ORIGIN -notmatch '
 if (-not $env:ATLAS_CODE_REVISION) {
   try { $env:ATLAS_CODE_REVISION = (git rev-parse HEAD).Trim() } catch { $env:ATLAS_CODE_REVISION = 'unknown' }
 }
+$planPath = $env:ATLAS_VERIFICATION_PLAN_PATH
+if ($planPath) {
+  $resolvedPlan = (Resolve-Path $planPath).Path
+  $env:ATLAS_VERIFICATION_PLAN_PATH = $resolvedPlan
+  $env:ATLAS_VERIFICATION_PLAN_SHA256 = 'sha256:' + (Get-FileHash $resolvedPlan -Algorithm SHA256).Hash.ToLowerInvariant()
+}
 if (-not $env:ATLAS_BASE_URL -and -not $env:ATLAS_EXPECTED_REVISION -and $env:ATLAS_CODE_REVISION -ne 'unknown') {
   $env:ATLAS_EXPECTED_REVISION = $env:ATLAS_CODE_REVISION
 }

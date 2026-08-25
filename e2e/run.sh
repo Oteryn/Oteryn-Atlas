@@ -47,6 +47,12 @@ if [[ -z "${ATLAS_CODE_REVISION:-}" ]]; then
 fi
 export ATLAS_CODE_REVISION
 
+if [[ -n "${ATLAS_VERIFICATION_PLAN_PATH:-}" ]]; then
+  ATLAS_VERIFICATION_PLAN_PATH="$(realpath "$ATLAS_VERIFICATION_PLAN_PATH")"
+  ATLAS_VERIFICATION_PLAN_SHA256="sha256:$(sha256sum "$ATLAS_VERIFICATION_PLAN_PATH" | awk '{print $1}')"
+  export ATLAS_VERIFICATION_PLAN_PATH ATLAS_VERIFICATION_PLAN_SHA256
+fi
+
 # In checkout-overlay mode the entry document is served by atlas-web, so bind
 # the browser proof to the exact checkout revision automatically. A direct
 # ATLAS_BASE_URL target can supply its own ATLAS_EXPECTED_REVISION explicitly.
