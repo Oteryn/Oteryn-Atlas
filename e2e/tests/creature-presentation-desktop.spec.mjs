@@ -72,11 +72,20 @@ test('desktop mixed scene exposes #115 diagnostics and coexists with #113 card g
   expect(selectedPresentation?.rect).toEqual(state.cardTargetRect);
   const selectedLabel = labelLayoutFor(state, MIXED_SCENE.npcRecordId);
   if (selectedLabel?.rect) await assertLayoutAvoids(page, selectedLabel.rect, '#creature-quick-card', 'selected creature label');
-  const hoverId = MIXED_SCENE.monsterRecordIds[0];
-  const hoverTarget = render.presentationRects.find((entry) => entry.recordId === hoverId);
-  expect(hoverTarget?.rect, 'mixed-scene monster presentation rect').not.toBeNull();
   const atlasBox = await page.locator('#atlas').boundingBox();
+  const cardBox = await page.locator('#creature-quick-card').boundingBox();
   expect(atlasBox).not.toBeNull();
+  expect(cardBox).not.toBeNull();
+  const hoverTarget = render.presentationRects
+    .filter((entry) => MIXED_SCENE.monsterRecordIds.includes(entry.recordId) && entry.rect)
+    .find((entry) => {
+      const screenX = atlasBox.x + entry.rect.x + entry.rect.width / 2;
+      const screenY = atlasBox.y + entry.rect.y + entry.rect.height / 2;
+      return screenX < cardBox.x || screenX > cardBox.x + cardBox.width
+        || screenY < cardBox.y || screenY > cardBox.y + cardBox.height;
+    });
+  expect(hoverTarget, 'mixed-scene needs an unoccluded monster hover target').toBeDefined();
+  const hoverId = hoverTarget.recordId;
   const beforeHoverLayout = render.labelLayoutGeneration;
   await page.mouse.move(
     atlasBox.x + hoverTarget.rect.x + hoverTarget.rect.width / 2,
@@ -142,7 +151,7 @@ test('desktop factual role rows preserve canonical roles, overflow count and act
 
 test('desktop dense collisions are deterministic and long factual names stay bounded at edges', async ({ page }, testInfo) => {
   const runtime = captureRuntimeFailures(page);
-  let state = await openScenario(page, sceneEntry(DENSE_MONSTER_SCENE, { creatures: 'monster', zoom: 2 }));
+  let state = await openScenario(page, sceneEntry(DENSE_MONSTER_SCENE, { creatures: 'monster', zoom: 1 }));
   await assertRecordIdsPublished(page, DENSE_MONSTER_SCENE.recordIds);
   await captureUserVisualEvidence(page, testInfo, 'creature-presentation.dense-monsters', {
     note: 'Five factual monsters occupy a two-tile cluster; lower-priority labels must suppress deterministically.',
@@ -198,15 +207,14 @@ test('desktop dense collisions are deterministic and long factual names stay bou
 
 test('desktop mode-aware LOD is sparse in minimap/classic/overview and follows canonical auto representation', async ({ page }, testInfo) => {
   const runtime = captureRuntimeFailures(page);
-  const mapDrawn = [];
+  const mapLods = [];
   for (const zoom of [0.5, 1, 2]) {
     const state = await openScenario(page, sceneEntry(MIXED_SCENE, { zoom, mode: 'map' }));
     const render = assertPresentationContract(state);
     expect(render.effectivePresentation.requestedMode).toBe('map');
-    mapDrawn.push(render.labelsDrawn);
+    mapLods.push(render.effectivePresentation.lod);
   }
-  expect(mapDrawn[1]).toBeGreaterThanOrEqual(mapDrawn[0]);
-  expect(mapDrawn[2]).toBeGreaterThanOrEqual(mapDrawn[1]);
+  expect(mapLods).toEqual(['far', 'medium', 'close']);
 
   let state = await openScenario(page, sceneEntry(MIXED_SCENE, { zoom: 2, mode: 'minimap' }));
   let render = assertPresentationContract(state);
