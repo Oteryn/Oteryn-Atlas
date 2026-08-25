@@ -81,6 +81,7 @@ test('identical presentation commits reuse cached text measurement and collision
     };
 
     const first = controller.commit(input);
+    assert.equal(first.labelLayouts[0]?.priority, 'monster');
     assert(measureTextCalls > 0, 'first layout commit must measure visible label text');
     const afterFirst = measureTextCalls;
     const second = controller.commit(input);

@@ -158,10 +158,10 @@ function drawLabel(context, item, rect) {
   context.shadowBlur = 0;
 }
 
-function priorityName({ selected, hovered, kind }) {
+function priorityName({ selected, hovered, record }) {
   if (selected) return 'selected';
   if (hovered) return 'hovered';
-  return kind;
+  return record.kind;
 }
 
 function stableSlotKey(slots) {
