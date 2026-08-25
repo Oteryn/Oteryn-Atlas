@@ -40,7 +40,7 @@ if ($env:ATLAS_E2E_LOCK_TIMEOUT_SECONDS) {
   $lockTimeoutSeconds = $parsedLockTimeout
 }
 
-$slotConfig = Resolve-AtlasHeavySlotConfig -DefaultSlotCount 1
+$slotConfig = Resolve-AtlasHeavySlotConfig -DefaultSlotCount 2
 $projectLease = Acquire-AtlasProjectLock -Project $project -Revision $env:ATLAS_CODE_REVISION
 $artifactLease = Acquire-AtlasArtifactLock -ArtifactPath $artifactDir -Project $project -Revision $env:ATLAS_CODE_REVISION
 New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null

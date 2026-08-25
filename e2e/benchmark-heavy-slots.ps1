@@ -18,12 +18,23 @@ New-Item -ItemType Directory -Force -Path $benchmarkDir | Out-Null
 
 function Get-SystemSample {
   $cpu = (Get-CimInstance Win32_Processor | Measure-Object -Property LoadPercentage -Average).Average
+  $cpuMetricAvailable = $null -ne $cpu
   $os = Get-CimInstance Win32_OperatingSystem
   [pscustomobject][ordered]@{
     atUtc = [DateTime]::UtcNow.ToString('o')
-    cpuPercent = [double]$cpu
+    cpuMetricAvailable = $cpuMetricAvailable
+    cpuPercent = if ($cpuMetricAvailable) { [math]::Round([double]$cpu, 2) } else { $null }
     freeMemoryGiB = [math]::Round(([double]$os.FreePhysicalMemory / 1MB), 2)
   }
+}
+
+function Read-RunExitCode {
+  param([string]$Path)
+  if (-not (Test-Path -LiteralPath $Path)) { return $null }
+  $raw = (Get-Content -LiteralPath $Path -Raw).Trim()
+  $parsed = 0
+  if (-not [int]::TryParse($raw, [ref]$parsed)) { return $null }
+  $parsed
 }
 
 function Get-PublicationRevision {
@@ -37,12 +48,18 @@ function Get-PublicationRevision {
 
 if ($SelfTest) {
   $samples = @(Get-SystemSample; Get-SystemSample)
-  $maxCpu = ($samples | Measure-Object -Property cpuPercent -Maximum).Maximum
+  $cpuSamples = @($samples | Where-Object { $_.cpuMetricAvailable -and $null -ne $_.cpuPercent })
   $minFree = ($samples | Measure-Object -Property freeMemoryGiB -Minimum).Minimum
-  if ($samples.Count -ne 2 -or $null -eq $maxCpu -or $null -eq $minFree) {
+  if ($samples.Count -ne 2 -or $null -eq $minFree) {
     throw 'Benchmark system-sample aggregation self-test failed.'
   }
-  Write-Output "benchmark-heavy-slots-self-test=PASS samples=$($samples.Count)"
+  $exitSelfTest = Join-Path $benchmarkDir 'benchmark-exit-code-selftest.txt'
+  [IO.File]::WriteAllText($exitSelfTest, '7', (New-Object Text.UTF8Encoding($false)))
+  if ((Read-RunExitCode -Path $exitSelfTest) -ne 7) { throw 'Benchmark exit-code parser rejected a valid child exit code.' }
+  [IO.File]::WriteAllText($exitSelfTest, 'invalid', (New-Object Text.UTF8Encoding($false)))
+  if ($null -ne (Read-RunExitCode -Path $exitSelfTest)) { throw 'Benchmark exit-code parser accepted malformed evidence.' }
+  Remove-Item -LiteralPath $exitSelfTest -Force
+  Write-Output "benchmark-heavy-slots-self-test=PASS samples=$($samples.Count) cpuMetricAvailable=$($cpuSamples.Count -gt 0)"
   exit 0
 }
 
@@ -69,6 +86,9 @@ for ($slotCount = 1; $slotCount -le $MaxSlots; $slotCount += 1) {
     $launcher = Join-Path $benchmarkDir "$project.launch.ps1"
     $stdout = Join-Path $benchmarkDir "$project.stdout.log"
     $stderr = Join-Path $benchmarkDir "$project.stderr.log"
+    $exitCodePath = Join-Path $benchmarkDir "$project.exit-code.txt"
+    Remove-Item -LiteralPath $exitCodePath -Force -ErrorAction SilentlyContinue
+    $exitCodeLiteral = $exitCodePath.Replace("'", "''")
     $launcherText = @"
 `$ErrorActionPreference = 'Stop'
 Set-Location -LiteralPath '$root'
@@ -81,12 +101,14 @@ Remove-Item Env:ATLAS_BASE_URL -ErrorAction SilentlyContinue
 `$env:ATLAS_E2E_PROJECT = '$project'
 `$env:ATLAS_E2E_LOCK_TIMEOUT_SECONDS = '7200'
 & '.\e2e\run.ps1'
-exit `$LASTEXITCODE
+`$runExitCode = `$LASTEXITCODE
+[IO.File]::WriteAllText('$exitCodeLiteral', [string]`$runExitCode, (New-Object Text.UTF8Encoding(`$false)))
+exit `$runExitCode
 "@
     [IO.File]::WriteAllText($launcher, $launcherText, (New-Object Text.UTF8Encoding($false)))
     $process = Start-Process powershell.exe -ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-File',$launcher) -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr
     $processes += $process
-    $runSpecs += [pscustomobject]@{ Slot = $slot; Project = $project; Stdout = $stdout; Stderr = $stderr; Process = $process }
+    $runSpecs += [pscustomobject]@{ Slot = $slot; Project = $project; Stdout = $stdout; Stderr = $stderr; ExitCodePath = $exitCodePath; Process = $process }
   }
 
   $samples = @()
@@ -105,10 +127,12 @@ exit `$LASTEXITCODE
     $summaryPath = Join-Path $root "artifacts\e2e\$($spec.Project)\summary.json"
     $summary = if (Test-Path $summaryPath) { Get-Content $summaryPath -Raw | ConvertFrom-Json } else { $null }
     $scenarios = if ($summary) { @($summary.scenarios) } else { @() }
+    $exitCode = Read-RunExitCode -Path $spec.ExitCodePath
     $runs += [ordered]@{
       slot = $spec.Slot
       project = $spec.Project
-      exitCode = $spec.Process.ExitCode
+      exitCode = $exitCode
+      exitCodeEvidencePath = $spec.ExitCodePath
       summaryPath = $summaryPath
       summaryStatus = if ($summary) { [string]$summary.status } else { 'missing' }
       scenarioCount = $scenarios.Count
@@ -118,10 +142,11 @@ exit `$LASTEXITCODE
     }
   }
   if ($samples.Count -eq 0) { $samples += Get-SystemSample }
-  $maxCpu = ($samples | Measure-Object -Property cpuPercent -Maximum).Maximum
+  $cpuSamples = @($samples | Where-Object { $_.cpuMetricAvailable -and $null -ne $_.cpuPercent })
+  $maxCpu = if ($cpuSamples.Count -gt 0) { ($cpuSamples | Measure-Object -Property cpuPercent -Maximum).Maximum } else { $null }
   $minFree = ($samples | Measure-Object -Property freeMemoryGiB -Minimum).Minimum
   $allPassed = @($runs | Where-Object {
-    $_.exitCode -ne 0 -or $_.summaryStatus -ne 'passed' -or $_.nonPassed -ne 0 -or $_.retried -ne 0 -or $_.workers -ne 1
+    $null -eq $_.exitCode -or $_.exitCode -ne 0 -or $_.summaryStatus -ne 'passed' -or $_.nonPassed -ne 0 -or $_.retried -ne 0 -or $_.workers -ne 1
   }).Count -eq 0 -and $revisionStable
   $groups += [ordered]@{
     slotCount = $slotCount
@@ -130,7 +155,8 @@ exit `$LASTEXITCODE
     completedAtUtc = $completed.ToString('o')
     wallSeconds = [math]::Round($wallSeconds, 3)
     gatesPerHour = [math]::Round(($slotCount * 3600.0 / $wallSeconds), 3)
-    maxCpuPercent = [double]$maxCpu
+    cpuMetricAvailable = $cpuSamples.Count -gt 0
+    maxCpuPercent = if ($null -ne $maxCpu) { [double]$maxCpu } else { $null }
     minFreeMemoryGiB = [double]$minFree
     publicationRevisionBefore = $publicationRevisionBefore
     publicationRevisionAfter = $publicationRevisionAfter

@@ -70,3 +70,22 @@ test('benchmark fences legacy runners before timed slot groups', () => {
   assert.match(benchmark, /benchmarkFence\s*=\s*Acquire-AtlasLegacyFence/);
   assert.match(benchmark, /benchmarkFence\.Stream\.Dispose/);
 });
+
+test('measured safe default is two bounded heavy slots', () => {
+  assert.match(run, /Resolve-AtlasHeavySlotConfig\s+-DefaultSlotCount\s+2/);
+  assert.match(helper, /parsed\s+-gt\s+3/);
+});
+
+test('benchmark records child exit codes explicitly instead of relying on Start-Process ExitCode', () => {
+  const benchmark = fs.readFileSync('e2e/benchmark-heavy-slots.ps1', 'utf8');
+  assert.match(benchmark, /exitCodePath/i);
+  assert.match(benchmark, /exit-code/i);
+  assert.match(benchmark, /TryParse/i);
+  assert.doesNotMatch(benchmark, /exitCode\s*=\s*\$spec\.Process\.ExitCode/);
+});
+
+test('benchmark never coerces an unavailable CPU counter to a truthful-looking zero', () => {
+  const benchmark = fs.readFileSync('e2e/benchmark-heavy-slots.ps1', 'utf8');
+  assert.match(benchmark, /cpuMetricAvailable/i);
+  assert.doesNotMatch(benchmark, /cpuPercent\s*=\s*\[double\]\$cpu/);
+});
