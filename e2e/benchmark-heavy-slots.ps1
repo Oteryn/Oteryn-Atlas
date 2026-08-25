@@ -25,6 +25,15 @@ function Get-SystemSample {
   }
 }
 
+function Get-PublicationRevision {
+  $url = ($PublicationOrigin.TrimEnd('/')) + '/web/fullworld.html'
+  $response = Invoke-WebRequest -UseBasicParsing -Method Head -Uri $url -TimeoutSec 10
+  if ([int]$response.StatusCode -ne 200) { throw "Publication revision probe returned HTTP $([int]$response.StatusCode)." }
+  $served = [string]$response.Headers['X-Oteryn-Atlas-Revision']
+  if ([string]::IsNullOrWhiteSpace($served)) { throw 'Publication revision probe returned no X-Oteryn-Atlas-Revision header.' }
+  $served.Trim()
+}
+
 if ($SelfTest) {
   $samples = @(Get-SystemSample; Get-SystemSample)
   $maxCpu = ($samples | Measure-Object -Property cpuPercent -Maximum).Maximum
@@ -39,6 +48,7 @@ if ($SelfTest) {
 $cpuInfo = Get-CimInstance Win32_Processor | Select-Object -First 1
 $osInfo = Get-CimInstance Win32_OperatingSystem
 $groups = @()
+$benchmarkPublicationRevision = Get-PublicationRevision
 $warmProject = "$Prefix-warm"
 docker compose -p $warmProject -f e2e\compose.yml build e2e atlas-web | Out-Host
 if ($LASTEXITCODE -ne 0) { throw "Docker warm build failed with exit code $LASTEXITCODE." }
@@ -46,6 +56,7 @@ if ($LASTEXITCODE -ne 0) { throw "Docker warm build failed with exit code $LASTE
 docker compose -p $warmProject -f e2e\compose.yml down --remove-orphans *> $null
 
 for ($slotCount = 1; $slotCount -le $MaxSlots; $slotCount += 1) {
+  $publicationRevisionBefore = Get-PublicationRevision
   $started = [DateTime]::UtcNow
   $processes = @()
   $runSpecs = @()
@@ -81,6 +92,8 @@ exit `$LASTEXITCODE
   }
   foreach ($process in $processes) { $process.WaitForExit() }
   $completed = [DateTime]::UtcNow
+  $publicationRevisionAfter = Get-PublicationRevision
+  $revisionStable = $publicationRevisionBefore -eq $benchmarkPublicationRevision -and $publicationRevisionAfter -eq $benchmarkPublicationRevision
   $wallSeconds = ($completed - $started).TotalSeconds
 
   $runs = @()
@@ -105,7 +118,7 @@ exit `$LASTEXITCODE
   $minFree = ($samples | Measure-Object -Property freeMemoryGiB -Minimum).Minimum
   $allPassed = @($runs | Where-Object {
     $_.exitCode -ne 0 -or $_.summaryStatus -ne 'passed' -or $_.nonPassed -ne 0 -or $_.retried -ne 0 -or $_.workers -ne 1
-  }).Count -eq 0
+  }).Count -eq 0 -and $revisionStable
   $groups += [ordered]@{
     slotCount = $slotCount
     status = if ($allPassed) { 'passed' } else { 'failed' }
@@ -115,6 +128,9 @@ exit `$LASTEXITCODE
     gatesPerHour = [math]::Round(($slotCount * 3600.0 / $wallSeconds), 3)
     maxCpuPercent = [double]$maxCpu
     minFreeMemoryGiB = [double]$minFree
+    publicationRevisionBefore = $publicationRevisionBefore
+    publicationRevisionAfter = $publicationRevisionAfter
+    publicationRevisionStable = $revisionStable
     samples = $samples
     runs = $runs
   }
@@ -125,6 +141,7 @@ $result = [ordered]@{
   version = 1
   atlasRevision = $revision
   publicationOrigin = $PublicationOrigin
+  publicationRevision = $benchmarkPublicationRevision
   hardware = [ordered]@{
     cpu = [string]$cpuInfo.Name
     physicalCores = [int]$cpuInfo.NumberOfCores

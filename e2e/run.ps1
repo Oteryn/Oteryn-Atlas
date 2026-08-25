@@ -25,8 +25,11 @@ $env:ATLAS_E2E_PROJECT = $project
 if (-not $env:ATLAS_E2E_ARTIFACTS_HOST) {
   $env:ATLAS_E2E_ARTIFACTS_HOST = "../artifacts/e2e/$project"
 }
-$artifactDir = Join-Path $root "artifacts\e2e\$project"
-New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
+$artifactDir = if ([IO.Path]::IsPathRooted($env:ATLAS_E2E_ARTIFACTS_HOST)) {
+  [IO.Path]::GetFullPath($env:ATLAS_E2E_ARTIFACTS_HOST)
+} else {
+  [IO.Path]::GetFullPath((Join-Path $PSScriptRoot $env:ATLAS_E2E_ARTIFACTS_HOST))
+}
 
 $lockTimeoutSeconds = 7200
 if ($env:ATLAS_E2E_LOCK_TIMEOUT_SECONDS) {
@@ -39,6 +42,8 @@ if ($env:ATLAS_E2E_LOCK_TIMEOUT_SECONDS) {
 
 $slotConfig = Resolve-AtlasHeavySlotConfig -DefaultSlotCount 1
 $projectLease = Acquire-AtlasProjectLock -Project $project -Revision $env:ATLAS_CODE_REVISION
+$artifactLease = Acquire-AtlasArtifactLock -ArtifactPath $artifactDir -Project $project -Revision $env:ATLAS_CODE_REVISION
+New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
 $legacyFence = Acquire-AtlasLegacyFence -TimeoutSeconds $lockTimeoutSeconds -Project $project -Revision $env:ATLAS_CODE_REVISION
 $slotLease = Acquire-AtlasHeavySlot -SlotCount $slotConfig.SlotCount -RequestedSlot $slotConfig.RequestedSlot -TimeoutSeconds $lockTimeoutSeconds -Project $project -Revision $env:ATLAS_CODE_REVISION
 $env:ATLAS_E2E_SLOT_ID = [string]$slotLease.SlotId
@@ -112,6 +117,7 @@ try {
   }
   if ($slotLease -and $slotLease.Stream) { $slotLease.Stream.Dispose() }
   if ($legacyFence -and $legacyFence.Stream) { $legacyFence.Stream.Dispose() }
+  if ($artifactLease -and $artifactLease.Stream) { $artifactLease.Stream.Dispose() }
   if ($projectLease -and $projectLease.Stream) { $projectLease.Stream.Dispose() }
   $ErrorActionPreference = $previousPreference
 }

@@ -10,6 +10,7 @@ $oldSlot = $env:ATLAS_E2E_SLOT
 $projectA = "slot-selftest-a-$PID"
 $projectB = "slot-selftest-b-$PID"
 $projectLease = $null
+$artifactLease = $null
 $fence1 = $null
 $fence2 = $null
 $slot1 = $null
@@ -33,6 +34,15 @@ try {
     throw 'duplicate project lock accepted'
   } catch {
     Assert-True ($_.Exception.Message -match 'already active') 'wrong duplicate-project failure'
+  }
+
+  $artifactPath = Join-Path ([IO.Path]::GetTempPath()) "slot-selftest-artifacts-$PID"
+  $artifactLease = Acquire-AtlasArtifactLock -ArtifactPath $artifactPath -Project $projectA -Revision 'selftest'
+  try {
+    Acquire-AtlasArtifactLock -ArtifactPath $artifactPath -Project $projectB -Revision 'duplicate' | Out-Null
+    throw 'duplicate artifact namespace accepted'
+  } catch {
+    Assert-True ($_.Exception.Message -match 'artifact namespace is already active') 'wrong duplicate-artifact failure'
   }
 
   $fence1 = Acquire-AtlasLegacyFence -TimeoutSeconds 2 -Project $projectA -Revision 'selftest'
@@ -63,7 +73,7 @@ try {
 
   Write-Output 'heavy-e2e-slot-pool-self-test=PASS'
 } finally {
-  foreach ($lease in @($slot3, $slot2, $slot1, $fence2, $fence1, $projectLease)) {
+  foreach ($lease in @($slot3, $slot2, $slot1, $fence2, $fence1, $artifactLease, $projectLease)) {
     if ($lease -and $lease.Stream) { $lease.Stream.Dispose() }
   }
   if ($null -eq $oldCount) { Remove-Item Env:ATLAS_E2E_SLOT_COUNT -ErrorAction SilentlyContinue } else { $env:ATLAS_E2E_SLOT_COUNT = $oldCount }

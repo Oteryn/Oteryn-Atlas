@@ -48,6 +48,25 @@ function Acquire-AtlasProjectLock {
   [pscustomobject]@{ Stream = $projectStream; Path = $projectLockPath }
 }
 
+function Acquire-AtlasArtifactLock {
+  param([string]$ArtifactPath, [string]$Project, [string]$Revision)
+  $canonical = [IO.Path]::GetFullPath($ArtifactPath).ToLowerInvariant()
+  $sha = [Security.Cryptography.SHA256]::Create()
+  try {
+    $hashBytes = $sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($canonical))
+    $hash = -join ($hashBytes | ForEach-Object { $_.ToString('x2') })
+  } finally { $sha.Dispose() }
+
+  $artifactLockPath = Join-Path ([IO.Path]::GetTempPath()) "oteryn-atlas-e2e-artifacts-$hash.lock"
+  try {
+    $artifactStream = [IO.File]::Open($artifactLockPath, [IO.FileMode]::OpenOrCreate, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+  } catch [IO.IOException] {
+    throw "Atlas E2E artifact namespace is already active: $canonical"
+  }
+  Write-AtlasLeaseOwner $artifactStream "pid=$PID project=$Project revision=$Revision artifacts=$canonical"
+  [pscustomobject]@{ Stream = $artifactStream; Path = $artifactLockPath; ArtifactPath = $canonical }
+}
+
 function Acquire-AtlasLegacyFence {
   param([int]$TimeoutSeconds, [string]$Project, [string]$Revision)
   $path = Join-Path ([IO.Path]::GetTempPath()) 'oteryn-atlas-heavy-e2e.lock'

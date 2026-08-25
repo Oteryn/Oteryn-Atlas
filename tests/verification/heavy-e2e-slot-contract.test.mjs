@@ -21,9 +21,12 @@ test('new slot runners coexist but fence legacy single-lock runners', () => {
   assert.match(source, /oteryn-atlas-heavy-e2e-slot-.*?FileShare\]::None/s);
 });
 
-test('parallel slots still fail closed on duplicate Compose project identity', () => {
+test('parallel slots fail closed on duplicate Compose and artifact namespaces', () => {
   assert.match(source, /oteryn-atlas-e2e-project-/);
   assert.match(source, /project.*FileShare\]::None|FileShare\]::None.*project/s);
+  assert.match(source, /oteryn-atlas-e2e-artifacts-/);
+  assert.match(source, /Acquire-AtlasArtifactLock/);
+  assert.match(source, /ATLAS_E2E_ARTIFACTS_HOST/);
   assert.match(source, /Dispose\(\)/);
 });
 
@@ -48,5 +51,8 @@ test('parallel slot benchmark is reproducible and keeps each full gate single-wo
   assert.match(benchmark, /\[pscustomobject\]/i);
   assert.match(benchmark, /SelfTest/);
   assert.match(benchmark, /Measure-Object[^\n]*cpuPercent/i);
+  assert.match(benchmark, /X-Oteryn-Atlas-Revision/i);
+  assert.match(benchmark, /publicationRevisionBefore/i);
+  assert.match(benchmark, /publicationRevisionAfter/i);
   assert.match(benchmark, /ConvertTo-Json/);
 });
