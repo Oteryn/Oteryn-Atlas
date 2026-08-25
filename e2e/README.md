@@ -71,7 +71,7 @@ Do not change the accepted worker policy from hardware intuition. The measuremen
 First validate the harness on Molehill-PC:
 
 ```powershell
-.\e2e\benchmark-workers.ps1 -SelfTest
+.\e2e\benchmark-workers.ps1 -Mode SelfTest
 ```
 
 Then run it only when the current checkout is the intended exact revision and no exclusive performance, soak, native-GPU, deployment, or conflicting calibration work is active:

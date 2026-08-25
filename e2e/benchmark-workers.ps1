@@ -1,12 +1,10 @@
-[CmdletBinding(DefaultParameterSetName = 'Benchmark')]
+[CmdletBinding()]
 param(
-  [Parameter(Mandatory = $true, ParameterSetName = 'Benchmark')][string]$PublicationOrigin,
-  [Parameter(ParameterSetName = 'Benchmark')][Parameter(ParameterSetName = 'SelfTest')]
+  [ValidateSet('Benchmark', 'SelfTest')][string]$Mode = 'Benchmark',
+  [string]$PublicationOrigin,
   [ValidateSet(1, 2, 4, 6, 8)][int[]]$Workers = @(1, 2, 4, 6, 8),
-  [Parameter(ParameterSetName = 'Benchmark')][Parameter(ParameterSetName = 'SelfTest')]
   [ValidateRange(3, 5)][int]$Repetitions = 3,
-  [Parameter(ParameterSetName = 'Benchmark')][Parameter(ParameterSetName = 'SelfTest')][string]$OutputPath,
-  [Parameter(Mandatory = $true, ParameterSetName = 'SelfTest')][switch]$SelfTest
+  [string]$OutputPath
 )
 
 $ErrorActionPreference = 'Stop'
@@ -96,7 +94,7 @@ if (-not $OutputPath) {
 New-Item -ItemType Directory -Force -Path (Split-Path -LiteralPath $OutputPath -Parent) | Out-Null
 
 $fingerprint = Get-EnvironmentFingerprint
-if ($SelfTest) {
+if ($Mode -eq 'SelfTest') {
   if ($Workers.Count -ne @($Workers | Select-Object -Unique).Count) { throw 'Worker candidates must be unique.' }
   $probe = Get-RequiredCounterSample
   if ($null -eq $probe.processorUtilityPercent -or $null -eq $probe.memoryPressurePercent -or $null -eq $probe.dockerBlockIo) {
@@ -108,7 +106,7 @@ if ($SelfTest) {
   exit 0
 }
 
-if (-not $PublicationOrigin) { throw 'PublicationOrigin is required unless -SelfTest is used.' }
+if (-not $PublicationOrigin) { throw 'PublicationOrigin is required unless -Mode SelfTest is used.' }
 if ($PublicationOrigin -notmatch '^https?://[A-Za-z0-9.-]+(:[0-9]{1,5})?$') {
   throw 'PublicationOrigin must be a plain http(s) origin without a path, query or credentials.'
 }
