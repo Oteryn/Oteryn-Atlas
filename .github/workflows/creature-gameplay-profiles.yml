@@ -1,0 +1,140 @@
+name: Creature gameplay profiles
+
+run-name: Creature gameplay profiles - ${{ github.event.pull_request.number || github.ref_name }}
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/browser/creature-gameplay-profiles.mjs'
+      - 'src/browser/creature-inspector-state.mjs'
+      - 'src/browser/creature-gameplay-model.mjs'
+      - 'tests/creature-gameplay-profiles.mjs'
+      - 'tests/creature-inspector-state.mjs'
+      - 'tests/creature-gameplay-model.mjs'
+      - 'tests/verification/creature-gameplay-publication.test.mjs'
+      - 'web/creature-gameplay/**'
+      - 'web/fullworld-creature-gameplay.mjs'
+      - 'web/fullworld-creatures.mjs'
+      - 'web/fullworld.css'
+      - 'web/fullworld.html'
+      - '.github/workflows/creature-gameplay-profiles.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'src/browser/creature-gameplay-profiles.mjs'
+      - 'src/browser/creature-inspector-state.mjs'
+      - 'src/browser/creature-gameplay-model.mjs'
+      - 'tests/creature-gameplay-profiles.mjs'
+      - 'tests/creature-inspector-state.mjs'
+      - 'tests/creature-gameplay-model.mjs'
+      - 'tests/verification/creature-gameplay-publication.test.mjs'
+      - 'web/creature-gameplay/**'
+      - 'web/fullworld-creature-gameplay.mjs'
+      - 'web/fullworld-creatures.mjs'
+      - 'web/fullworld.css'
+      - 'web/fullworld.html'
+      - '.github/workflows/creature-gameplay-profiles.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: creature-gameplay-profiles-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Creature gameplay exact-source publication
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      GAME_REVISION: b56ce339281d252a9e01a5a2bed583582bf29e68
+      LEGACY_REVISION: e417c5e7c22986bf4acef0495eb47f7b72c97cce
+      EXPECTED_DIGEST: sha256:7ac7c08949aa498cb843ca26e3417e537b3409d89e4f265861f3f94855b96d28
+    steps:
+      - name: Check out exact Atlas revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Verify exact checked-out Atlas revision
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v6.0.0
+        with:
+          python-version: '3.12'
+          check-latest: false
+
+      - name: Check out exact merged Game producer
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: Oteryn/Oteryn-Game
+          ref: ${{ env.GAME_REVISION }}
+          path: .deps/game
+          fetch-depth: 1
+          persist-credentials: false
+          sparse-checkout: |
+            tools/game-atlas-creature-gameplay
+            tools/game-atlas-creatures
+          sparse-checkout-cone-mode: true
+
+      - name: Check out exact pinned migration evidence
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: blakinio/Otheryn
+          ref: ${{ env.LEGACY_REVISION }}
+          path: .deps/legacy
+          fetch-depth: 1
+          persist-credentials: false
+          sparse-checkout: |
+            vendor/map-analysis/crystalserver/data-global/npc
+            vendor/map-analysis/crystalserver/data-global/monster
+          sparse-checkout-cone-mode: false
+
+      - name: Verify producer and evidence revisions
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C .deps/game rev-parse HEAD)" = "$GAME_REVISION"
+          test "$(git -C .deps/legacy rev-parse HEAD)" = "$LEGACY_REVISION"
+
+      - name: Run deterministic consumer contracts
+        run: node --test tests/creature-gameplay-profiles.mjs tests/creature-inspector-state.mjs tests/creature-gameplay-model.mjs tests/verification/creature-gameplay-publication.test.mjs
+
+      - name: Rebuild exact merged Game product
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="$GITHUB_WORKSPACE/.deps/legacy/vendor/map-analysis/crystalserver/data-global"
+          rm -rf /tmp/creature-gameplay
+          python .deps/game/tools/game-atlas-creature-gameplay/export.py \
+            "$ROOT/npc" "$ROOT/monster" /tmp/creature-gameplay \
+            --producer-sha "$GAME_REVISION"
+          diff -qr web/creature-gameplay /tmp/creature-gameplay
+
+      - name: Verify exact merged publication identity and census
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          manifest=json.loads(Path('/tmp/creature-gameplay/manifest.json').read_text(encoding='utf-8'))
+          assert manifest['producer_repository_sha']=='b56ce339281d252a9e01a5a2bed583582bf29e68'
+          assert manifest['semantic_digest']=='sha256:7ac7c08949aa498cb843ca26e3417e537b3409d89e4f265861f3f94855b96d28'
+          assert manifest['counts']=={'npc_profiles':1049,'monster_profiles':1800,'referenced_items':0}
+          assert len(manifest['shards'])==508
+          assert max(row['bytes'] for row in manifest['shards'])==174660
+          assert max(row['records'] for row in manifest['shards'])==15
+          print(json.dumps({'counts':manifest['counts'],'semantic_digest':manifest['semantic_digest'],'shards':len(manifest['shards'])},sort_keys=True))
+          PY
