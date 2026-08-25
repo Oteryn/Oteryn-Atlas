@@ -4,7 +4,7 @@
 issue: 165
 repository: Oteryn/Oteryn-Atlas
 base_branch: main
-base_sha: ee7c8a53e6b5ac46c7620065bcf5e03694e24c5b
+base_sha: 5697b3c0dd3d544dab363e8e1e09cf76b3cca6ba
 branch: feat/creature-gameplay-profiles-165
 pr: 170
 status: verifying
@@ -21,14 +21,13 @@ game_semantic_digest: sha256:7ac7c08949aa498cb843ca26e3417e537b3409d89e4f265861f
 
 Consume the exact merged Game gameplay-profile projection through a bounded lazy browser service and expose truthful NPC/monster Gameplay profiles while preserving the existing Semantic inspector and #113 direct creature interaction.
 
-## Active overlap
+## Integration state
 
-- PR #162 / Issue #145 owns walking-in-place runtime and currently touches `web/fullworld-creatures.mjs`.
-- PR #163 / Issue #115 owns creature presentation and currently touches `web/fullworld-creatures.mjs` and `web/fullworld-app.mjs`.
-- Issue #113 is merged and its quick-card/interaction seam is canonical.
-- PR #143 is merged; Farm Explorer stays a consumer, never gameplay-fact authority.
-
-Pure consumer/state/model and publication paths are owned here. Shared runtime wiring must be rebased against fresh #162/#163 state before final-head freeze.
+- PR #163 / Issue #115 is merged into `main@5697b3c0dd3d544dab363e8e1e09cf76b3cca6ba`; its labels/badges presentation controller is preserved.
+- PR #162 / Issue #145 remains a separate draft for walking-in-place animation and is not imported into this task.
+- Issue #113 remains the canonical quick-card/interaction seam.
+- Farm Explorer remains a consumer and never becomes gameplay-fact authority.
+- Shared runtime was integrated by normal non-force merge-up; no open draft branch was cherry-picked.
 
 ## Acceptance
 
@@ -38,15 +37,17 @@ Pure consumer/state/model and publication paths are owned here. Shared runtime w
 - [x] NPC Sells/Buys/Services/Travel and monster Loot/Stats/Resistances/Spawns distinguish COMPLETE from non-complete absence.
 - [x] Quick card remains immediate and gains only bounded proven profile summaries.
 - [x] Existing Semantic facts remain available.
-- [ ] Desktop/mobile direct creature E2E, visual review, exact-head Molehill gate, CI/provenance/security, merged-main Synology live gameplay acceptance all pass.
+- [ ] Desktop/mobile direct creature E2E, 17-frame visual review, exact-head Molehill gate, CI/provenance/security and merged-main Synology gameplay acceptance all pass.
 
 ## Verification checkpoint
 
-- Rebased cleanly onto main@ee7c8a53e6b5ac46c7620065bcf5e03694e24c5b.
-- Exact Game publication: 1049 NPC / 1800 monster profiles / 508 shards / sha256:7ac7c08949aa498cb843ca26e3417e537b3409d89e4f265861f3f94855b96d28.
-- CI-equivalent deterministic Node matrix after rebase: 302/302 PASS, 0 fail, 0 skip.
-- Required Playwright census is now 70 (64 merged-main + 6 gameplay journeys).
-- Molehill browser qualification pending serialized machine lock.
+- Integrated current main by normal merge-up at `5697b3c0dd3d544dab363e8e1e09cf76b3cca6ba`; targeted integration contracts: 30/30 PASS.
+- Exact Game publication: 1049 NPC / 1800 monster profiles / 508 shards / `sha256:7ac7c08949aa498cb843ca26e3417e537b3409d89e4f265861f3f94855b96d28`.
+- CI-equivalent deterministic Node matrix after integration and live-acceptance GREEN: 357/357 PASS, 0 fail, 0 skip.
+- Extraction provenance verifier: PASS, 144 mapped rows against exact legacy `e417c5e7c22986bf4acef0495eb47f7b72c97cce`.
+- Required Playwright census is 77 (71 merged-main scenarios + six gameplay journeys); required formal visual census is 17 (15 merged-main frames + desktop/mobile Gameplay).
+- Synology candidate/live gameplay manifest contract and live Chromium Sam/Rat gameplay contract: 8/8 PASS locally; merged-main execution remains pending until PR merge.
+- Final exact-head Molehill browser qualification and visual review remain pending serialized machine lock.
 
 ## Excluded
 
