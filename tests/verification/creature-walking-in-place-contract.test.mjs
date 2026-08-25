@@ -67,3 +67,16 @@ test('live browser oracle validates V2 walking pixels and static restoration', a
   assert.ok(proof.includes('staticMonsterPixels, false'), 'monster playback must prove actual pixel change');
   assert.ok(proof.includes('staticMonsterPixels, true'), 'monster playback must prove exact static restoration');
 });
+
+
+test('walking browser proof keeps factual selection and independent committed-draw epochs across animation frames', async () => {
+  const [proof, web] = await Promise.all([
+    source('e2e/support/creature-walking-in-place-proof.mjs'),
+    source('web/fullworld-creatures.mjs'),
+  ]);
+  assert.ok(proof.includes('value.selectedTargetRect != null'), 'walking proof must require current interaction geometry');
+  assert.ok(proof.includes('value.selectedVisible === true'), 'walking proof must require factual selected visibility');
+  assert.ok(proof.includes("page.locator('#mobile-controls-toggle')"), 'walking proof must expose the mobile controls drawer before using Playback');
+  assert.ok(web.includes('selectedVisible: Boolean('), 'creature diagnostics must publish selected visibility on every PASS');
+  assert.ok(web.includes('committedDrawEpoch'), 'committed base redraws must not share the animation draw epoch');
+});
