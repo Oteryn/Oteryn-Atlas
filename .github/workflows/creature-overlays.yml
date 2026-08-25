@@ -67,7 +67,7 @@ jobs:
           node --check src/browser/creature-presentation-runtime.mjs
           node --check src/browser/creature-render-diagnostics.mjs
           node --check web/fullworld-creatures.mjs
-          node --test tests/npc-markers.mjs tests/npc-badge-primitives.mjs tests/creature-presentation-layout.mjs tests/creature-presentation-lod.mjs tests/creature-presentation-runtime.mjs
+          node --test tests/npc-markers.mjs tests/npc-badge-primitives.mjs tests/creature-presentation-layout.mjs tests/creature-presentation-lod.mjs tests/creature-presentation-runtime.mjs tests/creature-presentation-controller.mjs
 
       - name: Run deterministic creature-index fixture
         shell: bash

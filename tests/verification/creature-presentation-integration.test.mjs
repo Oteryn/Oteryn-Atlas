@@ -4,4 +4,5 @@ import '../creature-presentation-lod.mjs';
 import '../npc-badge-primitives.mjs';
 import '../creature-presentation-contract.mjs';
 import '../creature-presentation-runtime.mjs';
+import '../creature-presentation-controller.mjs';
 import '../creature-presentation-browser-contract.mjs';

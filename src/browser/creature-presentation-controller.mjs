@@ -200,11 +200,8 @@ function badgeSlotRects(slots, rect) {
   return Object.freeze(rects);
 }
 
-function buildLayout({ context, entries, view, viewport, effectivePresentation, selectedId, hoveredId, activeFilter, reserved }) {
-  context.font = FONT;
-  const items = [];
-  const resolved = [];
-  for (const entry of entries) {
+function resolveLayoutEntries({ entries, view, effectivePresentation, selectedId, hoveredId, activeFilter }) {
+  return Object.freeze(entries.map((entry) => {
     const selected = entry.record.record_id === selectedId;
     const hovered = entry.record.record_id === hoveredId;
     const policy = creaturePresentationLod({
@@ -216,6 +213,21 @@ function buildLayout({ context, entries, view, viewport, effectivePresentation, 
       hovered,
       kind: entry.record.kind,
     });
+    let slots = null;
+    if (entry.record.kind === 'npc' && policy.showPrimaryBadges) {
+      const maxSlots = policy.showSecondaryBadges ? 3 : 1;
+      slots = npcBadgeSlots(entry.record, activeFilter, maxSlots);
+    }
+    return Object.freeze({ ...entry, selected, hovered, policy, slots });
+  }));
+}
+
+function buildLayout({ context, entries, viewport, reserved }) {
+  context.font = FONT;
+  const items = [];
+  const resolved = [];
+  for (const entry of entries) {
+    const { selected, hovered, policy, slots } = entry;
     let label = null;
     if (policy.showLabel) {
       const fitted = fitCreatureLabelText({
@@ -234,11 +246,8 @@ function buildLayout({ context, entries, view, viewport, effectivePresentation, 
         candidates: label.candidates,
       });
     }
-    let slots = null;
     let badges = null;
-    if (entry.record.kind === 'npc' && policy.showPrimaryBadges) {
-      const maxSlots = policy.showSecondaryBadges ? 3 : 1;
-      slots = npcBadgeSlots(entry.record, activeFilter, maxSlots);
+    if (slots) {
       const size = badgeClusterSize(slots);
       badges = badgeCandidates(entry.target.presentationRect, size);
       items.push({
@@ -247,7 +256,7 @@ function buildLayout({ context, entries, view, viewport, effectivePresentation, 
         candidates: badges,
       });
     }
-    resolved.push(Object.freeze({ ...entry, selected, hovered, policy, label, slots, badges }));
+    resolved.push(Object.freeze({ ...entry, label, badges }));
   }
   const layout = solveCreaturePresentationLayout({
     viewport,
@@ -353,15 +362,11 @@ export function createCreaturePresentationController({ frame } = {}) {
       return Object.freeze({ target, record });
     });
 
-    context.save();
-    context.setTransform(backing.dpr, 0, 0, backing.dpr, 0, 0);
-    context.font = FONT;
-    const provisional = buildLayout({
-      context, entries, view, viewport, effectivePresentation,
-      selectedId, hoveredId, activeFilter, reserved,
+    const resolvedEntries = resolveLayoutEntries({
+      entries, view, effectivePresentation, selectedId, hoveredId, activeFilter,
     });
     const nextKey = makeLayoutKey({
-      entries: provisional.entries,
+      entries: resolvedEntries,
       view,
       viewport,
       effectivePresentation,
@@ -370,9 +375,12 @@ export function createCreaturePresentationController({ frame } = {}) {
       activeFilter,
       reserved,
     });
+
+    context.save();
+    context.setTransform(backing.dpr, 0, 0, backing.dpr, 0, 0);
     if (nextKey !== layoutKey || !cachedLayout) {
       layoutKey = nextKey;
-      cachedLayout = provisional;
+      cachedLayout = buildLayout({ context, entries: resolvedEntries, viewport, reserved });
       layoutGeneration += 1;
     }
 
