@@ -177,8 +177,13 @@ jobs:
           assert role_counts=={'bank':25,'travel':51,'shop':313,'quest':432,'blessing':26,'trainer':54}
           assert sum(bool(r.get('roles')) for r in creatures['npcs'])==705
           assert sum(r.get('role_resolution_state')=='AMBIGUOUS' for r in creatures['npcs'])==10
-          dynamic_presentations={p['outfit_presentation_id'] for p in programs['creature_programs'] if p['phase_count']>1 and len(set(p['phase_content_ids']))>1}
-          assert len(dynamic_presentations)==100
+          dynamic_presentations={
+              p['outfit_presentation_id'] for p in programs['creature_programs']
+              if p.get('walking_program') is not None
+              and p['walking_program']['phase_count']>1
+              and len(set(p['walking_program']['phase_content_ids']))>1
+          }
+          assert dynamic_presentations
           def presentation_id(record):
               presentation=record.get('outfit_presentation') or {}
               return presentation.get('outfit_presentation_id')

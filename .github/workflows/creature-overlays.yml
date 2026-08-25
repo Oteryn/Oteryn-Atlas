@@ -1,4 +1,4 @@
-name: Creature overlays
+﻿name: Creature overlays
 
 on:
   pull_request:
@@ -155,7 +155,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          grep -q "EXPECTED_SEMANTIC_DIGEST = 'sha256:7dc951874c95424279737eaaf51cf2d50940162ef4799daea39a187a581ef0e8'" web/fullworld-creatures.mjs
+          grep -q "EXPECTED_SEMANTIC_DIGEST = 'sha256:5f10a15758199105584c38634d08254af79973cf7ce25d54bf46e54d8fee26ca'" web/fullworld-creatures.mjs
           grep -q "EXPECTED_CAPABILITY = 'animated-creatures-v1'" web/fullworld-creatures.mjs
           grep -q 'getAnimationRuntime' web/fullworld-creatures.mjs
           grep -q "EXPECTED_NPC_ROLE_SCHEMA = 1" web/fullworld-creatures.mjs

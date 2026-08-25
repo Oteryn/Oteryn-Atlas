@@ -1,4 +1,4 @@
-name: Creature walking in place
+﻿name: Creature walking in place
 
 on:
   pull_request:
@@ -205,7 +205,7 @@ jobs:
               ordinary[name]={
                   'kind':kind,
                   'record_id':record['record_id'],
-                  'position':{'x':record['x'],'y':record['y'],'floor':record['floor']},
+                  'position':record['position'],
                   'look_type':record['appearance']['look_type'],
                   'phase_count':walking['phase_count'],
                   'south_pattern_x':projection['pattern_x'],

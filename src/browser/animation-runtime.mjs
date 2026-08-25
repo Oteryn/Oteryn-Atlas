@@ -96,21 +96,23 @@ function validateCreatureProgram(entry) {
   const id = entry?.outfit_presentation_id;
   requireValue(typeof id === 'string' && id.length > 0, 'invalid creature presentation id');
   validateCreatureVisualProgram(entry.static_program, id, 'static');
-  if (entry.walking_program == null) {
+  const a = entry.static_program;
+  const b = entry.walking_program;
+  const envelope = entry.presentation_envelope;
+  const requiredWidth = b == null ? a.width : Math.max(a.width, b.width);
+  const requiredHeight = b == null ? a.height : Math.max(a.height, b.height);
+  requireValue(Number.isSafeInteger(envelope?.width) && envelope.width >= requiredWidth
+    && Number.isSafeInteger(envelope?.height) && envelope.height >= requiredHeight,
+  'creature playback envelope invalid');
+  requireValue(envelope.displacement?.x === a.displacement.x && envelope.displacement?.y === a.displacement.y,
+  'creature playback envelope displacement drift');
+  if (b == null) {
     requireValue(typeof entry.walking_fallback_reason === 'string' && entry.walking_fallback_reason.length > 0, 'creature walking fallback reason missing');
     return;
   }
   requireValue(entry.walking_fallback_reason == null, 'resolved creature walking program must not carry fallback reason');
-  validateCreatureVisualProgram(entry.walking_program, id, 'moving-in-place');
-  const a = entry.static_program;
-  const b = entry.walking_program;
+  validateCreatureVisualProgram(b, id, 'moving-in-place');
   requireValue(a.displacement.x === b.displacement.x && a.displacement.y === b.displacement.y, 'creature playback displacement drift');
-  const envelope = entry.presentation_envelope;
-  requireValue(Number.isSafeInteger(envelope?.width) && envelope.width >= a.width && envelope.width >= b.width
-    && Number.isSafeInteger(envelope?.height) && envelope.height >= a.height && envelope.height >= b.height,
-  'creature playback envelope invalid');
-  requireValue(envelope.displacement?.x === a.displacement.x && envelope.displacement?.y === a.displacement.y,
-  'creature playback envelope displacement drift');
 }
 export async function loadAnimationRuntime(baseUrl, fetcher = fetch) {
   const root = new URL(baseUrl);
