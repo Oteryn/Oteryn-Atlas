@@ -5,6 +5,7 @@ import test from 'node:test';
 const appSource = await readFile(new URL('../web/fullworld-app.mjs', import.meta.url), 'utf8');
 const creatureSource = await readFile(new URL('../web/fullworld-creatures.mjs', import.meta.url), 'utf8');
 const controllerSource = await readFile(new URL('../src/browser/creature-presentation-controller.mjs', import.meta.url), 'utf8').catch(() => '');
+const badgePrimitiveSource = await readFile(new URL('../src/browser/npc-badge-primitives.mjs', import.meta.url), 'utf8').catch(() => '');
 const overlayWorkflow = await readFile(new URL('../.github/workflows/creature-overlays.yml', import.meta.url), 'utf8');
 
 test('creature runtime consumes canonical FullWorld LOD inputs without replacing the view seam', () => {
@@ -20,8 +21,9 @@ test('creature presentation uses a separate pointer-transparent controller canva
   assert.match(controllerSource, /creature-presentation-overlay/);
   assert.match(controllerSource, /presentationCanvas/);
   assert.match(controllerSource, /pointerEvents\s*:\s*'none'/);
-  assert.match(controllerSource, /NPC_MARKER_STYLE = 'functional-icons-v2'/);
-  assert.match(controllerSource, /LABEL_STYLE = 'creature-labels-v1'/);
+  assert.match(controllerSource, /NPC_MARKER_STYLE\s*=\s*NPC_BADGE_STYLE/);
+  assert.match(badgePrimitiveSource, /NPC_BADGE_STYLE\s*=\s*'functional-icons-v2'/);
+  assert.match(controllerSource, /LABEL_STYLE\s*=\s*'creature-labels-v1'/);
 });
 
 test('shared runtime reuses canonical #113 presentation rectangles and worker seams', () => {
