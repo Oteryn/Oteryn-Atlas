@@ -69,6 +69,7 @@ test('visual user acceptance contract enumerates complete primary user-facing st
   assert.deepEqual(contract.scenarios.map(({ id }) => id), [
     'desktop.initial',
     'desktop.search-inspector',
+    'desktop.creature-gameplay',
     'desktop.layers',
     'desktop.playback',
     'desktop.minimap',
@@ -81,6 +82,7 @@ test('visual user acceptance contract enumerates complete primary user-facing st
     'mobile.controls',
     'mobile.search',
     'mobile.inspector',
+    'mobile.creature-gameplay',
     'mobile.landscape',
   ]);
   for (const scenario of contract.scenarios) {
@@ -91,9 +93,13 @@ test('visual user acceptance contract enumerates complete primary user-facing st
   const audit = await read('e2e/tests/audit-desktop.spec.mjs');
   const degraded = await read('e2e/tests/degraded-search-desktop.spec.mjs');
   const resilience = await read('e2e/tests/resilience-desktop.spec.mjs');
+  const gameplayDesktop = await read('e2e/tests/creature-gameplay-desktop.spec.mjs');
+  const gameplayMobile = await read('e2e/tests/creature-gameplay-mobile.spec.mjs');
   for (const id of ['desktop.minimap', 'desktop.classic', 'desktop.floor-mode', 'desktop.coordinate-pan']) {
     assert.ok(audit.includes(id), `visual audit must cover ${id}`);
   }
   assert.match(degraded, /desktop\.search-degraded/);
   assert.match(resilience, /desktop\.fail-closed/);
+  assert.match(gameplayDesktop, /desktop\.creature-gameplay/);
+  assert.match(gameplayMobile, /mobile\.creature-gameplay/);
 });

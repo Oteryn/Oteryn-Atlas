@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { assertNoRuntimeFailures, captureRuntimeFailures, gotoAtlas, waitForAtlas } from './runtime.mjs';
+import { assertUserVisibleSurface, captureUserVisualEvidence } from '../support/user-acceptance.mjs';
 
 const SAM = Object.freeze({ entityId: 'npc-entity:f8d4f0200616061ffa4ae0b4c38c6d3e', label: 'Sam' });
 const RAT = Object.freeze({ entityId: 'monster-entity:80295e51265b3662bfbea2ea01ee3ccb', label: 'Rat' });
@@ -56,7 +57,7 @@ async function openFixture(page, fixture) {
   return record;
 }
 
-test('mobile Sam direct tap reaches readable Gameplay trade data and tabs', async ({ page }) => {
+test('mobile Sam direct tap reaches readable Gameplay trade data and tabs', async ({ page }, testInfo) => {
   const runtime = captureRuntimeFailures(page);
   await openFixture(page, SAM);
   await expect(page.locator('#creature-card-body')).toContainText('Shop · 71 sells · 67 buys');
@@ -77,6 +78,19 @@ test('mobile Sam direct tap reaches readable Gameplay trade data and tabs', asyn
   await gameplayTab.tap();
   await expect(page.locator('#gameplay-section-sells')).toContainText('20 gold');
   await expect(liveTab).toBeDisabled();
+  const gameplayMetrics = await assertUserVisibleSurface(page, {
+    label: 'Mobile creature Gameplay inspector',
+    elements: [
+      { selector: '#mobile-inspector-panel', label: 'Gameplay inspector' },
+      { selector: '#inspector-tab-gameplay', label: 'Gameplay tab', interactive: true, minWidth: 44, minHeight: 44 },
+      { selector: '#gameplay-section-sells', label: 'Sells section' },
+      { selector: '#gameplay-section-buys', label: 'Buys section' },
+    ],
+  });
+  await captureUserVisualEvidence(page, testInfo, 'mobile.creature-gameplay', {
+    surfaceMetrics: gameplayMetrics,
+    note: 'Mobile verified Sam Gameplay drawer with readable trade data and touch-sized tabs.',
+  });
   assertNoRuntimeFailures(runtime);
 });
 

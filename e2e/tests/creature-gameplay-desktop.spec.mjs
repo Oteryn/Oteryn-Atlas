@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { assertNoRuntimeFailures, captureRuntimeFailures, gotoAtlas, waitForAtlas } from './runtime.mjs';
+import { assertUserVisibleSurface, captureUserVisualEvidence } from '../support/user-acceptance.mjs';
 
 const FIXTURES = Object.freeze({
   sam: Object.freeze({ entityId: 'npc-entity:f8d4f0200616061ffa4ae0b4c38c6d3e', label: 'Sam' }),
@@ -63,7 +64,7 @@ async function openFixture(page, fixture, { directClick = true } = {}) {
   return record;
 }
 
-test('desktop Sam direct activation opens exact Gameplay shop, preserves Semantic, and round-trips URL state', async ({ page }) => {
+test('desktop Sam direct activation opens exact Gameplay shop, preserves Semantic, and round-trips URL state', async ({ page }, testInfo) => {
   const runtime = captureRuntimeFailures(page);
   const record = await openFixture(page, FIXTURES.sam);
   await expect(page.locator('#creature-card-body')).toContainText('Shop · 71 sells · 67 buys');
@@ -76,6 +77,19 @@ test('desktop Sam direct activation opens exact Gameplay shop, preserves Semanti
   await expect(page.locator('#gameplay-section-buys')).toContainText('axe');
   await expect(page.locator('#gameplay-section-buys')).toContainText('7 gold');
   await expect(page.locator('#gameplay-section-services')).toContainText(/partially published/i);
+  const gameplayMetrics = await assertUserVisibleSurface(page, {
+    label: 'Desktop creature Gameplay inspector',
+    elements: [
+      { selector: '#mobile-inspector-panel', label: 'Gameplay inspector' },
+      { selector: '#inspector-tab-gameplay', label: 'Gameplay tab', interactive: true },
+      { selector: '#gameplay-section-sells', label: 'Sells section' },
+      { selector: '#gameplay-section-buys', label: 'Buys section' },
+    ],
+  });
+  await captureUserVisualEvidence(page, testInfo, 'desktop.creature-gameplay', {
+    surfaceMetrics: gameplayMetrics,
+    note: 'Desktop verified Sam Gameplay inspector with real Game-owned trade data.',
+  });
 
   await page.locator('#inspector-tab-semantic').click();
   expect(new URL(page.url()).searchParams.get('inspector')).toBe('semantic');
