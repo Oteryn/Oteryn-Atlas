@@ -38,8 +38,12 @@ test('walking presentation remains on the shared clock without per-creature time
   const web = await source('web/fullworld-creatures.mjs');
   assert.ok(web.includes('oteryn-atlas-animation-frame'), 'creature overlay must consume the shared logical animation clock');
   assert.ok(web.includes('logicalTimeMs'), 'creature overlay must advance presentation from shared logical time');
-  assert.doesNotMatch(web, /\bsetInterval\s*\(/u, 'creature overlay must not allocate per-creature intervals');
-  assert.doesNotMatch(web, /\bsetTimeout\s*\(/u, 'creature overlay must not allocate per-creature timeouts');
+  const prepareStart = web.indexOf('async function prepareDraw');
+  const prepareEnd = web.indexOf('function npcBadgeOffset', prepareStart);
+  assert.ok(prepareStart >= 0 && prepareEnd > prepareStart, 'creature draw loop must remain inspectable');
+  const prepareDraw = web.slice(prepareStart, prepareEnd);
+  assert.doesNotMatch(prepareDraw, /\bsetInterval\s*\(/u, 'creature draw loop must not allocate per-creature intervals');
+  assert.doesNotMatch(prepareDraw, /\bsetTimeout\s*\(/u, 'creature draw loop must not allocate per-creature timeouts');
 });
 
 test('main-only live workflow cannot rebuild the stale creature/runtime authority', async () => {

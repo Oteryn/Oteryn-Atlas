@@ -169,27 +169,43 @@ jobs:
                   assert new[field]==old[field], (presentation_id,field)
               assert new['presentation_mode']=='static'
 
-          records=creatures['npcs']+creatures['monster_spawns']
+          records=[('npc',r) for r in creatures['npcs']]+[('monster',r) for r in creatures['monster_spawns']]
           ordinary={}
+          geometry_union_envelopes=0
+          for entry in new_by_id.values():
+              static=entry['static_program']; walking=entry['walking_program']
+              if walking is not None and (walking['width']!=static['width'] or walking['height']!=static['height']):
+                  geometry_union_envelopes += 1
+              envelope=entry['presentation_envelope']
+              assert envelope['width'] >= static['width'] and envelope['height'] >= static['height']
+              assert envelope['displacement']==static['displacement']
+              if walking is not None:
+                  assert envelope['width'] >= walking['width'] and envelope['height'] >= walking['height']
+                  assert walking['displacement']==static['displacement']
+          assert manifest['counts']['creature_geometry_union_envelopes']==geometry_union_envelopes
+          assert geometry_union_envelopes > 0
+
           for name in ('Sheep','Pig','Chicken'):
-              record=next(r for r in records if r.get('name')==name and r.get('presentation_resolution_state')=='RESOLVED')
+              kind,record=next((kind,r) for kind,r in records if r.get('name')==name and r.get('presentation_resolution_state')=='RESOLVED')
               projection=record['outfit_presentation']['playback_projection']
               assert projection['playback_resolution_state']=='RESOLVED_MOVING_IN_PLACE'
               assert projection['presentation_mode']=='moving-in-place'
               assert projection['world_position_policy']=='UNCHANGED'
               assert projection['direction']=='south' and projection['pattern_x']==2
               assert projection['phase_count']==8
-              envelope=new_by_id[record['outfit_presentation']['outfit_presentation_id']]
-              static=envelope['static_program']; walking=envelope['walking_program']
+              entry=new_by_id[record['outfit_presentation']['outfit_presentation_id']]
+              static=entry['static_program']; walking=entry['walking_program']
               assert walking is not None
-              assert walking['width']==static['width'] and walking['height']==static['height']
-              assert walking['displacement']==static['displacement']
+              presentation_envelope=entry['presentation_envelope']
+              assert presentation_envelope['width'] >= max(static['width'], walking['width'])
+              assert presentation_envelope['height'] >= max(static['height'], walking['height'])
+              assert presentation_envelope['displacement']==static['displacement']==walking['displacement']
               assert len(set(walking['phase_content_ids']))>1
               assert walking['phase_content_ids'][0] != walking['phase_content_ids'][1]
               ordinary[name]={
-                  'kind':record['kind'],
+                  'kind':kind,
                   'record_id':record['record_id'],
-                  'position':record['position'],
+                  'position':{'x':record['x'],'y':record['y'],'floor':record['floor']},
                   'look_type':record['appearance']['look_type'],
                   'phase_count':walking['phase_count'],
                   'south_pattern_x':projection['pattern_x'],
@@ -216,6 +232,7 @@ jobs:
               'baseline_v1_root':old_manifest['rootContentId'],
               'runtime_root':manifest['rootContentId'],
               'runtime_counts':manifest['counts'],
+              'geometry_union_envelopes':geometry_union_envelopes,
               'static_program_semantics_equal_v1':True,
               'deterministic_double_build':True,
               'ordinary_creatures':ordinary,

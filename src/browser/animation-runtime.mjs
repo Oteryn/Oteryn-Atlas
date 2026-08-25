@@ -104,8 +104,13 @@ function validateCreatureProgram(entry) {
   validateCreatureVisualProgram(entry.walking_program, id, 'moving-in-place');
   const a = entry.static_program;
   const b = entry.walking_program;
-  requireValue(a.width === b.width && a.height === b.height, 'creature playback geometry drift');
   requireValue(a.displacement.x === b.displacement.x && a.displacement.y === b.displacement.y, 'creature playback displacement drift');
+  const envelope = entry.presentation_envelope;
+  requireValue(Number.isSafeInteger(envelope?.width) && envelope.width >= a.width && envelope.width >= b.width
+    && Number.isSafeInteger(envelope?.height) && envelope.height >= a.height && envelope.height >= b.height,
+  'creature playback envelope invalid');
+  requireValue(envelope.displacement?.x === a.displacement.x && envelope.displacement?.y === a.displacement.y,
+  'creature playback envelope displacement drift');
 }
 export async function loadAnimationRuntime(baseUrl, fetcher = fetch) {
   const root = new URL(baseUrl);
@@ -209,7 +214,11 @@ export function createAnimationRuntime(root, product) {
     }
     const phase = phaseAt(program, logicalTimeMs, record.record_id);
     const contentId = program.phase_content_ids[phase]; requireValue(isSha(contentId), 'creature phase content missing');
-    return Object.freeze({ phase, contentId, program, presentationMode, ...(fallbackReason ? { fallbackReason } : {}) });
+    const presentationEnvelope = entry.presentation_envelope ?? Object.freeze({
+      width: program.width, height: program.height, displacement: program.displacement,
+      anchor_policy: 'tile-bottom-right-minus-sprite-overhang-and-displacement-v1',
+    });
+    return Object.freeze({ phase, contentId, program, presentationEnvelope, presentationMode, ...(fallbackReason ? { fallbackReason } : {}) });
   }
   function noteFrameUpdate(count = 1) { frameUpdates += count; }
   function stats() {

@@ -226,11 +226,23 @@ def finalize_creature_program(composed: dict[str, Any], add_blob) -> dict[str, A
     return {**composed["core"], "phase_content_ids": phase_ids, "width": width, "height": height}
 
 
-def verify_stable_creature_geometry(static_program: dict[str, Any], walking_program: dict[str, Any]) -> None:
-    if static_program["width"] != walking_program["width"] or static_program["height"] != walking_program["height"]:
-        raise BuildError("creature playback geometry drift")
-    if static_program["displacement"] != walking_program["displacement"]:
+def creature_presentation_envelope(
+    static_program: dict[str, Any],
+    walking_program: dict[str, Any] | None,
+) -> dict[str, Any]:
+    if walking_program is not None and static_program["displacement"] != walking_program["displacement"]:
         raise BuildError("creature playback displacement drift")
+    width = int(static_program["width"])
+    height = int(static_program["height"])
+    if walking_program is not None:
+        width = max(width, int(walking_program["width"]))
+        height = max(height, int(walking_program["height"]))
+    return {
+        "width": width,
+        "height": height,
+        "displacement": static_program["displacement"],
+        "anchor_policy": "tile-bottom-right-minus-sprite-overhang-and-displacement-v1",
+    }
 
 
 def build(asset_zip: Path, appearance_product: Path, creatures_path: Path, output: Path) -> dict[str, Any]:
@@ -268,6 +280,7 @@ def build(asset_zip: Path, appearance_product: Path, creatures_path: Path, outpu
     creature_programs: list[dict[str, Any]] = []
     walking_program_count = 0
     walking_fallback_count = 0
+    geometry_union_envelope_count = 0
     for presentation_id in sorted(unique_presentations):
         presentation = unique_presentations[presentation_id]
         static_projection = presentation.get("static_projection")
@@ -290,8 +303,9 @@ def build(asset_zip: Path, appearance_product: Path, creatures_path: Path, outpu
                 precompose_creature_projection(presentation, playback_projection, outfit_by_id, decode_sprite, presentation_mode="moving-in-place"),
                 add_blob,
             )
-            verify_stable_creature_geometry(static_program, walking_program)
             walking_program_count += 1
+            if static_program["width"] != walking_program["width"] or static_program["height"] != walking_program["height"]:
+                geometry_union_envelope_count += 1
         elif playback_state == "FALLBACK_STATIC_PROJECTION":
             fallback_reason = playback_projection.get("playback_reason")
             if playback_projection.get("presentation_mode") != "static-fallback" or playback_projection.get("world_position_policy") != "UNCHANGED":
@@ -308,6 +322,7 @@ def build(asset_zip: Path, appearance_product: Path, creatures_path: Path, outpu
             "static_program": static_program,
             "walking_program": walking_program,
             "walking_fallback_reason": fallback_reason,
+            "presentation_envelope": creature_presentation_envelope(static_program, walking_program),
         })
     archive.close()
 
@@ -362,6 +377,7 @@ def build(asset_zip: Path, appearance_product: Path, creatures_path: Path, outpu
             "creature_static_programs": len(creature_programs),
             "creature_walking_programs": walking_program_count,
             "creature_walking_fallbacks": walking_fallback_count,
+            "creature_geometry_union_envelopes": geometry_union_envelope_count,
             "sprite_refs": len(sprite_index),
             "pixel_blobs": len(blobs),
             "pixel_bytes": sum(len(value[2]) for value in blobs.values()),

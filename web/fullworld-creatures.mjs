@@ -10,7 +10,7 @@ import { availableNpcFilters, npcMatchesRole, npcPresentationRoles, npcRoleFilte
 const ROOT = new URL('../data/creatures/', location.href);
 const EXPECTED_CONTRACT = 'oteryn-game-atlas-export-v1';
 const EXPECTED_CAPABILITY = 'animated-creatures-v1';
-const EXPECTED_SEMANTIC_DIGEST = 'sha256:7dc951874c95424279737eaaf51cf2d50940162ef4799daea39a187a581ef0e8';
+const EXPECTED_SEMANTIC_DIGEST = 'sha256:5f10a15758199105584c38634d08254af79973cf7ce25d54bf46e54d8fee26ca';
 const EXPECTED_NPC_ROLE_SCHEMA = 1;
 const MAX_INDEX_CHUNKS = 20_000;
 const MAX_CHUNK_RECORDS = 5_000;
@@ -784,7 +784,7 @@ async function prepareDraw(records, view = state.view) {
   return Promise.all(candidates.map(async (record) => {
     const verified = record.presentation_resolution_state === 'RESOLVED' && state.animationRuntime?.hasCreature(record);
     if (!verified || (record.kind === 'npc' && view.zoom < 1)) return { record, marker: true };
-    const frame = state.animationRuntime.creatureFrame(record, state.animationOn ? state.logicalTimeMs : 0);
+    const frame = state.animationRuntime.creatureFrame(record, state.logicalTimeMs, state.animationOn ? 'moving-in-place' : 'static');
     return { record, frame, bitmap: await state.animationRuntime.bitmap(frame.contentId), marker: false };
   }));
 }
@@ -796,8 +796,11 @@ function monsterMarkerRadius(view) {
 function interactionPresentation(item, record, npcSize, view) {
   if (!item.marker) {
     return {
-      kind: 'pixel', bitmapWidth: item.bitmap.width, bitmapHeight: item.bitmap.height,
-      displacement: item.frame.program.displacement ?? { x: 0, y: 0 }, contentId: item.frame.contentId,
+      kind: 'pixel',
+      bitmapWidth: item.frame.presentationEnvelope?.width ?? item.bitmap.width,
+      bitmapHeight: item.frame.presentationEnvelope?.height ?? item.bitmap.height,
+      displacement: item.frame.presentationEnvelope?.displacement ?? item.frame.program.displacement ?? { x: 0, y: 0 },
+      contentId: item.frame.contentId,
     };
   }
   if (record.kind === 'npc') return { kind: 'marker', width: npcSize, height: npcSize, originRounding: 'nearest' };
