@@ -74,7 +74,7 @@ test('desktop NPC category filter persists and uses functional icon rendering wh
   await expect(page.locator('#npc-role-filter')).toBeVisible();
   await expect(page.locator('#npc-role-filter')).toHaveValue('shop');
   expect(creatures.npcRole).toBe('shop');
-  expect(creatures.npcMarkerStyle).toBe('functional-icons-v1');
+  expect(creatures.npcMarkerStyle).toBe('functional-icons-v2');
   expect(creatures.drawnNpcIcons).toBeGreaterThan(0);
 
   await page.locator('#npc-role-filter').selectOption('all');

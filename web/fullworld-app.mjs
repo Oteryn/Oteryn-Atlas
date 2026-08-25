@@ -25,7 +25,7 @@ import { createFrameScheduler } from '../src/browser/frame-scheduler.mjs';
 import { getAnimationRuntime } from '../src/browser/animation-runtime-service.mjs';
 import { VerifiedContentCache } from '../src/browser/verified-content-cache.mjs';
 import { loadOverviewChunk, loadOverviewFloor, loadOverviewWorld } from '../src/layers/overview.mjs';
-import { LOD_POLICY, detailStreamWanted, lodBlend } from '../src/layers/minimap-lod.mjs';
+import { LOD_POLICY, detailStreamWanted, lodBlend, normalizeViewMode } from '../src/layers/minimap-lod.mjs';
 import { createWorldQueryApi } from '../src/browser/world-query.mjs';
 import { dispatchMapActivation } from '../src/browser/map-activation.mjs';
 
@@ -220,8 +220,17 @@ function clampView(next) {
 
 function publishView() {
   const snapshot = Object.freeze({ ...view });
+  const blend = lodBlend(view.zoom, view.mode, detailReady);
+  const effectivePresentation = Object.freeze({
+    requestedMode: normalizeViewMode(view.mode),
+    representation: blend.representation,
+    detailReady,
+  });
   globalThis.__OTERYN_ATLAS_VIEW__ = snapshot;
-  window.dispatchEvent(new CustomEvent('oteryn-atlas-view', { detail: { view: snapshot, detailReady, detailStreaming } }));
+  globalThis.__OTERYN_ATLAS_EFFECTIVE_PRESENTATION__ = effectivePresentation;
+  window.dispatchEvent(new CustomEvent('oteryn-atlas-view', {
+    detail: { view: snapshot, effectivePresentation, detailReady, detailStreaming },
+  }));
 }
 
 function syncViewUi({ preserveExternalParams = false } = {}) {
@@ -429,6 +438,7 @@ async function refreshScene() {
     lastSceneLoadMs = performance.now() - started;
     if (initialLoadMs == null) initialLoadMs = performance.now() - bootStartedMs;
     detailReady = false;
+    publishView();
     detailBadge.textContent = 'VISUAL MINIMAP LOD';
     detailBadge.classList.add('overview-only');
     $('#status-detail').textContent = view.mode === 'classic'
@@ -443,6 +453,7 @@ async function refreshScene() {
   }
 
   detailReady = false;
+  publishView();
   detailBadge.textContent = 'AUTHENTICATED DETAIL STREAM';
   detailBadge.classList.remove('overview-only');
   setBadge('STREAMING VERIFIED RANGES');

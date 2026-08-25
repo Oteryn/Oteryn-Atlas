@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   NPC_ROLE_IDS,
   availableNpcFilters,
+  npcBadgeSlots,
   npcMatchesRole,
   npcPresentationRoles,
   npcRoleFilter,
@@ -59,4 +60,96 @@ test('discovers only categories present in the current publication', () => {
     { kind: 'monster' },
   ]);
   assert.deepEqual(filters, ['all', 'bank', 'travel', 'quest', 'other']);
+});
+
+test('builds immutable bounded badge slots in canonical factual order', () => {
+  const one = { kind: 'npc', roles: ['bank'], role_resolution_state: 'RESOLVED' };
+  const three = { kind: 'npc', roles: ['bank', 'travel', 'shop'], role_resolution_state: 'RESOLVED' };
+  const four = { kind: 'npc', roles: ['bank', 'travel', 'shop', 'quest'], role_resolution_state: 'RESOLVED' };
+  const five = { kind: 'npc', roles: ['bank', 'travel', 'shop', 'quest', 'blessing'], role_resolution_state: 'RESOLVED' };
+
+  assert.deepEqual(npcBadgeSlots(one), [
+    { kind: 'role', role: 'bank', glyph: 'coin' },
+  ]);
+  assert.deepEqual(npcBadgeSlots(resolved), [
+    { kind: 'role', role: 'bank', glyph: 'coin' },
+    { kind: 'role', role: 'quest', glyph: 'quest' },
+  ]);
+  assert.deepEqual(npcBadgeSlots(three), [
+    { kind: 'role', role: 'bank', glyph: 'coin' },
+    { kind: 'role', role: 'travel', glyph: 'travel' },
+    { kind: 'role', role: 'shop', glyph: 'bag' },
+  ]);
+  assert.deepEqual(npcBadgeSlots(four), [
+    { kind: 'role', role: 'bank', glyph: 'coin' },
+    { kind: 'role', role: 'travel', glyph: 'travel' },
+    { kind: 'overflow', hiddenCount: 2, text: '+2' },
+  ]);
+  const fiveSlots = npcBadgeSlots(five);
+  assert.deepEqual(fiveSlots, [
+    { kind: 'role', role: 'bank', glyph: 'coin' },
+    { kind: 'role', role: 'travel', glyph: 'travel' },
+    { kind: 'overflow', hiddenCount: 3, text: '+3' },
+  ]);
+  assert.equal(Object.isFrozen(fiveSlots), true);
+  assert.equal(fiveSlots.every(Object.isFrozen), true);
+});
+
+test('keeps a hidden active factual filter role visible without rewriting roles', () => {
+  const record = {
+    kind: 'npc',
+    roles: ['bank', 'travel', 'shop', 'quest', 'blessing'],
+    role_resolution_state: 'RESOLVED',
+  };
+  const before = [...record.roles];
+
+  assert.deepEqual(npcBadgeSlots(record, 'travel'), [
+    { kind: 'role', role: 'bank', glyph: 'coin' },
+    { kind: 'role', role: 'travel', glyph: 'travel' },
+    { kind: 'overflow', hiddenCount: 3, text: '+3' },
+  ]);
+  assert.deepEqual(npcBadgeSlots(record, 'blessing'), [
+    { kind: 'role', role: 'bank', glyph: 'coin' },
+    { kind: 'role', role: 'blessing', glyph: 'star' },
+    { kind: 'overflow', hiddenCount: 3, text: '+3' },
+  ]);
+  assert.deepEqual(record.roles, before);
+});
+
+test('uses only the neutral presentation fallback for unresolved factual roles', () => {
+  const fallback = [{ kind: 'fallback', role: 'other', glyph: 'npc' }];
+  assert.deepEqual(npcBadgeSlots(plain), fallback);
+  assert.deepEqual(npcBadgeSlots(ambiguous), fallback);
+  assert.throws(
+    () => npcBadgeSlots({ kind: 'npc', roles: ['weapons'], role_resolution_state: 'RESOLVED' }),
+    /role/,
+  );
+});
+
+test('badge slot bounds fail closed and overflow is not a factual role descriptor', () => {
+  const record = {
+    kind: 'npc',
+    roles: ['bank', 'travel', 'shop', 'quest'],
+    role_resolution_state: 'RESOLVED',
+  };
+  assert.throws(() => npcBadgeSlots(record, 'all', 0), /maxSlots/);
+  assert.throws(() => npcBadgeSlots(record, 'all', 4), /maxSlots/);
+  assert.throws(() => npcBadgeSlots(record, 'all', 1.5), /maxSlots/);
+  const overflow = npcBadgeSlots(record)[2];
+  assert.equal(overflow.kind, 'overflow');
+  assert.equal(Object.hasOwn(overflow, 'role'), false);
+});
+
+test('sparse single-slot badges retain a factual role and active filter visibility', () => {
+  const record = {
+    kind: 'npc',
+    roles: ['bank', 'travel', 'shop', 'quest'],
+    role_resolution_state: 'RESOLVED',
+  };
+  assert.deepEqual(npcBadgeSlots(record, 'all', 1), [
+    { kind: 'role', role: 'bank', glyph: 'coin' },
+  ]);
+  assert.deepEqual(npcBadgeSlots(record, 'quest', 1), [
+    { kind: 'role', role: 'quest', glyph: 'quest' },
+  ]);
 });

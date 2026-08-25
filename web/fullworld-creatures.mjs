@@ -4,14 +4,14 @@ import { FULLWORLD_PATHS } from '../src/browser/fullworld-trust.mjs';
 import { createCreatureRenderSnapshot } from '../src/browser/creature-render-diagnostics.mjs';
 import { buildCreatureInteractionIndex, createClosedCreatureCardState, placeCreatureCard, queryCreatureHits, reduceCreatureCardState } from '../src/browser/creature-interaction.mjs';
 import { createCreatureInteractionTarget } from '../src/browser/creature-interaction-target.mjs';
-import { availableNpcFilters, npcMatchesRole, npcPresentationRoles, npcRoleFilter, npcRoleGlyph, npcRoleLabel, validateNpcRoleMetadata } from '../src/browser/npc-markers.mjs';
+import { createCreaturePresentationController, NPC_MARKER_STYLE } from '../src/browser/creature-presentation-controller.mjs';
+import { availableNpcFilters, npcMatchesRole, npcPresentationRoles, npcRoleFilter, npcRoleLabel, validateNpcRoleMetadata } from '../src/browser/npc-markers.mjs';
 
 const ROOT = new URL('../data/creatures/', location.href);
 const EXPECTED_CONTRACT = 'oteryn-game-atlas-export-v1';
 const EXPECTED_CAPABILITY = 'animated-creatures-v1';
 const EXPECTED_SEMANTIC_DIGEST = 'sha256:7dc951874c95424279737eaaf51cf2d50940162ef4799daea39a187a581ef0e8';
 const EXPECTED_NPC_ROLE_SCHEMA = 1;
-const NPC_MARKER_STYLE = 'functional-icons-v1';
 const MAX_INDEX_CHUNKS = 20_000;
 const MAX_CHUNK_RECORDS = 5_000;
 const MAX_VISIBLE_CHUNKS = 64;
@@ -32,6 +32,8 @@ let pageUnloading = false;
 const state = {
   index: null,
   view: null,
+  detailReady: false,
+  effectivePresentation: null,
   enabled: { npc: requested.has('npc'), monster: requested.has('monster') },
   npcRole: requestedNpcRole,
   availableNpcRoles: ['all'],
@@ -39,6 +41,7 @@ const state = {
   cache: new Map(),
   search: [],
   canvas: null,
+  presentation: null,
   inspector: null,
   lastVisibleRecords: [],
   lastPreparedRecords: [],
@@ -53,6 +56,9 @@ const state = {
   lastDrawnNpcIcons: 0,
   renderGeneration: 0,
   lastRender: null,
+  lastCommittedBase: null,
+  lastCommittedAnchors: [],
+  lastCanvasMetrics: null,
   interactionIndex: null,
   interactionGeneration: null,
   interactionBaseGeneration: null,
@@ -141,6 +147,7 @@ function fail(message) {
   state.pixelDrawnRecords = 0;
   state.markerDrawnRecords = 0;
   state.lastDrawnNpcIcons = 0;
+  state.presentation?.clear();
   draw([]).catch(() => {});
   publish('FAIL', error);
 }
@@ -174,6 +181,7 @@ function closeCreatureCard({ publishState = true } = {}) {
   const card = cardElement('creature-quick-card');
   if (card) card.hidden = true;
   clearCardCopyFeedback();
+  repaintPresentation();
   if (publishState) publish('PASS');
 }
 
@@ -182,6 +190,7 @@ function suspendCreatureCard() {
   state.cardState = reduceCreatureCardState(state.cardState, { type: 'suspend' });
   const card = cardElement('creature-quick-card');
   if (card) card.hidden = true;
+  repaintPresentation();
 }
 
 function invalidateInteraction({ closeCard = false } = {}) {
@@ -194,6 +203,7 @@ function invalidateInteraction({ closeCard = false } = {}) {
   document.querySelector('#map-frame')?.classList.remove('creature-hovering');
   if (closeCard) closeCreatureCard({ publishState: false });
   else suspendCreatureCard();
+  state.presentation?.clear();
 }
 
 function visibleBounds(view, canvas) {
@@ -374,6 +384,7 @@ function openCreatureRecord(recordId) {
   persist();
   renderCreatureInspector(record);
   renderCreatureCardRecord(record, target);
+  repaintPresentation();
   publish('PASS');
   return true;
 }
@@ -411,6 +422,7 @@ function openCreatureChooser(hits) {
   }
   card.hidden = false;
   positionCreatureCard(bounded[0]);
+  repaintPresentation();
   publish('PASS');
   return true;
 }
@@ -468,6 +480,7 @@ function clearCreatureHover() {
   if (state.hoveredId == null) return;
   state.hoveredId = null;
   document.querySelector('#map-frame')?.classList.remove('creature-hovering');
+  repaintPresentation();
   publish('PASS');
 }
 
@@ -486,6 +499,7 @@ function scheduleCreatureHover(event, base) {
     if (next === state.hoveredId) return;
     state.hoveredId = next;
     document.querySelector('#map-frame')?.classList.toggle('creature-hovering', Boolean(next));
+    repaintPresentation();
     publish('PASS');
   });
 }
@@ -506,16 +520,21 @@ function syncNpcRoleControl() {
   persist();
 }
 
-function applyView(nextView) {
+function applyView(nextView, detailReady = state.detailReady, effectivePresentation = null) {
   requireValue(nextView && typeof nextView === 'object', 'invalid FullWorld view snapshot');
   state.view = nextView;
   state.animationOn = nextView.animation === 'on';
+  if (typeof detailReady === 'boolean') state.detailReady = detailReady;
+  state.effectivePresentation = effectivePresentation && typeof effectivePresentation === 'object'
+    ? effectivePresentation
+    : null;
 }
 
 function consumePublishedView() {
   const snapshot = globalThis.__OTERYN_ATLAS_VIEW__;
   if (!snapshot || typeof snapshot !== 'object') return false;
-  applyView(snapshot);
+  const effectivePresentation = globalThis.__OTERYN_ATLAS_EFFECTIVE_PRESENTATION__;
+  applyView(snapshot, effectivePresentation?.detailReady, effectivePresentation);
   return true;
 }
 
@@ -529,7 +548,7 @@ async function waitForInitialView(timeoutMs = 30_000) {
     };
     const onView = (event) => {
       if (!event.detail?.view) return;
-      applyView(event.detail.view);
+      applyView(event.detail.view, event.detail.detailReady, event.detail.effectivePresentation ?? null);
       cleanup();
       resolve();
     };
@@ -562,6 +581,7 @@ function setup() {
   Object.assign(canvas.style, { position: 'absolute', inset: '0', width: '100%', height: '100%', pointerEvents: 'none', zIndex: '6' });
   frame.append(canvas);
   state.canvas = canvas;
+  state.presentation = createCreaturePresentationController({ frame });
 
   const host = document.querySelector('#semantic-layer-list');
   if (host) {
@@ -630,9 +650,10 @@ function setup() {
   });
 
   window.addEventListener('oteryn-atlas-view', (event) => {
+    if (!event.detail?.view) return;
     const floorChanged = state.view && event.detail.view.floor !== state.view.floor;
     invalidateInteraction({ closeCard: Boolean(floorChanged) });
-    applyView(event.detail.view);
+    applyView(event.detail.view, event.detail.detailReady, event.detail.effectivePresentation ?? null);
     persist();
     repaintPreparedForCurrentState();
     refresh().catch(fail);
@@ -698,6 +719,15 @@ function rendererView(snapshot) {
   });
 }
 
+function presentationView(baseView) {
+  if (!baseView) return null;
+  return Object.freeze({
+    ...baseView,
+    mode: state.view?.mode ?? 'auto',
+    overview: Boolean(state.view?.overview),
+  });
+}
+
 function sameView(left, right) {
   return Boolean(left && right)
     && left.floor === right.floor
@@ -715,39 +745,37 @@ function sameRendererCommit(expected) {
     && current?.transform?.zoom === expected?.transform?.zoom;
 }
 
-function drawNpcIcon(context, x, y, glyph, size) {
-  const left = Math.round(x - size / 2);
-  const top = Math.round(y - size / 2);
-  const mid = Math.floor(size / 2);
-  const pad = Math.max(2, Math.floor(size / 5));
-  context.save();
-  context.translate(left, top);
-  context.fillStyle = 'rgba(5, 10, 17, .94)';
-  context.fillRect(0, 0, size, size);
-  context.strokeStyle = '#d7e5f2';
-  context.lineWidth = 1;
-  context.strokeRect(0.5, 0.5, size - 1, size - 1);
-  context.fillStyle = '#ffd166'; context.strokeStyle = '#ffd166';
-  context.lineWidth = Math.max(1, Math.floor(size / 8));
-  context.lineCap = 'square'; context.lineJoin = 'miter';
-  if (glyph === 'coin') {
-    context.beginPath(); context.arc(mid, mid, Math.max(3, mid - pad), 0, Math.PI * 2); context.stroke();
-    context.fillRect(mid - 1, pad + 2, 2, size - (pad + 2) * 2);
-  } else if (glyph === 'travel') {
-    context.beginPath(); context.moveTo(mid, pad); context.lineTo(size - pad, mid); context.lineTo(mid, size - pad); context.lineTo(pad, mid); context.closePath(); context.stroke();
-    context.fillRect(mid - 1, pad + 2, 2, size - (pad + 2) * 2); context.fillRect(pad + 2, mid - 1, size - (pad + 2) * 2, 2);
-  } else if (glyph === 'bag') {
-    context.strokeRect(pad, mid - 1, size - pad * 2, size - mid - pad + 1); context.strokeRect(mid - 3, pad + 1, 6, Math.max(3, mid - pad - 1));
-  } else if (glyph === 'quest') {
-    context.fillRect(mid - 1, pad, 3, size - pad * 2 - 4); context.fillRect(mid - 1, size - pad - 2, 3, 3);
-  } else if (glyph === 'star') {
-    context.beginPath(); context.moveTo(mid, pad); context.lineTo(mid + 2, mid - 2); context.lineTo(size - pad, mid); context.lineTo(mid + 2, mid + 2); context.lineTo(mid, size - pad); context.lineTo(mid - 2, mid + 2); context.lineTo(pad, mid); context.lineTo(mid - 2, mid - 2); context.closePath(); context.fill();
-  } else if (glyph === 'book') {
-    context.strokeRect(pad, pad + 2, mid - pad, size - pad * 2 - 2); context.strokeRect(mid, pad + 2, mid - pad, size - pad * 2 - 2); context.fillRect(mid - 1, pad + 2, 2, size - pad * 2 - 2);
-  } else {
-    context.beginPath(); context.arc(mid, pad + 3, Math.max(2, Math.floor(size / 6)), 0, Math.PI * 2); context.fill(); context.fillRect(pad + 1, mid + 1, size - (pad + 1) * 2, Math.max(3, size - mid - pad - 1));
-  }
-  context.restore();
+function presentationDiagnostics(baseView) {
+  if (!state.presentation) return {};
+  return state.presentation.commit({
+    view: presentationView(baseView),
+    detailReady: state.detailReady,
+    effectivePresentation: state.effectivePresentation,
+    targets: [...state.interactionTargets.values()],
+    records: state.interactionRecords,
+    selectedId: state.selectedId,
+    hoveredId: state.hoveredId,
+    activeFilter: state.npcRole,
+  });
+}
+
+function repaintPresentation() {
+  if (!state.presentation || !state.lastRender || !state.lastCommittedBase || !state.lastCanvasMetrics) return;
+  if (!sameRendererCommit(state.lastCommittedBase)) return;
+  const baseView = rendererView(state.lastCommittedBase);
+  if (!baseView) return;
+  const presentation = presentationDiagnostics(baseView);
+  state.lastDrawnNpcIcons = presentation.drawnNpcIcons ?? 0;
+  state.lastRender = createCreatureRenderSnapshot({
+    generation: state.lastRender.generation,
+    baseGenerationAtStart: state.lastCommittedBase.generation,
+    baseGenerationAtCommit: state.lastCommittedBase.generation,
+    view: baseView,
+    canvas: state.lastCanvasMetrics,
+    anchors: state.lastCommittedAnchors,
+    ...presentation,
+  });
+  window.dispatchEvent(new CustomEvent('oteryn-atlas-creature-render-committed', { detail: state.lastRender }));
 }
 
 async function prepareDraw(records, view = state.view) {
@@ -769,10 +797,6 @@ async function prepareDraw(records, view = state.view) {
     const frame = state.animationRuntime.creatureFrame(record, state.animationOn ? state.logicalTimeMs : 0);
     return { record, frame, bitmap: await state.animationRuntime.bitmap(frame.contentId), marker: false };
   }));
-}
-
-function npcBadgeOffset(item, view) {
-  return item.marker ? 0 : Math.min(14, 8 + view.zoom * 3);
 }
 
 function monsterMarkerRadius(view) {
@@ -805,12 +829,9 @@ function paintPrepared(prepared, view = state.view, committedBase = null) {
   context.save();
   context.scale(dpr, dpr);
   context.imageSmoothingEnabled = false;
-  context.font = '12px sans-serif';
-  context.textBaseline = 'middle';
   const npcSize = Math.round(Math.max(13, Math.min(20, 12 + view.zoom * 2)));
   let pixelDrawn = 0;
   let markerDrawn = 0;
-  let npcIcons = 0;
   let drawn = 0;
   const anchors = [];
   const commitEligible = Boolean(committedBase && sameRendererCommit(committedBase));
@@ -834,19 +855,7 @@ function paintPrepared(prepared, view = state.view, committedBase = null) {
       const y = tileY - (item.bitmap.height - 32 + Number(displacement.y ?? 0)) * view.zoom;
       context.drawImage(item.bitmap, x, y, item.bitmap.width * view.zoom, item.bitmap.height * view.zoom);
       pixelDrawn += 1;
-    }
-    const auxiliaryRects = [];
-    if (record.kind === 'npc') {
-      const badgeOffset = npcBadgeOffset(item, view);
-      const badgeX = tileX + badgeOffset;
-      const badgeY = tileY - badgeOffset;
-      drawNpcIcon(context, badgeX, badgeY, npcRoleGlyph(record, state.npcRole), npcSize);
-      if (!item.marker) auxiliaryRects.push({
-        x: Math.round(badgeX - npcSize / 2), y: Math.round(badgeY - npcSize / 2),
-        width: npcSize, height: npcSize,
-      });
-      npcIcons += 1;
-    } else if (item.marker) {
+    } else if (record.kind === 'monster') {
       const radius = monsterMarkerRadius(view);
       context.beginPath(); context.arc(tileX, tileY, radius, 0, Math.PI * 2);
       context.fillStyle = '#ef476f'; context.fill();
@@ -857,7 +866,7 @@ function paintPrepared(prepared, view = state.view, committedBase = null) {
       const target = createCreatureInteractionTarget({
         record, view, viewport: { width: rect.width, height: rect.height },
         presentation: interactionPresentation(item, record, npcSize, view),
-        auxiliaryRects, drawOrder: drawn,
+        auxiliaryRects: [], drawOrder: drawn,
         baseGeneration: committedBase.generation,
         creatureGeneration: nextCreatureGeneration,
       });
@@ -865,9 +874,6 @@ function paintPrepared(prepared, view = state.view, committedBase = null) {
         interactionTargets.push(target);
         interactionRecords.set(record.record_id, record);
       }
-    }
-    if (view.zoom >= (record.kind === 'npc' ? 1.5 : 1)) {
-      context.fillStyle = '#f8fafc'; context.fillText(record.name, tileX + 8, tileY);
     }
   }
   context.restore();
@@ -881,13 +887,19 @@ function paintPrepared(prepared, view = state.view, committedBase = null) {
       width: rect.width, height: rect.height,
       cellSize: INTERACTION_CELL_SIZE, generation: state.interactionGeneration,
     });
+    state.lastCommittedBase = committedBase;
+    state.lastCommittedAnchors = anchors;
+    state.lastCanvasMetrics = { width: rect.width, height: rect.height, dpr };
+    const presentation = presentationDiagnostics(view);
+    state.lastDrawnNpcIcons = presentation.drawnNpcIcons ?? 0;
     state.lastRender = createCreatureRenderSnapshot({
       generation: state.renderGeneration,
       baseGenerationAtStart: committedBase.generation,
       baseGenerationAtCommit: committedBase.generation,
       view,
-      canvas: { width: rect.width, height: rect.height, dpr },
+      canvas: state.lastCanvasMetrics,
       anchors,
+      ...presentation,
     });
     window.dispatchEvent(new CustomEvent('oteryn-atlas-creature-render-committed', { detail: state.lastRender }));
     if (state.cardState.mode === 'chooser' && state.cardState.generation !== state.interactionGeneration) {
@@ -900,7 +912,7 @@ function paintPrepared(prepared, view = state.view, committedBase = null) {
   }
   state.pixelDrawnRecords = pixelDrawn;
   state.markerDrawnRecords = markerDrawn;
-  state.lastDrawnNpcIcons = npcIcons;
+  if (!commitEligible) state.lastDrawnNpcIcons = state.presentation?.snapshot()?.drawnNpcIcons ?? state.lastDrawnNpcIcons;
   state.animationRuntime?.noteFrameUpdate(state.animationOn ? pixelDrawn : 0);
   return drawn;
 }
@@ -956,6 +968,7 @@ async function refresh() {
   if (status) status.textContent = `Game-owned verified creatures · ${state.index.counts.records.toLocaleString()} placements · NPC ${npcRoleLabel(state.npcRole)} · ${entries.length} visible shards · ${state.pixelDrawnRecords} pixel / ${state.lastDrawnNpcIcons} NPC icon / ${state.markerDrawnRecords} marker`;
   publish('PASS', null, { visibleShards: entries.length, selectedVisible: Boolean(selected) });
 }
+
 async function boot() {
   publish();
   setup();
