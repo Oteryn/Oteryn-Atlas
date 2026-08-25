@@ -68,15 +68,8 @@ test('secondary mobile-like engine supports touch drawers, search and inspector 
   const controlsClose = page.getByRole('button', { name: 'Close Atlas controls' });
   await expect(controlsClose).toBeFocused();
   const floorSelect = page.getByRole('combobox', { name: 'Exported floor' });
-  await expect(floorSelect).toBeVisible();
-  const floor0 = new URL(page.url()).searchParams.get('floor');
-  const higherFloor = page.getByRole('button', { name: 'Higher floor' });
-  const lowerFloor = page.getByRole('button', { name: 'Lower floor' });
-  if (await higherFloor.isEnabled()) await higherFloor.tap();
-  else if (await lowerFloor.isEnabled()) await lowerFloor.tap();
-  else throw new Error('cross-browser mobile fixture exposes no adjacent floor');
-  await expect.poll(() => new URL(page.url()).searchParams.get('floor')).not.toBe(floor0);
-  await expect(page.locator('#mobile-search-input')).toBeVisible();
+  const mobileSearch = page.locator('#mobile-search-input');
+  await expect(mobileSearch).toBeVisible();
   await assertUserVisibleSurface(page, {
     label: `${browserName} mobile-like controls`,
     minimumMapAreaRatio: 0.62,
@@ -86,7 +79,33 @@ test('secondary mobile-like engine supports touch drawers, search and inspector 
       { selector: '#mobile-search-input', label: 'search', interactive: true, minHeight: 34 },
     ],
   });
-  const mobileSearch = page.locator('#mobile-search-input');
+
+  const floor0 = new URL(page.url()).searchParams.get('floor');
+  const higherFloor = page.getByRole('button', { name: 'Higher floor' });
+  const lowerFloor = page.getByRole('button', { name: 'Lower floor' });
+  await floorSelect.scrollIntoViewIfNeeded();
+  await assertUserVisibleSurface(page, {
+    label: `${browserName} mobile-like floor control`,
+    minimumMapAreaRatio: 0.62,
+    elements: [
+      { selector: '#floor-select', label: 'floor selector', interactive: true, minHeight: 34 },
+      { selector: '#floor-up', label: 'higher floor', minWidth: 34, minHeight: 34 },
+      { selector: '#floor-down', label: 'lower floor', minWidth: 34, minHeight: 34 },
+    ],
+  });
+  if (await higherFloor.isEnabled()) await higherFloor.tap();
+  else if (await lowerFloor.isEnabled()) await lowerFloor.tap();
+  else throw new Error('cross-browser mobile fixture exposes no adjacent floor');
+  await expect.poll(() => new URL(page.url()).searchParams.get('floor')).not.toBe(floor0);
+
+  await mobileSearch.scrollIntoViewIfNeeded();
+  await assertUserVisibleSurface(page, {
+    label: `${browserName} mobile-like search return`,
+    minimumMapAreaRatio: 0.62,
+    elements: [
+      { selector: '#mobile-search-input', label: 'search', interactive: true, minHeight: 34 },
+    ],
+  });
   await mobileSearch.fill('Thais');
   const results = page.locator('#semantic-search-results-mobile');
   await expect(results).toBeVisible();

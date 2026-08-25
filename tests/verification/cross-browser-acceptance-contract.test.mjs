@@ -77,6 +77,21 @@ test('cross-browser journeys cover behavior, layout and engine identity without 
   assert.match(desktop, /toEqual\(staticEvidence\)/);
 });
 
+test('mobile cross-browser acceptance proves the top drawer before scrolling to deep controls', async () => {
+  const mobile = await read('e2e/tests/cross-browser-mobile.spec.mjs');
+  const drawerOpen = mobile.indexOf('await controls.tap()');
+  const topSurface = mobile.indexOf('label: `${browserName} mobile-like controls`');
+  const floorScroll = mobile.indexOf('await floorSelect.scrollIntoViewIfNeeded()');
+  const floorAction = mobile.indexOf('if (await higherFloor.isEnabled()) await higherFloor.tap()');
+  const searchReturn = mobile.indexOf('await mobileSearch.scrollIntoViewIfNeeded()');
+  const searchFill = mobile.indexOf("await mobileSearch.fill('Thais')");
+  assert(drawerOpen >= 0, 'mobile drawer must be opened by touch');
+  assert(topSurface > drawerOpen, 'top drawer acceptance must follow the open action');
+  assert(floorScroll > topSurface, 'deep floor control scrolling must follow top drawer acceptance');
+  assert(floorAction > floorScroll, 'floor action must only run after its control is explicitly brought into view');
+  assert(searchReturn > floorAction, 'search must be brought back into view after the deep floor action');
+  assert(searchFill > searchReturn, 'semantic search must be filled only after it is back in view');
+});
 test('pinned browser availability probe launches both secondary engines with touch context', async () => {
   const probe = await read('e2e/support/browser-availability.mjs');
   assert.match(probe, /firefox/);
