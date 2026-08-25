@@ -5,6 +5,7 @@ const crypto = require('node:crypto');
 const fs = require('node:fs');
 const { chromium } = require('@playwright/test');
 const visualOracle = import('../support/visual-oracle.mjs');
+const { liveCreatureReady } = require('../support/live-creature-readiness.cjs');
 
 const preview = process.env.PREVIEW_URL;
 const expectedRevision = process.env.ATLAS_REV;
@@ -111,20 +112,17 @@ async function waitSemanticReady(page) {
   return value;
 }
 
-async function waitReady(page, { selectedId = null, npc = true, monster = true } = {}) {
+async function waitReady(page, { selectedId = null, npc = true, monster = true, requireNpcBadge = false } = {}) {
   try {
     await page.waitForFunction(
-      ({ digest, selected, wantNpc, wantMonster }) => {
-        const value = globalThis.__OTERYN_ATLAS_CREATURES__;
-        if (!value || value.status !== 'PASS') return false;
-        if (value.sourceSemanticDigest !== digest) return false;
-        if (value.cacheChunks > 96 || value.drawnRecords < 1 || value.pixelDrawnRecords < 1) return false;
-        if (!value.animationRuntime || value.animationRuntime.creaturePrograms !== 1377) return false;
-        if (value.enabled?.npc !== wantNpc || value.enabled?.monster !== wantMonster) return false;
-        if (selected && (value.selectedRecordId !== selected || value.selectedVisible !== true)) return false;
-        return true;
+      liveCreatureReady,
+      {
+        digest: expectedDigest,
+        selected: selectedId,
+        wantNpc: npc,
+        wantMonster: monster,
+        requireNpcBadge,
       },
-      { digest: expectedDigest, selected: selectedId, wantNpc: npc, wantMonster: monster },
       { timeout: 120_000 },
     );
   } catch (error) {
@@ -257,7 +255,7 @@ async function runDesktop(browser) {
   await assertRevisionResponse(page);
   const animationCoverage = await publishedAnimationCoverage(page);
   await waitSemanticReady(page);
-  const initial = await waitReady(page);
+  const initial = await waitReady(page, { requireNpcBadge: true });
   assert.ok(initial.visibleRecords > 0);
   assert.equal(initial.npcRole, 'shop');
   assert.equal(initial.npcMarkerStyle, 'functional-icons-v2');
