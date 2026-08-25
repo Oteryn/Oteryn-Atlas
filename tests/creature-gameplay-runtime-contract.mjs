@@ -28,7 +28,7 @@ test('creature runtime reuses #113 selection and routes Details to durable Gamep
   assert.match(source, /inspectorState/);
   assert.match(source, /gameplaySummary/);
   assert.match(source, /renderCreatureInspector\(record\)/);
-  assert.match(source, /createCreatureInteractionIndex/);
+  assert.match(source, /buildCreatureInteractionIndex/);
 });
 
 test('gameplay renderer is text-only, bounded, and names every required section', () => {

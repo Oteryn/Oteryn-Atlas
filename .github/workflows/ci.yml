@@ -221,6 +221,7 @@ jobs:
             tests/creature-gameplay-profiles.mjs
             tests/creature-inspector-state.mjs
             tests/creature-gameplay-model.mjs
+            tests/creature-gameplay-runtime-contract.mjs
             tests/gui-contract.mjs
             tests/npc-markers.mjs
             tests/pixel-store.mjs

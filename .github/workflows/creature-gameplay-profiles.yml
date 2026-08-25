@@ -12,6 +12,7 @@ on:
       - 'tests/creature-gameplay-profiles.mjs'
       - 'tests/creature-inspector-state.mjs'
       - 'tests/creature-gameplay-model.mjs'
+      - 'tests/creature-gameplay-runtime-contract.mjs'
       - 'tests/verification/creature-gameplay-publication.test.mjs'
       - 'web/creature-gameplay/**'
       - 'web/fullworld-creature-gameplay.mjs'
@@ -28,6 +29,7 @@ on:
       - 'tests/creature-gameplay-profiles.mjs'
       - 'tests/creature-inspector-state.mjs'
       - 'tests/creature-gameplay-model.mjs'
+      - 'tests/creature-gameplay-runtime-contract.mjs'
       - 'tests/verification/creature-gameplay-publication.test.mjs'
       - 'web/creature-gameplay/**'
       - 'web/fullworld-creature-gameplay.mjs'
@@ -109,7 +111,7 @@ jobs:
           test "$(git -C .deps/legacy rev-parse HEAD)" = "$LEGACY_REVISION"
 
       - name: Run deterministic consumer contracts
-        run: node --test tests/creature-gameplay-profiles.mjs tests/creature-inspector-state.mjs tests/creature-gameplay-model.mjs tests/verification/creature-gameplay-publication.test.mjs
+        run: node --test tests/creature-gameplay-profiles.mjs tests/creature-inspector-state.mjs tests/creature-gameplay-model.mjs tests/creature-gameplay-runtime-contract.mjs tests/verification/creature-gameplay-publication.test.mjs
 
       - name: Rebuild exact merged Game product
         shell: bash

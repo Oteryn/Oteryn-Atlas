@@ -5,8 +5,12 @@ import { createCreatureRenderSnapshot } from '../src/browser/creature-render-dia
 import { buildCreatureInteractionIndex, createClosedCreatureCardState, placeCreatureCard, queryCreatureHits, reduceCreatureCardState } from '../src/browser/creature-interaction.mjs';
 import { createCreatureInteractionTarget } from '../src/browser/creature-interaction-target.mjs';
 import { availableNpcFilters, npcMatchesRole, npcPresentationRoles, npcRoleFilter, npcRoleGlyph, npcRoleLabel, validateNpcRoleMetadata } from '../src/browser/npc-markers.mjs';
+import { createCreatureGameplayProfileService } from '../src/browser/creature-gameplay-profiles.mjs';
+import { parseCreatureInspectorState, reduceCreatureInspectorState, serializeCreatureInspectorState } from '../src/browser/creature-inspector-state.mjs';
+import { createCreatureGameplayInspectorController } from './fullworld-creature-gameplay.mjs';
 
 const ROOT = new URL('../data/creatures/', location.href);
+const GAMEPLAY_ROOT = new URL('./creature-gameplay/', import.meta.url);
 const EXPECTED_CONTRACT = 'oteryn-game-atlas-export-v1';
 const EXPECTED_CAPABILITY = 'animated-creatures-v1';
 const EXPECTED_SEMANTIC_DIGEST = 'sha256:7dc951874c95424279737eaaf51cf2d50940162ef4799daea39a187a581ef0e8';
@@ -27,6 +31,7 @@ const initialParams = new URLSearchParams(location.search);
 const requested = new Set((initialParams.get('creatures') || '').split(',').filter(Boolean));
 const selectedParam = initialParams.get('creature') || null;
 const requestedNpcRole = npcRoleFilter(initialParams.get('npcRole'));
+const inspectorState = parseCreatureInspectorState(initialParams, { liveAvailable: false });
 const state = {
   index: null,
   view: null,
@@ -60,6 +65,9 @@ const state = {
   hoverFrame: null,
   cardState: createClosedCreatureCardState(),
   restoreCardFromDeepLink: Boolean(selectedParam),
+  inspectorState,
+  gameplayProfiles: null,
+  gameplayInspector: null,
 };
 
 function requireValue(condition, message) {
@@ -117,6 +125,8 @@ function publish(status = 'LOADING', error = null, extra = {}) {
     selectedTargetRect: state.selectedId ? state.interactionTargets.get(state.selectedId)?.presentationRect ?? null : null,
     cardTargetRect: state.cardState.recordId ? state.interactionTargets.get(state.cardState.recordId)?.presentationRect ?? null : null,
     cardTargetAssistRect: state.cardState.recordId ? state.interactionTargets.get(state.cardState.recordId)?.assistRect ?? null : null,
+    inspectorTab: state.inspectorState.tab,
+    gameplay: state.gameplayInspector?.stats?.() ?? null,
     error: error ? String(error.message ?? error) : null,
     ...extra,
   });
@@ -144,7 +154,8 @@ function persist() {
   else params.delete('npcRole');
   if (state.selectedId) params.set('creature', state.selectedId);
   else params.delete('creature');
-  const next = `${location.pathname}?${params.toString()}${location.hash}`;
+  const serialized = serializeCreatureInspectorState(params, state.inspectorState, { liveAvailable: false });
+  const next = `${location.pathname}?${serialized.toString()}${location.hash}`;
   if (`${location.pathname}${location.search}${location.hash}` !== next) history.replaceState(null, '', next);
 }
 
@@ -246,20 +257,11 @@ function createTextRow(label, value) {
   return row;
 }
 
-function renderCreatureInspector(record) {
-  const panel = state.inspector;
-  if (!panel) return;
+function renderCreatureSemantic(panel, record) {
   panel.textContent = '';
   const heading = document.createElement('h3');
   heading.textContent = 'Verified creature';
   panel.append(heading);
-  if (!record) {
-    const empty = document.createElement('p');
-    empty.className = 'empty';
-    empty.textContent = state.selectedId ? 'Selected creature is outside the currently loaded factual region.' : 'Select a creature from search to inspect its factual record.';
-    panel.append(empty);
-    return;
-  }
   panel.append(
     createTextRow('Name', record.name),
     createTextRow('Kind', record.kind === 'npc' ? 'NPC' : 'Monster / Spawn'),
@@ -283,10 +285,25 @@ function renderCreatureInspector(record) {
   );
 }
 
+function renderCreatureInspector(record) {
+  if (!state.gameplayInspector) return;
+  state.gameplayInspector.render(record, state.inspectorState.tab).catch((error) => {
+    console.error(`Creature gameplay inspector unavailable: ${error.message ?? error}`);
+    if (state.inspector) {
+      state.inspector.textContent = '';
+      const message = document.createElement('p');
+      message.className = 'creature-gameplay-notice';
+      message.textContent = `Gameplay inspector unavailable: ${error.message ?? error}`;
+      state.inspector.append(message);
+    }
+  });
+}
+
 function appendCardFact(container, label, value, { warning = false } = {}) {
   const row = createTextRow(label, value);
   if (warning) row.className = 'creature-card-warning';
   container.append(row);
+  return row;
 }
 
 function reservedCardRects() {
@@ -350,6 +367,24 @@ function renderCreatureCardRecord(record, target) {
   actions.hidden = false;
   card.hidden = false;
   positionCreatureCard(target);
+  updateCreatureCardGameplaySummary(record, body).catch((error) => console.warn(`Creature gameplay card summary unavailable: ${error.message ?? error}`));
+}
+
+async function updateCreatureCardGameplaySummary(record, body) {
+  if (!state.gameplayInspector || !record?.entity_id) return;
+  const recordId = record.record_id;
+  const summary = await state.gameplayInspector.gameplaySummary(record);
+  if (!summary || state.cardState.recordId !== recordId || body !== cardElement('creature-card-body')) return;
+  if (body.querySelector('[data-gameplay-summary]')) return;
+  const row = appendCardFact(body, 'Gameplay', summary);
+  row.dataset.gameplaySummary = 'true';
+}
+
+function selectedCreatureRecord() {
+  if (!state.selectedId) return null;
+  return state.interactionRecords.get(state.selectedId)
+    ?? state.lastVisibleRecords.find((record) => record.record_id === state.selectedId)
+    ?? null;
 }
 
 function openCreatureRecord(recordId) {
@@ -357,6 +392,7 @@ function openCreatureRecord(recordId) {
   const target = state.interactionTargets.get(recordId);
   if (!record || !target || !state.interactionGeneration) return false;
   state.selectedId = recordId;
+  state.inspectorState = reduceCreatureInspectorState(state.inspectorState, { type: 'select-creature' });
   state.cardState = reduceCreatureCardState(state.cardState, {
     type: 'open-record', generation: state.interactionGeneration, recordId,
   });
@@ -449,8 +485,10 @@ function openCreatureDetails() {
   const recordId = state.cardState.recordId;
   const record = recordId ? state.interactionRecords.get(recordId) : null;
   if (!record) return;
+  state.inspectorState = reduceCreatureInspectorState(state.inspectorState, { type: 'open-details' });
+  persist();
   renderCreatureInspector(record);
-  window.dispatchEvent(new CustomEvent('oteryn-atlas-open-inspector', { detail: { recordId } }));
+  window.dispatchEvent(new CustomEvent('oteryn-atlas-open-inspector', { detail: { recordId, tab: 'gameplay' } }));
   requestAnimationFrame(() => state.inspector?.scrollIntoView({ block: 'nearest' }));
 }
 
@@ -599,9 +637,29 @@ function setup() {
   if (inspectorContent) {
     const panel = document.createElement('section');
     panel.id = 'creature-inspector';
-    panel.className = 'notice-box';
+    panel.className = 'creature-inspector';
+    panel.hidden = true;
     inspectorContent.after(panel);
     state.inspector = panel;
+    state.gameplayProfiles = createCreatureGameplayProfileService({ baseUrl: GAMEPLAY_ROOT });
+    state.gameplayInspector = createCreatureGameplayInspectorController({
+      panel,
+      baseInspector: inspectorContent,
+      tabs: {
+        gameplay: document.querySelector('#inspector-tab-gameplay'),
+        semantic: document.querySelector('#inspector-tab-semantic'),
+        live: document.querySelector('#inspector-tab-live'),
+      },
+      profileService: state.gameplayProfiles,
+      getPlacements: (entityId) => state.lastVisibleRecords.filter((record) => record.entity_id === entityId),
+      onSelectTab: (tab) => {
+        state.inspectorState = reduceCreatureInspectorState(state.inspectorState, { type: 'select-tab', tab, liveAvailable: false });
+        persist();
+        renderCreatureInspector(selectedCreatureRecord());
+        publish('PASS');
+      },
+      renderSemantic: renderCreatureSemantic,
+    });
     renderCreatureInspector(null);
   }
 
@@ -643,6 +701,10 @@ function setup() {
     repaintPreparedForCurrentState();
     refresh().catch(fail);
   });
+  window.addEventListener('popstate', () => {
+    state.inspectorState = parseCreatureInspectorState(new URLSearchParams(location.search), { liveAvailable: false });
+    renderCreatureInspector(selectedCreatureRecord());
+  });
 }
 
 function navigate(item) {
@@ -659,6 +721,7 @@ function navigate(item) {
   if (state.npcRole !== 'all') params.set('npcRole', state.npcRole);
   else params.delete('npcRole');
   params.set('creature', item.record_id);
+  params.set('inspector', 'gameplay');
   location.search = params.toString();
 }
 

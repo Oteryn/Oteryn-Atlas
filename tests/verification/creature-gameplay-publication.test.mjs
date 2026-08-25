@@ -57,7 +57,7 @@ test('exact-source workflow rebuilds the same merged Game product and CI runs co
   assert.match(workflow, new RegExp(DIGEST.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
 
   const ci = readFileSync(join(ROOT, '.github', 'workflows', 'ci.yml'), 'utf8');
-  for (const path of ['tests/creature-gameplay-profiles.mjs', 'tests/creature-inspector-state.mjs', 'tests/creature-gameplay-model.mjs']) {
+  for (const path of ['tests/creature-gameplay-profiles.mjs', 'tests/creature-inspector-state.mjs', 'tests/creature-gameplay-model.mjs', 'tests/creature-gameplay-runtime-contract.mjs']) {
     assert.match(ci, new RegExp(path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   }
 });
