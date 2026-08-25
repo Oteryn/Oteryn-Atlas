@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import test from 'node:test';
 
 import { validatePlanBoundE2eEvidence } from '../../tools/verification/validate-e2e-evidence.mjs';
@@ -41,4 +42,10 @@ test('plan-bound evidence rejects stale plans, duplicate IDs and matching-count 
       { stableTestId: 'mobile-chromium::e2e/tests/mobile.spec.mjs::substitution', status: 'passed', retry: 0 },
     ],
   } })), /census does not match/);
+});
+
+test('plan-bound evidence CLI has a platform-safe entrypoint for Windows publication', () => {
+  const source = fs.readFileSync(new URL('../../tools/verification/validate-e2e-evidence.mjs', import.meta.url), 'utf8');
+  assert.match(source, /pathToFileURL\(process\.argv\[1\]\)\.href === import\.meta\.url/);
+  assert.doesNotMatch(source, /import\.meta\.url === `file:\$\{process\.argv\[1\]\}`/);
 });

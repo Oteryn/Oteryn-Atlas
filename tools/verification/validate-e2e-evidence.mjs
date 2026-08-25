@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
+import { pathToFileURL } from 'node:url';
 
 function readJson(pathname, label) {
   try {
@@ -47,7 +48,7 @@ function parseArgs(argv) {
   return { planPath: argv[1], summaryPath: argv[3], headSha: argv[5] };
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
   const { planPath, summaryPath, headSha } = parseArgs(process.argv.slice(2));
   const result = validatePlanBoundE2eEvidence({
     plan: readJson(planPath, 'verification plan'),
