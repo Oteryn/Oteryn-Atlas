@@ -235,6 +235,7 @@ test('classification emits a trusted-base shadow plan without changing legacy ga
   assert.match(classifierJob, /--candidate-catalog/);
   assert.match(classifierJob, /--merge-base-sha "\$merge_base_sha"/);
   assert.match(classifierJob, /npm ci --prefix e2e/);
+  assert.match(classifierJob, /ATLAS_ARTIFACTS_DIR="\$PWD\/artifacts\/verification\/playwright-list"/);
   assert.match(classifierJob, /playwright test --config=e2e\/playwright\.config\.mjs --list/);
   assert.match(classifierJob, /parse-playwright-test-list\.mjs/);
   assert.match(classifierJob, /--stable-test-ids artifacts\/verification\/stable-test-ids\.json/);

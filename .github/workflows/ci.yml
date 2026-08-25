@@ -361,7 +361,7 @@ jobs:
           NODE
           mkdir -p artifacts/verification
           npm ci --prefix e2e
-          npm exec --prefix e2e -- playwright test --config=e2e/playwright.config.mjs --list > artifacts/verification/playwright-test-list.txt
+          ATLAS_ARTIFACTS_DIR="$PWD/artifacts/verification/playwright-list" npm exec --prefix e2e -- playwright test --config=e2e/playwright.config.mjs --list > artifacts/verification/playwright-test-list.txt
           node tools/verification/parse-playwright-test-list.mjs artifacts/verification/playwright-test-list.txt > artifacts/verification/stable-test-ids.json
           node tools/verification/build-verification-plan.mjs \
             --changed-files "$changes" \
