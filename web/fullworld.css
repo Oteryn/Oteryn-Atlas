@@ -162,4 +162,3 @@
 .farm-estimate-output { margin-top: 8px; padding-top: 7px; border-top: 1px solid #172330; color: #b7cee1; font-size: 10px; }
 .farm-estimate-output p { margin: 4px 0; }
 @media (max-width: 980px) { .farm-custom input, .farm-custom select, .farm-custom button, .farm-creature-result { min-height: 44px; } }
-
