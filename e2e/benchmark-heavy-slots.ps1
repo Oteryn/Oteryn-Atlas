@@ -12,6 +12,8 @@ $root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 Set-Location $root
 . (Join-Path $PSScriptRoot 'heavy-slot-pool.ps1')
 $revision = (git rev-parse HEAD).Trim()
+$runScriptPath = (Resolve-Path (Join-Path $PSScriptRoot 'run.ps1')).Path
+$runScriptLiteral = $runScriptPath.Replace("'", "''")
 if (-not $OutputPath) { $OutputPath = Join-Path $root "artifacts\e2e\$Prefix\benchmark.json" }
 $benchmarkDir = Split-Path $OutputPath -Parent
 New-Item -ItemType Directory -Force -Path $benchmarkDir | Out-Null
@@ -54,11 +56,23 @@ if ($SelfTest) {
     throw 'Benchmark system-sample aggregation self-test failed.'
   }
   $exitSelfTest = Join-Path $benchmarkDir 'benchmark-exit-code-selftest.txt'
-  [IO.File]::WriteAllText($exitSelfTest, '7', (New-Object Text.UTF8Encoding($false)))
-  if ((Read-RunExitCode -Path $exitSelfTest) -ne 7) { throw 'Benchmark exit-code parser rejected a valid child exit code.' }
+  $exitChild = Join-Path $benchmarkDir 'benchmark-exit-child-selftest.ps1'
+  $exitWrapper = Join-Path $benchmarkDir 'benchmark-exit-wrapper-selftest.ps1'
+  $exitChildLiteral = $exitChild.Replace("'", "''")
+  $exitSelfTestLiteral = $exitSelfTest.Replace("'", "''")
+  [IO.File]::WriteAllText($exitChild, 'exit 7' + [Environment]::NewLine, (New-Object Text.UTF8Encoding($false)))
+  $exitWrapperText = @"
+& powershell.exe -NoProfile -ExecutionPolicy Bypass -File '$exitChildLiteral'
+`$runExitCode = `$LASTEXITCODE
+[IO.File]::WriteAllText('$exitSelfTestLiteral', [string]`$runExitCode, (New-Object Text.UTF8Encoding(`$false)))
+exit `$runExitCode
+"@
+  [IO.File]::WriteAllText($exitWrapper, $exitWrapperText, (New-Object Text.UTF8Encoding($false)))
+  $exitWrapperProcess = Start-Process powershell.exe -ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-File',$exitWrapper) -PassThru -Wait
+  if ((Read-RunExitCode -Path $exitSelfTest) -ne 7) { throw 'Benchmark launcher did not persist a child exit code across a PowerShell exit boundary.' }
   [IO.File]::WriteAllText($exitSelfTest, 'invalid', (New-Object Text.UTF8Encoding($false)))
   if ($null -ne (Read-RunExitCode -Path $exitSelfTest)) { throw 'Benchmark exit-code parser accepted malformed evidence.' }
-  Remove-Item -LiteralPath $exitSelfTest -Force
+  Remove-Item -LiteralPath $exitSelfTest,$exitChild,$exitWrapper -Force
   Write-Output "benchmark-heavy-slots-self-test=PASS samples=$($samples.Count) cpuMetricAvailable=$($cpuSamples.Count -gt 0)"
   exit 0
 }
@@ -100,7 +114,7 @@ Remove-Item Env:ATLAS_BASE_URL -ErrorAction SilentlyContinue
 `$env:ATLAS_E2E_WORKERS = '1'
 `$env:ATLAS_E2E_PROJECT = '$project'
 `$env:ATLAS_E2E_LOCK_TIMEOUT_SECONDS = '7200'
-& '.\e2e\run.ps1'
+& powershell.exe -NoProfile -ExecutionPolicy Bypass -File '$runScriptLiteral'
 `$runExitCode = `$LASTEXITCODE
 [IO.File]::WriteAllText('$exitCodeLiteral', [string]`$runExitCode, (New-Object Text.UTF8Encoding(`$false)))
 exit `$runExitCode

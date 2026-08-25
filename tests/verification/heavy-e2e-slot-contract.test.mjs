@@ -89,3 +89,9 @@ test('benchmark never coerces an unavailable CPU counter to a truthful-looking z
   assert.match(benchmark, /cpuMetricAvailable/i);
   assert.doesNotMatch(benchmark, /cpuPercent\s*=\s*\[double\]\$cpu/);
 });
+
+test('benchmark launcher survives run.ps1 exit long enough to persist child exit evidence', () => {
+  const benchmark = fs.readFileSync('e2e/benchmark-heavy-slots.ps1', 'utf8');
+  assert.match(benchmark, /& powershell\.exe[^\n]+-File[^\n]+runScript/i);
+  assert.doesNotMatch(benchmark, /& '\.\\e2e\\run\.ps1'\s*\n`\$runExitCode/);
+});
