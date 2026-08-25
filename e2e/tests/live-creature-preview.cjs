@@ -12,14 +12,16 @@ const expectedDigest = process.env.CREATURE_SEMANTIC_DIGEST;
 const targets = JSON.parse(fs.readFileSync('/targets.json', 'utf8'));
 const evidenceDir = '/evidence';
 const STATIC_EQUIVALENT_PRESENTATION = 'outfit-presentation:sha256:b16bfc92e9d9e9c8f790507f987a11b25a169c4343c9d68471de76a5f3565c88';
-const EXPECTED_ANIMATION_COVERAGE = {
+const EXPECTED_STATIC_ANIMATION_COVERAGE = {
   multiPhasePrograms: 101,
   phaseContentReferences: 2036,
   phaseCountHistogram: { 1: 1276, 2: 2, 3: 4, 4: 4, 6: 1, 8: 88, 9: 2 },
   staticEquivalentProgramIds: [STATIC_EQUIVALENT_PRESENTATION],
-  totalPrograms: 1377,
   visuallyDynamicPrograms: 100,
 };
+const EXPECTED_WALKING_PROGRAMS = 1376;
+const EXPECTED_WALKING_FALLBACKS = 1;
+const EXPECTED_WALKING_FALLBACK_REASONS = { MOVING_GROUP_UNAVAILABLE: 1 };
 fs.mkdirSync(evidenceDir, { recursive: true });
 
 assert.match(preview ?? '', /^https?:\/\/[A-Za-z0-9.-]+(?::[0-9]{1,5})?$/);
@@ -80,7 +82,14 @@ async function publishedAnimationCoverage(page) {
   assert.equal(`sha256:${crypto.createHash('sha256').update(bytes).digest('hex')}`, manifest.programs.digest);
   const coverage = analyzeCreatureAnimationCoverage(JSON.parse(bytes.toString('utf8')));
   assert.equal(coverage.totalPrograms, manifest.counts.creature_programs);
-  assert.deepEqual(coverage, EXPECTED_ANIMATION_COVERAGE);
+  assert.equal(coverage.walkingPrograms, manifest.counts.creature_walking_programs);
+  assert.equal(coverage.walkingFallbacks, manifest.counts.creature_walking_fallbacks);
+  assert.equal(coverage.walkingPrograms, EXPECTED_WALKING_PROGRAMS);
+  assert.equal(coverage.walkingFallbacks, EXPECTED_WALKING_FALLBACKS);
+  assert.deepEqual(coverage.walkingFallbackReasons, EXPECTED_WALKING_FALLBACK_REASONS);
+  assert.deepEqual(coverage.static, EXPECTED_STATIC_ANIMATION_COVERAGE);
+  assert.ok(coverage.walking.multiPhasePrograms > 0);
+  assert.ok(coverage.walking.visuallyDynamicPrograms > 0);
   return coverage;
 }
 

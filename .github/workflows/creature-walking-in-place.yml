@@ -185,6 +185,31 @@ jobs:
           assert manifest['counts']['creature_geometry_union_envelopes']==geometry_union_envelopes
           assert geometry_union_envelopes > 0
 
+          def placement_coverage(rows):
+              resolved=[r for r in rows if r.get('presentation_resolution_state')=='RESOLVED']
+              moving=[r for r in resolved if r['outfit_presentation']['playback_projection']['playback_resolution_state']=='RESOLVED_MOVING_IN_PLACE']
+              fallback_rows=[r for r in resolved if r['outfit_presentation']['playback_projection']['playback_resolution_state']=='FALLBACK_STATIC_PROJECTION']
+              ids=lambda values:{r['outfit_presentation']['outfit_presentation_id'] for r in values}
+              return {'resolved_placements':len(resolved),'moving_placements':len(moving),'fallback_placements':len(fallback_rows),'unique_presentations':len(ids(resolved)),'moving_presentations':len(ids(moving)),'fallback_presentations':len(ids(fallback_rows))}
+          placement_census={'npc':placement_coverage(creatures['npcs']),'monster':placement_coverage(creatures['monster_spawns'])}
+          assert placement_census['npc']['moving_placements']==972 and placement_census['npc']['fallback_placements']==1
+          assert placement_census['monster']['moving_placements']==87193 and placement_census['monster']['fallback_placements']==0
+
+          walking_programs=[entry['walking_program'] for entry in new_by_id.values() if entry['walking_program'] is not None]
+          walking_phase_count_histogram={}
+          walking_visually_dynamic_programs=0
+          walking_static_equivalent_programs=0
+          walking_phase_content_references=0
+          for walking in walking_programs:
+              phase_count=walking['phase_count']
+              walking_phase_count_histogram[phase_count]=walking_phase_count_histogram.get(phase_count,0)+1
+              walking_phase_content_references += len(walking['phase_content_ids'])
+              if len(set(walking['phase_content_ids']))>1: walking_visually_dynamic_programs += 1
+              elif phase_count>1: walking_static_equivalent_programs += 1
+          assert len(walking_programs)==manifest['counts']['creature_walking_programs']==1376
+          assert walking_visually_dynamic_programs > 0
+          walking_program_census={'programs':len(walking_programs),'phase_count_histogram':walking_phase_count_histogram,'phase_content_references':walking_phase_content_references,'visually_dynamic_programs':walking_visually_dynamic_programs,'static_equivalent_multi_phase_programs':walking_static_equivalent_programs}
+
           for name in ('Sheep','Pig','Chicken'):
               kind,record=next((kind,r) for kind,r in records if r.get('name')==name and r.get('presentation_resolution_state')=='RESOLVED')
               projection=record['outfit_presentation']['playback_projection']
@@ -233,6 +258,8 @@ jobs:
               'runtime_root':manifest['rootContentId'],
               'runtime_counts':manifest['counts'],
               'geometry_union_envelopes':geometry_union_envelopes,
+              'placement_census':placement_census,
+              'walking_program_census':walking_program_census,
               'static_program_semantics_equal_v1':True,
               'deterministic_double_build':True,
               'ordinary_creatures':ordinary,

@@ -52,3 +52,18 @@ test('main-only live workflow cannot rebuild the stale creature/runtime authorit
   assert.ok(workflow.includes(`CREATURE_SEMANTIC_DIGEST: ${CREATURE_DIGEST}`), 'live acceptance must expect the new creature digest');
   assert.ok(!workflow.includes(STALE_CREATURE_DIGEST), 'live acceptance must not accept the old creature digest');
 });
+
+test('live browser oracle validates V2 walking pixels and static restoration', async () => {
+  const [proof, coverage] = await Promise.all([
+    source('e2e/tests/live-creature-preview.cjs'),
+    source('e2e/support/creature-animation-coverage.mjs'),
+  ]);
+  assert.ok(coverage.includes(RUNTIME_PROFILE), 'coverage oracle must consume animation runtime v2');
+  assert.ok(coverage.includes('walking_program'), 'coverage oracle must inspect walking programs explicitly');
+  assert.ok(proof.includes('EXPECTED_WALKING_PROGRAMS = 1376'), 'browser oracle must bind walking program census');
+  assert.ok(proof.includes('walkingFallbackReasons'), 'browser oracle must validate walking fallback census');
+  assert.ok(proof.includes('staticNpcPixels, false'), 'NPC playback must prove actual pixel change');
+  assert.ok(proof.includes('staticNpcPixels, true'), 'NPC playback must prove exact static restoration');
+  assert.ok(proof.includes('staticMonsterPixels, false'), 'monster playback must prove actual pixel change');
+  assert.ok(proof.includes('staticMonsterPixels, true'), 'monster playback must prove exact static restoration');
+});
