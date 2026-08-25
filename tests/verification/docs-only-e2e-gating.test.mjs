@@ -28,12 +28,32 @@ test('pure Markdown under docs is exempt from heavy E2E', () => {
   });
 });
 
+test('root AGENTS governance Markdown is exempt from heavy E2E', () => {
+  assert.deepEqual(classify(['AGENTS.md']), {
+    docs_only: 'true',
+    requires_e2e: 'false',
+  });
+});
+
+test('root AGENTS plus safe docs Markdown remains exempt from heavy E2E', () => {
+  assert.deepEqual(classify([
+    'AGENTS.md',
+    'docs/testing/ATLAS-VERIFICATION-PLATFORM.md',
+  ]), {
+    docs_only: 'true',
+    requires_e2e: 'false',
+  });
+});
+
 test('mixed or non-Markdown documentation changes require heavy E2E', () => {
   for (const paths of [
     ['docs/evidence/note.md', 'web/app.mjs'],
+    ['AGENTS.md', 'web/app.mjs'],
     ['docs/migration/legacy-atlas-extraction-provenance.json'],
     ['README.md'],
     ['.github/workflows/ci.yml'],
+    ['tools/verification/classify-pr-changes.mjs'],
+    ['tests/verification/docs-only-e2e-gating.test.mjs'],
     [],
   ]) {
     assert.deepEqual(classify(paths), {
@@ -50,6 +70,9 @@ test('malformed documentation paths fail closed', () => {
     '/docs/evidence/note.md',
     'docs/evidence/note.MD',
     'docs\\evidence\\note.md',
+    './AGENTS.md',
+    '/AGENTS.md',
+    'agents.md',
   ]) {
     assert.deepEqual(classify([path]), {
       docs_only: 'false',
