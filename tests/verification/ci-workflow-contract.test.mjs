@@ -13,6 +13,7 @@ const synology = readText(new URL('../../.github/workflows/synology-live-accepta
 const playwrightConfig = readText(new URL('../../e2e/playwright.config.mjs', import.meta.url));
 const agents = readText(new URL('../../AGENTS.md', import.meta.url));
 const localRunPs1 = readText(new URL('../../e2e/run.ps1', import.meta.url));
+const localCompose = readText(new URL('../../e2e/compose.yml', import.meta.url));
 
 function block(source, start, end) {
   const begin = source.indexOf(start);
@@ -82,6 +83,7 @@ test('local Docker status publisher only accepts exact clean all-pass evidence',
   assert.match(publisher, /statuses\/\$sha/);
   assert.match(playwrightConfig, /verificationPlanSha256/);
   assert.match(localRunPs1, /ATLAS_VERIFICATION_PLAN_PATH/);
+  assert.match(localCompose, /ATLAS_VERIFICATION_PLAN_SHA256:\s*\$\{ATLAS_VERIFICATION_PLAN_SHA256:-\}/);
 });
 
 test('required workflows verify the exact pull-request head rather than a synthetic merge ref', () => {
