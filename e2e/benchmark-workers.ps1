@@ -12,21 +12,29 @@ $root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 Set-Location $root
 
 function Get-RequiredCounterSample {
-  $counter = Get-Counter -Counter @(
-    '\Processor Information(_Total)\% Processor Utility',
-    '\PhysicalDisk(_Total)\Disk Bytes/sec'
-  ) -ErrorAction Stop
-  $values = @{}
-  foreach ($sample in $counter.CounterSamples) {
-    if ($null -eq $sample.CookedValue -or [double]::IsNaN([double]$sample.CookedValue)) {
-      throw "Performance counter returned no usable value: $($sample.Path)"
-    }
-    $values[$sample.Path] = [math]::Round([double]$sample.CookedValue, 3)
+  $processorSamples = @(
+    (Get-Counter -Counter '\Processor Information(_Total)\% Processor Utility' -ErrorAction Stop).CounterSamples |
+      Where-Object { $null -ne $_.CookedValue -and -not [double]::IsNaN([double]$_.CookedValue) }
+  )
+  if ($processorSamples.Count -ne 1) { throw 'Processor telemetry did not yield exactly one usable total sample.' }
+  $os = Get-CimInstance Win32_OperatingSystem -ErrorAction Stop
+  $computer = Get-ComputerInfo -Property CsTotalPhysicalMemory
+  $availableMemoryBytes = [double]$os.FreePhysicalMemory * 1KB
+  $totalMemoryBytes = [double]$computer.CsTotalPhysicalMemory
+  if ($availableMemoryBytes -lt 0 -or $totalMemoryBytes -le 0 -or $availableMemoryBytes -gt $totalMemoryBytes) {
+    throw 'Operating-system memory telemetry is invalid.'
   }
+  $dockerStats = @(Get-DockerStats)
+  $dockerBlockIo = @($dockerStats | ForEach-Object {
+    [pscustomobject][ordered]@{ name = $_.Name; blockIo = $_.BlockIO }
+  })
   return [pscustomobject][ordered]@{
     atUtc = [DateTime]::UtcNow.ToString('o')
-    processorUtilityPercent = $values['\\Processor Information(_Total)\\% Processor Utility']
-    diskBytesPerSecond = $values['\\PhysicalDisk(_Total)\\Disk Bytes/sec']
+    processorUtilityPercent = [math]::Round([double]$processorSamples[0].CookedValue, 3)
+    memoryAvailableBytes = [math]::Round($availableMemoryBytes, 0)
+    memoryPressurePercent = [math]::Round(100 * (1 - ($availableMemoryBytes / $totalMemoryBytes)), 3)
+    dockerContainerCount = $dockerStats.Count
+    dockerBlockIo = $dockerBlockIo
   }
 }
 
@@ -88,7 +96,7 @@ $fingerprint = Get-EnvironmentFingerprint
 if ($SelfTest) {
   if ($Workers.Count -ne @($Workers | Select-Object -Unique).Count) { throw 'Worker candidates must be unique.' }
   $probe = Get-RequiredCounterSample
-  if ($null -eq $probe.processorUtilityPercent -or $null -eq $probe.diskBytesPerSecond) {
+  if ($null -eq $probe.processorUtilityPercent -or $null -eq $probe.memoryPressurePercent -or $null -eq $probe.dockerBlockIo) {
     throw 'Benchmark telemetry self-test failed.'
   }
   [pscustomobject]@{ version = 1; selfTest = 'passed'; fingerprint = $fingerprint; telemetry = $probe } |
@@ -120,10 +128,24 @@ try {
       $env:ATLAS_E2E_LOCK_TIMEOUT_SECONDS = '7200'
       $before = Get-RequiredCounterSample
       $started = [DateTime]::UtcNow
-      & (Join-Path $PSScriptRoot 'run.ps1')
-      $exitCode = $LASTEXITCODE
+      $runLog = Join-Path $artifactDir 'benchmark-run.log'
+      $runErrorLog = Join-Path $artifactDir 'benchmark-run.err.log'
+      New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
+      $run = Start-Process -FilePath powershell.exe -ArgumentList @(
+        '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $PSScriptRoot 'run.ps1')
+      ) -PassThru -RedirectStandardOutput $runLog -RedirectStandardError $runErrorLog
+      $resourceSamples = [System.Collections.Generic.List[object]]::new()
+      while (-not $run.HasExited) {
+        $resourceSamples.Add((Get-RequiredCounterSample))
+        Start-Sleep -Seconds 2
+        $run.Refresh()
+      }
+      $exitCode = $run.ExitCode
       $finished = [DateTime]::UtcNow
       $after = Get-RequiredCounterSample
+      if ($exitCode -eq 0 -and @($resourceSamples | Where-Object { $_.dockerContainerCount -gt 0 }).Count -eq 0) {
+        throw "Benchmark run emitted no active Docker container telemetry: repetition=$repetition workers=$workerCount project=$project"
+      }
       $runs.Add([pscustomobject][ordered]@{
         repetition = $repetition
         workers = $workerCount
@@ -134,7 +156,7 @@ try {
         exitCode = $exitCode
         telemetryBefore = $before
         telemetryAfter = $after
-        dockerStatsAfter = @(Get-DockerStats)
+        resourceSamples = @($resourceSamples)
         summary = Get-SummaryMetrics (Join-Path $artifactDir 'summary.json')
       })
       if ($exitCode -ne 0) { throw "Benchmark run failed: repetition=$repetition workers=$workerCount project=$project exit=$exitCode" }

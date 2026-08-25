@@ -11,9 +11,17 @@ test('worker benchmark is measurement-only, repeatable and uses non-null telemet
   assert.match(script, /ValidateSet\(1, 2, 4, 6, 8\)/);
   assert.match(script, /ValidateRange\(3, 5\)/);
   assert.match(script, /Get-Counter/);
+  assert.match(script, /Get-CimInstance Win32_OperatingSystem/);
   assert.match(script, /docker stats --no-stream --format/);
   assert.match(script, /docker version --format/);
   assert.match(script, /Get-ComputerInfo/);
+  assert.match(script, /memoryPressurePercent/);
+  assert.match(script, /dockerBlockIo/);
+  assert.match(script, /dockerContainerCount/);
+  assert.match(script, /Start-Process/);
+  assert.match(script, /resourceSamples/);
+  assert.doesNotMatch(script, /PhysicalDisk\(_Total\)/);
+  assert.doesNotMatch(script, /\$values\['\\\\Processor Information/);
   assert.match(script, /ATLAS_E2E_WORKERS/);
   assert.match(script, /-SelfTest/);
   assert.doesNotMatch(script, /LoadPercentage/);
