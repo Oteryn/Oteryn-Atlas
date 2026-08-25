@@ -1,10 +1,10 @@
 [CmdletBinding()]
 param(
-  [ValidateSet('Benchmark', 'SelfTest')][string]$Mode = 'Benchmark',
   [string]$PublicationOrigin,
   [ValidateSet(1, 2, 4, 6, 8)][int[]]$Workers = @(1, 2, 4, 6, 8),
   [ValidateRange(3, 5)][int]$Repetitions = 3,
-  [string]$OutputPath
+  [string]$OutputPath,
+  [switch]$SelfTest
 )
 
 $ErrorActionPreference = 'Stop'
@@ -49,7 +49,8 @@ function Get-EnvironmentFingerprint {
   $docker = docker version --format '{{json .Server}}'
   if ($LASTEXITCODE -ne 0 -or -not $docker) { throw 'docker version failed.' }
   $drive = Get-PSDrive -Name C -ErrorAction Stop
-  $runner = Get-Process Runner.Listener -ErrorAction SilentlyContinue | Select-Object -First 1 Id, Path, StartTime
+  $runner = Get-Process Runner.Listener -ErrorAction SilentlyContinue |
+    Select-Object -First 1 | Select-Object Id, Path, StartTime
   return [pscustomobject][ordered]@{
     atlasRevision = (git rev-parse HEAD).Trim()
     capturedAtUtc = [DateTime]::UtcNow.ToString('o')
@@ -94,7 +95,7 @@ if (-not $OutputPath) {
 New-Item -ItemType Directory -Force -Path (Split-Path -LiteralPath $OutputPath -Parent) | Out-Null
 
 $fingerprint = Get-EnvironmentFingerprint
-if ($Mode -eq 'SelfTest') {
+if ($SelfTest) {
   if ($Workers.Count -ne @($Workers | Select-Object -Unique).Count) { throw 'Worker candidates must be unique.' }
   $probe = Get-RequiredCounterSample
   if ($null -eq $probe.processorUtilityPercent -or $null -eq $probe.memoryPressurePercent -or $null -eq $probe.dockerBlockIo) {
@@ -106,7 +107,7 @@ if ($Mode -eq 'SelfTest') {
   exit 0
 }
 
-if (-not $PublicationOrigin) { throw 'PublicationOrigin is required unless -Mode SelfTest is used.' }
+if (-not $PublicationOrigin) { throw 'PublicationOrigin is required unless -SelfTest is used.' }
 if ($PublicationOrigin -notmatch '^https?://[A-Za-z0-9.-]+(:[0-9]{1,5})?$') {
   throw 'PublicationOrigin must be a plain http(s) origin without a path, query or credentials.'
 }
