@@ -92,7 +92,9 @@ if (-not $OutputPath) {
   $stamp = [DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss')
   $OutputPath = Join-Path $root "artifacts\e2e\worker-benchmark-$stamp.json"
 }
-New-Item -ItemType Directory -Force -Path (Split-Path -LiteralPath $OutputPath -Parent) | Out-Null
+$outputDirectory = [IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($OutputPath))
+if ([string]::IsNullOrWhiteSpace($outputDirectory)) { throw 'Benchmark output path must have a parent directory.' }
+New-Item -ItemType Directory -Force -Path $outputDirectory | Out-Null
 
 $fingerprint = Get-EnvironmentFingerprint
 if ($SelfTest) {

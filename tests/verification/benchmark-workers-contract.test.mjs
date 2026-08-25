@@ -23,7 +23,8 @@ test('worker benchmark is measurement-only, repeatable and uses non-null telemet
   assert.match(script, /resourceSamples/);
   assert.match(script, /Select-Object -First 1 \| Select-Object Id, Path, StartTime/);
   assert.doesNotMatch(script, /Select-Object -First 1 Id, Path, StartTime/);
-  assert.match(script, /New-Item -ItemType Directory -Force -Path \(Split-Path -LiteralPath \$OutputPath -Parent\)/);
+  assert.match(script, /\[IO\.Path\]::GetDirectoryName\(\[IO\.Path\]::GetFullPath\(\$OutputPath\)\)/);
+  assert.doesNotMatch(script, /Split-Path -LiteralPath \$OutputPath -Parent/);
   assert.doesNotMatch(script, /PhysicalDisk\(_Total\)/);
   assert.doesNotMatch(script, /\$values\['\\\\Processor Information/);
   assert.match(script, /ATLAS_E2E_WORKERS/);
