@@ -10,9 +10,14 @@ const overlayWorkflow = await readFile(new URL('../.github/workflows/creature-ov
 
 test('creature runtime consumes canonical FullWorld LOD inputs without replacing the view seam', () => {
   assert.match(appSource, /__OTERYN_ATLAS_VIEW__ = snapshot/);
-  assert.match(appSource, /detail: \{ view: snapshot, detailReady, detailStreaming \}/);
-  assert.match(creatureSource, /detailReady/);
-  assert.match(controllerSource, /resolveCreatureEffectivePresentation/);
+  assert.match(appSource, /__OTERYN_ATLAS_EFFECTIVE_PRESENTATION__/);
+  assert.match(appSource, /lodBlend\(view\.zoom, view\.mode, detailReady\)/);
+  assert.match(appSource, /detail: \{ view: snapshot, effectivePresentation, detailReady, detailStreaming \}/);
+  assert.equal((appSource.match(/detailReady = false;\s*publishView\(\);/g) ?? []).length, 2);
+  assert.match(creatureSource, /__OTERYN_ATLAS_EFFECTIVE_PRESENTATION__/);
+  assert.match(creatureSource, /effectivePresentation/);
+  assert.match(controllerSource, /effectivePresentation = null/);
+  assert.match(controllerSource, /resolveCreatureEffectivePresentation\(\{ view, effectivePresentation, detailReady \}\)/);
 });
 
 test('creature presentation uses a separate pointer-transparent controller canvas and versioned styles', () => {

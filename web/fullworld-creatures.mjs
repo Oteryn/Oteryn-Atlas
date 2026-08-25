@@ -31,6 +31,7 @@ const state = {
   index: null,
   view: null,
   detailReady: false,
+  effectivePresentation: null,
   enabled: { npc: requested.has('npc'), monster: requested.has('monster') },
   npcRole: requestedNpcRole,
   availableNpcRoles: ['all'],
@@ -509,17 +510,21 @@ function syncNpcRoleControl() {
   persist();
 }
 
-function applyView(nextView, detailReady = state.detailReady) {
+function applyView(nextView, detailReady = state.detailReady, effectivePresentation = null) {
   requireValue(nextView && typeof nextView === 'object', 'invalid FullWorld view snapshot');
   state.view = nextView;
   state.animationOn = nextView.animation === 'on';
   if (typeof detailReady === 'boolean') state.detailReady = detailReady;
+  state.effectivePresentation = effectivePresentation && typeof effectivePresentation === 'object'
+    ? effectivePresentation
+    : null;
 }
 
 function consumePublishedView() {
   const snapshot = globalThis.__OTERYN_ATLAS_VIEW__;
   if (!snapshot || typeof snapshot !== 'object') return false;
-  applyView(snapshot);
+  const effectivePresentation = globalThis.__OTERYN_ATLAS_EFFECTIVE_PRESENTATION__;
+  applyView(snapshot, effectivePresentation?.detailReady, effectivePresentation);
   return true;
 }
 
@@ -533,7 +538,7 @@ async function waitForInitialView(timeoutMs = 30_000) {
     };
     const onView = (event) => {
       if (!event.detail?.view) return;
-      applyView(event.detail.view, event.detail.detailReady);
+      applyView(event.detail.view, event.detail.detailReady, event.detail.effectivePresentation ?? null);
       cleanup();
       resolve();
     };
@@ -638,7 +643,7 @@ function setup() {
     if (!event.detail?.view) return;
     const floorChanged = state.view && event.detail.view.floor !== state.view.floor;
     invalidateInteraction({ closeCard: Boolean(floorChanged) });
-    applyView(event.detail.view, event.detail.detailReady);
+    applyView(event.detail.view, event.detail.detailReady, event.detail.effectivePresentation ?? null);
     persist();
     repaintPreparedForCurrentState();
     refresh().catch(fail);
@@ -735,6 +740,7 @@ function presentationDiagnostics(baseView) {
   return state.presentation.commit({
     view: presentationView(baseView),
     detailReady: state.detailReady,
+    effectivePresentation: state.effectivePresentation,
     targets: [...state.interactionTargets.values()],
     records: state.interactionRecords,
     selectedId: state.selectedId,

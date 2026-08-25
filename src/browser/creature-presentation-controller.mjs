@@ -333,6 +333,7 @@ export function createCreaturePresentationController({ frame } = {}) {
   function commit({
     view,
     detailReady = false,
+    effectivePresentation = null,
     targets = [],
     records = new Map(),
     selectedId = null,
@@ -354,7 +355,7 @@ export function createCreaturePresentationController({ frame } = {}) {
     }
     const context = presentationCanvas.getContext('2d');
     requireValue(context, 'creature presentation 2d context unavailable');
-    const effectivePresentation = resolveCreatureEffectivePresentation({ view, detailReady });
+    const resolvedEffectivePresentation = resolveCreatureEffectivePresentation({ view, effectivePresentation, detailReady });
     const reserved = reservedRects(frame);
     const entries = targets.map((target) => {
       const record = records.get(target.recordId);
@@ -363,13 +364,13 @@ export function createCreaturePresentationController({ frame } = {}) {
     });
 
     const resolvedEntries = resolveLayoutEntries({
-      entries, view, effectivePresentation, selectedId, hoveredId, activeFilter,
+      entries, view, effectivePresentation: resolvedEffectivePresentation, selectedId, hoveredId, activeFilter,
     });
     const nextKey = makeLayoutKey({
       entries: resolvedEntries,
       view,
       viewport,
-      effectivePresentation,
+      effectivePresentation: resolvedEffectivePresentation,
       selectedId,
       hoveredId,
       activeFilter,
@@ -454,8 +455,8 @@ export function createCreaturePresentationController({ frame } = {}) {
       drawnNpcBadges,
       drawnNpcIcons,
       effectivePresentation: Object.freeze({
-        requestedMode: effectivePresentation.requestedMode,
-        representation: effectivePresentation.representation,
+        requestedMode: resolvedEffectivePresentation.requestedMode,
+        representation: resolvedEffectivePresentation.representation,
         lod: tiers.size ? [...tiers].sort().join('+') : 'empty',
       }),
       labelLayoutGeneration: layoutGeneration,
