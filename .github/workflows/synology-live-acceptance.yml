@@ -169,8 +169,8 @@ jobs:
           assert index['source']['capability']=='animated-creatures-v1'
           assert index['source']['npc_role_schema_version']==1
           assert index['counts']=={'records':88633,'chunks':5746,'search_records':1945}
-          assert animation['rootContentId']=='sha256:413de22b245288da68153e2c0e9d4efe4ee011421b56a09532c8119829079540'
-          assert animation['counts']['object_programs']==5190 and animation['counts']['creature_programs']==1377 and animation['counts']['buckets']==43
+          assert animation['rootContentId']=='sha256:a9a082b49f18cdd43f1b147a3e6df1b452e596de4c580f90b6a5b725111f1d00'
+          assert animation['counts']['object_programs']==5190 and animation['counts']['creature_programs']==1377 and animation['counts']['creature_walking_programs']==1376 and animation['counts']['creature_walking_fallbacks']==1 and animation['counts']['creature_geometry_union_envelopes']==20 and animation['counts']['buckets']==60
           search=json.loads(Path('creature-index-a/search.json').read_text())['records']
           by_id={r['record_id']:r for r in search}
           role_counts={role:sum(role in r.get('roles',[]) for r in creatures['npcs']) for role in ('bank','travel','shop','quest','blessing','trainer')}
