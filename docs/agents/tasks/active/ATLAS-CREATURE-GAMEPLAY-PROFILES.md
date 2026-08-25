@@ -4,9 +4,10 @@
 issue: 165
 repository: Oteryn/Oteryn-Atlas
 base_branch: main
-base_sha: f4826c0abd0a07a2539f7b7027bd779c453f431a
+base_sha: ee7c8a53e6b5ac46c7620065bcf5e03694e24c5b
 branch: feat/creature-gameplay-profiles-165
-status: implementing
+pr: 170
+status: verifying
 programme: ATLAS-CREATURE-GAMEPLAY-PROFILES
 game_issue: Oteryn/Oteryn-Game#136
 game_pr: Oteryn/Oteryn-Game#138
@@ -31,13 +32,21 @@ Pure consumer/state/model and publication paths are owned here. Shared runtime w
 
 ## Acceptance
 
-- [ ] Exact merged Game SHA/digest are pinned and committed publication bytes rebuild exactly.
-- [ ] Consumer rejects malformed/mixed/corrupt/unbounded products and lazily fetches one entity shard with bounded LRU cache.
-- [ ] `inspector=gameplay|semantic|live` is durable; gameplay default; unavailable live falls back to gameplay.
-- [ ] NPC Sells/Buys/Services/Travel and monster Loot/Stats/Resistances/Spawns distinguish COMPLETE from non-complete absence.
-- [ ] Quick card remains immediate and gains only bounded proven profile summaries.
-- [ ] Existing Semantic facts remain available.
+- [x] Exact merged Game SHA/digest are pinned and committed publication bytes rebuild exactly.
+- [x] Consumer rejects malformed/mixed/corrupt/unbounded products and lazily fetches one entity shard with bounded LRU cache.
+- [x] `inspector=gameplay|semantic|live` is durable; gameplay default; unavailable live falls back to gameplay.
+- [x] NPC Sells/Buys/Services/Travel and monster Loot/Stats/Resistances/Spawns distinguish COMPLETE from non-complete absence.
+- [x] Quick card remains immediate and gains only bounded proven profile summaries.
+- [x] Existing Semantic facts remain available.
 - [ ] Desktop/mobile direct creature E2E, visual review, exact-head Molehill gate, CI/provenance/security, merged-main Synology live gameplay acceptance all pass.
+
+## Verification checkpoint
+
+- Rebased cleanly onto main@ee7c8a53e6b5ac46c7620065bcf5e03694e24c5b.
+- Exact Game publication: 1049 NPC / 1800 monster profiles / 508 shards / sha256:7ac7c08949aa498cb843ca26e3417e537b3409d89e4f265861f3f94855b96d28.
+- CI-equivalent deterministic Node matrix after rebase: 302/302 PASS, 0 fail, 0 skip.
+- Required Playwright census is now 70 (64 merged-main + 6 gameplay journeys).
+- Molehill browser qualification pending serialized machine lock.
 
 ## Excluded
 
