@@ -43,7 +43,7 @@ test('atlas-gate requires exact-head local Docker browser evidence', () => {
 
   assert.match(browserJob, /github\.event_name == 'pull_request'/);
   assert.match(browserJob, /github\.event\.pull_request\.head\.repo\.full_name == github\.repository/);
-  assert.match(browserJob, /needs: verification-node/);
+  assert.match(browserJob, /- verification-node/);
   assert.match(browserJob, /runs-on: ubuntu-24\.04/);
   assert.match(browserJob, /statuses: read/);
   assert.match(browserJob, /ATLAS_CODE_REVISION: \$\{\{ github\.event\.pull_request\.head\.sha \}\}/);
@@ -69,7 +69,7 @@ test('local Docker status publisher only accepts exact clean all-pass evidence',
   assert.match(publisher, /git status --porcelain/);
   assert.match(publisher, /git ls-remote --heads origin/);
   assert.match(publisher, /metadata\.expectedRevision/);
-  assert.match(publisher, /^\$ExpectedScenarioCount = 58$/m);
+  assert.match(publisher, /^\$ExpectedScenarioCount = 60$/m);
   assert.match(publisher, /targetMode -ne 'checkout-overlay'/);
   assert.match(publisher, /metadata\.workers -ne 1/);
   assert.match(playwrightConfig, /metadata:\s*\{[\s\S]*workers,/);
@@ -83,7 +83,9 @@ test('local Docker status publisher only accepts exact clean all-pass evidence',
 
 test('required workflows verify the exact pull-request head rather than a synthetic merge ref', () => {
   const checkoutCount = (ci.match(/uses: actions\/checkout@/g) ?? []).length;
-  const exactHeadCount = (ci.match(/ref: \${{ github\.event\.pull_request\.head\.sha \|\| github\.sha }}/g) ?? []).length;
+  const generalExactHeadCount = (ci.match(/ref: \${{ github\.event\.pull_request\.head\.sha \|\| github\.sha }}/g) ?? []).length;
+  const prOnlyExactHeadCount = (ci.match(/ref: \${{ github\.event\.pull_request\.head\.sha }}/g) ?? []).length;
+  const exactHeadCount = generalExactHeadCount + prOnlyExactHeadCount;
   assert.equal(exactHeadCount, checkoutCount);
 
   const candidate = block(provenance, '      - name: Check out exact Atlas candidate\n', '      - name: Check out pinned legacy Atlas source as inert Git data\n');
@@ -137,7 +139,7 @@ test('heavy browser verification is pinned to Molehill while Synology remains li
   assert.match(agents, /Molehill-PC/);
   assert.match(agents, /heavy.*browser/i);
   assert.match(agents, /Synology.*live acceptance/i);
-  assert.match(agents, /must not.*58-scenario/i);
+  assert.match(agents, /must not.*60-scenario/i);
 });
 
 test('nightly Molehill identity avoids pre-scheduling runner context expressions', () => {
@@ -183,5 +185,29 @@ test('Molehill local heavy qualification is machine-serialized to prevent public
   assert.match(localRunPs1, /Start-Sleep/);
   assert.match(localRunPs1, /Dispose\(\)/);
   assert.match(agents, /serializ/i);
-  assert.match(agents, /concurrent.*58-scenario|58-scenario.*concurrent/i);
+  assert.match(agents, /concurrent.*60-scenario|60-scenario.*concurrent/i);
+});
+
+test('docs-only PR classification skips heavy browser proof only when proven safe', () => {
+  const classifierJob = block(ci, '  change-classification:\n', '  verification-browser:\n');
+  const browserJob = block(ci, '  verification-browser:\n', '  atlas-gate:\n');
+  const gate = ci.slice(ci.indexOf('  atlas-gate:\n'));
+
+  assert.match(classifierJob, /github\.event_name == 'pull_request'/);
+  assert.match(classifierJob, /pull-requests: read/);
+  assert.match(classifierJob, /github\.event\.pull_request\.head\.sha/);
+  assert.match(classifierJob, /gh api --paginate/);
+  assert.match(classifierJob, /classify-pr-changes\.mjs/);
+  assert.match(classifierJob, /docs_only:.*steps\.classify\.outputs\.docs_only/);
+  assert.match(classifierJob, /requires_e2e:.*steps\.classify\.outputs\.requires_e2e/);
+
+  assert.match(browserJob, /needs:\s*\n\s*- verification-node\s*\n\s*- change-classification/);
+  assert.match(browserJob, /needs\.change-classification\.outputs\.requires_e2e == 'true'/);
+
+  assert.match(gate, /- change-classification/);
+  assert.match(gate, /CHANGE_CLASSIFICATION:.*needs\.change-classification\.result/);
+  assert.match(gate, /DOCS_ONLY:.*needs\.change-classification\.outputs\.docs_only/);
+  assert.match(gate, /REQUIRES_E2E:.*needs\.change-classification\.outputs\.requires_e2e/);
+  assert.match(gate, /false:true[\s\S]*VERIFICATION_BROWSER[\s\S]*skipped/);
+  assert.match(gate, /true:false[\s\S]*VERIFICATION_BROWSER[\s\S]*success/);
 });
