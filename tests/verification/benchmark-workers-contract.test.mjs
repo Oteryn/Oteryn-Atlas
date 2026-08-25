@@ -8,6 +8,8 @@ test('worker benchmark is measurement-only, repeatable and uses non-null telemet
   assert.equal(fs.existsSync(scriptPath), true, 'missing worker benchmark harness');
   const script = fs.readFileSync(scriptPath, 'utf8').replace(/\r\n/g, '\n');
 
+  assert.match(script, /\[CmdletBinding\(DefaultParameterSetName = 'Benchmark'\)\]/);
+  assert.match(script, /ParameterSetName = 'SelfTest'/);
   assert.match(script, /ValidateSet\(1, 2, 4, 6, 8\)/);
   assert.match(script, /ValidateRange\(3, 5\)/);
   assert.match(script, /Get-Counter/);

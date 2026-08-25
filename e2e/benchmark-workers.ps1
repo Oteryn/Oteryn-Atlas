@@ -1,10 +1,12 @@
-[CmdletBinding()]
+[CmdletBinding(DefaultParameterSetName = 'Benchmark')]
 param(
-  [string]$PublicationOrigin,
+  [Parameter(Mandatory = $true, ParameterSetName = 'Benchmark')][string]$PublicationOrigin,
+  [Parameter(ParameterSetName = 'Benchmark')][Parameter(ParameterSetName = 'SelfTest')]
   [ValidateSet(1, 2, 4, 6, 8)][int[]]$Workers = @(1, 2, 4, 6, 8),
+  [Parameter(ParameterSetName = 'Benchmark')][Parameter(ParameterSetName = 'SelfTest')]
   [ValidateRange(3, 5)][int]$Repetitions = 3,
-  [string]$OutputPath,
-  [switch]$SelfTest
+  [Parameter(ParameterSetName = 'Benchmark')][Parameter(ParameterSetName = 'SelfTest')][string]$OutputPath,
+  [Parameter(Mandatory = $true, ParameterSetName = 'SelfTest')][switch]$SelfTest
 )
 
 $ErrorActionPreference = 'Stop'
