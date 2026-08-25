@@ -25,6 +25,17 @@ function beginMainFrameNavigationRuntime(page, currentRuntime) {
   });
 }
 
+async function waitForControlsDrawerSettled(page) {
+  await page.waitForFunction(() => {
+    const panel = document.querySelector('#mobile-controls-panel');
+    if (!panel) return false;
+    const rect = panel.getBoundingClientRect();
+    return Math.abs(rect.left) <= 1
+      && rect.right <= innerWidth + 1
+      && rect.top >= -1
+      && rect.bottom <= innerHeight + 1;
+  }, null, { timeout: 5_000 });
+}
 async function attachMobileEvidence(page, testInfo, browserName, extra = {}) {
   await testInfo.attach('cross-browser-mobile-evidence', {
     body: Buffer.from(JSON.stringify({
@@ -67,6 +78,7 @@ test('secondary mobile-like engine supports touch drawers, search and inspector 
   await expect(controls).toHaveAttribute('aria-expanded', 'true');
   const controlsClose = page.getByRole('button', { name: 'Close Atlas controls' });
   await expect(controlsClose).toBeFocused();
+  await waitForControlsDrawerSettled(page);
   const floorSelect = page.getByRole('combobox', { name: 'Exported floor' });
   const mobileSearch = page.locator('#mobile-search-input');
   await expect(mobileSearch).toBeVisible();
@@ -156,6 +168,7 @@ test('secondary mobile-like engine supports touch drawers, search and inspector 
   await controls.tap();
   await expect(controls).toHaveAttribute('aria-expanded', 'true');
   await expect(controlsClose).toBeFocused();
+  await waitForControlsDrawerSettled(page);
   await floorSelect.scrollIntoViewIfNeeded();
   await expect(floorSelect).toBeVisible();
   await mobileSearch.scrollIntoViewIfNeeded();
