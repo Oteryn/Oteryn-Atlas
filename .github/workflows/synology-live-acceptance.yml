@@ -103,6 +103,7 @@ jobs:
           docker run --rm --user 0:0 --entrypoint sh -e STAGE_NAME="$STAGE_NAME" -v "$REVISION_ROOT:/revisions" "$IMAGE" -c 'rm -rf "/revisions/$STAGE_NAME"; mkdir -p "/revisions/$STAGE_NAME/repo"'
           tar --exclude=.git -cf - . | docker run --rm -i --user 0:0 --entrypoint sh -v "$NEW_ROOT/repo:/repo" "$IMAGE" -c 'tar -xf - -C /repo'
           docker run --rm --user 0:0 --entrypoint sh -v "$OLD_NGINX:/old:ro" -v "$NEW_ROOT:/new" -e OLD_REV="$OLD_REV" -e NEW_REV="$ATLAS_REV" "$IMAGE" -c 'sed "s/$OLD_REV/$NEW_REV/g" /old > /new/nginx.conf; test -s /new/nginx.conf'
+          docker run --rm --user 0:0 --entrypoint sh -v "$NEW_ROOT:/new" "$IMAGE" -c "if ! grep -Eq '^[[:space:]]*absolute_redirect[[:space:]]+off[[:space:]]*;' /new/nginx.conf; then sed -i '/server_name _;/a\    absolute_redirect off;' /new/nginx.conf; fi; grep -Eq '^[[:space:]]*absolute_redirect[[:space:]]+off[[:space:]]*;' /new/nginx.conf"
           echo 'exact-main-candidate-staged=PASS'
 
       - name: Build exact animated Game and Atlas products
@@ -245,6 +246,8 @@ jobs:
           for _ in $(seq 1 30); do curl -fsS -D /tmp/candidate.headers http://192.168.1.2:18098/web/fullworld.html -o /tmp/candidate.html && break; sleep 1; done
           grep -qi "X-Oteryn-Atlas-Revision: $ATLAS_REV" /tmp/candidate.headers
           cmp web/fullworld.html /tmp/candidate.html
+          curl -fsS -D /tmp/candidate-root.headers -o /dev/null http://192.168.1.2:18098/
+          grep -qi '^Location: /web/fullworld.html' /tmp/candidate-root.headers
           curl -fsS http://192.168.1.2:18098/data/creatures/index.json -o /tmp/candidate-creatures.json
           curl -fsS http://192.168.1.2:18098/fullworld/animation/manifest.json -o /tmp/candidate-animation.json
           curl -fsS http://192.168.1.2:18098/fullworld/animation/programs.json -o /tmp/candidate-programs.json
@@ -287,6 +290,8 @@ jobs:
           for _ in $(seq 1 30); do curl -fsS -D /tmp/live-new.headers "$PREVIEW_URL/web/fullworld.html" -o /tmp/live-new.html && break; sleep 1; done
           grep -qi "X-Oteryn-Atlas-Revision: $ATLAS_REV" /tmp/live-new.headers
           cmp web/fullworld.html /tmp/live-new.html
+          curl -fsS -D /tmp/live-root.headers -o /dev/null "$PREVIEW_URL/"
+          grep -qi '^Location: /web/fullworld.html' /tmp/live-root.headers
           test "$(docker inspect --format '{{ index .Config.Labels "org.oteryn.revision" }}' "$C")" = "$ATLAS_REV"
           curl -fsS "$PREVIEW_URL/data/creatures/index.json" -o /tmp/live-creatures.json
           curl -fsS "$PREVIEW_URL/fullworld/animation/manifest.json" -o /tmp/live-animation.json
