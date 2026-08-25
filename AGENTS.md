@@ -21,6 +21,18 @@ Before editing locally, verify remote URL, branch/worktree identity, HEAD and wo
 
 Local-only work receives no completion credit until the durable result exists on the approved GitHub branch/PR. If GitHub is genuinely unavailable, continue safe read-only analysis/patch preparation but do not start new product mutations merely to bypass the control plane unless the owner explicitly authorizes an emergency exception.
 
+## Parallel-agent Git concurrency
+
+The organization baseline is META ADR 0004 plus the central agent execution/continuation contract. Atlas keeps the bootstrap-critical minimum here because repository instructions do not inherit across repositories.
+
+- For substantial mutating work, keep `admission_main_sha`, `task_head_sha` and `integration_main_sha` distinct. `admission_main_sha` is immutable task provenance; `task_head_sha` is the current task-branch head; `integration_main_sha` is the protected `main` selected at final integration.
+- One active mutating worker owns one canonical task branch and one writable worktree. Do not share a writable branch/worktree between active agents.
+- If protected `main` advances after admission, classify it as `UPSTREAM_ADVANCED`; that movement alone does not invalidate implementation and is not a reason to restart, reset, recreate, rebase, force-push or discard still-applicable work.
+- If the upstream delta changes an applicable instruction, safety/security/provenance rule, architecture authority, compatibility contract or invariant, reload and reconcile that governing authority before further mutation while preserving unaffected work.
+- Preserve published task history by default. When entering final integration, refresh to current `integration_main_sha` with a normal non-force merge-up, resolve only authorized conflicts, review the resulting diff and rerun every validation/review layer invalidated by the new `task_head_sha`.
+- A lost merge race returns the task to integration/reconciliation, not to implementation from scratch.
+- Invalidate affected work only when verified task cancellation/supersession/rescope, incompatible governing authority, semantic contract/API/schema/invariant conflict, an unresolvable authorized reconciliation, or required tests prove prior assumptions no longer hold. Textual overlap or a changed filename alone is not sufficient proof.
+
 ## Work boundary
 
 - Use a GitHub Issue as lifecycle authority for substantial work.
@@ -50,10 +62,10 @@ Before editing, inspect the current default-branch head, this file, the active I
 
 - GitHub-hosted CI owns deterministic Node/contract/property checks, provenance, security/CodeQL, lightweight browser/WebGL verification and `atlas-gate` fan-in; it does not replace the heavy physical browser qualification.
 - Molehill-PC (`oteryn-molehill-atlas`, custom label `oteryn-atlas-pc`) owns heavy exact-head browser verification: the full Docker Playwright PR gate and scheduled/manual browser-depth work including repeated geometry/render probes, replayable stress, extra viewport/DPR profiles and stable performance/visual/accessibility/race/soak depth.
-- Heavy Molehill qualification must be serialized through `e2e/run.ps1`; never launch concurrent 70-scenario local gates or competing full browser-depth runs against the same publication origin. The wrapper holds a machine-wide exclusive lock so agents wait instead of overloading the publication path.
+- Heavy Molehill qualification must be serialized through `e2e/run.ps1`; never launch concurrent 77-scenario local gates or competing full browser-depth runs against the same publication origin. The wrapper holds a machine-wide exclusive lock so agents wait instead of overloading the publication path.
 - A pull request may skip heavy Molehill qualification only when the repository CI change classifier proves every current/previous changed path is safe lowercase-Markdown under `docs/**`. Mixed, empty, malformed, non-Markdown, root-doc, workflow, test, runtime, package, data or unknown changes fail closed to requiring exact-head `atlas-local-e2e`.
 - Synology (`oteryn-synology-atlas`, custom label `oteryn-atlas`) owns trusted merged-main deployment and live acceptance only: exact revision/container/header identity, publication/product checks, bounded desktop/mobile real-browser smoke, cutover and rollback proof.
-- Synology must not run the 70-scenario full PR matrix, broad stress matrices, soak, performance depth or visual-regression depth as a substitute for Molehill-PC capacity.
+- Synology must not run the 77-scenario full PR matrix, broad stress matrices, soak, performance depth or visual-regression depth as a substitute for Molehill-PC capacity.
 - Nightly browser depth is additive to the exact-head PR gate and must not duplicate the generic full required matrix that already produced `atlas-local-e2e=success`.
 - If Molehill-PC is unavailable, the corresponding heavy browser proof remains blocked. Do not move that workload to Synology, reuse stale evidence, weaken timeouts/retries/tolerances or publish a copied `atlas-local-e2e` status.
 - Molehill GitHub Actions steps must use the Windows PowerShell shell actually installed on the runner (powershell), not assume PowerShell 7 (pwsh).

@@ -260,7 +260,7 @@ async function runDesktop(browser) {
   const initial = await waitReady(page);
   assert.ok(initial.visibleRecords > 0);
   assert.equal(initial.npcRole, 'shop');
-  assert.equal(initial.npcMarkerStyle, 'functional-icons-v1');
+  assert.equal(initial.npcMarkerStyle, 'functional-icons-v2');
   assert.ok(initial.drawnNpcIcons > 0);
   await assertVisibleCreatureOverlay(page);
   const roleFilter = page.locator('#npc-role-filter');
