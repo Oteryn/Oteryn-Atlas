@@ -63,3 +63,10 @@ test('slot-pool self-test cannot contend with production heavy E2E locks', () =>
   assert.match(selfTest, /-LockPath/);
   assert.match(selfTest, /-SlotPrefix/);
 });
+
+test('benchmark fences legacy runners before timed slot groups', () => {
+  const benchmark = fs.readFileSync('e2e/benchmark-heavy-slots.ps1', 'utf8');
+  assert.match(benchmark, /heavy-slot-pool\.ps1/);
+  assert.match(benchmark, /benchmarkFence\s*=\s*Acquire-AtlasLegacyFence/);
+  assert.match(benchmark, /benchmarkFence\.Stream\.Dispose/);
+});

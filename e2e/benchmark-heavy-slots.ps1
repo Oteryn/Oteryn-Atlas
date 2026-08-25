@@ -10,6 +10,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 Set-Location $root
+. (Join-Path $PSScriptRoot 'heavy-slot-pool.ps1')
 $revision = (git rev-parse HEAD).Trim()
 if (-not $OutputPath) { $OutputPath = Join-Path $root "artifacts\e2e\$Prefix\benchmark.json" }
 $benchmarkDir = Split-Path $OutputPath -Parent
@@ -44,6 +45,9 @@ if ($SelfTest) {
   Write-Output "benchmark-heavy-slots-self-test=PASS samples=$($samples.Count)"
   exit 0
 }
+
+$benchmarkFence = Acquire-AtlasLegacyFence -TimeoutSeconds 21600 -Project $Prefix -Revision $revision
+Write-Output "benchmark legacy fence acquired: $($benchmarkFence.Path)"
 
 $cpuInfo = Get-CimInstance Win32_Processor | Select-Object -First 1
 $osInfo = Get-CimInstance Win32_OperatingSystem
@@ -153,4 +157,6 @@ $result = [ordered]@{
 $json = $result | ConvertTo-Json -Depth 10
 [IO.File]::WriteAllText($OutputPath, $json + [Environment]::NewLine, (New-Object Text.UTF8Encoding($false)))
 Write-Output "benchmark-evidence=$OutputPath"
-if (@($groups | Where-Object { $_.status -ne 'passed' }).Count -gt 0) { exit 2 }
+$benchmarkFailed = @($groups | Where-Object { $_.status -ne 'passed' }).Count -gt 0
+if ($benchmarkFence -and $benchmarkFence.Stream) { $benchmarkFence.Stream.Dispose() }
+if ($benchmarkFailed) { exit 2 }
