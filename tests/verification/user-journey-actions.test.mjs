@@ -59,6 +59,6 @@ if (fs.existsSync(modulePath)) {
 test('local E2E status publisher accounts for all four new user-journey scenarios', () => {
   const publisher = fs.readFileSync('e2e/publish-local-e2e-status.ps1', 'utf8');
   const readme = fs.readFileSync('e2e/README.md', 'utf8');
-  assert.match(publisher, /\$ExpectedScenarioCount = 71\b/);
-  assert.match(readme, /71-scenario exact-head PR gate/);
+  assert.match(publisher, /\$ExpectedScenarioCount = 73\b/);
+  assert.match(readme, /73-scenario exact-head PR gate/);
 });
