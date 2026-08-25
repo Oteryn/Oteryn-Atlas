@@ -69,7 +69,7 @@ test('local Docker status publisher only accepts exact clean all-pass evidence',
   assert.match(publisher, /git status --porcelain/);
   assert.match(publisher, /git ls-remote --heads origin/);
   assert.match(publisher, /metadata\.expectedRevision/);
-  assert.match(publisher, /^\$ExpectedScenarioCount = 64$/m);
+  assert.match(publisher, /^\$ExpectedScenarioCount = 71$/m);
   assert.match(publisher, /targetMode -ne 'checkout-overlay'/);
   assert.match(publisher, /metadata\.workers -ne 1/);
   assert.match(playwrightConfig, /metadata:\s*\{[\s\S]*workers,/);
@@ -139,7 +139,7 @@ test('heavy browser verification is pinned to Molehill while Synology remains li
   assert.match(agents, /Molehill-PC/);
   assert.match(agents, /heavy.*browser/i);
   assert.match(agents, /Synology.*live acceptance/i);
-  assert.match(agents, /must not.*64-scenario/i);
+  assert.match(agents, /must not.*71-scenario/i);
 });
 
 test('nightly Molehill identity avoids pre-scheduling runner context expressions', () => {
@@ -185,7 +185,7 @@ test('Molehill local heavy qualification is machine-serialized to prevent public
   assert.match(localRunPs1, /Start-Sleep/);
   assert.match(localRunPs1, /Dispose\(\)/);
   assert.match(agents, /serializ/i);
-  assert.match(agents, /concurrent.*64-scenario|64-scenario.*concurrent/i);
+  assert.match(agents, /concurrent.*71-scenario|71-scenario.*concurrent/i);
 });
 
 test('docs-only PR classification skips heavy browser proof only when proven safe', () => {
@@ -217,7 +217,10 @@ test('classification emits a trusted-base shadow plan without changing legacy ga
 
   assert.match(classifierJob, /shadow_plan_digest:.*steps\.classify\.outputs\.shadow_plan_digest/);
   assert.match(classifierJob, /ATLAS_INTEGRATION_BASE_SHA: \$\{\{ github\.event\.pull_request\.base\.sha \}\}/);
-  assert.match(classifierJob, /git fetch --no-tags --depth=1 origin "\$ATLAS_INTEGRATION_BASE_SHA"/);
+  assert.match(classifierJob, /fetch-depth: 0/);
+  assert.match(classifierJob, /git merge-base "\$ATLAS_CODE_REVISION" "\$ATLAS_INTEGRATION_BASE_SHA"/);
+  assert.match(classifierJob, /git diff --name-status -z --find-renames "\$merge_base_sha" "\$ATLAS_CODE_REVISION"/);
+  assert.match(classifierJob, /GitHub changed-file evidence does not match exact merge-base diff/);
   assert.match(classifierJob, /git cat-file -e "\$ATLAS_INTEGRATION_BASE_SHA:tools\/verification\/impact-manifest\.json"/);
   assert.match(classifierJob, /Initial bootstrap policy has no path exemptions/);
   assert.match(classifierJob, /git show "\$ATLAS_INTEGRATION_BASE_SHA:tools\/verification\/impact-manifest\.json"/);
@@ -225,6 +228,7 @@ test('classification emits a trusted-base shadow plan without changing legacy ga
   assert.match(classifierJob, /--candidate-impact/);
   assert.match(classifierJob, /--trusted-catalog/);
   assert.match(classifierJob, /--candidate-catalog/);
+  assert.match(classifierJob, /--merge-base-sha "\$merge_base_sha"/);
   assert.match(classifierJob, /shadow_plan_digest=/);
   assert.match(classifierJob, /node tools\/verification\/classify-pr-changes\.mjs < "\$paths"/);
 });

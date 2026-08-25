@@ -10,6 +10,7 @@ import {
 } from './verification-plan-schema.mjs';
 
 const FALLBACK_GROUPS = Object.freeze(['deterministic.core', 'e2e.full']);
+const SHADOW_WORKER_POLICY = Object.freeze({ id: 'unmeasured-shadow-v1', version: 1 });
 const GOVERNANCE_PREFIXES = Object.freeze([
   'tools/verification/', '.github/workflows/', 'e2e/summary-reporter.mjs',
   'e2e/publish-local-e2e-status.ps1', 'e2e/run.ps1', 'e2e/playwright.config.mjs',
@@ -169,11 +170,16 @@ export function buildVerificationPlan(input) {
   const visualGroupIds = groups.filter((group) => group.evidence === 'restricted-visual-review').map((group) => group.id);
   const resourceClasses = [...new Set(groups.map((group) => group.resourceClass))].sort();
   const stableTestIds = groups.flatMap((group) => group.stableTestIds).sort();
+  const headSha = sha(input.headSha, 'headSha');
+  const integrationBaseSha = sha(input.integrationBaseSha, 'integrationBaseSha');
+  const mergeBaseSha = sha(input.mergeBaseSha, 'mergeBaseSha');
   return freeze({
     schemaVersion: 1,
     repository: input.repository,
-    headSha: sha(input.headSha, 'headSha'),
-    integrationBaseSha: sha(input.integrationBaseSha, 'integrationBaseSha'),
+    headSha,
+    integrationBaseSha,
+    mergeBaseSha,
+    diffIdentity: digest({ mergeBaseSha, integrationBaseSha, headSha, changedPaths: changedPaths ?? { invalid: true } }),
     changedPaths: changedPaths ?? [],
     changedPathsDigest: digest(changedPaths ?? { invalid: true }),
     impactPolicyDigest: digest({ trustedImpactManifest, candidateImpactManifest }),
@@ -185,7 +191,8 @@ export function buildVerificationPlan(input) {
     stableTestIds,
     requiredVisualGroupIds: visualGroupIds,
     resourceClasses,
-    workerPolicyId: 'unmeasured-shadow-v1',
+    workerPolicyId: SHADOW_WORKER_POLICY.id,
+    workerPolicyDigest: digest(SHADOW_WORKER_POLICY),
     retryPolicy: { retries: 0 },
     requiredEvidence: [...new Set(groups.map((group) => group.evidence))].sort(),
     requiresNativeHardware: resourceClasses.includes('native-gpu'),
@@ -219,7 +226,7 @@ function runCli() {
   const args = parseCliArguments(process.argv.slice(2));
   const required = [
     '--changed-files', '--trusted-impact', '--candidate-impact',
-    '--repository', '--head-sha', '--integration-base-sha',
+    '--repository', '--head-sha', '--integration-base-sha', '--merge-base-sha',
   ];
   const hasCatalog = Object.hasOwn(args, '--catalog')
     || (Object.hasOwn(args, '--trusted-catalog') && Object.hasOwn(args, '--candidate-catalog'));
@@ -230,6 +237,7 @@ function runCli() {
     repository: args['--repository'],
     headSha: args['--head-sha'],
     integrationBaseSha: args['--integration-base-sha'],
+    mergeBaseSha: args['--merge-base-sha'],
     changedFiles: readJson(args['--changed-files'], 'changed files'),
     trustedImpactManifest: readJson(args['--trusted-impact'], 'trusted impact manifest'),
     candidateImpactManifest: readJson(args['--candidate-impact'], 'candidate impact manifest'),

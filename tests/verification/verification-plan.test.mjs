@@ -35,6 +35,7 @@ function build(changedFiles, candidateImpactManifest = trustedImpactManifest) {
     repository: 'Oteryn/Oteryn-Atlas',
     headSha: 'a'.repeat(40),
     integrationBaseSha: 'b'.repeat(40),
+    mergeBaseSha: 'c'.repeat(40),
     changedFiles,
     trustedImpactManifest,
     candidateImpactManifest,
@@ -95,6 +96,7 @@ test('candidate catalog cannot narrow a trusted stable group definition', () => 
     repository: 'Oteryn/Oteryn-Atlas',
     headSha: 'a'.repeat(40),
     integrationBaseSha: 'b'.repeat(40),
+    mergeBaseSha: 'c'.repeat(40),
     changedFiles: [{ path: 'tools/verification/classify-pr-changes.mjs' }],
     trustedImpactManifest,
     candidateImpactManifest: trustedImpactManifest,
@@ -111,6 +113,23 @@ test('planner output is byte-stable for equivalent ordered changed-file evidence
   const first = JSON.stringify(build([{ path: 'src/browser/creature-interaction.mjs' }]));
   const second = JSON.stringify(build([{ path: 'src/browser/creature-interaction.mjs' }]));
   assert.equal(first, second);
+});
+
+test('planner binds merge-base and diff identity to the exact candidate', () => {
+  const plan = buildVerificationPlan({
+    repository: 'Oteryn/Oteryn-Atlas',
+    headSha: 'a'.repeat(40),
+    integrationBaseSha: 'b'.repeat(40),
+    mergeBaseSha: 'c'.repeat(40),
+    changedFiles: [{ path: 'src/browser/creature-interaction.mjs' }],
+    trustedImpactManifest,
+    candidateImpactManifest: trustedImpactManifest,
+    verificationCatalog: catalog,
+  });
+
+  assert.equal(plan.mergeBaseSha, 'c'.repeat(40));
+  assert.match(plan.diffIdentity, /^sha256:[a-f0-9]{64}$/);
+  assert.match(plan.workerPolicyDigest, /^sha256:[a-f0-9]{64}$/);
 });
 
 test('planner CLI emits a canonical shadow plan from explicit trusted and candidate inputs', () => {
@@ -135,6 +154,7 @@ test('planner CLI emits a canonical shadow plan from explicit trusted and candid
     '--repository', 'Oteryn/Oteryn-Atlas',
     '--head-sha', 'a'.repeat(40),
     '--integration-base-sha', 'b'.repeat(40),
+    '--merge-base-sha', 'c'.repeat(40),
   ], { encoding: 'utf8' });
 
   assert.equal(result.status, 0, result.stderr);

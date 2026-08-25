@@ -283,6 +283,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Classify exact PR changed paths
@@ -294,9 +295,10 @@ jobs:
           rows="$(mktemp)"
           paths="$(mktemp)"
           changes="$(mktemp)"
+          git_changes="$(mktemp)"
           trusted_impact="$(mktemp)"
           trusted_catalog="$(mktemp)"
-          trap 'rm -f "$rows" "$paths" "$changes" "$trusted_impact" "$trusted_catalog"' EXIT
+          trap 'rm -f "$rows" "$paths" "$changes" "$git_changes" "$trusted_impact" "$trusted_catalog"' EXIT
           gh api --paginate \
             "repos/$GITHUB_REPOSITORY/pulls/$ATLAS_PR_NUMBER/files?per_page=100" \
             --jq '.[] | [.filename, (.previous_filename // "")] | @tsv' > "$rows"
@@ -309,7 +311,10 @@ jobs:
               printf '%s\n' "$previous_filename" >> "$paths"
             fi
           done < "$rows"
-          git fetch --no-tags --depth=1 origin "$ATLAS_INTEGRATION_BASE_SHA"
+          git fetch --no-tags origin "$ATLAS_INTEGRATION_BASE_SHA"
+          merge_base_sha="$(git merge-base "$ATLAS_CODE_REVISION" "$ATLAS_INTEGRATION_BASE_SHA")"
+          test -n "$merge_base_sha"
+          git diff --name-status -z --find-renames "$merge_base_sha" "$ATLAS_CODE_REVISION" > "$git_changes"
           if git cat-file -e "$ATLAS_INTEGRATION_BASE_SHA:tools/verification/impact-manifest.json" 2>/dev/null && \
              git cat-file -e "$ATLAS_INTEGRATION_BASE_SHA:tools/verification/verification-catalog.json" 2>/dev/null; then
             git show "$ATLAS_INTEGRATION_BASE_SHA:tools/verification/impact-manifest.json" > "$trusted_impact"
@@ -319,15 +324,38 @@ jobs:
             printf '%s\n' '{"schemaVersion":1,"entries":[]}' > "$trusted_impact"
             printf '%s\n' '{"schemaVersion":1,"groups":{"deterministic.core":{"specs":["tests/verification/*.test.mjs"],"projects":[],"resourceClass":"cpu-light","evidence":"machine-summary"},"e2e.full":{"specs":["e2e/tests/*.spec.mjs"],"projects":["desktop-chromium","mobile-chromium"],"resourceClass":"browser-full","evidence":"restricted-visual-review"}}}' > "$trusted_catalog"
           fi
-          node --input-type=module - "$rows" "$changes" <<'NODE'
+          node --input-type=module - "$rows" "$git_changes" "$changes" <<'NODE'
           import fs from 'node:fs';
-          const [rowsPath, changesPath] = process.argv.slice(2);
+          const [rowsPath, gitChangesPath, changesPath] = process.argv.slice(2);
           const rows = fs.readFileSync(rowsPath, 'utf8').split(/\r?\n/).filter(Boolean);
           const changes = rows.map((row) => {
             const fields = row.split('\t');
             if (fields.length !== 2 || !fields[0]) throw new Error('Malformed GitHub changed-file evidence.');
             return fields[1] ? { path: fields[0], previousPath: fields[1] } : { path: fields[0] };
           });
+          const fields = fs.readFileSync(gitChangesPath, 'utf8').split('\0');
+          fields.pop();
+          const gitChanges = [];
+          while (fields.length) {
+            const status = fields.shift();
+            if (!status) throw new Error('Malformed merge-base diff evidence.');
+            if (status.startsWith('R')) {
+              const previousPath = fields.shift();
+              const path = fields.shift();
+              if (!previousPath || !path) throw new Error('Malformed renamed path evidence.');
+              gitChanges.push({ path, previousPath });
+            } else {
+              const path = fields.shift();
+              if (!path) throw new Error('Malformed changed path evidence.');
+              gitChanges.push({ path });
+            }
+          }
+          const canonical = (items) => JSON.stringify(items
+            .map((item) => ({ path: item.path, previousPath: item.previousPath ?? null }))
+            .sort((left, right) => `${left.path}\0${left.previousPath}`.localeCompare(`${right.path}\0${right.previousPath}`)));
+          if (canonical(changes) !== canonical(gitChanges)) {
+            throw new Error('GitHub changed-file evidence does not match exact merge-base diff.');
+          }
           fs.writeFileSync(changesPath, `${JSON.stringify(changes)}\n`);
           NODE
           mkdir -p artifacts/verification
@@ -340,6 +368,7 @@ jobs:
             --repository "$GITHUB_REPOSITORY" \
             --head-sha "$ATLAS_CODE_REVISION" \
             --integration-base-sha "$ATLAS_INTEGRATION_BASE_SHA" \
+            --merge-base-sha "$merge_base_sha" \
             > artifacts/verification/shadow-verification-plan.json
           node --input-type=module - artifacts/verification/shadow-verification-plan.json "$GITHUB_OUTPUT" <<'NODE'
           import crypto from 'node:crypto';
