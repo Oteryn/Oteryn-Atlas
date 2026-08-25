@@ -82,6 +82,12 @@ export async function proveCreatureWalkingInPlace(page, testInfo, target) {
   await expect(toggle).toBeVisible();
   await expect(toggle).toBeEnabled();
   await expect(toggle).not.toBeChecked();
+  const mobileControls = page.locator('#mobile-controls-toggle');
+  if (await mobileControls.isVisible()) {
+    if ((await mobileControls.getAttribute('aria-expanded')) !== 'true') await mobileControls.tap();
+    await expect(mobileControls).toHaveAttribute('aria-expanded', 'true');
+    await expect(page.locator('#mobile-controls-panel')).toHaveClass(/mobile-open/);
+  }
   const beforeFrames = staticState.animationRuntime.frameUpdates;
   await toggle.check();
   await page.waitForFunction((before) => {

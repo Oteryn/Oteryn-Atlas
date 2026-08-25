@@ -46,6 +46,7 @@ const state = {
   lastDrawnRecords: 0,
   refreshEpoch: 0,
   drawEpoch: 0,
+  committedDrawEpoch: 0,
   animationRuntime: null,
   animationOn: initialParams.get('animation') === 'on',
   logicalTimeMs: 0,
@@ -102,6 +103,7 @@ function publish(status = 'LOADING', error = null, extra = {}) {
     availableNpcRoles: Object.freeze([...state.availableNpcRoles]),
     npcMarkerStyle: NPC_MARKER_STYLE,
     selectedRecordId: state.selectedId,
+    selectedVisible: Boolean(state.selectedId && state.lastVisibleRecords.some((record) => record.record_id === state.selectedId)),
     visibleRecords: state.lastVisibleRecords.length,
     drawnRecords: state.lastDrawnRecords,
     pixelDrawnRecords: state.pixelDrawnRecords,
@@ -922,7 +924,7 @@ async function draw(records, view = state.view) {
 async function drawCommitted(records, committedBase) {
   const view = rendererView(committedBase);
   const canvas = state.canvas;
-  const epoch = ++state.drawEpoch;
+  const epoch = ++state.committedDrawEpoch;
   if (!canvas || !view || !committedBase?.generation) return null;
   const rect = canvas.getBoundingClientRect();
   const baseViewport = committedBase.transform;
@@ -931,7 +933,7 @@ async function drawCommitted(records, committedBase) {
   const dpr = Math.max(1, Math.min(2, devicePixelRatio || 1));
   if (Math.abs(dpr - baseViewport.dpr) > 0.01) return null;
   const prepared = await prepareDraw(records, view);
-  if (epoch !== state.drawEpoch || !sameRendererCommit(committedBase)) return null;
+  if (epoch !== state.committedDrawEpoch || !sameRendererCommit(committedBase)) return null;
   state.lastPreparedRecords = prepared;
   state.lastDrawnRecords = paintPrepared(prepared, view, committedBase);
   return state.lastDrawnRecords;
