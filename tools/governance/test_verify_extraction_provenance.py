@@ -91,6 +91,58 @@ class PinnedSourceVerificationTest(unittest.TestCase):
         with self.assertRaises(AssertionError):
             verifier(data)
 
+    def test_target_evolution_requires_exact_prior_and_current_blob_identity(self) -> None:
+        verifier = getattr(m, "verify_target_evolution", None)
+        self.assertIsNotNone(verifier, "target evolution verifier must exist")
+        rows = [
+            {
+                "target_paths": [
+                    {"path": ".github/workflows/ci.yml", "blob": "1" * 40},
+                ]
+            }
+        ]
+        evolution = {
+            "schema_version": 1,
+            "authority": "Oteryn/Oteryn-Atlas#179",
+            "paths": {
+                ".github/workflows/ci.yml": {
+                    "prior_blob": "1" * 40,
+                    "current_blob": "2" * 40,
+                    "reason": "tested CI routing evolution",
+                }
+            },
+        }
+        parsed = verifier(evolution, rows)
+        self.assertEqual(parsed[".github/workflows/ci.yml"]["current_blob"], "2" * 40)
+
+        bad_prior = json.loads(json.dumps(evolution))
+        bad_prior["paths"][".github/workflows/ci.yml"]["prior_blob"] = "0" * 40
+        with self.assertRaises(AssertionError):
+            verifier(bad_prior, rows)
+
+        bad_current = json.loads(json.dumps(evolution))
+        bad_current["paths"][".github/workflows/ci.yml"]["current_blob"] = "not-a-git-blob"
+        with self.assertRaises(AssertionError):
+            verifier(bad_current, rows)
+
+    def test_target_evolution_rejects_unmapped_paths(self) -> None:
+        verifier = getattr(m, "verify_target_evolution", None)
+        self.assertIsNotNone(verifier, "target evolution verifier must exist")
+        rows = [{"target_paths": []}]
+        evolution = {
+            "schema_version": 1,
+            "authority": "Oteryn/Oteryn-Atlas#179",
+            "paths": {
+                "unmapped.txt": {
+                    "prior_blob": "1" * 40,
+                    "current_blob": "2" * 40,
+                    "reason": "must be rejected",
+                }
+            },
+        }
+        with self.assertRaises(AssertionError):
+            verifier(evolution, rows)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
