@@ -4,387 +4,272 @@ ALIAS:
 `ATLAS-PRODUCTION-UI-SHELL-V1`
 
 MODE:
-Autonomous bounded multi-agent implementation + verification + integration + protected squash merge + merged-main live acceptance.
+Autonomous programme bootstrap + explicit multi-agent dispatcher for Production UI Shell V1.
 
-DO NOT STOP AT AUDIT OR PLANNING ONCE THE IMPLEMENTATION DEPENDENCY GATE IS OPEN.
+## Purpose
 
-If the dependency/ownership gate is not open, report `WAITING_EXTERNAL` with the exact blocking PR/Issue/SHA, release workers, make no no-op/retrigger commits and stop the run. Resume only from fresh GitHub state when the blocker changes.
+This is the **bootstrap/coordinator alias**, not a monolithic implementation worker.
 
-## Mission
+Its job is to:
+1. resolve whether the Production UI Shell implementation gate is open;
+2. create/resume the fresh implementation lifecycle;
+3. create the coordinator/task packet and isolated worker branches;
+4. publish the exact durable aliases that may be launched in parallel;
+5. stop before doing worker-lane implementation itself.
 
-Implement the owner-approved Oteryn Atlas Production UI Shell V1 defined by programme Issue #185, the merged design spec and the merged implementation plan.
+After bootstrap, use `ATLAS-UI-SHELL-INTEGRATOR` between execution waves and for final integration/merge/live closeout.
 
-The user-visible result must move Atlas from the current engineering/debugger-oriented FullWorld shell to a polished production application while preserving the proven map renderer, map state, deep links, creature interaction geometry, gameplay/data authority boundaries and truthful fail-closed behavior.
+Do not silently invent ephemeral worker prompts when durable aliases exist in the repository.
+
+## Product mission
+
+Implement the owner-approved Atlas Production UI Shell V1 defined by programme #185 and the merged current-main documents:
+
+- `docs/superpowers/specs/2026-08-26-atlas-production-ui-shell-v1-design.md`
+- `docs/superpowers/plans/2026-08-26-atlas-production-ui-shell-v1.md`
 
 Approved product composition:
 
 `global navigation rail + contextual left panel + dominant map surface + contextual right analysis panel + on-demand Developer Mode`
 
-The redesign is a shell/composition evolution of the existing FullWorld application. It is not a renderer rewrite, framework migration or second Atlas application.
+The redesign is an evolution of the existing FullWorld application. It is not a renderer rewrite, UI-framework migration or second Atlas application.
 
-## Canonical repository
+Oteryn-Game remains canonical World/Content/gameplay-fact authority. This programme grants no Game mutation authority.
 
-Atlas runtime/consumer:
-`https://github.com/Oteryn/Oteryn-Atlas`
+## Durable execution aliases
 
-Read-only external authority as needed for dependency verification:
-`https://github.com/Oteryn/Oteryn-Game`
+### Wave 1 — launch concurrently
 
-Oteryn-Game remains canonical World/Content/gameplay-fact authority. This alias grants **no Game mutation authority**. If a missing Game product such as item/drop/task farm intelligence is still absent, keep the affected Atlas capability unavailable/partial; do not implement the Game producer from this prompt.
+- `ATLAS-UI-SHELL-CAPABILITY-STATE`
+- `ATLAS-UI-SHELL-DESIGN-SYSTEM`
+- `ATLAS-UI-SHELL-MAP-HUD`
+- `ATLAS-UI-SHELL-DEVELOPER-MODE`
 
-## Programme authority
+### Wave 2 — launch concurrently after Integrator accepts Wave 1
 
-Parent planning/design programme:
-`Oteryn/Oteryn-Atlas#185`
+- `ATLAS-UI-SHELL-NAV-CONTEXT`
+- `ATLAS-UI-SHELL-INSPECTOR`
 
-Required current-main documents:
-- `docs/superpowers/specs/2026-08-26-atlas-production-ui-shell-v1-design.md`
-- `docs/superpowers/plans/2026-08-26-atlas-production-ui-shell-v1.md`
-- this prompt
-- root and every nearer applicable `AGENTS.md`
-- `docs/testing/ATLAS-VERIFICATION-PLATFORM.md`
+### Integration / qualification
 
-Planning-time Atlas main `abb799b5bb0905c8f2e8b57e67950334db39d5f7` and historical PR heads are evidence only. Resolve all current identities again before mutation.
+- `ATLAS-UI-SHELL-INTEGRATOR`
+- `ATLAS-UI-SHELL-RESPONSIVE-ACCEPTANCE`
+
+These aliases are canonical. The dispatcher/integrator must not replace them with broader improvised worker scopes.
 
 ## Mandatory GitHub-first preflight
 
-Before any local/remote product mutation:
+Before creating any implementation Issue/branch/task packet:
 
-1. Resolve exact current protected Atlas `main` SHA and branch protection.
-2. Read current `AGENTS.md` and nearer instructions for every intended path.
-3. Verify this prompt, the design spec and the implementation plan are already on protected `main`. Never implement from the docs/programme branch.
-4. Refresh parent Issue #185.
-5. Refresh Atlas PR #162 / Issue #145 (walking-in-place animation).
-6. Refresh Atlas PR #170 / Issue #165 (Creature Gameplay Profiles).
-7. Refresh Atlas Issue #117 (Hunt Intelligence).
-8. Refresh Oteryn-Game Issue #75 (item/drop/task farm-intelligence export) read-only.
-9. Search current open PRs/branches touching `web/fullworld*`, `src/browser/**`, `e2e/**`, verification policy or shell-adjacent product state.
-10. Resolve current heavy-E2E runner/slot policy and current exact-head verification requirements.
-11. Record current live merged-main Synology revision/acceptance only as baseline evidence; do not deploy or mutate live during implementation.
+1. Resolve exact current protected `Oteryn/Oteryn-Atlas` `main` SHA and branch protection.
+2. Read current root and every applicable nearer `AGENTS.md`.
+3. Verify this prompt, all eight durable worker/integrator aliases, the design spec and implementation plan are present on protected `main`.
+4. Refresh programme #185 and docs-worker-alias lifecycle history.
+5. Refresh Atlas PR #162 / Issue #145.
+6. Refresh Atlas PR #170 / Issue #165.
+7. Refresh Atlas Issue #117.
+8. Refresh Oteryn-Game Issue #75 read-only.
+9. Search current open PRs/branches touching `web/fullworld*`, shell-adjacent `src/browser/**`, `e2e/**` or verification policy.
+10. Resolve the current heavy-E2E runner/slot policy.
+11. Resolve current merged-main/live revision only as baseline evidence; do not mutate live during bootstrap.
+
+Planning-time SHAs are historical evidence only. Always use fresh GitHub state.
 
 ## Hard dependency/ownership gate
 
-Shared Product Shell implementation must not start while #162 or #170 still has unresolved active ownership over the same shared FullWorld/runtime/inspector surfaces.
+Do **not** open competing runtime/UI implementation while #162 or #170 still has unresolved active ownership over the same FullWorld/runtime/inspector surfaces.
 
-If either remains active and overlapping:
-- do not create a competing implementation branch that edits its owned hot files;
-- do not cherry-pick unfinished candidate semantics as authority;
-- do not reimplement animation, gameplay inspector state or gameplay data consumers;
-- report `WAITING_EXTERNAL` with exact current state and stop cleanly.
+If either is active and overlapping:
+- do not create worker branches for implementation;
+- do not cherry-pick unfinished candidate semantics;
+- do not reimplement animation/gameplay/inspector state;
+- return `WAITING_EXTERNAL` with the exact blocking PR, head SHA and ownership reason;
+- release all would-be workers;
+- make no no-op/retrigger commits.
 
-If either merges, refresh `main` and consume the merged contract.
-If either closes unmerged/superseded, verify that terminal state and current `main` before assuming ownership.
-If explicit ownership transfer/reconciliation exists, record the exact evidence in the implementation Issue/task packet before proceeding.
+Resume only after fresh GitHub evidence shows:
+- the PR merged and its contracts are on protected `main`, or
+- it closed/superseded unmerged and current `main` is refreshed, or
+- explicit ownership reconciliation/transfer is recorded.
 
 ## Fresh implementation lifecycle
 
-Issue #185 is planning/programme authority and does not by itself authorize runtime mutation.
+Programme #185 is planning authority only. Runtime implementation requires a fresh substantial-work Issue.
+
+When the dependency gate is open:
+
+### Step 1 — ensure no duplicate lifecycle exists
+
+Search for an open implementation Issue/branch/task packet for `ATLAS-PRODUCTION-UI-SHELL-V1`.
+
+If a valid existing lifecycle exists, resume it; do not create a duplicate.
+
+If none exists, continue.
 
-After the dependency gate is open:
+### Step 2 — create implementation Issue
 
-1. Create a new Atlas Issue titled `feat(ui): implement Production UI Shell V1`.
-2. Reference #185 and copy the exact current implementation baseline, dependency resolution, authority constraints and Definition of Done.
-3. Create coordinator branch `feat/atlas-production-ui-shell-v1` from exact refreshed protected `main`.
-4. Create one active task packet at `docs/agents/tasks/active/ATLAS-PRODUCTION-UI-SHELL-V1.md` with exact issue/base/branch/ownership/evidence state.
-5. Use one writable coordinator worktree and isolated worker worktrees/branches.
-6. The coordinator owns the only implementation PR to `main`; subordinate lanes do not create/merge independent PRs to protected `main`.
+Create one Atlas Issue titled:
 
-## Required Superpowers execution model
+`feat(ui): implement Production UI Shell V1`
 
-Use `superpowers:subagent-driven-development` for implementation unless unavailable; if unavailable use the repository-supported equivalent isolated multi-agent workflow.
+Body must include:
+- parent programme #185;
+- exact admission `main` SHA;
+- resolved terminal/reconciled #162/#170 state;
+- explicit no-Game-mutation authority;
+- parallel worker topology;
+- one mutable path = one active owner;
+- coordinator-only shared-hot-file ownership;
+- current heavy-E2E capacity/policy reference;
+- Definition of Done from the merged design.
 
-Before each worker starts, give it a self-contained prompt with:
-- exact current `main` and implementation Issue;
-- exact owned paths;
-- exact forbidden coordinator/shared paths;
-- interfaces consumed/produced from the merged plan;
-- RED → GREEN test commands;
-- required handoff shape;
-- no authority to merge to `main`.
-
-One mutable path may have only one active owner.
-
-## Parallel topology
+### Step 3 — create coordinator branch
 
-### Wave 1 — launch concurrently after Task 0
-
-**Lane A — Capability + shell state**
-Own only:
-- `src/browser/product-capabilities.mjs`
-- `src/browser/product-shell-state.mjs`
-- `tests/product-capabilities.mjs`
-- `tests/product-shell-state.mjs`
+Create:
 
-Must produce the exact public interfaces from the implementation plan and preserve capability states `loading|available|partial|unavailable|error`.
+`feat/atlas-production-ui-shell-v1`
 
-**Lane B — Design system**
-Own only:
-- `web/product-shell.css`
-- `tests/product-shell-style-contract.mjs`
+from the exact refreshed protected `main` used as `admission_main_sha`.
 
-Must implement semantic surfaces/text/brand/interaction/state/spacing/radius tokens and accessible reusable shell primitives. No shared HTML edits.
+No runtime implementation is performed during this bootstrap step.
 
-**Lane D — Map HUD**
-Own only:
-- `src/browser/map-hud-model.mjs`
-- `web/fullworld-map-hud.mjs`
-- `tests/map-hud-model.mjs`
+### Step 4 — write active task packet
 
-Must adopt existing zoom/floor/view/layer controls without duplicating camera/floor handlers or AUTO thresholds.
+On the coordinator branch create:
 
-**Lane F — Developer Mode**
-Own only:
-- `src/browser/developer-diagnostics.mjs`
-- `web/fullworld-developer-panel.mjs`
-- `tests/developer-diagnostics.mjs`
+`docs/agents/tasks/active/ATLAS-PRODUCTION-UI-SHELL-V1.md`
 
-Must preserve truthful read-only diagnostics and advanced provenance on demand. Missing measured values remain unavailable, never invented as zero.
+It must record at minimum:
 
-Coordinator reviews every Wave 1 full diff and reruns lane tests. Freeze Lane A interfaces before Wave 2.
+```yaml
+programme: ATLAS-PRODUCTION-UI-SHELL-V1
+parent_programme_issue: 185
+implementation_issue: <real issue number>
+admission_main_sha: <exact current protected main>
+integration_main_sha: <exact current protected main at bootstrap>
+coordinator_branch: feat/atlas-production-ui-shell-v1
+stage: WAVE_1_READY
+wave_1:
+  capability_state:
+    alias: ATLAS-UI-SHELL-CAPABILITY-STATE
+    branch: work/atlas-ui-shell-capability-state
+    status: READY
+  design_system:
+    alias: ATLAS-UI-SHELL-DESIGN-SYSTEM
+    branch: work/atlas-ui-shell-design-system
+    status: READY
+  map_hud:
+    alias: ATLAS-UI-SHELL-MAP-HUD
+    branch: work/atlas-ui-shell-map-hud
+    status: READY
+  developer_mode:
+    alias: ATLAS-UI-SHELL-DEVELOPER-MODE
+    branch: work/atlas-ui-shell-developer-mode
+    status: READY
+wave_2:
+  nav_context:
+    alias: ATLAS-UI-SHELL-NAV-CONTEXT
+    branch: work/atlas-ui-shell-nav-context
+    status: BLOCKED_WAVE_1
+  inspector:
+    alias: ATLAS-UI-SHELL-INSPECTOR
+    branch: work/atlas-ui-shell-inspector
+    status: BLOCKED_WAVE_1
+lane_g:
+  alias: ATLAS-UI-SHELL-RESPONSIVE-ACCEPTANCE
+  branch: work/atlas-ui-shell-responsive-acceptance
+  status: BLOCKED_INTEGRATION
+integrator_alias: ATLAS-UI-SHELL-INTEGRATOR
+```
 
-### Wave 2 — launch concurrently after Lane A acceptance
-
-**Lane C — Navigation + left context**
-Own only:
-- `src/browser/product-navigation.mjs`
-- `src/browser/context-panel-model.mjs`
-- `web/fullworld-context-panel.mjs`
-- `tests/product-navigation.mjs`
-- `tests/context-panel-model.mjs`
-
-Navigation order is `World`, `Creatures`, `NPCs`, `Items / Farm`, `Hunts`. Availability comes only from Lane A. Reuse existing search/filter/domain controls; do not create duplicate datasets/handlers.
-
-**Lane E — Right context / inspector**
-Own only:
-- `src/browser/inspector-context-model.mjs`
-- `web/fullworld-inspector-shell.mjs`
-- `tests/inspector-context-model.mjs`
-
-Must consume terminal/merged #170 inspector/gameplay contracts. When verified creature gameplay exists, product hierarchy is `Gameplay | Semantic | Live state | Provenance`, Gameplay default, Live state disabled without genuine authority. No second gameplay-data consumer.
+Also record exact path ownership from the merged implementation plan and coordinator-owned shared hot files.
 
-If #170 ownership is not terminal/reconciled, Lane E waits; do not guess.
-
-## Coordinator-owned shared hot files
-
-Workers must not edit these unless the coordinator explicitly transfers one exact path for one exact task:
-- `web/fullworld.html`
-- `web/fullworld.css`
-- `web/style.css` when acting as global shell composition
-- `web/fullworld-app.mjs`
-- `web/fullworld-mobile.mjs`
-- shared E2E orchestration/configuration
-- formal visual-review manifests
-
-The coordinator integrates reviewed lane commits and performs all shared wiring.
-
-## Product semantics that must remain true
-
-### World / map
-- existing WebGL/full-world renderer remains the rendering authority;
-- map is the dominant surface;
-- no second camera, floor, coordinate transform, selection or creature hit-test system;
-- zoom/floor/view controls are presentation-relocated only;
-- current deep links/history remain deterministic.
-
-### Product navigation
-- `World` available only when verified FullWorld activation succeeds;
-- `Creatures` / `NPCs` depend on validated creature/search products;
-- `Items / Farm` may be `partial` while custom kill estimate is available but Game item/drop/task facts remain absent;
-- `Hunts` stays unavailable until accepted Hunt products exist;
-- `Live state` stays unavailable until a genuine live source exists;
-- normal user-facing unavailable copy never references GitHub Issues, compiler generations or internal blockers.
-
-### Farm
-Preserve current truthful custom kill estimator semantics and existing Farm state ownership.
-Do not fabricate:
-- item cards;
-- average drop chances;
-- task requirements;
-- named “Best places”;
-- item-source facts absent from accepted Game products.
-
-Future full Farm probability/ranking semantics remain governed by the existing Farm Explorer spec.
-
-### Creature Gameplay
-If #170 is merged, reuse its exact Game-derived consumer, completeness states, `inspector=` behavior and Gameplay/Semantic content. Do not duplicate or repair identity by display name.
-
-### Hunt
-Production Shell V1 creates integration seams only. It does not invent Hunt data, metrics, routes or recommendations.
-
-### Developer Mode
-Move technical diagnostics/provenance out of normal default chrome while keeping them reachable/read-only. Developer Mode must not mutate product state, inject fake data or become alternate authority.
-
-## Shell state contract
-
-The only new top-level shell query parameter is:
-
-`product=world|creatures|npcs|farm|hunts`
-
-Rules:
-- `creature=` remains concrete creature selection authority;
-- merged `inspector=` remains inspector-tab authority;
-- existing Farm parameters remain Farm authority;
-- `creature=` with no explicit `product=` resolves to a compatible creature context;
-- active Farm state with no product resolves to Farm context;
-- unavailable requested product fails closed to World;
-- unrelated query params survive serialization;
-- back/forward/reload restore a coherent product context.
-
-## Coordinator integration sequence
-
-After both waves are reviewed:
-
-1. Refresh `main` and normal non-force merge-up according to current `AGENTS.md`.
-2. Integrate reviewed lanes A → B → D/F → C/E.
-3. Add/activate RED integrated shell contract before shared markup mutation.
-4. Recompose `web/fullworld.html` into topbar + global nav + contextual left panel + existing map stage + product analysis panel + Developer Mode host.
-5. Preserve existing essential DOM IDs, map canvases, quick card and current product runtime hooks unless a newly merged authoritative contract explicitly changed them.
-6. Load `web/product-shell.css` after current styles and make map reclaim the permanent diagnostics height.
-7. Build one capability bridge from already validated runtime readiness into Lane A. Pure capability code never parses low-level products itself.
-8. Wire `product=` history without duplicating domain state.
-9. Adopt existing map controls into HUD with existing handlers intact.
-10. Adopt existing World/Creature/NPC/Farm controls into contextual left panel.
-11. Wire the right product-first inspector around merged gameplay/Semantic/provenance content.
-12. Wire on-demand Developer Mode from existing truthful diagnostics.
-13. Remove stale engineering lifecycle copy (`G3`, `G4 PROVEN`, `UPSTREAM_BLOCKED`, `PRESENTATION DEPENDENCY`, `VERIFYING ROOTS`, `DETAIL STREAM`, Issue-owned status prose) from the default normal-user shell while preserving advanced factual provenance.
-14. Run all new deterministic tests and every current GUI/FullWorld/mobile/search/creature/Farm/gameplay test selected by current CI.
-15. Commit/push exact integrated coordinator head.
-
-Do not weaken existing runtime tests just because DOM composition changed. Update test selectors only when they tested old chrome rather than required behavior, and retain independent behavioral oracles.
-
-## Lane G — integrated responsive/accessibility/browser verification
-
-After coordinator integration, dispatch one independent Lane G to own:
-- `e2e/tests/production-ui-shell.spec.mjs`
-- `tests/production-shell-accessibility-contract.mjs`
-
-It must verify at least:
-
-### Desktop
-- clean World default;
-- global product navigation and context switches;
-- global search;
-- pan/zoom/floor/view mode;
-- creature click → quick card → Details → Gameplay/Semantic when available;
-- NPC role/filter flow;
-- Farm custom-kill flow with truthful partial/unavailable item intelligence;
-- left/right panel open/close while map remains usable;
-- Developer Mode open/close;
-- reload/back/forward/deep-link restoration;
-- loading/empty/partial/unavailable/error treatment;
-- no page/console/network failures.
-
-### Mobile/tablet
-- map remains primary viewport rather than a compressed strip;
-- compact product navigation;
-- context drawer/sheet;
-- details drawer/bottom sheet;
-- quick-card coexistence;
-- Escape/backdrop/focus return;
-- current accepted touch-target sizing and safe-area behavior.
-
-### Geometry/accessibility
-- no map/creature world-anchor or hit-test drift when panels open/close/resize;
-- DPR 1/2 synchronization;
-- semantic landmarks;
-- accessible icon-only names;
-- visible focus;
-- active/selected/expanded/disabled semantics;
-- important trust/state meaning not color-only;
-- essential product text not encoded in 8–9px labels.
-
-Lane G returns failing evidence to the coordinator for shared-hot-file fixes unless ownership is explicitly transferred.
-
-## Visual acceptance
-
-Use the current repository visual-review mechanism and require exact-head full frames for at least:
-- clean World default;
-- World with left context open;
-- creature Gameplay;
-- Semantic/Provenance advanced view;
-- Farm partial/unavailable state;
-- Developer Mode;
-- mobile default map;
-- mobile context drawer/sheet;
-- mobile details sheet.
-
-Every required screenshot must actually be opened and reviewed before approving/publishing local E2E evidence. Do not auto-approve unseen screenshots.
-
-## Testing and Molehill concurrency
-
-Targeted lane deterministic tests may run concurrently when they do not share mutable fixtures/output.
-
-Heavy browser qualification must obey current repository policy. At planning time `e2e/run.ps1` has a measured safe default of 2 isolated concurrent full slots; refresh this before execution and never exceed current selected capacity.
-
-Each heavy slot must keep unique Compose project/artifact namespace and independent publication forwarder/origin as current policy requires.
-
-Lane-local heavy evidence is supporting evidence only. Final acceptance must run against one frozen integrated candidate SHA.
-
-Any post-freeze code-changing commit invalidates final proof for the previous SHA.
-
-## Worker return format
-
-Every lane handoff must state:
-- lane name;
-- exact admission main SHA;
-- worker branch;
-- exact worker head SHA;
-- exact changed-file list;
-- exact exported interfaces;
-- each test command with exact result;
-- observed RED evidence;
-- final GREEN evidence;
-- unresolved risks/blockers;
-- confirmation that no forbidden path was edited.
-
-Reject vague “tests pass” summaries or handoffs without an exact head/full diff.
-
-## Final candidate and protected merge
-
-The coordinator alone performs final integration/merge lifecycle:
-
-1. Integrate Lane G and review the full changed-file set/full diff.
-2. Freeze exact `candidate_sha`.
-3. Run complete current deterministic/hosted checks.
-4. Run full exact-head Molehill qualification through current `e2e/run.ps1`, workers/retries/slot rules unchanged.
-5. Open and review all required screenshots; bind visual review to exact candidate and browser summary.
-6. Publish `atlas-local-e2e` only through the current approved exact-head publisher after true success.
-7. Open/update the single implementation PR linked to the fresh implementation Issue and parent #185.
-8. Require current `atlas-gate`, `provenance-gate`, CodeQL and every other current required/specialized check.
-9. Resolve review threads and perform final independent full-diff audit.
-10. Any code-changing review fix creates a new candidate and requires all invalidated proof again.
-11. Squash merge only with expected-head fencing and without weakening protection.
-12. Clean completed worker/coordinator branches according to current policy.
-13. Close the fresh implementation Issue only when the implementation Definition of Done is actually met.
-
-## Merged-main live acceptance
-
-After protected squash merge:
-
-1. Resolve exact resulting protected `main` SHA.
-2. Require normal merged-main hosted checks.
-3. Require Synology Live Acceptance on that exact SHA under current deployment policy.
-4. Verify live container `org.oteryn.revision` and `X-Oteryn-Atlas-Revision` equal the exact merged SHA.
-5. Run bounded live desktop/mobile product smoke that proves production shell, map interaction, representative creature details and truthful capability states.
-6. Never deploy a task branch or detached candidate.
-7. If live acceptance fails, fix on a fresh protected PR with permanent regression; do not hand-edit production to make it pass.
-
-## Terminal Definition of Done
-
-Do not claim completion until all are verified:
-- live default Atlas looks and behaves like a production product rather than engineering dashboard;
-- map remains dominant and current renderer/camera/floor/deep-link behavior remains correct;
-- one global nav + one contextual left panel replace the monolithic mixed rail;
-- right panel is product-first and keeps Semantic/Provenance advanced access;
-- merged Creature Gameplay is native/default where supported and not duplicated;
-- Farm custom kill remains truthful while unavailable item/task facts stay gated;
-- Hunt has extension seams without fake Hunt facts;
-- capability availability comes from validated runtime/publication state;
-- default permanent diagnostics are removed but Developer Mode preserves truthful read-only diagnostics;
-- desktop/tablet/mobile/a11y/geometry behavior passes exact-head acceptance;
-- required screenshots were actually reviewed;
-- exact-final-head protected gates pass;
-- implementation PR is squash-merged and branches cleaned;
-- merged-main Synology Live Acceptance passes on the exact resulting SHA.
-
-Return the fresh implementation Issue, implementation PR, final candidate SHA, squash-merge SHA, exact verification results, live-acceptance run/result and any remaining explicitly unavailable upstream capabilities.
+### Step 5 — validate ownership
+
+Before creating workers, prove:
+- every mutable path belongs to at most one active lane;
+- shared hot files remain coordinator-owned;
+- no lane overlaps #162/#170 active ownership;
+- the task packet contains exact branch names and aliases.
+
+### Step 6 — create Wave 1 worker branches
+
+Create these four branches from the exact worker base recorded in the task packet:
+
+- `work/atlas-ui-shell-capability-state`
+- `work/atlas-ui-shell-design-system`
+- `work/atlas-ui-shell-map-hud`
+- `work/atlas-ui-shell-developer-mode`
+
+Do not create Wave 2 branches yet unless the integrator has accepted/frozen Lane A and recorded the Wave 2 base. This prevents stale-interface workers.
+
+### Step 7 — persist and verify bootstrap
+
+Commit/push the task packet to the coordinator branch and verify remote readback.
+
+Confirm all four Wave 1 worker branches exist at the intended base.
+
+No production runtime files should be changed by this bootstrap alias.
+
+## Required dispatcher output
+
+When Wave 1 is truly ready, finish with a launch block equivalent to:
+
+```text
+IMPLEMENTATION ISSUE: #<n>
+COORDINATOR BRANCH: feat/atlas-production-ui-shell-v1
+STAGE: WAVE_1_READY
+
+URUCHOM RÓWNOLEGLE:
+ATLAS-UI-SHELL-CAPABILITY-STATE
+ATLAS-UI-SHELL-DESIGN-SYSTEM
+ATLAS-UI-SHELL-MAP-HUD
+ATLAS-UI-SHELL-DEVELOPER-MODE
+
+PO ZAKOŃCZENIU TYCH 4 ZADAŃ URUCHOM:
+ATLAS-UI-SHELL-INTEGRATOR
+```
+
+Do not claim worker work has started merely because branches exist.
+
+Do not continue implementing Lane A/B/D/F in the same bootstrap execution. The purpose of durable aliases is to make the parallel jobs independently visible and launchable.
+
+## Wave progression
+
+After Wave 1 workers finish, run:
+
+`ATLAS-UI-SHELL-INTEGRATOR`
+
+The integrator reviews/integrates Wave 1, freezes Lane A interfaces, creates/releases Wave 2 branches and tells the user to launch in parallel:
+
+- `ATLAS-UI-SHELL-NAV-CONTEXT`
+- `ATLAS-UI-SHELL-INSPECTOR`
+
+After Wave 2 finishes, run `ATLAS-UI-SHELL-INTEGRATOR` again. It performs shared FullWorld wiring and releases:
+
+`ATLAS-UI-SHELL-RESPONSIVE-ACCEPTANCE`
+
+After Lane G finishes, run `ATLAS-UI-SHELL-INTEGRATOR` again for defect reconciliation, final candidate freeze, exact-head qualification, protected squash merge and merged-main live acceptance.
+
+## Parallel and verification invariants
+
+- One mutable path = one active owner.
+- One worker = one branch/worktree.
+- Worker aliases never merge to protected `main`.
+- The integrator owns the only implementation PR and all coordinator hot files.
+- Targeted deterministic tests may run concurrently when isolated.
+- Heavy browser tests must use current `e2e/run.ps1` slot policy; never bypass or exceed current capacity.
+- Lane-local evidence never substitutes for final exact-head integrated qualification.
+- Any code-changing post-freeze commit invalidates affected final evidence.
+- Required visual frames must be actually opened/reviewed before local E2E approval.
+- Oteryn-Game remains read-only for this programme.
+
+## Stop conditions
+
+Return `WAITING_EXTERNAL` if implementation ownership prerequisites are not satisfied.
+
+Return `WAITING_COORDINATOR` if a resumptive invocation finds an incomplete/malformed task packet that cannot be safely repaired from GitHub authority.
+
+Return `WAVE_1_READY` only after the implementation Issue, coordinator task packet and four Wave 1 branches are durable and verified.
+
+Never fabricate a readiness state to keep workers busy.
