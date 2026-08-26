@@ -4,7 +4,7 @@
 issue: 165
 repository: Oteryn/Oteryn-Atlas
 base_branch: main
-base_sha: 5697b3c0dd3d544dab363e8e1e09cf76b3cca6ba
+base_sha: abb799b5bb0905c8f2e8b57e67950334db39d5f7
 branch: feat/creature-gameplay-profiles-165
 pr: 170
 status: verifying
@@ -23,7 +23,7 @@ Consume the exact merged Game gameplay-profile projection through a bounded lazy
 
 ## Integration state
 
-- PR #163 / Issue #115 is merged into `main@5697b3c0dd3d544dab363e8e1e09cf76b3cca6ba`; its labels/badges presentation controller is preserved.
+- Current `main@abb799b5bb0905c8f2e8b57e67950334db39d5f7` retains merged #163 labels/badges presentation, adds the bounded Molehill heavy-E2E slot pool and includes #184 live NPC badge readiness hardening.
 - PR #162 / Issue #145 remains a separate draft for walking-in-place animation and is not imported into this task.
 - Issue #113 remains the canonical quick-card/interaction seam.
 - Farm Explorer remains a consumer and never becomes gameplay-fact authority.
@@ -41,13 +41,13 @@ Consume the exact merged Game gameplay-profile projection through a bounded lazy
 
 ## Verification checkpoint
 
-- Integrated current main by normal merge-up at `5697b3c0dd3d544dab363e8e1e09cf76b3cca6ba`; targeted integration contracts: 30/30 PASS.
+- Integrated current main by normal non-force merge-up at `abb799b5bb0905c8f2e8b57e67950334db39d5f7`; targeted Gameplay/slot-pool/live-readiness integration contracts: 52/52 PASS.
 - Exact Game publication: 1049 NPC / 1800 monster profiles / 508 shards / `sha256:7ac7c08949aa498cb843ca26e3417e537b3409d89e4f265861f3f94855b96d28`.
-- CI-equivalent deterministic Node matrix after integration and live-acceptance GREEN: 357/357 PASS, 0 fail, 0 skip.
+- CI-equivalent deterministic Node matrix after current-main integration: 372/372 PASS, 0 fail, 0 skip.
 - Extraction provenance verifier: PASS, 144 mapped rows against exact legacy `e417c5e7c22986bf4acef0495eb47f7b72c97cce`.
 - Required Playwright census is 77 (71 merged-main scenarios + six gameplay journeys); required formal visual census is 17 (15 merged-main frames + desktop/mobile Gameplay).
 - Synology candidate/live gameplay manifest contract and live Chromium Sam/Rat gameplay contract: 8/8 PASS locally; merged-main execution remains pending until PR merge.
-- Final exact-head Molehill browser qualification and visual review remain pending serialized machine lock.
+- Final exact-head Molehill browser qualification and visual review remain pending through the bounded machine-wide slot pool.
 
 ## Excluded
 
