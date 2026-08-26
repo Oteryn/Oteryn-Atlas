@@ -115,3 +115,19 @@ test('passing full-frame visual evidence remains local while GitHub artifacts st
   assert.doesNotMatch(uploadStep, /candidate\/artifacts\/e2e\/\s*$/m);
   assert.doesNotMatch(uploadStep, /user-visual-evidence|\.png|\.webm|trace\.zip/i);
 });
+
+test('edited exact-head visual approval publishes through trusted-base policy code only', () => {
+  assert.match(workflow, /types:\s*\[[^\]]*edited[^\]]*\]/);
+  assert.match(workflow, /heavy-e2e:[\s\S]*github\.event\.action != 'edited'/);
+  const publish = workflow.slice(workflow.indexOf('  review-publish:\n'));
+  assert.ok(publish.length > 0, 'review-publish job is missing');
+  assert.match(publish, /github\.event\.action == 'edited'/);
+  assert.match(publish, /Visual-Review-Approved-For/);
+  assert.match(publish, /Visual-Evidence-Run/);
+  assert.match(publish, /statuses:\s*write/);
+  assert.match(publish, /ref:\s*\$\{\{ github\.event\.pull_request\.base\.sha \}\}/);
+  assert.doesNotMatch(publish, /ref:\s*\$\{\{ needs\.trust-admission\.outputs\.head_sha \}\}/);
+  assert.match(publish, /approve-visual-user-acceptance\.ps1[\s\S]*-ReviewedHeadSha/);
+  assert.match(publish, /publish-local-e2e-status\.ps1[\s\S]*-TestedHeadSha/);
+  assert.match(publish, /git fetch --no-tags origin \$env:ATLAS_CODE_REVISION/);
+});
