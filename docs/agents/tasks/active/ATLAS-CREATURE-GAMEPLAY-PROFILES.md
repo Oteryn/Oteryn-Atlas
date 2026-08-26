@@ -4,7 +4,7 @@
 issue: 165
 repository: Oteryn/Oteryn-Atlas
 base_branch: main
-base_sha: 082a7180b6b4dbb63b1990135d24e26afb65c516
+base_sha: 7f5226f08909a4eb8991ac9958192b5d613ead67
 branch: feat/creature-gameplay-profiles-165
 pr: 170
 status: verifying
@@ -23,8 +23,8 @@ Consume the exact merged Game gameplay-profile projection through a bounded lazy
 
 ## Integration state
 
-- Current protected `main@082a7180b6b4dbb63b1990135d24e26afb65c516` includes #180 plan-bound verification, #192 META execution routing, #197 capability truthfulness, #179 GitHub-hosted E2E architecture docs, and #203 readiness/concurrency contract.
-- #203 adds only `docs/testing/ATLAS-GITHUB-HOSTED-E2E-READINESS-CONCURRENCY-CONTRACT.md`; it changes qualification authority, not #165 runtime/data bytes.
+- Current protected `main@7f5226f08909a4eb8991ac9958192b5d613ead67` includes #180 plan-bound verification, #192 META execution routing, #197 capability truthfulness, #179 GitHub-hosted E2E architecture authority, #203 readiness/concurrency contract, and #205 Pro P0 E2E audit requirements.
+- #205 adds only three #179 documentation/audit files. The merge-up from `082a7180...` to `7f5226f0...` has no #165 runtime/data/workflow byte delta, so prior implementation findings remain applicable but old-head browser evidence cannot satisfy the newer qualification head.
 - PR #162 / Issue #145 remains a separate draft for walking-in-place animation and is not imported into this task.
 - Issue #113 remains the canonical quick-card/interaction seam. Farm Explorer remains a consumer and never becomes gameplay-fact authority.
 - Upstream movement has been reconciled only by normal non-force merge-up; unaffected implementation and deterministic findings are preserved.
@@ -59,8 +59,9 @@ Strategy: `parallel_first`. No implementation writer remains; final hosted verif
 - Permanent browser regressions cover Rat loot/max-count distinction, inspector tab visibility, visual filter cleanup, map-reachable H.L. large-shop fixture, desktop/mobile inspector baselines, and bounded authenticated pixel fetches.
 - The former AUTO mode-aware LOD hang was reproduced, given a deterministic RED regression, and fixed by bounded pixel-bucket/bundle fetch deadlines; later exact-head hardware evidence showed that scenario PASS.
 - Exact `90f9661e...` hardware evidence is diagnostic FAIL only: five clustered HTTP 502 failures were traced to `ConnectionRefusedError [WinError 10061]` from the external LAN publication origin, not an Atlas runtime regression.
-- Exact `683069ba...` qualification was launched only after publication-origin preflight, but became old-head diagnostic evidence when protected main advanced to #203 and the task was merged up again.
-- #203 requires browser evidence to bind the exact current qualification head; an old-head artifact cannot satisfy the new head fan-in.
+- Exact `683069ba...` qualification became old-head diagnostic evidence when protected main advanced to #203.
+- Exact `032f7c1e...` hosted qualification was green except the intentionally missing physical evidence, but its specialist packet was never consumed because Molehill did not respond; #205 advanced protected main before a run started.
+- #203/#205 freshness rules require browser evidence to bind the exact current qualification head; no old-head artifact may satisfy current fan-in.
 
 ## Excluded
 
