@@ -11,6 +11,7 @@ from pathlib import Path, PurePosixPath
 
 ROOT = Path(__file__).resolve().parents[2]
 MAP = ROOT / "docs" / "migration" / "legacy-atlas-extraction-provenance.json"
+TARGET_EVOLUTION = ROOT / "docs" / "migration" / "legacy-atlas-target-evolution.json"
 HEX40 = re.compile(r"^[0-9a-f]{40}$")
 SOURCE_PREFIXES = ("tools/otbm_atlas/", "tools/otbm_atlas_facts/", ".github/workflows/otbm-atlas-")
 ALLOWED = {
@@ -43,6 +44,38 @@ def target_git_blob(path: str) -> str:
     if not candidate.is_file():
         raise AssertionError(f"mapped target path missing: {path}")
     return git(ROOT, "hash-object", path)
+
+
+def verify_target_evolution(data: dict, rows: list[dict]) -> dict[str, dict]:
+    assert data["schema_version"] == 1
+    assert data["authority"] == "Oteryn/Oteryn-Atlas#179"
+    paths = data["paths"]
+    assert isinstance(paths, dict)
+
+    recorded_by_path: dict[str, set[str]] = {}
+    for row in rows:
+        for target in row.get("target_paths", []):
+            path = target["path"]
+            recorded_by_path.setdefault(path, set()).add(target["blob"])
+
+    for path, entry in paths.items():
+        pure = PurePosixPath(path)
+        assert ".." not in pure.parts, f"target evolution path traversal is forbidden: {path}"
+        assert path in recorded_by_path, f"target evolution path is not present in provenance map: {path}"
+        assert set(entry) == {"prior_blob", "current_blob", "reason"}, path
+        prior_blob = entry["prior_blob"]
+        current_blob = entry["current_blob"]
+        reason = entry["reason"]
+        assert HEX40.fullmatch(prior_blob), path
+        assert HEX40.fullmatch(current_blob), path
+        assert prior_blob != current_blob, path
+        assert isinstance(reason, str) and reason.strip(), path
+        assert recorded_by_path[path] == {prior_blob}, (
+            f"target evolution prior blob does not exactly match every recorded provenance row: "
+            f"{path}: {sorted(recorded_by_path[path])} != {prior_blob}"
+        )
+
+    return paths
 
 
 def verify_source_row(row: dict, source_root: Path, source_sha: str) -> None:
@@ -125,6 +158,11 @@ def verify(map_path: Path, source_root: Path | None = None) -> dict[str, int]:
     if source_root is not None:
         selected_count = verify_source_coverage(rows, source_root, source_sha)
         assert data["bounded_source_coverage"]["selected_blob_count"] == selected_count
+
+    evolution_data = json.loads(TARGET_EVOLUTION.read_text(encoding="utf-8"))
+    target_evolution = verify_target_evolution(evolution_data, rows)
+    used_evolution: set[str] = set()
+
     counts = Counter()
     for row in rows:
         path = row["source_path"]
@@ -142,9 +180,28 @@ def verify(map_path: Path, source_root: Path | None = None) -> dict[str, int]:
             assert not target_path.startswith("vendor/")
             assert not target_path.lower().endswith((".otbm", ".otb", ".spr", ".dat"))
             actual = target_git_blob(target_path)
-            assert actual == target["blob"], (
-                f"target blob drift: {target_path}: {actual} != {target['blob']}"
+            recorded = target["blob"]
+            if actual == recorded:
+                assert target_path not in target_evolution, (
+                    f"stale target evolution entry: {target_path}: actual target returned to recorded blob {recorded}"
+                )
+                continue
+
+            evolution = target_evolution.get(target_path)
+            assert evolution is not None, (
+                f"target blob drift without explicit evolution ledger: {target_path}: {actual} != {recorded}"
             )
+            assert evolution["prior_blob"] == recorded, (
+                f"target evolution prior mismatch: {target_path}: {evolution['prior_blob']} != {recorded}"
+            )
+            assert evolution["current_blob"] == actual, (
+                f"target evolution current mismatch: {target_path}: {actual} != {evolution['current_blob']}"
+            )
+            used_evolution.add(target_path)
+
+    assert used_evolution == set(target_evolution), (
+        f"unused target evolution entries: {sorted(set(target_evolution) - used_evolution)}"
+    )
     return dict(sorted(counts.items()))
 
 
