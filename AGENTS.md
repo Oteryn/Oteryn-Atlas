@@ -21,6 +21,18 @@ Before editing locally, verify remote URL, branch/worktree identity, HEAD and wo
 
 Local-only work receives no completion credit until the durable result exists on the approved GitHub branch/PR. If GitHub is genuinely unavailable, continue safe read-only analysis/patch preparation but do not start new product mutations merely to bypass the control plane unless the owner explicitly authorizes an emergency exception.
 
+## Capability truthfulness and tool discovery
+
+Technical execution capability is determined by the tools, connectors and actions actually exposed in the current session, not by assumptions about Chat, Work, Codex or another UI mode. A rejected handoff, missing local checkout, missing `gh`, unauthenticated local CLI, or an earlier agent statement is not proof that GitHub or write capability is unavailable.
+
+Before reporting that GitHub is read-only, commit/push/PR cannot be performed, Work mode is required, or repository work cannot continue, inspect all relevant currently exposed tools/actions and available authentication/permission evidence. Prefer repository-native GitHub operations for repository lifecycle work. If the preferred route fails, evaluate safe authorized fallbacks before asking the owner to switch modes or perform work manually.
+
+Classify a real limitation precisely as missing tool/action, unauthenticated context, permission denied, unsupported operation, repository/policy restriction, transient transport/service failure, or another directly observed condition. Do not generalize one failed action into a broader capability claim. If the capability has not been checked, record it as `UNKNOWN` and perform discovery rather than presenting it as a blocker.
+
+Capability discovery MUST be observational and least-mutating. Do not create throwaway branches, files, commits, comments, PRs, workflow runs, deployments or other durable state merely to prove write access. A genuine blocker report must name the exact operation, tool/connector/action inspected or attempted, observed failure, checked safe authorized fallbacks, and smallest missing capability or permission.
+
+Remote Desktop/Desktop Commander remains exception-only under the organization execution-routing policy and is not the routine fallback for repository work. Tool availability never grants or broadens authorization.
+
 ## Parallel-agent Git concurrency
 
 The organization baseline is META ADR 0004 plus the central agent execution/continuation contract. Atlas keeps the bootstrap-critical minimum here because repository instructions do not inherit across repositories.
@@ -32,6 +44,14 @@ The organization baseline is META ADR 0004 plus the central agent execution/cont
 - Preserve published task history by default. When entering final integration, refresh to current `integration_main_sha` with a normal non-force merge-up, resolve only authorized conflicts, review the resulting diff and rerun every validation/review layer invalidated by the new `task_head_sha`.
 - A lost merge race returns the task to integration/reconciliation, not to implementation from scratch.
 - Invalidate affected work only when verified task cancellation/supersession/rescope, incompatible governing authority, semantic contract/API/schema/invariant conflict, an unresolvable authorized reconciliation, or required tests prove prior assumptions no longer hold. Textual overlap or a changed filename alone is not sufficient proof.
+
+## META execution-routing policy
+
+The canonical organization policy is [`Oteryn/Oteryn@8fac1d55805fc3372351ea0a55ad7728b3570ebc:ecosystem/agent-execution-routing-policy.json`](https://github.com/Oteryn/Oteryn/blob/8fac1d55805fc3372351ea0a55ad7728b3570ebc/ecosystem/agent-execution-routing-policy.json). Atlas adopts it by reference and must not create a weaker local copy.
+
+Route project work through GitHub state, GitHub Actions or the repository-approved runner, and an isolated worktree first. Remote Desktop/Desktop Commander is default-deny; a host exception requires a closed recorded reason and a least-privilege recorded action. It is not a route for ordinary builds, tests, Git inspection or manual polling. Equivalent CI prohibits RDC polling of process output, Docker logs, workflow state and Git state.
+
+Before resuming, refresh GitHub repository/default-branch SHA/governing Issue/PR/task-head state; a local worktree or handoff is evidence only. Substantial task packets must plan parallel-first with independent lanes, exclusive branch/worktree and owned paths, dependencies, needed shared-resource leases and integration order. Serial work needs an explicit reason.
 
 ## Work boundary
 
