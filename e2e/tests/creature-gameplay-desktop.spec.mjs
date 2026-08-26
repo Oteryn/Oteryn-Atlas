@@ -95,6 +95,8 @@ test('desktop Sam direct activation opens exact Gameplay shop, preserves Semanti
     surfaceMetrics: gameplayMetrics,
     note: 'Desktop verified Sam Gameplay inspector with real Game-owned trade data.',
   });
+  await page.locator('.creature-gameplay-search').fill('');
+  await expect(page.locator('#gameplay-section-sells')).toContainText('20 gold');
 
   await page.locator('#inspector-tab-semantic').click();
   expect(new URL(page.url()).searchParams.get('inspector')).toBe('semantic');

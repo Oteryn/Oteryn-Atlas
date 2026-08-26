@@ -50,6 +50,7 @@ Consume the exact merged Game gameplay-profile projection through a bounded lazy
 - Exact-head browser qualification caught and corrected a stale Rat quick-card oracle: authoritative loot has 2 entries while gold coin max_count is 4; deterministic regression guard now preserves that distinction.
 - Exact-head visual qualification caught and corrected content-level inspector scrolling that hid the Gameplay/Semantic tablist; Details now keeps the inspector container at top and the tab remains hit-testable.
 - Formal Gameplay screenshot evidence uses the exact unique battle axe filter (235 gold sell / 80 gold buy) so both trade directions are simultaneously unclipped; full unfiltered lists remain covered by the functional journeys.
+- The visual-only battle axe filter is cleared immediately after evidence capture before the Semantic/Gameplay roundtrip; a deterministic source contract prevents screenshot state from contaminating the functional journey.
 - Exact-head browser qualification rejected out-of-bounds Yasir as a large-shop map fixture; the stress journey now uses exact map-reachable H.L. (`npc-entity:0c83ae18a907dc7e8f15c37c03e4f04c`) with 124 authoritative buy rows, guarded deterministically.
 - Final exact-head Molehill browser qualification and visual review remain pending through the bounded machine-wide slot pool.
 

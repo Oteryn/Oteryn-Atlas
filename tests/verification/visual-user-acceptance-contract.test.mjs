@@ -103,6 +103,7 @@ test('visual user acceptance contract enumerates complete primary user-facing st
   assert.match(gameplayDesktop, /desktop\.creature-gameplay/);
   assert.match(gameplayMobile, /mobile\.creature-gameplay/);
   assert.ok(gameplayDesktop.includes(".fill('battle axe')"));
+  assert.match(gameplayDesktop, /captureUserVisualEvidence[\s\S]*?\.fill\(''\)[\s\S]*?#inspector-tab-semantic/);
   assert.ok(gameplayMobile.includes(".fill('battle axe')"));
   assert.match(gameplayDesktop, /235 gold/);
   assert.match(gameplayDesktop, /80 gold/);
