@@ -28,6 +28,14 @@ test('all checkout-overlay launch paths provide normalized publication upstream 
   }
 });
 
+test('GitHub-hosted Compose fails closed before browser allocation when publication identity is missing', () => {
+  for (const key of ['ATLAS_PUBLICATION_ORIGIN', 'ATLAS_PUBLICATION_SCHEME', 'ATLAS_PUBLICATION_UPSTREAM', 'ATLAS_PUBLICATION_HOST_HEADER', 'ATLAS_PUBLICATION_HOST']) {
+    assert.match(compose, new RegExp(`${key}:\\s+"?\\$\\{${key}:\\?`), `${key} must be required by Compose interpolation`);
+  }
+  assert.doesNotMatch(compose, /ATLAS_PUBLICATION_(?:ORIGIN|UPSTREAM):[^\n]*127\.0\.0\.1:9/);
+  assert.match(runSh, /ATLAS_PUBLICATION_ORIGIN is required/);
+});
+
 test('native Windows checkout overlay bridges Docker Desktop to LAN through the host', () => {
   assert.equal(fs.existsSync(forwarderPath), true, 'missing local publication forwarder');
   const forwarder = fs.readFileSync(forwarderPath, 'utf8');
