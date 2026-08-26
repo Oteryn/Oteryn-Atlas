@@ -98,6 +98,10 @@ The deterministic suite covers:
 - critical accessible names and truthful disabled/hidden states;
 - user-facing visual acceptance across desktop/mobile initial state, search/inspector, layer presentation, animation playback, MINIMAP/CLASSIC/floor transitions, coordinate/zoom/pan navigation, degraded-search and fail-closed presentation, mobile drawers and responsive landscape-like resize, with deterministic clipping/occlusion/hit-target checks plus reviewed exact-revision full-frame evidence.
 
+Cross-browser depth uses the same pinned Playwright container but does not change the primary Chromium PR/pixel-baseline contract. `e2e/browser-matrix.json` defines Firefox desktop/mobile-like and WebKit desktop/mobile-like profiles. Nightly/manual Molehill runs first execute a real launch/touch probe, then run the four profiles sequentially with `workers=1` and `retries=0`. Firefox/WebKit acceptance is behavioral/user-facing and includes strict runtime/network failures, WebGL2 qualification, navigation, semantic inspector/history, playback and mobile-like touch/layout assertions; it never commits Game-derived cross-engine raster baselines.
+
+The pinned Linux Firefox profile is deliberately headed under Xvfb because the same Firefox 153 build exposes no WebGL in headless mode; the browser probe must prove WebGL2 under that exact mode. WebKit remains headless. Mobile-like secondary profiles use viewport plus Playwright-supported `hasTouch` and intentionally omit `isMobile`. Failure artifacts retain the exact Atlas revision, browser project/profile and engine. Unsupported or broken engine behavior fails the compatibility claim rather than being silently skipped.
+
 ## Network/error policy
 
 Unexpected page exceptions, console errors, failed requests and HTTP >=400 responses fail the suite. The allowlist is intentionally narrow: a missing favicon and a 404 for the optional `/data/creatures/index.json` entry point may be classified as expected. Once a creature index is present, missing child products are not ignored.

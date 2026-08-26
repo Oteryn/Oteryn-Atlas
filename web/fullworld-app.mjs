@@ -71,6 +71,7 @@ let pixelTransport = 'stable-buckets';
 let refreshTimer = null;
 let refreshEpoch = 0;
 let refreshAbortController = null;
+let pageUnloading = false;
 let dragging = null;
 let frameScheduler = null;
 let animationRuntime = null;
@@ -383,6 +384,7 @@ function scheduleRender(reason = 'view') {
 
 function scheduleRefresh(delay = 100) {
   clearTimeout(refreshTimer);
+  publishQualification('PENDING');
   refreshTimer = setTimeout(() => refreshScene().catch((error) => {
     if (error?.name !== 'AbortError') failClosed(error);
   }), delay);
@@ -783,7 +785,19 @@ function publishQualification(status, error = null) {
   globalThis.__OTERYN_ATLAS_FULLWORLD__ = result;
 }
 
+function markPageUnloading() {
+  pageUnloading = true;
+  clearTimeout(refreshTimer);
+  refreshTimer = null;
+  refreshAbortController?.abort();
+  stopAnimationLoop();
+}
+
+addEventListener('beforeunload', markPageUnloading, { once: true });
+addEventListener('pagehide', markPageUnloading, { once: true });
+
 function failClosed(error) {
+  if (pageUnloading) return;
   console.error(error);
   setBadge('FAIL-CLOSED', 'error');
   detailBadge.textContent = 'RUNTIME BLOCKED';
@@ -813,7 +827,7 @@ function applyView(next, options = {}) {
     selected = null;
     setRendererRecords([]);
   }
-  syncViewUi();
+  syncViewUi({ preserveExternalParams: options.preserveExternalParams ?? false });
   syncAnimationLoop();
   scheduleRender('view');
   renderInspector();
@@ -821,6 +835,12 @@ function applyView(next, options = {}) {
 }
 
 function wireInteraction() {
+  const syncHistoryView = () => applyView(parseFullWorldViewState(location.search, runtimeWorld), {
+    delay: 0,
+    preserveExternalParams: true,
+  });
+  window.addEventListener('popstate', syncHistoryView);
+  window.addEventListener('oteryn-atlas-semantic-navigation', syncHistoryView);
   for (const button of document.querySelectorAll('#view-mode-control [data-mode]')) button.addEventListener('click', () => {
     const mode = button.dataset.mode;
     const zoom = mode === 'map' && view.zoom < LOD_POLICY.detailZoom ? LOD_POLICY.detailZoom : view.zoom;

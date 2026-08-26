@@ -64,6 +64,77 @@ $slotEvidence = [ordered]@{
 $slotEvidence | ConvertTo-Json | Set-Content -Encoding utf8 (Join-Path $artifactDir 'slot-lease.json')
 Write-Output "Acquired Atlas heavy E2E slot $($slotLease.SlotId)/$($slotLease.SlotCount): $($slotLease.Path)"
 
+function Invoke-AtlasOverviewBurstPreflight {
+  param(
+    [Parameter(Mandatory = $true)][Uri]$OverviewBaseUri,
+    [Parameter(Mandatory = $true)][string]$HostHeader,
+    [Parameter(Mandatory = $true)][datetime]$Deadline
+  )
+
+  # The reference profile loads up to eight overview chunks concurrently before
+  # its first renderer commit.  Probe that same fan-out through the exact
+  # bridge used by Docker, so a merely readable manifest cannot mask a broken
+  # publication path.
+  $overviewConcurrency = 8
+  [System.Net.ServicePointManager]::DefaultConnectionLimit = [Math]::Max([System.Net.ServicePointManager]::DefaultConnectionLimit, $overviewConcurrency)
+  $failures = @()
+  do {
+    $failures = @()
+    try {
+      $worldResponse = Invoke-WebRequest -UseBasicParsing -Uri ([Uri]::new($OverviewBaseUri, 'world.json')) -Headers @{ Host = $HostHeader } -TimeoutSec 10
+      if ($worldResponse.StatusCode -ne 200 -or [string]::IsNullOrWhiteSpace($worldResponse.Content)) { throw "overview world status=$($worldResponse.StatusCode)" }
+      $world = $worldResponse.Content | ConvertFrom-Json
+      $floor = @($world.floors | Where-Object { $_.floor -eq -7 }) | Select-Object -First 1
+      if (-not $floor) { throw 'overview floor -7 is missing from the published world' }
+      if ($floor.path -notmatch '^[A-Za-z0-9._/-]+$' -or $floor.path.Contains('..')) { throw 'overview floor path is unsafe' }
+      $floorResponse = Invoke-WebRequest -UseBasicParsing -Uri ([Uri]::new($OverviewBaseUri, [string]$floor.path)) -Headers @{ Host = $HostHeader } -TimeoutSec 10
+      if ($floorResponse.StatusCode -ne 200 -or [string]::IsNullOrWhiteSpace($floorResponse.Content)) { throw "overview floor status=$($floorResponse.StatusCode)" }
+      $floorIndex = $floorResponse.Content | ConvertFrom-Json
+      $chunks = @($floorIndex.chunks | Select-Object -First $overviewConcurrency)
+      if ($chunks.Count -ne $overviewConcurrency) { throw "overview floor -7 exposes only $($chunks.Count) chunks; expected $overviewConcurrency" }
+
+      $pending = @()
+      foreach ($chunk in $chunks) {
+        if ($chunk.path -notmatch '^[A-Za-z0-9._/-]+$' -or $chunk.path.Contains('..')) { throw 'overview chunk path is unsafe' }
+        $path = [string]$chunk.path
+        $request = [System.Net.HttpWebRequest]::Create([Uri]::new($OverviewBaseUri, $path))
+        $request.Method = 'GET'
+        $request.Host = $HostHeader
+        $request.Proxy = $null
+        $request.Timeout = 10000
+        $request.ReadWriteTimeout = 10000
+        $request.ConnectionGroupName = "atlas-overview-preflight-$([Guid]::NewGuid().ToString('n'))"
+        $pending += [pscustomobject]@{ Path = $path; Request = $request; Task = $request.GetResponseAsync() }
+      }
+      foreach ($item in $pending) {
+        $response = $null
+        try {
+          $response = $item.Task.GetAwaiter().GetResult()
+          $stream = $response.GetResponseStream()
+          $body = [IO.MemoryStream]::new()
+          try {
+            $stream.CopyTo($body)
+            $bodyBytes = $body.Length
+          } finally {
+            $stream.Dispose()
+            $body.Dispose()
+          }
+          if ([int]$response.StatusCode -ne 200 -or $bodyBytes -le 0) { $failures += "$($item.Path) status=$([int]$response.StatusCode) bytes=$bodyBytes" }
+        } catch {
+          $failures += "$($item.Path) error=$($_.Exception.Message)"
+        } finally {
+          if ($response) { $response.Dispose() }
+        }
+      }
+    } catch {
+      $failures += "overview index error=$($_.Exception.Message)"
+    }
+    if ($failures.Count -eq 0) { return }
+    Start-Sleep -Seconds 2
+  } while ([DateTime]::UtcNow -lt $Deadline)
+  throw "Publication overview burst preflight did not become healthy: $($failures -join '; ')"
+}
+
 $publicationForwarder = $null
 if ($env:ATLAS_PUBLICATION_ORIGIN) {
   $origin = [Uri]$env:ATLAS_PUBLICATION_ORIGIN
@@ -74,7 +145,8 @@ if ($env:ATLAS_PUBLICATION_ORIGIN) {
   $publicationPreflightPaths = @(
     '/fullworld/publication/publication.json',
     '/fullworld/animation/manifest.json',
-    '/fullworld/minimap/world.json'
+    '/fullworld/minimap/world.json',
+    '/fullworld/overview/world.json'
   )
   $publicationPreflightDeadline = [DateTime]::UtcNow.AddSeconds(60)
   $publicationPreflightFailures = @()
@@ -125,8 +197,10 @@ if ($env:ATLAS_PUBLICATION_ORIGIN) {
       throw "Local publication forwarder failed to listen; see $forwarderErr"
     }
     $env:ATLAS_PUBLICATION_UPSTREAM = "host.docker.internal:$forwardPort"
+    Invoke-AtlasOverviewBurstPreflight -OverviewBaseUri ([Uri]"http://127.0.0.1:$forwardPort/fullworld/overview/") -HostHeader $origin.Authority -Deadline $publicationPreflightDeadline
   } else {
     $env:ATLAS_PUBLICATION_UPSTREAM = "$($origin.Host):$originPort"
+    Invoke-AtlasOverviewBurstPreflight -OverviewBaseUri ([Uri]"$($origin.AbsoluteUri.TrimEnd('/'))/fullworld/overview/") -HostHeader $origin.Authority -Deadline $publicationPreflightDeadline
   }
 } else {
   $env:ATLAS_PUBLICATION_SCHEME = 'http'

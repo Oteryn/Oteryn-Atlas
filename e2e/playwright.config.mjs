@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { defineConfig } from '@playwright/test';
 
@@ -9,17 +10,23 @@ const expectedRevision = process.env.ATLAS_EXPECTED_REVISION?.trim() || null;
 const verificationPlanSha256 = process.env.ATLAS_VERIFICATION_PLAN_SHA256?.trim() || null;
 const publicationOrigin = process.env.ATLAS_PUBLICATION_ORIGIN?.trim() || null;
 const depth = process.env.ATLAS_E2E_DEPTH?.trim() || 'required';
-const browserContainer = 'mcr.microsoft.com/playwright:v1.62.0-noble@sha256:baed2032d533817f3dbe6425de795788430ba345e819a1201337009ba17c9d07';
+const browserMatrix = JSON.parse(readFileSync(new URL('./browser-matrix.json', import.meta.url), 'utf8'));
+if (browserMatrix.version !== 1 || browserMatrix.primaryBrowser !== 'chromium') {
+  throw new Error('unsupported Atlas browser matrix');
+}
+const browserContainer = browserMatrix.browserContainer;
 
 const projects = [
   {
     name: 'desktop-chromium',
     testMatch: /desktop\.spec\.mjs$/,
+    testIgnore: /cross-browser-/,
     use: { browserName: 'chromium', viewport: { width: 1440, height: 900 } },
   },
   {
     name: 'mobile-chromium',
     testMatch: /mobile\.spec\.mjs$/,
+    testIgnore: /cross-browser-/,
     use: {
       browserName: 'chromium',
       viewport: { width: 390, height: 844 },
@@ -59,6 +66,23 @@ if (depth === 'nightly') {
       },
     },
   );
+}
+
+if (depth === browserMatrix.depthMode) {
+  for (const profile of browserMatrix.profiles) {
+    projects.push({
+      name: profile.name,
+      testMatch: profile.surface === 'desktop'
+        ? /cross-browser-desktop\.spec\.mjs$/
+        : /cross-browser-mobile\.spec\.mjs$/,
+      use: {
+        browserName: profile.browserName,
+        headless: profile.headless,
+        viewport: profile.viewport,
+        hasTouch: profile.hasTouch,
+      },
+    });
+  }
 }
 
 export default defineConfig({
