@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "entries": [
+    {
+      "pathPrefix": "docs/",
+      "domains": ["documentation"],
+      "minimumProfile": "none",
+      "requiredGroups": []
+    },
+    {
+      "pathPrefix": "tools/dyn-atlas-semantic/",
+      "domains": ["generator"],
+      "minimumProfile": "focused",
+      "requiredGroups": ["deterministic.core"]
+    },
+    {
+      "pathPrefix": "src/browser/creature-",
+      "domains": ["creatures"],
+      "minimumProfile": "targeted",
+      "requiredGroups": ["deterministic.core", "e2e.common-smoke", "e2e.creatures", "visual.creatures"]
+    },
+    {
+      "pathPrefix": "src/browser/",
+      "domains": ["browser-runtime"],
+      "minimumProfile": "broad",
+      "requiredGroups": ["deterministic.core", "e2e.common-smoke"]
+    },
+    {
+      "pathPrefix": "tools/verification/",
+      "domains": ["verification-governance"],
+      "minimumProfile": "full",
+      "requiredGroups": ["deterministic.core", "e2e.full"]
+    }
+  ]
+}
