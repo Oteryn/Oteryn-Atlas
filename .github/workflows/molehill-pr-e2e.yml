@@ -127,8 +127,9 @@ jobs:
           New-Item -ItemType Directory -Force artifacts/verification | Out-Null
           npm ci --prefix e2e
           $env:ATLAS_ARTIFACTS_DIR = "$PWD/artifacts/verification/playwright-list"
-          npm exec --prefix e2e -- playwright test --config=e2e/playwright.config.mjs --list |
-            Set-Content -Encoding utf8 artifacts/verification/playwright-test-list.txt
+          $playwrightList = 'artifacts\\verification\\playwright-test-list.txt'
+          cmd.exe /d /s /c "npm exec --prefix e2e -- playwright test --config=e2e/playwright.config.mjs --list > `"$playwrightList`""
+          if ($LASTEXITCODE -ne 0) { throw "Playwright list enumeration failed with exit code $LASTEXITCODE." }
           node ../trusted-base/tools/verification/parse-playwright-test-list.mjs `
             artifacts/verification/playwright-test-list.txt > artifacts/verification/stable-test-ids.json
           $mergeBase = (git merge-base $env:ATLAS_CODE_REVISION $env:ATLAS_BASE_SHA).Trim()

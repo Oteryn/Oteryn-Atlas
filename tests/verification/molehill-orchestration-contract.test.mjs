@@ -84,3 +84,12 @@ test('new host admission fences historical diagnostic slot three during migratio
   assert.match(selfTest, /host admission entered while legacy diagnostic slot three was active/i);
   assert.match(run, /Release-AtlasHostAdmission/);
 });
+
+
+test('Molehill plan census captures Playwright list without PowerShell transcoding', () => {
+  const planStep = workflow.slice(workflow.indexOf('      - name: Build exact trusted-base lower-bound plan'));
+  assert.match(planStep, /cmd\.exe \/d \/s \/c/);
+  assert.match(planStep, /playwright-test-list\.txt/);
+  assert.doesNotMatch(planStep, /playwright[^\n]*--list\s*\|\s*\n?\s*Set-Content/);
+  assert.match(planStep, /\.\.\/trusted-base\/tools\/verification\/parse-playwright-test-list\.mjs/);
+});
