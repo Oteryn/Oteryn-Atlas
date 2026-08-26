@@ -54,6 +54,7 @@ Consume the exact merged Game gameplay-profile projection through a bounded lazy
 - The visual-only battle axe filter is cleared immediately after evidence capture before the Semantic/Gameplay roundtrip; a deterministic source contract prevents screenshot state from contaminating the functional journey.
 - Exact-head browser qualification rejected out-of-bounds Yasir as a large-shop map fixture; the stress journey now uses exact map-reachable H.L. (`npc-entity:0c83ae18a907dc7e8f15c37c03e4f04c`) with 124 authoritative buy rows, guarded deterministically.
 - Plan-bound visual regression caught the stale desktop inspector baseline; the old two-tab + empty creature placeholder image was manually compared against the intended Gameplay/Semantic/Live inspector and replaced with the reviewed exact frame (`sha256:9a06890661417258a65aa75902ab752dc4d8cdf2973e5bd1c5e36373508737ee`).
+- Exact-head visual qualification also caught the stale mobile inspector snapshot; manual actual/baseline/diff review confirmed the same intentional Gameplay/Semantic/Live-state tab delta with no clipping, and only that reviewed mobile baseline was refreshed.
 - Final exact-head Molehill browser qualification and visual review remain pending through the bounded machine-wide slot pool.
 
 ## Excluded
