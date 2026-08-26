@@ -13,8 +13,8 @@ const catalog = {
   groups: {
     'deterministic.core': { specs: ['tests/verification/*.test.mjs'], projects: [], resourceClass: 'cpu-light', evidence: 'machine-summary' },
     'e2e.common-smoke': { specs: ['e2e/tests/desktop.spec.mjs', 'e2e/tests/mobile.spec.mjs'], projects: ['desktop-chromium', 'mobile-chromium'], resourceClass: 'browser-targeted', evidence: 'machine-summary' },
-    'e2e.creatures': { specs: ['e2e/tests/creatures-desktop.spec.mjs'], projects: ['desktop-chromium'], resourceClass: 'browser-targeted', evidence: 'machine-summary' },
-    'visual.creatures': { specs: ['e2e/tests/visual-desktop.spec.mjs'], projects: ['desktop-chromium'], resourceClass: 'browser-targeted', evidence: 'restricted-visual-review' },
+    'e2e.creatures': { specs: ['e2e/tests/creatures-desktop.spec.mjs'], projects: ['desktop-chromium'], resourceClass: 'browser-targeted', evidence: 'machine-summary', dependsOn: ['e2e.common-smoke'] },
+    'visual.creatures': { specs: ['e2e/tests/visual-desktop.spec.mjs'], projects: ['desktop-chromium'], resourceClass: 'browser-targeted', evidence: 'restricted-visual-review', dependsOn: ['e2e.creatures'] },
     'e2e.full': { specs: ['e2e/tests/*.spec.mjs'], projects: ['desktop-chromium', 'mobile-chromium'], resourceClass: 'browser-full', evidence: 'restricted-visual-review' },
   },
 };
@@ -83,6 +83,28 @@ test('planner composes every applicable impact prefix instead of allowing longes
   assert.equal(plan.profile, 'broad');
   assert.deepEqual(plan.requiredGroupIds, ['e2e.common-smoke', 'e2e.creatures', 'visual.creatures']);
   assert.deepEqual(plan.impactDomains, ['browser-runtime', 'creatures']);
+});
+
+test('planner expands transitive producer-consumer group dependencies', () => {
+  const visualOnlyManifest = {
+    schemaVersion: 1,
+    entries: [
+      { pathPrefix: 'visual-change/', domains: ['visual-change'], minimumProfile: 'targeted', requiredGroups: ['visual.creatures'] },
+    ],
+  };
+  const plan = buildVerificationPlan({
+    repository: 'Oteryn/Oteryn-Atlas',
+    headSha: 'a'.repeat(40),
+    integrationBaseSha: 'b'.repeat(40),
+    mergeBaseSha: 'c'.repeat(40),
+    changedFiles: [{ path: 'visual-change/example.mjs' }],
+    trustedImpactManifest: visualOnlyManifest,
+    candidateImpactManifest: visualOnlyManifest,
+    verificationCatalog: catalog,
+  });
+
+  assert.deepEqual(plan.requiredGroupIds, ['e2e.common-smoke', 'e2e.creatures', 'visual.creatures']);
+  assert.deepEqual(plan.groups.find((group) => group.id === 'visual.creatures').dependsOn, ['e2e.creatures']);
 });
 
 test('planner fails closed to full for unknown, empty, malformed and governance evidence', () => {
