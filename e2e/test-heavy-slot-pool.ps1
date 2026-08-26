@@ -13,6 +13,7 @@ $legacyLockPath = Join-Path ([IO.Path]::GetTempPath()) "slot-selftest-$PID-legac
 $slotPrefix = "slot-selftest-$PID-slot-"
 $hostPrefix = "host-selftest-$PID-admission-"
 $diagnosticFencePath = Join-Path ([IO.Path]::GetTempPath()) "host-selftest-$PID-diagnostic-slot3-migration-fence.lock"
+$exclusiveLockPath = Join-Path ([IO.Path]::GetTempPath()) "host-selftest-$PID-exclusive.lock"
 $projectLease = $null
 $artifactLease = $null
 $fence1 = $null
@@ -23,6 +24,9 @@ $slot3 = $null
 $host1 = $null
 $host2 = $null
 $host3 = $null
+$exclusive1 = $null
+$exclusive2 = $null
+$exclusiveBrowser = $null
 try {
   Remove-Item Env:ATLAS_E2E_SLOT_COUNT -ErrorAction SilentlyContinue
   Remove-Item Env:ATLAS_E2E_SLOT -ErrorAction SilentlyContinue
@@ -116,8 +120,49 @@ try {
   $host3 = Acquire-AtlasHostAdmission -HostCapacity 2 -TimeoutSeconds 2 -Project 'host-selftest-after-legacy' -Revision 'selftest' -HostPrefix $hostPrefix -DiagnosticSlotFencePath $diagnosticFencePath
   Assert-True ($host3.TokenId -ge 1) 'host admission did not recover after legacy diagnostic slot three released'
 
+  # Release the ordinary measured leases before exercising the exclusive-host drain.
+  Release-AtlasHostAdmission $host3
+  $host3 = $null
+  foreach ($slotLease in @($slot3, $slot2)) { if ($slotLease -and $slotLease.Stream) { $slotLease.Stream.Dispose() } }
+  $slot3 = $null
+  $slot2 = $null
+
+  $exclusive1 = Acquire-AtlasExclusiveHostAdmission -TimeoutSeconds 3 -Project 'exclusive-host-selftest-a' -Revision 'selftest' -ResourceClass 'performance' -AuthorityMode 'diagnostic' -HostPrefix $hostPrefix -SlotPrefix $slotPrefix -LegacyLockPath $legacyLockPath -DiagnosticSlotFencePath $diagnosticFencePath -ExclusiveLockPath $exclusiveLockPath
+  Assert-True (@($exclusive1.HostLeases).Count -eq 2) 'exclusive host admission did not reserve both host tokens'
+  Assert-True (@($exclusive1.SlotLeases).Count -eq 2) 'exclusive host admission did not reserve both legacy slots'
+  Assert-True (@($exclusive1.HostLeases.TokenId | Select-Object -Unique).Count -eq 2) 'exclusive host admission duplicated a host token'
+  Assert-True (@($exclusive1.SlotLeases.SlotId | Sort-Object) -join ',' -eq '1,2') 'exclusive host admission did not reserve slots 1 and 2'
+
+  try {
+    Acquire-AtlasHostAdmission -HostCapacity 2 -TimeoutSeconds 1 -Project 'exclusive-host-browser-probe' -Revision 'selftest' -HostPrefix $hostPrefix -DiagnosticSlotFencePath $diagnosticFencePath | Out-Null
+    throw 'browser admission entered while exclusive host admission was active'
+  } catch {
+    Assert-True ($_.Exception.Message -match 'Timed out') 'wrong browser admission failure while exclusive host admission was active'
+  }
+  try {
+    Acquire-AtlasHeavySlot -SlotCount 2 -RequestedSlot $null -TimeoutSeconds 1 -Project 'exclusive-host-slot-probe' -Revision 'selftest' -SlotPrefix $slotPrefix | Out-Null
+    throw 'legacy slot admission entered while exclusive host admission was active'
+  } catch {
+    Assert-True ($_.Exception.Message -match 'Timed out') 'wrong legacy slot failure while exclusive host admission was active'
+  }
+
+  Release-AtlasExclusiveHostAdmission $exclusive1
+  $exclusive1 = $null
+  $exclusiveBrowser = Acquire-AtlasHostAdmission -HostCapacity 2 -TimeoutSeconds 2 -Project 'exclusive-host-browser-after-release' -Revision 'selftest' -HostPrefix $hostPrefix -DiagnosticSlotFencePath $diagnosticFencePath
+  Assert-True ($exclusiveBrowser.TokenId -ge 1) 'browser host admission did not recover after exclusive release'
+  Release-AtlasHostAdmission $exclusiveBrowser
+  $exclusiveBrowser = $null
+
+  $exclusive2 = Acquire-AtlasExclusiveHostAdmission -TimeoutSeconds 3 -Project 'exclusive-host-selftest-b' -Revision 'selftest' -ResourceClass 'native-gpu' -AuthorityMode 'diagnostic' -HostPrefix $hostPrefix -SlotPrefix $slotPrefix -LegacyLockPath $legacyLockPath -DiagnosticSlotFencePath $diagnosticFencePath -ExclusiveLockPath $exclusiveLockPath
+  Assert-True (@($exclusive2.HostLeases).Count -eq 2) 'exclusive host admission was not reusable'
+  Release-AtlasExclusiveHostAdmission $exclusive2
+  $exclusive2 = $null
+
   Write-Output 'heavy-e2e-slot-pool-self-test=PASS'
 } finally {
+  Release-AtlasExclusiveHostAdmission $exclusive2
+  Release-AtlasExclusiveHostAdmission $exclusive1
+  Release-AtlasHostAdmission $exclusiveBrowser
   foreach ($hostLease in @($host3, $host2, $host1)) { Release-AtlasHostAdmission $hostLease }
   foreach ($lease in @($slot3, $slot2, $slot1, $fence2, $fence1, $artifactLease, $projectLease)) {
     if ($lease -and $lease.Stream) { $lease.Stream.Dispose() }
