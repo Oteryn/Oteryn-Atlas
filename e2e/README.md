@@ -23,6 +23,7 @@ Native Windows PowerShell:
 ```powershell
 $env:ATLAS_PUBLICATION_ORIGIN = 'http://192.168.1.2:8097'
 $env:ATLAS_E2E_WORKERS = '1'
+$env:ATLAS_VERIFICATION_PLAN_PATH = 'C:\\path\\to\\shadow-verification-plan.json'
 .\e2e\run.ps1
 ```
 
@@ -34,6 +35,7 @@ After the exact tested commit has been pushed to the PR branch, publish the veri
 ```powershell
 .\e2e\publish-local-e2e-status.ps1 `
   -SummaryPath .\artifacts\e2e\<project>\summary.json `
+  -VerificationPlanPath C:\\path\\to\\shadow-verification-plan.json `
   -RemoteBranch agent/atlas-verify-ci-nightly-01
 ```
 
@@ -46,7 +48,7 @@ Trusted local `run.ps1`/`run.sh` invocations enable successful full-frame user e
   -ConfirmReviewedAllScreenshots
 ```
 
-`publish-local-e2e-status.ps1` now requires the resulting `visual-review.json`, verifies the exact summary digest and re-hashes every reviewed screenshot before it can publish success. The publisher writes only the `atlas-local-e2e` commit status; it does not merge, deploy or modify the publication.
+`publish-local-e2e-status.ps1` now requires the resulting `visual-review.json` and the exact verification-plan artifact. It verifies the plan hash embedded in the Playwright summary, its exact HEAD/merge-base identity, and the complete stable Playwright test-ID census before re-hashing every reviewed screenshot. The publisher writes only the `atlas-local-e2e` commit status; it does not merge, deploy or modify the publication.
 
 ## Test a deployed preview directly
 
@@ -63,6 +65,24 @@ PowerShell uses the same environment variable names with `.\e2e\run.ps1`.
 Direct mode exercises deployed code and data together. `ATLAS_EXPECTED_REVISION` is optional for exploratory runs but required for a revision-qualified acceptance claim.
 
 Set `ATLAS_E2E_WORKERS=1` for a low-resource machine. The suite has no retries, so first-run failures remain visible.
+
+## Worker calibration (Molehill-PC only)
+
+Do not change the accepted worker policy from hardware intuition. The measurement-only harness runs the required baseline/candidates (`1`, `2`, `4`, `6`, `8`) in counterbalanced order with at least three repetitions and records Windows performance-counter, Docker, disk, runner, environment, summary and zero-retry evidence. It does not change Playwright configuration, runner slots, branch policy, or status publication.
+
+First validate the harness on Molehill-PC:
+
+```powershell
+.\e2e\benchmark-workers.ps1 -SelfTest
+```
+
+Then run it only when the current checkout is the intended exact revision and no exclusive performance, soak, native-GPU, deployment, or conflicting calibration work is active:
+
+```powershell
+.\e2e\benchmark-workers.ps1 -PublicationOrigin http://192.168.1.2:8097 -Repetitions 3
+```
+
+Review the generated JSON before proposing any worker or concurrency default. A nonzero test exit, nonzero retry, missing summary, browser/container instability, or incomplete telemetry invalidates that measurement set.
 
 ## Coverage
 
