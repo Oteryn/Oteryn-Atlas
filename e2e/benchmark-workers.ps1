@@ -3,6 +3,8 @@ param(
   [string]$PublicationOrigin,
   [ValidateSet(1, 2, 4, 6, 8)][int[]]$Workers = @(1, 2, 4, 6, 8),
   [ValidateSet('full', 'targeted', 'broad')][string[]]$Workloads = @('full', 'targeted', 'broad'),
+  [ValidateSet('host', 'private')][string[]]$IpcModes = @('host', 'private'),
+  [ValidatePattern('^[1-9][0-9]*(?:[kKmMgG][bB]?)$')][string]$ShmSize = '1gb',
   [ValidateRange(3, 5)][int]$Repetitions = 3,
   [string]$OutputPath,
   [switch]$SelfTest
@@ -140,9 +142,10 @@ $fingerprint = Get-EnvironmentFingerprint
 if ($SelfTest) {
   if ($Workers.Count -ne @($Workers | Select-Object -Unique).Count) { throw 'Worker candidates must be unique.' }
   if ($Workloads.Count -ne @($Workloads | Select-Object -Unique).Count) { throw 'Workloads must be unique.' }
+  if ($IpcModes.Count -ne @($IpcModes | Select-Object -Unique).Count) { throw 'IPC modes must be unique.' }
   $probe = Get-RequiredCounterSample
   if ($null -eq $probe.processorUtilityPercent -or $null -eq $probe.diskQueueLength -or $null -eq $probe.memoryPressurePercent) { throw 'Benchmark telemetry self-test failed.' }
-  [pscustomobject]@{ schemaVersion = 2; selfTest = 'passed'; fingerprint = $fingerprint; workloadDigest = $workloadDigest; telemetry = $probe; selectionApplied = $false } |
+  [pscustomobject]@{ schemaVersion = 2; selfTest = 'passed'; fingerprint = $fingerprint; workloadDigest = $workloadDigest; requestedIpcModes = @($IpcModes); shmSize = $ShmSize; telemetry = $probe; selectionApplied = $false } |
     ConvertTo-Json -Depth 16 | Set-Content -LiteralPath $OutputPath -Encoding utf8
   Write-Output "benchmark-workers-self-test=PASS output=$OutputPath"
   exit 0
@@ -152,7 +155,7 @@ if (-not $PublicationOrigin) { throw 'PublicationOrigin is required unless -Self
 if ($PublicationOrigin -notmatch '^https?://[A-Za-z0-9.-]+(:[0-9]{1,5})?$') { throw 'PublicationOrigin must be a plain http(s) origin without a path, query or credentials.' }
 
 $originalEnvironment = @{}
-foreach ($name in @('ATLAS_PUBLICATION_ORIGIN','ATLAS_E2E_WORKERS','ATLAS_E2E_PROJECT','ATLAS_E2E_ARTIFACTS_HOST','ATLAS_E2E_LOCK_TIMEOUT_SECONDS','ATLAS_E2E_BENCHMARK_WORKLOAD','ATLAS_E2E_AUTHORITY_MODE','ATLAS_E2E_RESOURCE_CLASS','ATLAS_E2E_SLOT_COUNT','ATLAS_E2E_SLOT')) {
+foreach ($name in @('ATLAS_PUBLICATION_ORIGIN','ATLAS_E2E_WORKERS','ATLAS_E2E_PROJECT','ATLAS_E2E_ARTIFACTS_HOST','ATLAS_E2E_LOCK_TIMEOUT_SECONDS','ATLAS_E2E_BENCHMARK_WORKLOAD','ATLAS_E2E_AUTHORITY_MODE','ATLAS_E2E_RESOURCE_CLASS','ATLAS_E2E_SLOT_COUNT','ATLAS_E2E_SLOT','ATLAS_E2E_IPC_MODE','ATLAS_E2E_SHM_SIZE')) {
   $originalEnvironment[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
 }
 
@@ -179,88 +182,94 @@ try {
 
   for ($repetition = 1; $repetition -le $Repetitions; $repetition += 1) {
     foreach ($workload in $Workloads) {
-      foreach ($workerCount in Get-RandomizedOrder $Workers) {
-        $project = "atlas-worker-$workload-r$repetition-w$workerCount-$([guid]::NewGuid().ToString('N').Substring(0, 6))"
-        $activeProject = $project
-        $artifactDir = Join-Path $root "artifacts\e2e\$project"
-        New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
-        $env:ATLAS_PUBLICATION_ORIGIN = $PublicationOrigin
-        $env:ATLAS_E2E_WORKERS = "$workerCount"
-        $env:ATLAS_E2E_BENCHMARK_WORKLOAD = $workload
-        $env:ATLAS_E2E_PROJECT = $project
-        $env:ATLAS_E2E_ARTIFACTS_HOST = "../artifacts/e2e/$project"
-        $env:ATLAS_E2E_LOCK_TIMEOUT_SECONDS = '21600'
-        $env:ATLAS_E2E_AUTHORITY_MODE = 'diagnostic'
-        $env:ATLAS_E2E_RESOURCE_CLASS = 'browser-full'
-        $env:ATLAS_E2E_SLOT_COUNT = '2'
-        $env:ATLAS_E2E_SLOT = '1'
+      foreach ($ipcMode in $IpcModes) {
+        foreach ($workerCount in Get-RandomizedOrder $Workers) {
+          $project = "atlas-worker-$workload-$ipcMode-r$repetition-w$workerCount-$([guid]::NewGuid().ToString('N').Substring(0, 6))"
+          $activeProject = $project
+          $artifactDir = Join-Path $root "artifacts\e2e\$project"
+          New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
+          $env:ATLAS_PUBLICATION_ORIGIN = $PublicationOrigin
+          $env:ATLAS_E2E_WORKERS = "$workerCount"
+          $env:ATLAS_E2E_BENCHMARK_WORKLOAD = $workload
+          $env:ATLAS_E2E_PROJECT = $project
+          $env:ATLAS_E2E_ARTIFACTS_HOST = "../artifacts/e2e/$project"
+          $env:ATLAS_E2E_LOCK_TIMEOUT_SECONDS = '21600'
+          $env:ATLAS_E2E_AUTHORITY_MODE = 'diagnostic'
+          $env:ATLAS_E2E_RESOURCE_CLASS = 'browser-full'
+          $env:ATLAS_E2E_SLOT_COUNT = '2'
+          $env:ATLAS_E2E_SLOT = '1'
+          $env:ATLAS_E2E_IPC_MODE = $ipcMode
+          $env:ATLAS_E2E_SHM_SIZE = $ShmSize
 
-        $buildStarted = [DateTime]::UtcNow
-        docker compose -p $project -f e2e\compose.yml build e2e | Out-Host
-        $buildMs = [math]::Round(([DateTime]::UtcNow - $buildStarted).TotalMilliseconds, 3)
-        if ($LASTEXITCODE -ne 0) { throw "Warm E2E build failed: $project" }
+          $buildStarted = [DateTime]::UtcNow
+          docker compose -p $project -f e2e\compose.yml build e2e | Out-Host
+          $buildMs = [math]::Round(([DateTime]::UtcNow - $buildStarted).TotalMilliseconds, 3)
+          if ($LASTEXITCODE -ne 0) { throw "Warm E2E build failed: $project" }
 
-        $serverStarted = [DateTime]::UtcNow
-        docker compose -p $project -f e2e\compose.yml up -d --no-build atlas-web | Out-Host
-        if ($LASTEXITCODE -ne 0) { throw "Atlas web startup failed: $project" }
-        $serverName = "$project-atlas-web-1"
-        $healthy = $false
-        for ($attempt = 0; $attempt -lt 60; $attempt += 1) {
-          $health = docker inspect --format '{{.State.Health.Status}}' $serverName 2>$null
-          if ($LASTEXITCODE -eq 0 -and $health -eq 'healthy') { $healthy = $true; break }
-          Start-Sleep -Seconds 1
+          $serverStarted = [DateTime]::UtcNow
+          docker compose -p $project -f e2e\compose.yml up -d --no-build atlas-web | Out-Host
+          if ($LASTEXITCODE -ne 0) { throw "Atlas web startup failed: $project" }
+          $serverName = "$project-atlas-web-1"
+          $healthy = $false
+          for ($attempt = 0; $attempt -lt 60; $attempt += 1) {
+            $health = docker inspect --format '{{.State.Health.Status}}' $serverName 2>$null
+            if ($LASTEXITCODE -eq 0 -and $health -eq 'healthy') { $healthy = $true; break }
+            Start-Sleep -Seconds 1
+          }
+          if (-not $healthy) { throw "Atlas web did not become healthy: $project" }
+          $serverStartupMs = [math]::Round(([DateTime]::UtcNow - $serverStarted).TotalMilliseconds, 3)
+
+          $before = Get-RequiredCounterSample $project
+          $started = [DateTime]::UtcNow
+          $runLog = Join-Path $artifactDir 'benchmark-run.log'
+          $runErrorLog = Join-Path $artifactDir 'benchmark-run.err.log'
+          $run = Start-Process -FilePath powershell.exe -ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $PSScriptRoot 'run.ps1')) -PassThru -RedirectStandardOutput $runLog -RedirectStandardError $runErrorLog
+          $resourceSamples = [System.Collections.Generic.List[object]]::new()
+          while (-not $run.HasExited) {
+            $resourceSamples.Add((Get-RequiredCounterSample $project))
+            Start-Sleep -Seconds 2
+            $run.Refresh()
+          }
+          $exitCode = $run.ExitCode
+          $finished = [DateTime]::UtcNow
+          $after = Get-RequiredCounterSample
+          $summary = Get-SummaryMetrics (Join-Path $artifactDir 'summary.json')
+          $firstRunFailures = if ($summary) { [int]$summary.nonPassed } else { 1 }
+          $browserCrashes = (Count-LogMatches $runLog '(?i)browser.*crash|target page, context or browser has been closed') + (Count-LogMatches $runErrorLog '(?i)browser.*crash|target page, context or browser has been closed')
+          $containerCrashes = (Count-LogMatches $runLog '(?i)exited with code [1-9]|container.*failed') + (Count-LogMatches $runErrorLog '(?i)exited with code [1-9]|container.*failed')
+          $oomKilled = (Count-LogMatches $runLog '(?i)oomkilled|out of memory') + (Count-LogMatches $runErrorLog '(?i)oomkilled|out of memory')
+          if ($exitCode -eq 0 -and @($resourceSamples | Where-Object { $_.dockerContainerCount -gt 0 }).Count -eq 0) { throw "No active Docker telemetry: $project" }
+          if ($exitCode -eq 0 -and @($resourceSamples | Where-Object { $null -ne $_.sharedMemory }).Count -eq 0) { throw "No sharedMemory telemetry: $project" }
+
+          $runs.Add([pscustomobject][ordered]@{
+            workload = $workload
+            ipcMode = $ipcMode
+            shmSize = $ShmSize
+            repetition = $repetition
+            workers = $workerCount
+            project = $project
+            startedAtUtc = $started.ToString('o')
+            finishedAtUtc = $finished.ToString('o')
+            wallTimeMs = [math]::Round(($finished - $started).TotalMilliseconds, 3)
+            buildTimeMs = $buildMs
+            serverStartupMs = $serverStartupMs
+            exitCode = $exitCode
+            firstRunFailures = $firstRunFailures
+            browserCrashes = [int]$browserCrashes
+            containerCrashes = [int]$containerCrashes
+            oomKilled = [int]$oomKilled
+            telemetryBefore = $before
+            telemetryAfter = $after
+            resourceSamples = @($resourceSamples)
+            summary = $summary
+          })
+          Write-Output "benchmark workload=$workload ipc=$ipcMode shm=$ShmSize repetition=$repetition workers=$workerCount exit=$exitCode wall=$([math]::Round(($finished-$started).TotalSeconds,1))s"
+          $previousPreference = $ErrorActionPreference
+          $ErrorActionPreference = 'Continue'
+          docker compose -p $project -f e2e\compose.yml down --remove-orphans *> $null
+          $ErrorActionPreference = $previousPreference
+          $activeProject = $null
         }
-        if (-not $healthy) { throw "Atlas web did not become healthy: $project" }
-        $serverStartupMs = [math]::Round(([DateTime]::UtcNow - $serverStarted).TotalMilliseconds, 3)
-
-        $before = Get-RequiredCounterSample $project
-        $started = [DateTime]::UtcNow
-        $runLog = Join-Path $artifactDir 'benchmark-run.log'
-        $runErrorLog = Join-Path $artifactDir 'benchmark-run.err.log'
-        $run = Start-Process -FilePath powershell.exe -ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $PSScriptRoot 'run.ps1')) -PassThru -RedirectStandardOutput $runLog -RedirectStandardError $runErrorLog
-        $resourceSamples = [System.Collections.Generic.List[object]]::new()
-        while (-not $run.HasExited) {
-          $resourceSamples.Add((Get-RequiredCounterSample $project))
-          Start-Sleep -Seconds 2
-          $run.Refresh()
-        }
-        $exitCode = $run.ExitCode
-        $finished = [DateTime]::UtcNow
-        $after = Get-RequiredCounterSample
-        $summary = Get-SummaryMetrics (Join-Path $artifactDir 'summary.json')
-        $firstRunFailures = if ($summary) { [int]$summary.nonPassed } else { 1 }
-        $browserCrashes = (Count-LogMatches $runLog '(?i)browser.*crash|target page, context or browser has been closed') + (Count-LogMatches $runErrorLog '(?i)browser.*crash|target page, context or browser has been closed')
-        $containerCrashes = (Count-LogMatches $runLog '(?i)exited with code [1-9]|container.*failed') + (Count-LogMatches $runErrorLog '(?i)exited with code [1-9]|container.*failed')
-        $oomKilled = (Count-LogMatches $runLog '(?i)oomkilled|out of memory') + (Count-LogMatches $runErrorLog '(?i)oomkilled|out of memory')
-        if ($exitCode -eq 0 -and @($resourceSamples | Where-Object { $_.dockerContainerCount -gt 0 }).Count -eq 0) { throw "No active Docker telemetry: $project" }
-        if ($exitCode -eq 0 -and @($resourceSamples | Where-Object { $null -ne $_.sharedMemory }).Count -eq 0) { throw "No sharedMemory telemetry: $project" }
-
-        $runs.Add([pscustomobject][ordered]@{
-          workload = $workload
-          repetition = $repetition
-          workers = $workerCount
-          project = $project
-          startedAtUtc = $started.ToString('o')
-          finishedAtUtc = $finished.ToString('o')
-          wallTimeMs = [math]::Round(($finished - $started).TotalMilliseconds, 3)
-          buildTimeMs = $buildMs
-          serverStartupMs = $serverStartupMs
-          exitCode = $exitCode
-          firstRunFailures = $firstRunFailures
-          browserCrashes = [int]$browserCrashes
-          containerCrashes = [int]$containerCrashes
-          oomKilled = [int]$oomKilled
-          telemetryBefore = $before
-          telemetryAfter = $after
-          resourceSamples = @($resourceSamples)
-          summary = $summary
-        })
-        Write-Output "benchmark workload=$workload repetition=$repetition workers=$workerCount exit=$exitCode wall=$([math]::Round(($finished-$started).TotalSeconds,1))s"
-        $previousPreference = $ErrorActionPreference
-        $ErrorActionPreference = 'Continue'
-        docker compose -p $project -f e2e\compose.yml down --remove-orphans *> $null
-        $ErrorActionPreference = $previousPreference
-        $activeProject = $null
       }
     }
   }
@@ -285,6 +294,8 @@ $result = [pscustomobject][ordered]@{
   workloadDigest = $workloadDigest
   requestedWorkers = @($Workers)
   requestedWorkloads = @($Workloads)
+  requestedIpcModes = @($IpcModes)
+  shmSize = $ShmSize
   repetitions = $Repetitions
   coldBuildTimeMs = $coldBuildMs
   fingerprint = $fingerprint
