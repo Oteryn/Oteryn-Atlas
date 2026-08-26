@@ -31,7 +31,8 @@ services:
       context: ..
       dockerfile: e2e/Dockerfile
     init: true
-    ipc: host
+    ipc: ${ATLAS_E2E_IPC_MODE:-host}
+    shm_size: ${ATLAS_E2E_SHM_SIZE:-1gb}
     depends_on:
       atlas-web:
         condition: service_healthy
