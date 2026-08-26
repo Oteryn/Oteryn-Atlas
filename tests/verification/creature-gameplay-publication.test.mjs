@@ -61,3 +61,16 @@ test('exact-source workflow rebuilds the same merged Game product and CI runs co
     assert.match(ci, new RegExp(path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   }
 });
+
+test('Rat loot row count stays separate from per-drop max count', () => {
+  const shard = JSON.parse(readFileSync(join(PRODUCT, 'shards', 'monster-80.json')));
+  const rat = shard.profiles.find((profile) => profile.entity_id === 'monster-entity:80295e51265b3662bfbea2ea01ee3ccb');
+  assert.ok(rat, 'exact Rat gameplay profile must remain published');
+  assert.equal(rat.loot.state, 'COMPLETE');
+  assert.equal(rat.loot.entries.length, 2);
+  const gold = rat.loot.entries.find((entry) => entry.item_name === 'gold coin');
+  assert.ok(gold, 'Rat gold coin loot row must remain published');
+  assert.equal(gold.chance_ppm, 1000000);
+  assert.equal(gold.min_count, 1);
+  assert.equal(gold.max_count, 4);
+});

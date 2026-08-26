@@ -43,10 +43,11 @@ Consume the exact merged Game gameplay-profile projection through a bounded lazy
 
 - Integrated current main by normal non-force merge-up at `abb799b5bb0905c8f2e8b57e67950334db39d5f7`; targeted Gameplay/slot-pool/live-readiness integration contracts: 52/52 PASS.
 - Exact Game publication: 1049 NPC / 1800 monster profiles / 508 shards / `sha256:7ac7c08949aa498cb843ca26e3417e537b3409d89e4f265861f3f94855b96d28`.
-- CI-equivalent deterministic Node matrix after current-main integration: 372/372 PASS, 0 fail, 0 skip.
+- CI-equivalent deterministic Node matrix after current-main integration and Rat oracle regression guard: 373/373 PASS, 0 fail, 0 skip.
 - Extraction provenance verifier: PASS, 144 mapped rows against exact legacy `e417c5e7c22986bf4acef0495eb47f7b72c97cce`.
 - Required Playwright census is 77 (71 merged-main scenarios + six gameplay journeys); required formal visual census is 17 (15 merged-main frames + desktop/mobile Gameplay).
 - Synology candidate/live gameplay manifest contract and live Chromium Sam/Rat gameplay contract: 8/8 PASS locally; merged-main execution remains pending until PR merge.
+- Exact-head browser qualification caught and corrected a stale Rat quick-card oracle: authoritative loot has 2 entries while gold coin max_count is 4; deterministic regression guard now preserves that distinction.
 - Final exact-head Molehill browser qualification and visual review remain pending through the bounded machine-wide slot pool.
 
 ## Excluded

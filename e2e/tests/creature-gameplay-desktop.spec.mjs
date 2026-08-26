@@ -111,7 +111,7 @@ test('desktop Sam direct activation opens exact Gameplay shop, preserves Semanti
 test('desktop Rat direct activation renders exact Loot Stats and placement-backed Spawns', async ({ page }) => {
   const runtime = captureRuntimeFailures(page);
   const record = await openFixture(page, FIXTURES.rat);
-  await expect(page.locator('#creature-card-body')).toContainText('Loot · 4 entries');
+  await expect(page.locator('#creature-card-body')).toContainText('Loot · 2 entries');
   await page.locator('#creature-card-details').click();
   await expect(page.locator('#gameplay-section-loot')).toContainText('gold coin');
   await expect(page.locator('#gameplay-section-loot')).toContainText('100%');
