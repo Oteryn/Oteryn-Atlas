@@ -47,6 +47,92 @@ test('asynchronous start offset is deterministic per stable instance id', () => 
   assert.ok(first >= 0 && first < 4);
 });
 
+test('creature playback keeps static OFF deterministic and advances authoritative walking ON on the shared logical clock', () => {
+  const staticId = `sha256:${'1'.repeat(64)}`;
+  const moving0 = `sha256:${'2'.repeat(64)}`;
+  const moving1 = `sha256:${'3'.repeat(64)}`;
+  const staticProgram = Object.freeze({
+    ...program({ phases: 1 }),
+    phase_content_ids: [staticId],
+    presentation_mode: 'static',
+    width: 32,
+    height: 32,
+  });
+  const walkingProgram = Object.freeze({
+    ...program({ phases: 2, durations: [100, 100] }),
+    phase_content_ids: [moving0, moving1],
+    presentation_mode: 'moving-in-place',
+    width: 32,
+    height: 32,
+  });
+  const record = Object.freeze({
+    record_id: 'npc:fixture',
+    x: 100,
+    y: 200,
+    floor: 7,
+    outfit_presentation: Object.freeze({ outfit_presentation_id: 'outfit-presentation:fixture' }),
+  });
+  const runtime = createAnimationRuntime(new URL('https://atlas.invalid/animation/'), {
+    manifest: {}, objects: new Map(), sprites: new Map(), blobs: new Map(), buckets: new Map(), fetcher: fetch,
+    creatures: new Map([['outfit-presentation:fixture', Object.freeze({
+      outfit_presentation_id: 'outfit-presentation:fixture',
+      static_program: staticProgram,
+      walking_program: walkingProgram,
+    })]]),
+  });
+
+  const staticFirst = runtime.creatureFrame(record, 0, 'static');
+  const staticLater = runtime.creatureFrame(record, 10_000, 'static');
+  assert.equal(staticFirst.contentId, staticId);
+  assert.equal(staticLater.contentId, staticId);
+  assert.equal(staticFirst.phase, 0);
+  assert.equal(staticFirst.presentationMode, 'static');
+
+  const walkingFirst = runtime.creatureFrame(record, 0, 'moving-in-place');
+  const walkingSecond = runtime.creatureFrame(record, 100, 'moving-in-place');
+  assert.equal(walkingFirst.contentId, moving0);
+  assert.equal(walkingSecond.contentId, moving1);
+  assert.equal(walkingFirst.presentationMode, 'moving-in-place');
+  assert.equal(walkingSecond.presentationMode, 'moving-in-place');
+
+  const implicitFirst = runtime.creatureFrame(record, 0);
+  const implicitLater = runtime.creatureFrame(record, 10_000);
+  assert.equal(implicitFirst.contentId, staticId);
+  assert.equal(implicitLater.contentId, staticId);
+  assert.equal(implicitFirst.presentationMode, 'static');
+  assert.equal(implicitLater.presentationMode, 'static');
+  assert.deepEqual({ record_id: record.record_id, x: record.x, y: record.y, floor: record.floor }, { record_id: 'npc:fixture', x: 100, y: 200, floor: 7 });
+});
+
+test('walking playback fails closed to the verified static program when moving authority is unavailable', () => {
+  const staticId = `sha256:${'4'.repeat(64)}`;
+  const staticProgram = Object.freeze({
+    ...program({ phases: 1 }),
+    phase_content_ids: [staticId],
+    presentation_mode: 'static',
+    width: 32,
+    height: 32,
+  });
+  const record = Object.freeze({
+    record_id: 'npc:fallback',
+    outfit_presentation: Object.freeze({ outfit_presentation_id: 'outfit-presentation:fallback' }),
+  });
+  const runtime = createAnimationRuntime(new URL('https://atlas.invalid/animation/'), {
+    manifest: {}, objects: new Map(), sprites: new Map(), blobs: new Map(), buckets: new Map(), fetcher: fetch,
+    creatures: new Map([['outfit-presentation:fallback', Object.freeze({
+      outfit_presentation_id: 'outfit-presentation:fallback',
+      static_program: staticProgram,
+      walking_program: null,
+      walking_fallback_reason: 'MOVING_GROUP_UNAVAILABLE',
+    })]]),
+  });
+  const frame = runtime.creatureFrame(record, 9999, 'moving-in-place');
+  assert.equal(frame.contentId, staticId);
+  assert.equal(frame.phase, 0);
+  assert.equal(frame.presentationMode, 'static-fallback');
+  assert.equal(frame.fallbackReason, 'MOVING_GROUP_UNAVAILABLE');
+});
+
 test('concurrent bitmap loads sharing one animation bucket perform one verified fetch', async () => {
   const bucketBytes = new Uint8Array([1, 2, 3, 255, 5, 6, 7, 255]);
   const firstBytes = bucketBytes.slice(0, 4);

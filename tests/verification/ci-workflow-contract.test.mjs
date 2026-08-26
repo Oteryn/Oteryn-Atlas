@@ -145,7 +145,7 @@ test('heavy browser verification is pinned to Molehill while Synology remains li
   assert.match(agents, /Molehill-PC/);
   assert.match(agents, /heavy.*browser/i);
   assert.match(agents, /Synology.*live acceptance/i);
-  assert.match(agents, /must not.*71-scenario/i);
+  assert.match(agents, /must not.*73-scenario/i);
 });
 
 test('nightly Molehill identity avoids pre-scheduling runner context expressions', () => {
@@ -195,7 +195,7 @@ test('Molehill local heavy qualification uses a bounded isolated slot pool', () 
   assert.match(heavySlotPool, /oteryn-atlas-e2e-artifacts-/);
   assert.match(agents, /bounded.*concurrent|concurrent.*bounded/i);
   assert.match(agents, /isolat/i);
-  assert.match(agents, /71-scenario/i);
+  assert.match(agents, /73-scenario/i);
 });
 
 test('docs-only PR classification skips heavy browser proof only when proven safe', () => {

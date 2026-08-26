@@ -449,7 +449,14 @@ export async function executeAtlasPerformanceAction(page, action) {
     } else {
       const wanted = action.value === 'on';
       if ((await control.isChecked()) !== wanted) await control.setChecked(wanted);
-      baseExpected = true;
+      await page.waitForFunction((enabled) => {
+        const creatures = globalThis.__OTERYN_ATLAS_CREATURES__;
+        const view = globalThis.__OTERYN_ATLAS_VIEW__;
+        return creatures?.status === 'PASS'
+          && creatures.animationOn === enabled
+          && view?.animation === (enabled ? 'on' : 'off');
+      }, wanted, { timeout: 30_000 });
+      creatureExpected = true;
       qualificationExpected = true;
     }
   } else {

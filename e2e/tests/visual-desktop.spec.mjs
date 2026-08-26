@@ -9,6 +9,7 @@ const VISUAL_ENTRY = '/web/fullworld.html?x=32369&y=32241&floor=-7&zoom=2&mode=m
 const CREATURE_ONLY_PLAYBACK_ENTRY = '/web/fullworld.html?x=32831&y=32596&floor=-12&zoom=2&mode=map&animation=off&creatures=monster';
 const NPC_ONLY_PLAYBACK_ENTRY = '/web/fullworld.html?x=32209&y=31924&floor=-12&zoom=2&mode=map&animation=off&creatures=npc';
 const STATIC_EQUIVALENT_PRESENTATION = 'outfit-presentation:sha256:b16bfc92e9d9e9c8f790507f987a11b25a169c4343c9d68471de76a5f3565c88';
+const WALKING_STATIC_EQUIVALENT_PRESENTATION = 'outfit-presentation:sha256:0f0c1084c144b3c767db6f8733a0f6115b7dec7661891bbf7bcbf90c73f61d5e';
 
 async function overlayOpaquePixels(page) {
   return page.locator('#creature-overlay').evaluate((canvas) => {
@@ -184,12 +185,24 @@ test('creature overlay never paints previous-floor records during a view event',
 test('published creature animation product passes the full authoritative coverage census', async ({ page }) => {
   const coverage = await publishedCreatureAnimationCoverage(page);
   expect(coverage).toEqual({
-    multiPhasePrograms: 101,
-    phaseContentReferences: 2036,
-    phaseCountHistogram: { 1: 1276, 2: 2, 3: 4, 4: 4, 6: 1, 8: 88, 9: 2 },
-    staticEquivalentProgramIds: [STATIC_EQUIVALENT_PRESENTATION],
     totalPrograms: 1377,
-    visuallyDynamicPrograms: 100,
+    static: {
+      multiPhasePrograms: 101,
+      phaseContentReferences: 2036,
+      phaseCountHistogram: { 1: 1276, 2: 2, 3: 4, 4: 4, 6: 1, 8: 88, 9: 2 },
+      staticEquivalentProgramIds: [STATIC_EQUIVALENT_PRESENTATION],
+      visuallyDynamicPrograms: 100,
+    },
+    walkingPrograms: 1376,
+    walkingFallbacks: 1,
+    walkingFallbackReasons: { MOVING_GROUP_UNAVAILABLE: 1 },
+    walking: {
+      multiPhasePrograms: 1375,
+      phaseContentReferences: 10178,
+      phaseCountHistogram: { 1: 1, 2: 130, 3: 6, 4: 5, 6: 1, 8: 1230, 9: 2, 15: 1 },
+      staticEquivalentProgramIds: [WALKING_STATIC_EQUIVALENT_PRESENTATION],
+      visuallyDynamicPrograms: 1374,
+    },
   });
 });
 

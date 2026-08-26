@@ -1,9 +1,11 @@
 import { sha256ContentId } from './loader.mjs';
 
-export const ANIMATION_RUNTIME_PROFILE = 'oteryn-atlas-animation-runtime-v1';
+export const ANIMATION_RUNTIME_PROFILE = 'oteryn-atlas-animation-runtime-v2';
 export const ANIMATION_PRODUCT_ROOT = 'sha256:0d1c8fc777d1d220a9d7723507fddd72585f7358d35a40209bd7415f1fe057c1';
 export const OUTFIT_SPATIAL_ROOT = 'sha256:62fdd7d0ce02652582f03bf971455f4a2f9ec1e472eaebfec5af739cf11a921e';
-export const GAME_ANIMATION_SHA = '8f6a4fdea4487a61c4cdaf1889d421ecd2265a31';
+export const GAME_ANIMATION_SHA = '91b73a7566a59991ebf7d471eacb3a858b755c9c';
+export const CREATURE_PLAYBACK_CAPABILITY = 'creature-moving-in-place-v1';
+export const CREATURE_SEMANTIC_DIGEST = 'sha256:5f10a15758199105584c38634d08254af79973cf7ce25d54bf46e54d8fee26ca';
 const MAX_MANIFEST_BYTES = 2 * 1024 * 1024;
 const MAX_PROGRAM_BYTES = 48 * 1024 * 1024;
 const MAX_BUCKET_BYTES = 8 * 1024 * 1024;
@@ -80,6 +82,38 @@ function objectSpriteFor(program, pattern, phase) {
   requireValue(Number.isSafeInteger(sprite) && sprite > 0, 'object animation sprite missing');
   return sprite;
 }
+function validateCreatureVisualProgram(program, presentationId, mode) {
+  requireValue(program && typeof program === 'object', `${mode} creature program missing`);
+  requireValue(program.outfit_presentation_id === presentationId, `${mode} creature presentation identity mismatch`);
+  requireValue(program.presentation_mode === mode, `${mode} creature presentation mode mismatch`);
+  requireValue(Number.isSafeInteger(program.phase_count) && program.phase_count > 0, `${mode} creature phase count invalid`);
+  requireValue(Array.isArray(program.phase_content_ids) && program.phase_content_ids.length === program.phase_count, `${mode} creature phase content cardinality mismatch`);
+  requireValue(program.phase_content_ids.every(isSha), `${mode} creature phase content invalid`);
+  requireValue(Number.isSafeInteger(program.width) && program.width > 0 && Number.isSafeInteger(program.height) && program.height > 0, `${mode} creature geometry invalid`);
+  requireValue(Number.isSafeInteger(program.displacement?.x) && Number.isSafeInteger(program.displacement?.y), `${mode} creature displacement invalid`);
+}
+function validateCreatureProgram(entry) {
+  const id = entry?.outfit_presentation_id;
+  requireValue(typeof id === 'string' && id.length > 0, 'invalid creature presentation id');
+  validateCreatureVisualProgram(entry.static_program, id, 'static');
+  const a = entry.static_program;
+  const b = entry.walking_program;
+  const envelope = entry.presentation_envelope;
+  const requiredWidth = b == null ? a.width : Math.max(a.width, b.width);
+  const requiredHeight = b == null ? a.height : Math.max(a.height, b.height);
+  requireValue(Number.isSafeInteger(envelope?.width) && envelope.width >= requiredWidth
+    && Number.isSafeInteger(envelope?.height) && envelope.height >= requiredHeight,
+  'creature playback envelope invalid');
+  requireValue(envelope.displacement?.x === a.displacement.x && envelope.displacement?.y === a.displacement.y,
+  'creature playback envelope displacement drift');
+  if (b == null) {
+    requireValue(typeof entry.walking_fallback_reason === 'string' && entry.walking_fallback_reason.length > 0, 'creature walking fallback reason missing');
+    return;
+  }
+  requireValue(entry.walking_fallback_reason == null, 'resolved creature walking program must not carry fallback reason');
+  validateCreatureVisualProgram(b, id, 'moving-in-place');
+  requireValue(a.displacement.x === b.displacement.x && a.displacement.y === b.displacement.y, 'creature playback displacement drift');
+}
 export async function loadAnimationRuntime(baseUrl, fetcher = fetch) {
   const root = new URL(baseUrl);
   const manifestBytes = await readBytes(new URL('manifest.json', root), MAX_MANIFEST_BYTES, null, null, fetcher);
@@ -88,6 +122,8 @@ export async function loadAnimationRuntime(baseUrl, fetcher = fetch) {
   requireValue(manifest.source?.game_sha === GAME_ANIMATION_SHA, 'animation Game SHA mismatch');
   requireValue(manifest.source?.appearance_product_root === ANIMATION_PRODUCT_ROOT, 'animation product root mismatch');
   requireValue(manifest.source?.outfit_spatial_product_root === OUTFIT_SPATIAL_ROOT, 'outfit spatial root mismatch');
+  requireValue(manifest.source?.creature_semantic_digest === CREATURE_SEMANTIC_DIGEST, 'creature semantic digest mismatch');
+  requireValue(manifest.source?.playback_projection_capability === CREATURE_PLAYBACK_CAPABILITY, 'creature playback capability mismatch');
   requireValue(Array.isArray(manifest.buckets) && manifest.buckets.length <= MAX_BUCKETS, 'animation bucket census invalid');
   const programBytes = await readBytes(new URL(safePath(manifest.programs.path), root), MAX_PROGRAM_BYTES, manifest.programs.digest, manifest.programs.bytes, fetcher);
   const product = parseJson(programBytes, 'animation programs');
@@ -98,9 +134,10 @@ export async function loadAnimationRuntime(baseUrl, fetcher = fetch) {
     objects.set(program.appearance_source_id, Object.freeze(program));
   }
   const creatures = new Map();
-  for (const program of product.creature_programs ?? []) {
-    requireValue(typeof program.outfit_presentation_id === 'string' && !creatures.has(program.outfit_presentation_id), 'duplicate/invalid creature program');
-    creatures.set(program.outfit_presentation_id, Object.freeze(program));
+  for (const entry of product.creature_programs ?? []) {
+    validateCreatureProgram(entry);
+    requireValue(!creatures.has(entry.outfit_presentation_id), 'duplicate creature program');
+    creatures.set(entry.outfit_presentation_id, Object.freeze(entry));
   }
   const sprites = new Map(Object.entries(product.sprite_index ?? {}).map(([key, value]) => [Number(key), Object.freeze(value)]));
   const blobs = new Map(Object.entries(product.blob_index ?? {}).map(([key, value]) => [key, Object.freeze(value)]));
@@ -159,14 +196,41 @@ export function createAnimationRuntime(root, product) {
     const sprite = product.sprites.get(spriteId); requireValue(sprite && isSha(sprite.content_id), 'animation sprite index missing');
     return Object.freeze({ phase, contentId: sprite.content_id, program });
   }
-  function creatureFrame(record, timeMs) {
+  function creatureFrame(record, timeMs, playbackMode = 'static') {
     const id = record?.outfit_presentation?.outfit_presentation_id; if (!id) return null;
-    const program = product.creatures.get(id); if (!program) return null;
-    const phase = phaseAt(program, timeMs, record.record_id);
+    const entry = product.creatures.get(id); if (!entry) return null;
+    requireValue(playbackMode === 'static' || playbackMode === 'moving-in-place', 'unsupported creature playback mode');
+    let program = entry.static_program;
+    let presentationMode = 'static';
+    let fallbackReason = null;
+    let logicalTimeMs = 0;
+    if (playbackMode === 'moving-in-place') {
+      if (entry.walking_program) {
+        program = entry.walking_program;
+        presentationMode = 'moving-in-place';
+        logicalTimeMs = timeMs;
+      } else {
+        presentationMode = 'static-fallback';
+        fallbackReason = entry.walking_fallback_reason ?? 'MOVING_GROUP_UNAVAILABLE';
+      }
+    }
+    const phase = phaseAt(program, logicalTimeMs, record.record_id);
     const contentId = program.phase_content_ids[phase]; requireValue(isSha(contentId), 'creature phase content missing');
-    return Object.freeze({ phase, contentId, program });
+    const presentationEnvelope = entry.presentation_envelope ?? Object.freeze({
+      width: program.width, height: program.height, displacement: program.displacement,
+      anchor_policy: 'tile-bottom-right-minus-sprite-overhang-and-displacement-v1',
+    });
+    return Object.freeze({ phase, contentId, program, presentationEnvelope, presentationMode, ...(fallbackReason ? { fallbackReason } : {}) });
   }
   function noteFrameUpdate(count = 1) { frameUpdates += count; }
-  function stats() { return Object.freeze({ bucketBytes, bucketLoads, cachedBuckets: bucketCache.size, cachedBitmaps: bitmapCache.size, frameUpdates, objectPrograms: product.objects.size, creaturePrograms: product.creatures.size }); }
+  function stats() {
+    let walkingPrograms = 0;
+    let walkingFallbacks = 0;
+    for (const entry of product.creatures.values()) {
+      if (entry?.walking_program) walkingPrograms += 1;
+      else if (entry?.static_program) walkingFallbacks += 1;
+    }
+    return Object.freeze({ bucketBytes, bucketLoads, cachedBuckets: bucketCache.size, cachedBitmaps: bitmapCache.size, frameUpdates, objectPrograms: product.objects.size, creaturePrograms: product.creatures.size, walkingPrograms, walkingFallbacks });
+  }
   return Object.freeze({ bitmap, creatureFrame, hasCreature, hasObject, manifest: product.manifest, noteFrameUpdate, objectFrame, stats });
 }

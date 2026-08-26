@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import {
@@ -163,4 +164,16 @@ test('numeric summaries retain distributions without turning timing into an SLO'
   });
   assert.equal(summarizeNumericSeries([]), null);
   assert.throws(() => summarizeNumericSeries([1, Infinity]), /finite/i);
+});
+
+
+test('animation performance action follows creature overlay commits instead of requiring a base render', () => {
+  const source = readFileSync(new URL('../../e2e/support/performance.mjs', import.meta.url), 'utf8');
+  const start = source.indexOf("} else if (action.type === 'animation') {");
+  const end = source.indexOf('throw new Error(`unsupported performance action', start);
+  assert.ok(start >= 0 && end > start, 'animation action block must remain inspectable');
+  const block = source.slice(start, end);
+  assert.match(block, /creatureExpected = true/);
+  assert.match(block, /creatures\.animationOn === enabled/);
+  assert.doesNotMatch(block, /baseExpected = true/);
 });

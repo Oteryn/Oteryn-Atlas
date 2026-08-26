@@ -10,7 +10,7 @@ import { availableNpcFilters, npcMatchesRole, npcPresentationRoles, npcRoleFilte
 const ROOT = new URL('../data/creatures/', location.href);
 const EXPECTED_CONTRACT = 'oteryn-game-atlas-export-v1';
 const EXPECTED_CAPABILITY = 'animated-creatures-v1';
-const EXPECTED_SEMANTIC_DIGEST = 'sha256:7dc951874c95424279737eaaf51cf2d50940162ef4799daea39a187a581ef0e8';
+const EXPECTED_SEMANTIC_DIGEST = 'sha256:5f10a15758199105584c38634d08254af79973cf7ce25d54bf46e54d8fee26ca';
 const EXPECTED_NPC_ROLE_SCHEMA = 1;
 const MAX_INDEX_CHUNKS = 20_000;
 const MAX_CHUNK_RECORDS = 5_000;
@@ -46,6 +46,7 @@ const state = {
   lastDrawnRecords: 0,
   refreshEpoch: 0,
   drawEpoch: 0,
+  committedDrawEpoch: 0,
   animationRuntime: null,
   animationOn: initialParams.get('animation') === 'on',
   logicalTimeMs: 0,
@@ -102,6 +103,7 @@ function publish(status = 'LOADING', error = null, extra = {}) {
     availableNpcRoles: Object.freeze([...state.availableNpcRoles]),
     npcMarkerStyle: NPC_MARKER_STYLE,
     selectedRecordId: state.selectedId,
+    selectedVisible: Boolean(state.selectedId && state.lastVisibleRecords.some((record) => record.record_id === state.selectedId)),
     visibleRecords: state.lastVisibleRecords.length,
     drawnRecords: state.lastDrawnRecords,
     pixelDrawnRecords: state.pixelDrawnRecords,
@@ -784,7 +786,7 @@ async function prepareDraw(records, view = state.view) {
   return Promise.all(candidates.map(async (record) => {
     const verified = record.presentation_resolution_state === 'RESOLVED' && state.animationRuntime?.hasCreature(record);
     if (!verified || (record.kind === 'npc' && view.zoom < 1)) return { record, marker: true };
-    const frame = state.animationRuntime.creatureFrame(record, state.animationOn ? state.logicalTimeMs : 0);
+    const frame = state.animationRuntime.creatureFrame(record, state.logicalTimeMs, state.animationOn ? 'moving-in-place' : 'static');
     return { record, frame, bitmap: await state.animationRuntime.bitmap(frame.contentId), marker: false };
   }));
 }
@@ -796,8 +798,11 @@ function monsterMarkerRadius(view) {
 function interactionPresentation(item, record, npcSize, view) {
   if (!item.marker) {
     return {
-      kind: 'pixel', bitmapWidth: item.bitmap.width, bitmapHeight: item.bitmap.height,
-      displacement: item.frame.program.displacement ?? { x: 0, y: 0 }, contentId: item.frame.contentId,
+      kind: 'pixel',
+      bitmapWidth: item.frame.presentationEnvelope?.width ?? item.bitmap.width,
+      bitmapHeight: item.frame.presentationEnvelope?.height ?? item.bitmap.height,
+      displacement: item.frame.presentationEnvelope?.displacement ?? item.frame.program.displacement ?? { x: 0, y: 0 },
+      contentId: item.frame.contentId,
     };
   }
   if (record.kind === 'npc') return { kind: 'marker', width: npcSize, height: npcSize, originRounding: 'nearest' };
@@ -919,7 +924,7 @@ async function draw(records, view = state.view) {
 async function drawCommitted(records, committedBase) {
   const view = rendererView(committedBase);
   const canvas = state.canvas;
-  const epoch = ++state.drawEpoch;
+  const epoch = ++state.committedDrawEpoch;
   if (!canvas || !view || !committedBase?.generation) return null;
   const rect = canvas.getBoundingClientRect();
   const baseViewport = committedBase.transform;
@@ -928,7 +933,7 @@ async function drawCommitted(records, committedBase) {
   const dpr = Math.max(1, Math.min(2, devicePixelRatio || 1));
   if (Math.abs(dpr - baseViewport.dpr) > 0.01) return null;
   const prepared = await prepareDraw(records, view);
-  if (epoch !== state.drawEpoch || !sameRendererCommit(committedBase)) return null;
+  if (epoch !== state.committedDrawEpoch || !sameRendererCommit(committedBase)) return null;
   state.lastPreparedRecords = prepared;
   state.lastDrawnRecords = paintPrepared(prepared, view, committedBase);
   return state.lastDrawnRecords;

@@ -22,12 +22,12 @@ jobs:
     timeout-minutes: 45
     env:
       ATLAS_REV: ${{ github.sha }}
-      GAME_REV: 0161b80c351b644b47c28b290a6f54b44f775de7
+      GAME_REV: 91b73a7566a59991ebf7d471eacb3a858b755c9c
       LEGACY_REV: e417c5e7c22986bf4acef0495eb47f7b72c97cce
       PREVIEW_CONTAINER: oteryn-atlas-fullworld-preview
       PREVIEW_URL: http://192.168.1.2:8097
       PYTHON_IMAGE: docker.io/library/python@sha256:2c941e860699f878900b0edc2403613c234d4b32eda3cc9fa7036991a2a63c4a
-      CREATURE_SEMANTIC_DIGEST: sha256:7dc951874c95424279737eaaf51cf2d50940162ef4799daea39a187a581ef0e8
+      CREATURE_SEMANTIC_DIGEST: sha256:5f10a15758199105584c38634d08254af79973cf7ce25d54bf46e54d8fee26ca
       PUBLICATION_ROOT: sha256:9d0d2f3bb16a5a90f9b51a21366e4ed42963f5cb12366c404a20d9502ec4857f
       SEMANTIC_ROOT: sha256:27d7a83a7d9f498ea614b440ab4216cae5e6d11ea0527482410e40948cade5a9
       PIXEL_ROOT: sha256:8b8228fcc4574903e547cb7d65b96f3d45e5a9e67045091c1bceb6e54d3690ad
@@ -165,20 +165,25 @@ jobs:
           programs=json.loads(Path('animation-runtime-a/programs.json').read_text())
           assert creatures['capability']=='animated-creatures-v1'
           assert creatures['npc_role_schema_version']==1
-          assert creatures['semantic_digest']=='sha256:7dc951874c95424279737eaaf51cf2d50940162ef4799daea39a187a581ef0e8'
+          assert creatures['semantic_digest']=='sha256:5f10a15758199105584c38634d08254af79973cf7ce25d54bf46e54d8fee26ca'
           assert index['source']['capability']=='animated-creatures-v1'
           assert index['source']['npc_role_schema_version']==1
           assert index['counts']=={'records':88633,'chunks':5746,'search_records':1945}
-          assert animation['rootContentId']=='sha256:413de22b245288da68153e2c0e9d4efe4ee011421b56a09532c8119829079540'
-          assert animation['counts']['object_programs']==5190 and animation['counts']['creature_programs']==1377 and animation['counts']['buckets']==43
+          assert animation['rootContentId']=='sha256:a9a082b49f18cdd43f1b147a3e6df1b452e596de4c580f90b6a5b725111f1d00'
+          assert animation['counts']['object_programs']==5190 and animation['counts']['creature_programs']==1377 and animation['counts']['creature_walking_programs']==1376 and animation['counts']['creature_walking_fallbacks']==1 and animation['counts']['creature_geometry_union_envelopes']==20 and animation['counts']['buckets']==60
           search=json.loads(Path('creature-index-a/search.json').read_text())['records']
           by_id={r['record_id']:r for r in search}
           role_counts={role:sum(role in r.get('roles',[]) for r in creatures['npcs']) for role in ('bank','travel','shop','quest','blessing','trainer')}
           assert role_counts=={'bank':25,'travel':51,'shop':313,'quest':432,'blessing':26,'trainer':54}
           assert sum(bool(r.get('roles')) for r in creatures['npcs'])==705
           assert sum(r.get('role_resolution_state')=='AMBIGUOUS' for r in creatures['npcs'])==10
-          dynamic_presentations={p['outfit_presentation_id'] for p in programs['creature_programs'] if p['phase_count']>1 and len(set(p['phase_content_ids']))>1}
-          assert len(dynamic_presentations)==100
+          dynamic_presentations={
+              p['outfit_presentation_id'] for p in programs['creature_programs']
+              if p.get('walking_program') is not None
+              and p['walking_program']['phase_count']>1
+              and len(set(p['walking_program']['phase_content_ids']))>1
+          }
+          assert dynamic_presentations
           def presentation_id(record):
               presentation=record.get('outfit_presentation') or {}
               return presentation.get('outfit_presentation_id')
