@@ -158,6 +158,7 @@ foreach ($name in @('ATLAS_PUBLICATION_ORIGIN','ATLAS_E2E_WORKERS','ATLAS_E2E_PR
 
 $windowProject = "atlas-worker-benchmark-window-$([guid]::NewGuid().ToString('N').Substring(0, 8))"
 $windowLegacy = $null; $windowSlot = $null; $windowHost = $null
+$activeProject = $null
 $runs = [System.Collections.Generic.List[object]]::new()
 $coldBuildMs = $null
 try {
@@ -168,16 +169,19 @@ try {
   $windowHost = Acquire-AtlasHostAdmission -HostCapacity 2 -TimeoutSeconds 21600 -Project $windowProject -Revision $fingerprint.atlasRevision -ResourceClass 'browser-full' -AuthorityMode 'diagnostic'
 
   $coldProject = "$windowProject-cold"
+  $activeProject = $coldProject
   $coldStarted = [DateTime]::UtcNow
   docker compose -p $coldProject -f e2e\compose.yml build --no-cache e2e | Out-Host
   if ($LASTEXITCODE -ne 0) { throw 'Cold no-cache E2E build failed.' }
   $coldBuildMs = [math]::Round(([DateTime]::UtcNow - $coldStarted).TotalMilliseconds, 3)
   docker compose -p $coldProject -f e2e\compose.yml down --remove-orphans *> $null
+  $activeProject = $null
 
   for ($repetition = 1; $repetition -le $Repetitions; $repetition += 1) {
     foreach ($workload in $Workloads) {
       foreach ($workerCount in Get-RandomizedOrder $Workers) {
         $project = "atlas-worker-$workload-r$repetition-w$workerCount-$([guid]::NewGuid().ToString('N').Substring(0, 6))"
+        $activeProject = $project
         $artifactDir = Join-Path $root "artifacts\e2e\$project"
         New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
         $env:ATLAS_PUBLICATION_ORIGIN = $PublicationOrigin
@@ -252,10 +256,21 @@ try {
           summary = $summary
         })
         Write-Output "benchmark workload=$workload repetition=$repetition workers=$workerCount exit=$exitCode wall=$([math]::Round(($finished-$started).TotalSeconds,1))s"
+        $previousPreference = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
+        docker compose -p $project -f e2e\compose.yml down --remove-orphans *> $null
+        $ErrorActionPreference = $previousPreference
+        $activeProject = $null
       }
     }
   }
 } finally {
+  if ($activeProject) {
+    $previousPreference = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    docker compose -p $activeProject -f e2e\compose.yml down --remove-orphans *> $null
+    $ErrorActionPreference = $previousPreference
+  }
   if ($windowHost) { Release-AtlasHostAdmission $windowHost }
   if ($windowSlot -and $windowSlot.Stream) { $windowSlot.Stream.Dispose() }
   if ($windowLegacy -and $windowLegacy.Stream) { $windowLegacy.Stream.Dispose() }
