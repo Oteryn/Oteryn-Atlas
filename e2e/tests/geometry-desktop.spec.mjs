@@ -38,6 +38,7 @@ test('NPC overlay never commits independently from the base renderer during cont
   const creature = await waitForCreatureCommit(page, 0, true);
   expect(base.generation).toBeGreaterThan(0);
   expect(creature.anchors.length).toBeGreaterThan(0);
+  await waitForCreatureAlignedToBase(page, true);
 
   await installGeometryEventLog(page);
   const canvas = page.locator('#atlas');

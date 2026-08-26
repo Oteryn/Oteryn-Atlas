@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import {
@@ -48,4 +49,13 @@ test('geometry oracle rejects overlay commits straddling a newer base frame', ()
   const result = compareCreatureAnchors(renderer, stale);
   assert.equal(result.synchronizedGeneration, false);
   assert.throws(() => result.assertWithin(0.25), /generation/i);
+});
+
+test('desktop continuous-pan geometry oracle aligns base and creature before logging', () => {
+  const source = readFileSync(new URL('../../e2e/tests/geometry-desktop.spec.mjs', import.meta.url), 'utf8');
+  const start = source.indexOf("test('NPC overlay never commits independently");
+  const align = source.indexOf('await waitForCreatureAlignedToBase(page, true);', start);
+  const install = source.indexOf('await installGeometryEventLog(page);', start);
+  assert.ok(start >= 0 && install > start, 'continuous-pan geometry test must remain inspectable');
+  assert.ok(align > start && align < install, 'continuous-pan geometry log must start only after exact creature/base alignment');
 });
