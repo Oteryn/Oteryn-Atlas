@@ -21,6 +21,11 @@ test('native hardware workflow is base-owned, trust-gated and exact-head bound',
   assert.match(workflow, /superseded-head/);
 });
 
+test('draft pull requests cannot schedule self-hosted native GPU execution', () => {
+  assert.match(workflow, /github\.event_name\s*==\s*'workflow_dispatch'|github\.event\.pull_request\.draft\s*==\s*false/);
+  assert.match(workflow, /native-gpu:[\s\S]*if:[^\n]*(?:draft|needs\.trust-admission)/);
+});
+
 test('native GPU execution is exclusive on Molehill and does not duplicate Docker functional authority', () => {
   assert.match(workflow, /group: atlas-runners/);
   assert.match(workflow, /labels: oteryn-atlas-pc/);
