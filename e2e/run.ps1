@@ -46,11 +46,23 @@ if ($env:ATLAS_E2E_LOCK_TIMEOUT_SECONDS) {
   $lockTimeoutSeconds = $parsedLockTimeout
 }
 
+$resourceClass = if ($env:ATLAS_E2E_RESOURCE_CLASS) { $env:ATLAS_E2E_RESOURCE_CLASS } else { 'browser-full' }
+$authorityMode = if ($env:ATLAS_E2E_AUTHORITY_MODE) { $env:ATLAS_E2E_AUTHORITY_MODE } else { 'authoritative' }
+if ($resourceClass -ne 'browser-full') { throw 'Bootstrap run.ps1 currently admits only browser-full until measured policy rollout.' }
+if ($authorityMode -notin @('authoritative', 'diagnostic')) { throw 'ATLAS_E2E_AUTHORITY_MODE must be authoritative or diagnostic.' }
+
 $slotConfig = Resolve-AtlasHeavySlotConfig -DefaultSlotCount 2
+if ($authorityMode -eq 'authoritative' -and $slotConfig.SlotCount -gt 2) {
+  throw 'Authoritative browser-full evidence cannot request more than the measured two-slot capacity.'
+}
+if ($authorityMode -eq 'authoritative' -and $null -ne $slotConfig.RequestedSlot -and $slotConfig.RequestedSlot -gt 2) {
+  throw 'Authoritative browser-full evidence cannot use requestedSlot above the measured two-slot capacity.'
+}
 $projectLease = Acquire-AtlasProjectLock -Project $project -Revision $env:ATLAS_CODE_REVISION
 $artifactLease = Acquire-AtlasArtifactLock -ArtifactPath $artifactDir -Project $project -Revision $env:ATLAS_CODE_REVISION
 New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
 $legacyFence = Acquire-AtlasLegacyFence -TimeoutSeconds $lockTimeoutSeconds -Project $project -Revision $env:ATLAS_CODE_REVISION
+$hostAdmissionLease = Acquire-AtlasHostAdmission -HostCapacity 2 -TimeoutSeconds $lockTimeoutSeconds -Project $project -Revision $env:ATLAS_CODE_REVISION -ResourceClass $resourceClass -AuthorityMode $authorityMode
 $slotLease = Acquire-AtlasHeavySlot -SlotCount $slotConfig.SlotCount -RequestedSlot $slotConfig.RequestedSlot -TimeoutSeconds $lockTimeoutSeconds -Project $project -Revision $env:ATLAS_CODE_REVISION
 $env:ATLAS_E2E_SLOT_ID = [string]$slotLease.SlotId
 $slotEvidence = [ordered]@{
@@ -62,7 +74,23 @@ $slotEvidence = [ordered]@{
   acquiredAtUtc = [DateTime]::UtcNow.ToString('o')
 }
 $slotEvidence | ConvertTo-Json | Set-Content -Encoding utf8 (Join-Path $artifactDir 'slot-lease.json')
-Write-Output "Acquired Atlas heavy E2E slot $($slotLease.SlotId)/$($slotLease.SlotCount): $($slotLease.Path)"
+$evidenceEligibility = if ($authorityMode -eq 'authoritative') { 'authoritative' } else { 'diagnostic-only' }
+$resourceEvidence = [ordered]@{
+  version = 1
+  policyId = 'molehill-bootstrap-safe-v1'
+  resourceClass = $resourceClass
+  authorityMode = $authorityMode
+  evidenceEligibility = $evidenceEligibility
+  hostAdmissionToken = $hostAdmissionLease.TokenId
+  hostCapacity = $hostAdmissionLease.HostCapacity
+  slotId = $slotLease.SlotId
+  slotCount = $slotLease.SlotCount
+  project = $project
+  revision = $env:ATLAS_CODE_REVISION
+  acquiredAtUtc = [DateTime]::UtcNow.ToString('o')
+}
+$resourceEvidence | ConvertTo-Json | Set-Content -Encoding utf8 (Join-Path $artifactDir 'resource-admission.json')
+Write-Output "Acquired Atlas host admission $($hostAdmissionLease.TokenId)/$($hostAdmissionLease.HostCapacity), heavy slot $($slotLease.SlotId)/$($slotLease.SlotCount); evidenceEligibility=$evidenceEligibility"
 
 $publicationForwarder = $null
 if ($env:ATLAS_PUBLICATION_ORIGIN) {
@@ -147,6 +175,7 @@ try {
     Stop-Process -Id $publicationForwarder.Id -Force
   }
   if ($slotLease -and $slotLease.Stream) { $slotLease.Stream.Dispose() }
+  if ($hostAdmissionLease -and $hostAdmissionLease.Stream) { $hostAdmissionLease.Stream.Dispose() }
   if ($legacyFence -and $legacyFence.Stream) { $legacyFence.Stream.Dispose() }
   if ($artifactLease -and $artifactLease.Stream) { $artifactLease.Stream.Dispose() }
   if ($projectLease -and $projectLease.Stream) { $projectLease.Stream.Dispose() }

@@ -76,6 +76,8 @@ jobs:
       ATLAS_EXPECTED_REVISION: ${{ github.sha }}
       ATLAS_PUBLICATION_ORIGIN: http://192.168.1.2:8097
       ATLAS_E2E_WORKERS: '1'
+      ATLAS_E2E_RESOURCE_CLASS: browser-full
+      ATLAS_E2E_AUTHORITY_MODE: diagnostic
       ATLAS_STRESS_LENGTH: '64'
     steps:
       - name: Verify immutable Molehill Atlas runner identity
@@ -148,6 +150,8 @@ jobs:
           $composeFile = 'e2e/compose.selfhosted.yml'
           $artifactRoot = Join-Path (Get-Location) 'artifacts/e2e/nightly'
           New-Item -ItemType Directory -Force $artifactRoot | Out-Null
+          . (Join-Path (Get-Location) 'e2e/heavy-slot-pool.ps1')
+          $hostAdmission = Acquire-AtlasHostAdmission -HostCapacity 2 -TimeoutSeconds 7200 -Project $project -Revision $env:ATLAS_CODE_REVISION -ResourceClass 'browser-full' -AuthorityMode 'diagnostic'
 
           try {
             $python = (Get-Command python -ErrorAction Stop).Source
@@ -233,6 +237,7 @@ jobs:
             }
             docker compose -p $project -f $composeFile down -v --remove-orphans | Out-Null
             if ($forwarder -and -not $forwarder.HasExited) { Stop-Process -Id $forwarder.Id -Force }
+            if ($hostAdmission -and $hostAdmission.Stream) { $hostAdmission.Stream.Dispose() }
             $ErrorActionPreference = $previous
           }
 

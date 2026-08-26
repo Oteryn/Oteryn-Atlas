@@ -109,3 +109,45 @@ function Acquire-AtlasHeavySlot {
     Start-Sleep -Milliseconds 500
   }
 }
+
+
+function Acquire-AtlasHostAdmission {
+  param(
+    [int]$HostCapacity = 2,
+    [int]$TimeoutSeconds,
+    [string]$Project,
+    [string]$Revision,
+    [string]$ResourceClass = 'browser-full',
+    [string]$AuthorityMode = 'authoritative',
+    [string]$HostPrefix = 'oteryn-atlas-host-admission-'
+  )
+  if ($HostCapacity -ne 2) {
+    throw 'Bootstrap Molehill host capacity must remain at the measured value 2 until a versioned measured policy replaces it.'
+  }
+  if ($AuthorityMode -notin @('authoritative', 'diagnostic')) {
+    throw 'AuthorityMode must be authoritative or diagnostic.'
+  }
+
+  $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+  while ($true) {
+    foreach ($tokenId in 1..$HostCapacity) {
+      $tokenPath = Join-Path ([IO.Path]::GetTempPath()) "$HostPrefix$tokenId.lock"
+      try {
+        $stream = [IO.File]::Open($tokenPath, [IO.FileMode]::OpenOrCreate, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+        Write-AtlasLeaseOwner $stream "pid=$PID token=$tokenId/$HostCapacity class=$ResourceClass authority=$AuthorityMode project=$Project revision=$Revision"
+        return [pscustomobject]@{
+          TokenId = $tokenId
+          HostCapacity = $HostCapacity
+          ResourceClass = $ResourceClass
+          AuthorityMode = $AuthorityMode
+          Stream = $stream
+          Path = $tokenPath
+        }
+      } catch [IO.IOException] { }
+    }
+    if ([DateTime]::UtcNow -ge $deadline) {
+      throw "Timed out waiting for $HostCapacity shared Molehill host-admission tokens."
+    }
+    Start-Sleep -Milliseconds 500
+  }
+}
