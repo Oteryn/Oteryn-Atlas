@@ -110,7 +110,6 @@ function Acquire-AtlasHeavySlot {
   }
 }
 
-
 function Acquire-AtlasHostAdmission {
   param(
     [int]$HostCapacity = 2,
@@ -189,4 +188,88 @@ function Release-AtlasHostAdmission {
   if (-not $Lease) { return }
   if ($Lease.Stream) { $Lease.Stream.Dispose() }
   if ($Lease.DiagnosticFenceStream) { $Lease.DiagnosticFenceStream.Dispose() }
+}
+
+function Acquire-AtlasExclusiveHostAdmission {
+  param(
+    [int]$TimeoutSeconds,
+    [string]$Project,
+    [string]$Revision,
+    [ValidateSet('native-gpu', 'performance', 'soak', 'artifact-build')][string]$ResourceClass,
+    [ValidateSet('authoritative', 'diagnostic')][string]$AuthorityMode = 'diagnostic',
+    [string]$HostPrefix = 'oteryn-atlas-host-admission-',
+    [string]$SlotPrefix = 'oteryn-atlas-heavy-e2e-slot-',
+    [string]$LegacyLockPath = '',
+    [string]$DiagnosticSlotFencePath = '',
+    [string]$ExclusiveLockPath = ''
+  )
+  $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+  $exclusivePath = if ($ExclusiveLockPath) {
+    [IO.Path]::GetFullPath($ExclusiveLockPath)
+  } else {
+    Join-Path ([IO.Path]::GetTempPath()) 'oteryn-atlas-exclusive-host-admission.lock'
+  }
+  $exclusiveStream = $null
+  $legacyFence = $null
+  $hostLeases = [System.Collections.Generic.List[object]]::new()
+  $slotLeases = [System.Collections.Generic.List[object]]::new()
+
+  function Remaining-AtlasExclusiveSeconds {
+    $remaining = [math]::Ceiling(($deadline - [DateTime]::UtcNow).TotalSeconds)
+    if ($remaining -lt 1) { throw "Timed out waiting for exclusive Molehill host admission: $exclusivePath" }
+    [int]$remaining
+  }
+
+  try {
+    while ($null -eq $exclusiveStream) {
+      try {
+        $exclusiveStream = [IO.File]::Open($exclusivePath, [IO.FileMode]::OpenOrCreate, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+        Write-AtlasLeaseOwner $exclusiveStream "pid=$PID class=$ResourceClass authority=$AuthorityMode project=$Project revision=$Revision"
+      } catch [IO.IOException] {
+        if ([DateTime]::UtcNow -ge $deadline) { throw "Timed out waiting for exclusive Molehill host admission: $exclusivePath" }
+        Start-Sleep -Milliseconds 500
+      }
+    }
+
+    # Fence old single-lock runners before draining the measured host tokens.
+    $legacyFence = Acquire-AtlasLegacyFence -TimeoutSeconds (Remaining-AtlasExclusiveSeconds) -Project $Project -Revision $Revision -LockPath $LegacyLockPath
+
+    # Drain both measured host-admission tokens first. Routine Phase-D jobs acquire
+    # host admission before slot admission, so once both are held no new routine job
+    # can enter while existing slot holders finish and release.
+    $hostLeases.Add((Acquire-AtlasHostAdmission -HostCapacity 2 -TimeoutSeconds (Remaining-AtlasExclusiveSeconds) -Project $Project -Revision $Revision -ResourceClass $ResourceClass -AuthorityMode $AuthorityMode -HostPrefix $HostPrefix -DiagnosticSlotFencePath $DiagnosticSlotFencePath))
+    $hostLeases.Add((Acquire-AtlasHostAdmission -HostCapacity 2 -TimeoutSeconds (Remaining-AtlasExclusiveSeconds) -Project $Project -Revision $Revision -ResourceClass $ResourceClass -AuthorityMode $AuthorityMode -HostPrefix $HostPrefix -DiagnosticSlotFencePath $DiagnosticSlotFencePath))
+    if ($hostLeases[0].TokenId -eq $hostLeases[1].TokenId) { throw 'Exclusive host admission received duplicate host tokens.' }
+
+    # Then fence the two historical measured slot identities as migration protection.
+    $slotLeases.Add((Acquire-AtlasHeavySlot -SlotCount 2 -RequestedSlot 1 -TimeoutSeconds (Remaining-AtlasExclusiveSeconds) -Project $Project -Revision $Revision -SlotPrefix $SlotPrefix))
+    $slotLeases.Add((Acquire-AtlasHeavySlot -SlotCount 2 -RequestedSlot 2 -TimeoutSeconds (Remaining-AtlasExclusiveSeconds) -Project $Project -Revision $Revision -SlotPrefix $SlotPrefix))
+
+    return [pscustomobject]@{
+      ResourceClass = $ResourceClass
+      AuthorityMode = $AuthorityMode
+      Project = $Project
+      Revision = $Revision
+      HostLeases = @($hostLeases)
+      SlotLeases = @($slotLeases)
+      LegacyFence = $legacyFence
+      ExclusiveStream = $exclusiveStream
+      ExclusivePath = $exclusivePath
+    }
+  } catch {
+    foreach ($slotLease in @($slotLeases)) { if ($slotLease -and $slotLease.Stream) { $slotLease.Stream.Dispose() } }
+    foreach ($hostLease in @($hostLeases)) { Release-AtlasHostAdmission $hostLease }
+    if ($legacyFence -and $legacyFence.Stream) { $legacyFence.Stream.Dispose() }
+    if ($exclusiveStream) { $exclusiveStream.Dispose() }
+    throw
+  }
+}
+
+function Release-AtlasExclusiveHostAdmission {
+  param($Lease)
+  if (-not $Lease) { return }
+  foreach ($slotLease in @($Lease.SlotLeases)) { if ($slotLease -and $slotLease.Stream) { $slotLease.Stream.Dispose() } }
+  foreach ($hostLease in @($Lease.HostLeases)) { Release-AtlasHostAdmission $hostLease }
+  if ($Lease.LegacyFence -and $Lease.LegacyFence.Stream) { $Lease.LegacyFence.Stream.Dispose() }
+  if ($Lease.ExclusiveStream) { $Lease.ExclusiveStream.Dispose() }
 }
