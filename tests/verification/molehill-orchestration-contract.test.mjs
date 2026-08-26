@@ -62,3 +62,12 @@ test('nightly browser depth participates in the same Molehill host admission', (
   assert.match(browserDepth, /browser-full/);
   assert.match(browserDepth, /hostAdmission.*Dispose/i);
 });
+
+
+test('host-admission self-test proves exhaustion and reuse independently of slot ids', () => {
+  const selfTest = read('e2e/test-heavy-slot-pool.ps1');
+  assert.match(selfTest, /Acquire-AtlasHostAdmission/);
+  assert.match(selfTest, /host-selftest-/);
+  assert.match(selfTest, /third host admission/i);
+  assert.match(selfTest, /released host admission/i);
+});

@@ -11,6 +11,7 @@ $projectA = "slot-selftest-a-$PID"
 $projectB = "slot-selftest-b-$PID"
 $legacyLockPath = Join-Path ([IO.Path]::GetTempPath()) "slot-selftest-$PID-legacy.lock"
 $slotPrefix = "slot-selftest-$PID-slot-"
+$hostPrefix = "host-selftest-$PID-admission-"
 $projectLease = $null
 $artifactLease = $null
 $fence1 = $null
@@ -18,6 +19,9 @@ $fence2 = $null
 $slot1 = $null
 $slot2 = $null
 $slot3 = $null
+$host1 = $null
+$host2 = $null
+$host3 = $null
 try {
   Remove-Item Env:ATLAS_E2E_SLOT_COUNT -ErrorAction SilentlyContinue
   Remove-Item Env:ATLAS_E2E_SLOT -ErrorAction SilentlyContinue
@@ -73,9 +77,24 @@ try {
   $slot3 = Acquire-AtlasHeavySlot -SlotCount 2 -RequestedSlot $releasedId -TimeoutSeconds 2 -Project 'slot-selftest-c' -Revision 'selftest' -SlotPrefix $slotPrefix
   Assert-True ($slot3.SlotId -eq $releasedId) 'released slot was not reusable'
 
+  $host1 = Acquire-AtlasHostAdmission -HostCapacity 2 -TimeoutSeconds 2 -Project $projectA -Revision 'selftest' -HostPrefix $hostPrefix
+  $host2 = Acquire-AtlasHostAdmission -HostCapacity 2 -TimeoutSeconds 2 -Project $projectB -Revision 'selftest' -HostPrefix $hostPrefix
+  Assert-True ($host1.TokenId -ne $host2.TokenId) 'host admissions reused the same token'
+  try {
+    Acquire-AtlasHostAdmission -HostCapacity 2 -TimeoutSeconds 1 -Project 'host-selftest-c' -Revision 'selftest' -HostPrefix $hostPrefix | Out-Null
+    throw 'third host admission entered measured two-job capacity'
+  } catch {
+    Assert-True ($_.Exception.Message -match 'Timed out') 'wrong third host admission failure'
+  }
+  $releasedHostId = $host1.TokenId
+  $host1.Stream.Dispose()
+  $host1 = $null
+  $host3 = Acquire-AtlasHostAdmission -HostCapacity 2 -TimeoutSeconds 2 -Project 'host-selftest-c' -Revision 'selftest' -HostPrefix $hostPrefix
+  Assert-True ($host3.TokenId -eq $releasedHostId) 'released host admission token was not reusable'
+
   Write-Output 'heavy-e2e-slot-pool-self-test=PASS'
 } finally {
-  foreach ($lease in @($slot3, $slot2, $slot1, $fence2, $fence1, $artifactLease, $projectLease)) {
+  foreach ($lease in @($host3, $host2, $host1, $slot3, $slot2, $slot1, $fence2, $fence1, $artifactLease, $projectLease)) {
     if ($lease -and $lease.Stream) { $lease.Stream.Dispose() }
   }
   if ($null -eq $oldCount) { Remove-Item Env:ATLAS_E2E_SLOT_COUNT -ErrorAction SilentlyContinue } else { $env:ATLAS_E2E_SLOT_COUNT = $oldCount }
