@@ -43,16 +43,16 @@ function build(changedFiles, candidateImpactManifest = trustedImpactManifest) {
   });
 }
 
-test('planner selects a deterministic targeted union across current and rename-source paths', () => {
+test('planner selects a deterministic compositional union across current and rename-source paths', () => {
   const plan = build([
     { path: 'src/browser/creature-interaction.mjs', previousPath: 'tools/dyn-atlas-semantic/legacy.mjs' },
   ]);
 
-  assert.equal(plan.profile, 'targeted');
+  assert.equal(plan.profile, 'broad');
   assert.deepEqual(plan.requiredGroupIds, [
     'deterministic.core', 'e2e.common-smoke', 'e2e.creatures', 'visual.creatures',
   ]);
-  assert.deepEqual(plan.impactDomains, ['creatures', 'generator']);
+  assert.deepEqual(plan.impactDomains, ['browser-runtime', 'creatures', 'generator']);
   assert.equal(plan.shadowOnly, true);
   assert.match(plan.changedPathsDigest, /^sha256:[a-f0-9]{64}$/);
   assert.match(plan.impactPolicyDigest, /^sha256:[a-f0-9]{64}$/);
@@ -106,7 +106,7 @@ test('candidate policy cannot narrow trusted-base requirements', () => {
   };
   const plan = build([{ path: 'src/browser/creature-interaction.mjs' }], narrowedCandidate);
 
-  assert.equal(plan.profile, 'targeted');
+  assert.equal(plan.profile, 'broad');
   assert.deepEqual(plan.requiredGroupIds, [
     'deterministic.core', 'e2e.common-smoke', 'e2e.creatures', 'visual.creatures',
   ]);
@@ -183,7 +183,7 @@ test('planner CLI emits a canonical shadow plan from explicit trusted and candid
 
   assert.equal(result.status, 0, result.stderr);
   const plan = JSON.parse(result.stdout);
-  assert.equal(plan.profile, 'targeted');
+  assert.equal(plan.profile, 'broad');
   assert.equal(plan.shadowOnly, true);
   fs.rmSync(directory, { recursive: true, force: true });
 });

@@ -68,11 +68,7 @@ function allEvidencePaths(changedFiles) {
 }
 
 function matchesForPath(path, manifest) {
-  const longest = manifest.entries.reduce((length, entry) => (
-    path.startsWith(entry.pathPrefix) ? Math.max(length, entry.pathPrefix.length) : length
-  ), -1);
-  if (longest < 0) return [];
-  return manifest.entries.filter((entry) => path.startsWith(entry.pathPrefix) && entry.pathPrefix.length === longest);
+  return manifest.entries.filter((entry) => path.startsWith(entry.pathPrefix));
 }
 
 function classify(paths, manifest) {
