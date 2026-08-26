@@ -1,6 +1,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+import { MAX_STABLE_TEST_ID_LENGTH, normalizeSpecPath, stableTestId } from './stable-test-id.mjs';
+
+export { normalizeSpecPath, stableTestId } from './stable-test-id.mjs';
+
 const CATEGORIES = new Set([
   'unit', 'contract', 'e2e', 'geometry', 'render', 'visual',
   'stress', 'performance', 'accessibility', 'failure',
@@ -28,19 +32,6 @@ function optionalInteger(value) {
   if (value == null || value === '') return null;
   const parsed = Number(value);
   return Number.isSafeInteger(parsed) ? parsed : null;
-}
-
-export function normalizeSpecPath(file) {
-  const normalized = String(file ?? '').replaceAll('\\', '/');
-  for (const marker of ['e2e/tests/', 'tests/']) {
-    const index = normalized.indexOf(marker);
-    if (index >= 0) return normalized.slice(index);
-  }
-  return normalized.replace(/^\.\//, '') || 'unknown';
-}
-
-export function stableTestId(project, specPath, scenario) {
-  return `${String(project ?? 'unknown').slice(0, 128)}::${String(specPath ?? 'unknown').slice(0, 512)}::${String(scenario ?? 'unknown').slice(0, 512)}`;
 }
 
 export function normalizeSummaryScenario(input) {
@@ -77,7 +68,7 @@ export function buildFailureManifest(summary) {
       project: String(scenario.project ?? 'unknown').slice(0, 128),
       specPath: String(scenario.specPath ?? 'unknown').slice(0, 512),
       scenario: String(scenario.scenario ?? 'unknown').slice(0, 512),
-      stableTestId: String(scenario.stableTestId ?? 'unknown').slice(0, 1152),
+      stableTestId: String(scenario.stableTestId ?? 'unknown').slice(0, MAX_STABLE_TEST_ID_LENGTH),
       category: scenario.category ?? 'e2e',
       status: scenario.status ?? 'unknown',
       durationMs: scenario.durationMs ?? null,

@@ -1,6 +1,8 @@
 import fs from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
+import { stableTestId } from '../../e2e/stable-test-id.mjs';
+
 const LIST_ROW = /^\s*\[([^\]]+)\]\s+›\s+([^:]+):\d+:\d+\s+›\s+(.+)$/;
 
 export function parsePlaywrightStableTestIds(text) {
@@ -10,7 +12,7 @@ export function parsePlaywrightStableTestIds(text) {
     const match = line.match(LIST_ROW);
     if (!match) continue;
     const [, project, spec, title] = match;
-    ids.push(`${project}::e2e/tests/${spec}::${title}`);
+    ids.push(stableTestId(project, `e2e/tests/${spec}`, title));
   }
   if (ids.length === 0) throw new TypeError('Playwright test list contains no scenarios');
   const stable = [...new Set(ids)].sort();
