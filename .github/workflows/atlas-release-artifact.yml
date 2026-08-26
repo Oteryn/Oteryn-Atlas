@@ -1,0 +1,136 @@
+name: Atlas Merged-Main Release Artifact
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: atlas-release-artifact-${{ github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  build-release:
+    name: Build exact immutable Atlas release on Molehill
+    if: github.ref == 'refs/heads/main'
+    runs-on:
+      group: atlas-runners
+      labels: oteryn-atlas-pc
+    timeout-minutes: 180
+    env:
+      ATLAS_REV: ${{ github.sha }}
+      RELEASE_SHARE_ROOT: \\192.168.1.2\OTS\oteryn-atlas\releases
+    steps:
+      - name: Check out exact protected-main revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify exact current protected main
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:GITHUB_REF -ne 'refs/heads/main') { throw 'Release construction is main-only.' }
+          if ((git rev-parse HEAD).Trim() -ne $env:ATLAS_REV) { throw 'Release checkout revision mismatch.' }
+          $remote = ((git ls-remote origin refs/heads/main) -split '\s+')[0]
+          if ($remote -ne $env:ATLAS_REV) { throw "Release SHA is no longer current protected main: remote=$remote expected=$env:ATLAS_REV" }
+          if (@(git status --porcelain).Count -ne 0) { throw 'Release checkout is dirty.' }
+          Write-Output 'exact-protected-main-release-authority=PASS'
+
+      - name: Build once under exclusive artifact-build admission
+        id: build
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          . "$PWD/e2e/heavy-slot-pool.ps1"
+          $lease = $null
+          $output = Join-Path $env:RUNNER_TEMP "atlas-release-$env:ATLAS_REV-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
+          try {
+            $lease = Acquire-AtlasExclusiveHostAdmission `
+              -TimeoutSeconds 21600 `
+              -Project "atlas-release-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT" `
+              -Revision $env:ATLAS_REV `
+              -ResourceClass 'artifact-build' `
+              -AuthorityMode 'authoritative'
+            $result = & "$PWD/tools/release/build-merged-main-release.ps1" -AtlasRevision $env:ATLAS_REV -OutputDirectory $output
+            if ($LASTEXITCODE -ne 0 -or $null -eq $result) { throw 'Merged-main release builder failed.' }
+            $record = @($result | Where-Object { $_.Artifact -and $_.Manifest } | Select-Object -Last 1)
+            if ($record.Count -ne 1) { throw 'Release builder returned no bounded artifact record.' }
+            "artifact=$($record[0].Artifact)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+            "manifest=$($record[0].Manifest)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+            "artifact_sha256=$($record[0].ArtifactSha256)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+            "source_tree_sha256=$($record[0].SourceTreeSha256)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          } finally {
+            Release-AtlasExclusiveHostAdmission $lease
+          }
+
+      - name: Publish immutable payload to private OTS release store
+        id: transport
+        shell: powershell
+        env:
+          ARTIFACT_PATH: ${{ steps.build.outputs.artifact }}
+          MANIFEST_PATH: ${{ steps.build.outputs.manifest }}
+          ARTIFACT_SHA256: ${{ steps.build.outputs.artifact_sha256 }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if (-not (Test-Path -LiteralPath $env:RELEASE_SHARE_ROOT)) { throw "Private release store is unavailable: $env:RELEASE_SHARE_ROOT" }
+          $manifest = Get-Content -LiteralPath $env:MANIFEST_PATH -Raw | ConvertFrom-Json
+          if ([string]$manifest.atlasRevision -ne $env:ATLAS_REV) { throw 'Release manifest revision mismatch before transport.' }
+          if ([string]$manifest.artifactSha256 -ne $env:ARTIFACT_SHA256) { throw 'Release manifest digest mismatch before transport.' }
+          $actual = 'sha256:' + (Get-FileHash -LiteralPath $env:ARTIFACT_PATH -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actual -ne $env:ARTIFACT_SHA256) { throw 'Release artifact changed before transport.' }
+          $digestName = $env:ARTIFACT_SHA256.Substring('sha256:'.Length)
+          $revisionDir = Join-Path $env:RELEASE_SHARE_ROOT $env:ATLAS_REV
+          New-Item -ItemType Directory -Force -Path $revisionDir | Out-Null
+          $artifactTarget = Join-Path $revisionDir "$digestName.tar"
+          $manifestTarget = Join-Path $revisionDir 'manifest.json'
+          $artifactTmp = Join-Path $revisionDir ".$digestName.$env:GITHUB_RUN_ID.$env:GITHUB_RUN_ATTEMPT.tmp"
+          $manifestTmp = Join-Path $revisionDir ".manifest.$env:GITHUB_RUN_ID.$env:GITHUB_RUN_ATTEMPT.tmp"
+          try {
+            if (Test-Path -LiteralPath $artifactTarget) {
+              $stored = 'sha256:' + (Get-FileHash -LiteralPath $artifactTarget -Algorithm SHA256).Hash.ToLowerInvariant()
+              if ($stored -ne $env:ARTIFACT_SHA256) { throw 'Existing digest-named release artifact does not match its name.' }
+            } else {
+              Copy-Item -LiteralPath $env:ARTIFACT_PATH -Destination $artifactTmp
+              $copied = 'sha256:' + (Get-FileHash -LiteralPath $artifactTmp -Algorithm SHA256).Hash.ToLowerInvariant()
+              if ($copied -ne $env:ARTIFACT_SHA256) { throw 'Private transport copy digest mismatch.' }
+              Move-Item -LiteralPath $artifactTmp -Destination $artifactTarget
+            }
+            $manifestBytes = [IO.File]::ReadAllBytes($env:MANIFEST_PATH)
+            if (Test-Path -LiteralPath $manifestTarget) {
+              $existing = [IO.File]::ReadAllBytes($manifestTarget)
+              if (-not [Linq.Enumerable]::SequenceEqual([byte[]]$manifestBytes, [byte[]]$existing)) { throw 'Existing exact-revision release manifest differs; refusing overwrite.' }
+            } else {
+              [IO.File]::WriteAllBytes($manifestTmp, $manifestBytes)
+              Move-Item -LiteralPath $manifestTmp -Destination $manifestTarget
+            }
+          } finally {
+            Remove-Item -LiteralPath $artifactTmp,$manifestTmp -Force -ErrorAction SilentlyContinue
+          }
+          "stored_artifact=$artifactTarget" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          Write-Output "private-release-transport=PASS revision=$env:ATLAS_REV digest=$env:ARTIFACT_SHA256"
+
+      - name: Upload public-safe release manifest only
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: atlas-release-manifest-${{ github.sha }}
+          path: ${{ steps.build.outputs.manifest }}
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Cleanup task-owned local release workspace
+        if: always()
+        shell: powershell
+        env:
+          ARTIFACT_PATH: ${{ steps.build.outputs.artifact }}
+        run: |
+          $ErrorActionPreference = 'Continue'
+          if ($env:ARTIFACT_PATH) {
+            $root = Split-Path (Split-Path $env:ARTIFACT_PATH -Parent) -Parent
+            if ($root -and $root.StartsWith($env:RUNNER_TEMP, [StringComparison]::OrdinalIgnoreCase)) { Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue }
+          }
