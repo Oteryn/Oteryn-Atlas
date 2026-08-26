@@ -118,7 +118,7 @@ export default class AtlasSummaryReporter {
     this.scenarios.push(normalizeSummaryScenario({
       project,
       file: test.location?.file ?? '',
-      title: test.titlePath().slice(1).join(' / '),
+      title: test.titlePath().slice(3).join(' › '),
       annotations: test.annotations ?? [],
       status: result.status,
       durationMs: result.duration,

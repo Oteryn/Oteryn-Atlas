@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import {
+import AtlasSummaryReporter, {
   buildFailureManifest,
   classifyScenario,
   normalizeSummaryScenario,
@@ -57,6 +57,53 @@ test('summary scenario emits a path-normalized stable test identity', () => {
     'desktop-chromium::e2e/tests/geometry-desktop.spec.mjs::geometry stays synchronized',
   );
   assert(Object.isFrozen(scenario));
+});
+
+test('Playwright reporter excludes project and spec path from the stable scenario title', () => {
+  const reporter = new AtlasSummaryReporter();
+  reporter.onBegin({ metadata: {}, projects: [] });
+  reporter.onTestEnd({
+    parent: { project: () => ({ name: 'desktop-chromium' }) },
+    location: { file: 'C:\\work\\Oteryn-Atlas\\e2e\\tests\\accessibility-desktop.spec.mjs' },
+    titlePath: () => [
+      '',
+      'desktop-chromium',
+      'accessibility-desktop.spec.mjs',
+      'desktop critical controls expose truthful accessible names and disabled states',
+    ],
+    annotations: [],
+  }, {
+    status: 'passed',
+    duration: 12,
+    retry: 0,
+    attachments: [],
+  });
+
+  assert.equal(
+    reporter.scenarios[0].stableTestId,
+    'desktop-chromium::e2e/tests/accessibility-desktop.spec.mjs::desktop critical controls expose truthful accessible names and disabled states',
+  );
+});
+
+test('Playwright reporter keeps nested titles in the same delimiter form as the test list', () => {
+  const reporter = new AtlasSummaryReporter();
+  reporter.onBegin({ metadata: {}, projects: [] });
+  reporter.onTestEnd({
+    parent: { project: () => ({ name: 'desktop-chromium' }) },
+    location: { file: 'e2e/tests/desktop.spec.mjs' },
+    titlePath: () => ['', 'desktop-chromium', 'desktop.spec.mjs', 'search drawer', 'restores result state'],
+    annotations: [],
+  }, {
+    status: 'passed',
+    duration: 12,
+    retry: 0,
+    attachments: [],
+  });
+
+  assert.equal(
+    reporter.scenarios[0].stableTestId,
+    'desktop-chromium::e2e/tests/desktop.spec.mjs::search drawer › restores result state',
+  );
 });
 
 test('failed browser runs produce a bounded machine-readable failure manifest', () => {
