@@ -53,6 +53,7 @@ Consume the exact merged Game gameplay-profile projection through a bounded lazy
 - Formal Gameplay screenshot evidence uses the exact unique battle axe filter (235 gold sell / 80 gold buy) so both trade directions are simultaneously unclipped; full unfiltered lists remain covered by the functional journeys.
 - The visual-only battle axe filter is cleared immediately after evidence capture before the Semantic/Gameplay roundtrip; a deterministic source contract prevents screenshot state from contaminating the functional journey.
 - Exact-head browser qualification rejected out-of-bounds Yasir as a large-shop map fixture; the stress journey now uses exact map-reachable H.L. (`npc-entity:0c83ae18a907dc7e8f15c37c03e4f04c`) with 124 authoritative buy rows, guarded deterministically.
+- Plan-bound visual regression caught the stale desktop inspector baseline; the old two-tab + empty creature placeholder image was manually compared against the intended Gameplay/Semantic/Live inspector and replaced with the reviewed exact frame (`sha256:9a06890661417258a65aa75902ab752dc4d8cdf2973e5bd1c5e36373508737ee`).
 - Final exact-head Molehill browser qualification and visual review remain pending through the bounded machine-wide slot pool.
 
 ## Excluded
