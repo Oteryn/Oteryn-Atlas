@@ -17,10 +17,14 @@ test('self-hosted Compose sends checkout into images instead of bind mounting ru
   assert.doesNotMatch(compose, /\.\.\/web:|\.\.\/src:|ATLAS_E2E_ARTIFACTS_HOST/);
 });
 
-test('required PR gate is status-only while nightly keeps the no-bind self-hosted Compose path', () => {
-  assert.match(ci, /atlas-local-e2e/);
-  assert.doesNotMatch(ci, /compose\.selfhosted\.yml/);
-  assert.doesNotMatch(ci, /docker cp/);
+test('ordinary PR gate uses GitHub-hosted Docker while self-hosted Compose stays outside required PR CI', () => {
+  const browserJob = ci.slice(ci.indexOf('  verification-browser:\n'), ci.indexOf('  atlas-gate:\n'));
+  assert.match(browserJob, /GitHub-hosted Docker Playwright evidence/);
+  assert.match(browserJob, /runs-on: ubuntu-24\.04/);
+  assert.match(browserJob, /docker compose -f e2e\/compose\.yml/);
+  assert.doesNotMatch(browserJob, /atlas-local-e2e/);
+  assert.doesNotMatch(browserJob, /compose\.selfhosted\.yml/);
+  assert.doesNotMatch(browserJob, /docker cp/);
   assert.match(nightly, /compose\.selfhosted\.yml/);
   assert.match(nightly, /docker cp/);
 });
