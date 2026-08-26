@@ -101,3 +101,17 @@ test('Molehill plan census captures Playwright list without PowerShell transcodi
   assert.doesNotMatch(planStep, /playwright[^\n]*--list\s*\|\s*\n?\s*Set-Content/);
   assert.match(planStep, /\.\.\/trusted-base\/tools\/verification\/parse-playwright-test-list\.mjs/);
 });
+
+test('passing full-frame visual evidence remains local while GitHub artifacts stay metadata-only', () => {
+  assert.match(workflow, /ATLAS_TRUSTED_EVIDENCE_ROOT/);
+  assert.match(workflow, /ATLAS_E2E_ARTIFACTS_HOST\s*=\s*Join-Path/);
+  assert.match(workflow, /Copy-Item[\s\S]*pr-verification-plan\.json/);
+  const uploadStep = workflow.slice(workflow.indexOf('      - name: Publish bounded machine evidence'));
+  assert.ok(uploadStep.length > 0, 'bounded machine evidence upload step is missing');
+  assert.match(uploadStep, /summary\.json/);
+  assert.match(uploadStep, /resource-admission\.json/);
+  assert.match(uploadStep, /slot-lease\.json/);
+  assert.match(uploadStep, /pr-verification-plan\.json/);
+  assert.doesNotMatch(uploadStep, /candidate\/artifacts\/e2e\/\s*$/m);
+  assert.doesNotMatch(uploadStep, /user-visual-evidence|\.png|\.webm|trace\.zip/i);
+});
