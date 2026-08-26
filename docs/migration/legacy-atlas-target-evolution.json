@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "authority": "Oteryn/Oteryn-Atlas#179",
+  "paths": {
+    ".github/workflows/ci.yml": {
+      "prior_blob": "7720b9c470c9839ec246175c5079a9fb78fcf882",
+      "current_blob": "c2852081f08c008951167a6b4201ded9c526a8bc",
+      "reason": "Phase D reconciles ordinary PR browser qualification from external local status authority to exact-head GitHub-hosted Docker Playwright while preserving the pinned prior extraction target identity."
+    }
+  }
+}
