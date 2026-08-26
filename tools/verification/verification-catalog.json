@@ -29,6 +29,14 @@
       "evidence": "restricted-visual-review",
       "fullSafetyNet": true
     },
+    "native.gpu": {
+      "specs": ["tests/verification/native-hardware-contract.test.mjs"],
+      "projects": [],
+      "resourceClass": "native-gpu",
+      "evidence": "machine-summary",
+      "sequential": true,
+      "fullSafetyNet": true
+    },
     "visual.creatures": {
       "specs": ["e2e/tests/visual-desktop.spec.mjs", "e2e/tests/visual-mobile.spec.mjs"],
       "projects": ["desktop-chromium", "mobile-chromium"],
