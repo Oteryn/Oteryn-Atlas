@@ -205,3 +205,10 @@ test('semantic cross-browser navigation keeps same-document history state cohere
   assert.match(app, /window\.addEventListener\('popstate',\s*syncHistoryView\)/);
   assert.match(app, /window\.addEventListener\('oteryn-atlas-semantic-navigation',\s*syncHistoryView\)/);
 });
+
+test('same-document refresh invalidates stale PASS before async qualification', async () => {
+  const app = await read(fullworldAppPath);
+  assert.match(app, /function scheduleRefresh\(delay = 100\) \{[\s\S]{0,180}clearTimeout\(refreshTimer\);[\s\S]{0,120}publishQualification\('PENDING'\);[\s\S]{0,180}setTimeout\(\(\) => refreshScene\(\)/);
+  assert.match(app, /publishQualification\('PASS'\)/);
+  assert.match(app, /function failClosed\(error\)[\s\S]{0,500}publishQualification\('FAIL', error\)/);
+});
