@@ -12,28 +12,39 @@ const helper = read('e2e/heavy-slot-pool.ps1');
 const run = read('e2e/run.ps1');
 const nightly = read('.github/workflows/verification-depth.yml');
 
-test('routine PR heavy execution is base-owned and trust-gated before Molehill', () => {
+test('Molehill is an explicit specialist dispatch rather than an ordinary PR execution path', () => {
   assert.equal(fs.existsSync(workflowPath), true, `${workflowPath} is missing`);
-  assert.match(workflow, /pull_request_target:/);
+  assert.match(workflow, /workflow_dispatch:/);
+  assert.doesNotMatch(workflow, /pull_request_target:/);
   assert.doesNotMatch(workflow, /^\s*pull_request:\s*$/m);
   assert.match(workflow, /trust-admission:/);
   assert.match(workflow, /runs-on: ubuntu-24\.04/);
   assert.match(workflow, /tools\/verification\/trust-admission\.mjs/);
-  assert.match(workflow, /github\.event\.pull_request\.base\.sha/);
-  assert.match(workflow, /github\.event\.pull_request\.head\.sha/);
-  assert.match(workflow, /needs\.trust-admission\.outputs\.admitted == 'true'/);
+  assert.match(workflow, /reason_code/);
+  assert.match(workflow, /required_capability/);
+  assert.match(workflow, /restricted-visual/);
   assert.match(workflow, /group: atlas-runners/);
   assert.match(workflow, /labels: oteryn-atlas-pc/);
   assert.match(workflow, /persist-credentials: false/);
-  assert.doesNotMatch(workflow, /pull_request_target[\s\S]*secrets\.[A-Z0-9_]+[\s\S]*Run exact-head Molehill E2E/i);
 });
 
-test('superseded heads are cancelled per PR and rechecked before candidate execution', () => {
-  assert.match(workflow, /group: atlas-molehill-pr-\$\{\{ github\.event\.pull_request\.number \}\}/);
-  assert.match(workflow, /cancel-in-progress: true/);
+test('specialist dispatch re-resolves protected main and exact current PR head before scheduling Molehill', () => {
+  assert.match(workflow, /branches\/main/);
+  assert.match(workflow, /pulls\/\$PR_NUMBER/);
   assert.match(workflow, /current_head_sha/);
   assert.match(workflow, /superseded-head/);
   assert.match(workflow, /git ls-remote/);
+  assert.match(workflow, /policy_sha/);
+  assert.match(workflow, /cancel-in-progress: false/);
+});
+
+test('capabilities not implemented by Phase D fail closed instead of borrowing the visual lane', () => {
+  assert.match(workflow, /unsupported-specialist-capability:/);
+  assert.match(workflow, /inputs\.required_capability != 'restricted-visual'/);
+  assert.match(workflow, /exit 1/);
+  const visual = workflow.slice(workflow.indexOf('  restricted-visual-e2e:\n'));
+  assert.match(visual, /inputs\.required_capability == 'restricted-visual'/);
+  assert.match(visual, /ATLAS_USER_VISUAL_EVIDENCE: '1'/);
 });
 
 test('machine-wide host admission is independent from diagnostic slot numbering', () => {
@@ -66,11 +77,10 @@ test('authoritative evidence cannot opt into the historical unsafe third slot', 
   assert.match(run, /diagnostic-only/);
 });
 
-test('nightly browser depth participates in the same Molehill host admission', () => {
+test('existing scheduled specialist depth participates in the same Molehill host admission', () => {
   const browserDepth = nightly.slice(nightly.indexOf('  browser-depth:\n'));
   assert.match(browserDepth, /heavy-slot-pool\.ps1/);
   assert.match(browserDepth, /Acquire-AtlasHostAdmission/);
-  assert.match(browserDepth, /browser-full/);
   assert.match(browserDepth, /Release-AtlasHostAdmission \$hostAdmission/);
 });
 
@@ -94,40 +104,30 @@ test('new host admission fences historical diagnostic slot three during migratio
   assert.match(run, /Release-AtlasHostAdmission/);
 });
 
-test('Molehill plan census captures Playwright list without PowerShell transcoding', () => {
-  const planStep = workflow.slice(workflow.indexOf('      - name: Build exact trusted-base lower-bound plan'));
+test('specialist visual plan census captures Playwright list without PowerShell transcoding', () => {
+  const planStep = workflow.slice(workflow.indexOf('      - name: Build exact trusted-main lower-bound plan'));
   assert.match(planStep, /cmd\.exe \/d \/s \/c/);
   assert.match(planStep, /playwright-test-list\.txt/);
   assert.doesNotMatch(planStep, /playwright[^\n]*--list\s*\|\s*\n?\s*Set-Content/);
   assert.match(planStep, /\.\.\/trusted-base\/tools\/verification\/parse-playwright-test-list\.mjs/);
 });
 
-test('passing full-frame visual evidence remains local while GitHub artifacts stay metadata-only', () => {
+test('restricted full-frame evidence remains local while GitHub artifacts stay metadata-only', () => {
   assert.match(workflow, /ATLAS_TRUSTED_EVIDENCE_ROOT/);
   assert.match(workflow, /ATLAS_E2E_ARTIFACTS_HOST\s*=\s*Join-Path/);
   assert.match(workflow, /Copy-Item[\s\S]*pr-verification-plan\.json/);
-  const uploadStep = workflow.slice(workflow.indexOf('      - name: Publish bounded machine evidence'));
-  assert.ok(uploadStep.length > 0, 'bounded machine evidence upload step is missing');
+  const uploadStep = workflow.slice(workflow.indexOf('      - name: Publish bounded specialist metadata only'));
+  assert.ok(uploadStep.length > 0, 'bounded specialist metadata upload step is missing');
   assert.match(uploadStep, /summary\.json/);
   assert.match(uploadStep, /resource-admission\.json/);
   assert.match(uploadStep, /slot-lease\.json/);
   assert.match(uploadStep, /pr-verification-plan\.json/);
-  assert.doesNotMatch(uploadStep, /candidate\/artifacts\/e2e\/\s*$/m);
+  assert.match(uploadStep, /run-metadata\.json/);
   assert.doesNotMatch(uploadStep, /user-visual-evidence|\.png|\.webm|trace\.zip/i);
 });
 
-test('edited exact-head visual approval publishes through trusted-base policy code only', () => {
-  assert.match(workflow, /types:\s*\[[^\]]*edited[^\]]*\]/);
-  assert.match(workflow, /heavy-e2e:[\s\S]*github\.event\.action != 'edited'/);
-  const publish = workflow.slice(workflow.indexOf('  review-publish:\n'));
-  assert.ok(publish.length > 0, 'review-publish job is missing');
-  assert.match(publish, /github\.event\.action == 'edited'/);
-  assert.match(publish, /Visual-Review-Approved-For/);
-  assert.match(publish, /Visual-Evidence-Run/);
-  assert.match(publish, /statuses:\s*write/);
-  assert.match(publish, /ref:\s*\$\{\{ github\.event\.pull_request\.base\.sha \}\}/);
-  assert.doesNotMatch(publish, /ref:\s*\$\{\{ needs\.trust-admission\.outputs\.head_sha \}\}/);
-  assert.match(publish, /approve-visual-user-acceptance\.ps1[\s\S]*-ReviewedHeadSha/);
-  assert.match(publish, /publish-local-e2e-status\.ps1[\s\S]*-TestedHeadSha/);
-  assert.match(publish, /git fetch --no-tags origin \$env:ATLAS_CODE_REVISION/);
+test('Phase D specialist workflow does not publish routine atlas-local-e2e authority', () => {
+  assert.doesNotMatch(workflow, /statuses:\s*write/);
+  assert.doesNotMatch(workflow, /publish-local-e2e-status\.ps1/);
+  assert.doesNotMatch(workflow, /atlas-local-e2e/);
 });
