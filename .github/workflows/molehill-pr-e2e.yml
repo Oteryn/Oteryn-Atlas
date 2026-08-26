@@ -84,6 +84,7 @@ jobs:
       ATLAS_E2E_WORKERS: '1'
       ATLAS_E2E_RESOURCE_CLASS: browser-full
       ATLAS_E2E_AUTHORITY_MODE: authoritative
+      ATLAS_TRUSTED_EVIDENCE_ROOT: C:\Oteryn\evidence\atlas-pr-e2e
     steps:
       - name: Verify Molehill runner identity
         shell: powershell
@@ -170,19 +171,46 @@ jobs:
         working-directory: candidate
         run: |
           $ErrorActionPreference = 'Stop'
+          $evidenceRoot = Join-Path $env:ATLAS_TRUSTED_EVIDENCE_ROOT (Join-Path $env:ATLAS_CODE_REVISION "$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT")
+          New-Item -ItemType Directory -Force $evidenceRoot | Out-Null
+          Copy-Item artifacts/verification/pr-verification-plan.json (Join-Path $evidenceRoot 'pr-verification-plan.json') -Force
           $env:ATLAS_VERIFICATION_PLAN_PATH = "$PWD/artifacts/verification/pr-verification-plan.json"
           $env:ATLAS_E2E_PROJECT = "atlas-pr-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
-          $env:ATLAS_E2E_ARTIFACTS_HOST = "../artifacts/e2e/$env:ATLAS_E2E_PROJECT"
+          $env:ATLAS_E2E_ARTIFACTS_HOST = Join-Path $evidenceRoot 'run'
           .\e2e\run.ps1
           exit $LASTEXITCODE
 
-      - name: Publish restricted machine and visual evidence
+      - name: Prepare bounded machine evidence
+        if: always()
+        shell: powershell
+        working-directory: candidate
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $evidenceRoot = Join-Path $env:ATLAS_TRUSTED_EVIDENCE_ROOT (Join-Path $env:ATLAS_CODE_REVISION "$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT")
+          $runRoot = Join-Path $evidenceRoot 'run'
+          $safeRoot = Join-Path $PWD 'artifacts/github-evidence'
+          New-Item -ItemType Directory -Force $safeRoot | Out-Null
+          $copies = @(
+            @{ Source = (Join-Path $runRoot 'summary.json'); Name = 'summary.json' },
+            @{ Source = (Join-Path $runRoot 'resource-admission.json'); Name = 'resource-admission.json' },
+            @{ Source = (Join-Path $runRoot 'slot-lease.json'); Name = 'slot-lease.json' },
+            @{ Source = (Join-Path $evidenceRoot 'pr-verification-plan.json'); Name = 'pr-verification-plan.json' }
+          )
+          foreach ($copy in $copies) {
+            if (Test-Path -LiteralPath $copy.Source) { Copy-Item -LiteralPath $copy.Source -Destination (Join-Path $safeRoot $copy.Name) -Force }
+          }
+          if (-not (Test-Path -LiteralPath (Join-Path $safeRoot 'pr-verification-plan.json'))) { throw 'Bounded plan evidence is missing.' }
+          Write-Output "restricted-full-frame-evidence=$evidenceRoot"
+
+      - name: Publish bounded machine evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: atlas-molehill-e2e-${{ github.run_id }}-${{ github.run_attempt }}
+          name: atlas-molehill-e2e-metadata-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
-            candidate/artifacts/e2e/
-            candidate/artifacts/verification/
-          if-no-files-found: error
+            candidate/artifacts/github-evidence/summary.json
+            candidate/artifacts/github-evidence/resource-admission.json
+            candidate/artifacts/github-evidence/slot-lease.json
+            candidate/artifacts/github-evidence/pr-verification-plan.json
+          if-no-files-found: warn
           retention-days: 7
