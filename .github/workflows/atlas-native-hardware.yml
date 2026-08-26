@@ -1,0 +1,234 @@
+name: Atlas Native Hardware Truth
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+    inputs:
+      exact_head_sha:
+        description: Exact protected-main SHA to qualify
+        required: true
+        type: string
+      plan_run_id:
+        description: GitHub Actions run containing the exact verification plan
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: atlas-native-gpu-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  trust-admission:
+    name: Trust and plan admission
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+    outputs:
+      admitted: ${{ steps.plan.outputs.admitted }}
+      head_sha: ${{ steps.plan.outputs.head_sha }}
+      base_sha: ${{ steps.plan.outputs.base_sha }}
+      plan_sha256: ${{ steps.plan.outputs.plan_sha256 }}
+      requires_native: ${{ steps.plan.outputs.requires_native }}
+    steps:
+      - name: Check out trusted protected base
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Evaluate exact trust and verification plan
+        id: plan
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          CANDIDATE_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          CANDIDATE_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          CANDIDATE_AUTHOR: ${{ github.event.pull_request.user.login }}
+          AUTHOR_ASSOCIATION: ${{ github.event.pull_request.author_association }}
+          EVENT_ACTOR: ${{ github.actor }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          DISPATCH_HEAD_SHA: ${{ inputs.exact_head_sha }}
+          DISPATCH_PLAN_RUN_ID: ${{ inputs.plan_run_id }}
+        run: |
+          set -euo pipefail
+          admitted=false
+          head_sha=''
+          base_sha=''
+          plan_run_id=''
+          if [[ "$GITHUB_EVENT_NAME" == pull_request_target ]]; then
+            current_head_sha="$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" --jq .head.sha)"
+            export current_head_sha
+            trust_json="$(node --input-type=module <<'NODE'
+          import { decideTrustAdmission } from './tools/verification/trust-admission.mjs';
+          const result = decideTrustAdmission({
+            repository: process.env.GITHUB_REPOSITORY,
+            eventName: process.env.GITHUB_EVENT_NAME,
+            baseRef: process.env.BASE_REF,
+            headRepository: process.env.CANDIDATE_HEAD_REPO,
+            headSha: process.env.CANDIDATE_HEAD_SHA,
+            currentHeadSha: process.env.current_head_sha,
+            actor: process.env.EVENT_ACTOR,
+            author: process.env.CANDIDATE_AUTHOR,
+            authorAssociation: process.env.AUTHOR_ASSOCIATION,
+            resourceClass: 'native-gpu',
+          });
+          process.stdout.write(JSON.stringify(result));
+          NODE
+          )"
+            [[ "$(jq -r .state <<<"$trust_json")" == admitted ]]
+            head_sha="$(jq -r .headSha <<<"$trust_json")"
+            base_sha="$BASE_SHA"
+            run_json="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$head_sha&event=pull_request&per_page=100")"
+            plan_run_id="$(jq -r '[.workflow_runs[] | select(.name == "CI")] | sort_by(.created_at) | reverse | .[0].id // empty' <<<"$run_json")"
+          else
+            [[ "$GITHUB_REF" == refs/heads/main ]]
+            [[ "$DISPATCH_HEAD_SHA" =~ ^[a-f0-9]{40}$ ]]
+            current_main="$(gh api "repos/$GITHUB_REPOSITORY/branches/main" --jq .commit.sha)"
+            [[ "$DISPATCH_HEAD_SHA" == "$current_main" && "$GITHUB_SHA" == "$current_main" ]]
+            [[ "$DISPATCH_PLAN_RUN_ID" =~ ^[0-9]+$ ]]
+            head_sha="$current_main"
+            base_sha="$current_main"
+            plan_run_id="$DISPATCH_PLAN_RUN_ID"
+          fi
+          [[ -n "$plan_run_id" ]]
+          run_head="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$plan_run_id" --jq .head_sha)"
+          [[ "$run_head" == "$head_sha" ]]
+          artifact_json="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$plan_run_id/artifacts?per_page=100")"
+          artifact_name="$(jq -r --arg run "$plan_run_id" '[.artifacts[] | select(.name | startswith("atlas-shadow-plan-" + $run + "-"))] | .[0].name // empty' <<<"$artifact_json")"
+          [[ -n "$artifact_name" ]]
+          rm -rf artifacts/native-plan
+          mkdir -p artifacts/native-plan
+          gh run download "$plan_run_id" --repo "$GITHUB_REPOSITORY" --name "$artifact_name" --dir artifacts/native-plan
+          plan_path=artifacts/native-plan/shadow-verification-plan.json
+          test -s "$plan_path"
+          PLAN_PATH="$plan_path" HEAD_SHA="$head_sha" BASE_SHA_RESOLVED="$base_sha" node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const plan = JSON.parse(fs.readFileSync(process.env.PLAN_PATH, 'utf8'));
+          if (plan.repository !== process.env.GITHUB_REPOSITORY) throw new Error('plan repository mismatch');
+          if (plan.headSha !== process.env.HEAD_SHA) throw new Error('plan head mismatch');
+          if (plan.retryPolicy?.retries !== 0) throw new Error('native plan retries must be zero');
+          if (!plan.requiresNativeHardware || !plan.resourceClasses?.includes('native-gpu')) throw new Error('plan does not require native hardware');
+          if (!plan.requiredGroupIds?.includes('native.gpu')) throw new Error('native.gpu group is absent');
+          if (!plan.shadowOnly) throw new Error('bootstrap native plan must remain shadow-only');
+          NODE
+          plan_sha256="sha256:$(sha256sum "$plan_path" | awk '{print $1}')"
+          if [[ "$GITHUB_EVENT_NAME" == pull_request_target ]]; then
+            latest="$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" --jq .head.sha)"
+            [[ "$latest" == "$head_sha" ]] || { echo "superseded-head current=$latest expected=$head_sha" >&2; exit 1; }
+          fi
+          admitted=true
+          {
+            echo "admitted=$admitted"
+            echo "head_sha=$head_sha"
+            echo "base_sha=$base_sha"
+            echo "plan_sha256=$plan_sha256"
+            echo "requires_native=true"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Upload bounded trusted plan evidence
+        if: steps.plan.outputs.admitted == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: atlas-native-plan-${{ steps.plan.outputs.head_sha }}-${{ github.run_id }}
+          path: artifacts/native-plan/shadow-verification-plan.json
+          if-no-files-found: error
+          retention-days: 7
+
+  native-gpu:
+    name: Native Windows GPU truth
+    needs: trust-admission
+    if: needs.trust-admission.outputs.admitted == 'true' && needs.trust-admission.outputs.requires_native == 'true'
+    runs-on:
+      group: atlas-runners
+      labels: oteryn-atlas-pc
+    timeout-minutes: 120
+    permissions:
+      contents: read
+      pull-requests: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      ATLAS_CODE_REVISION: ${{ needs.trust-admission.outputs.head_sha }}
+      ATLAS_BASE_SHA: ${{ needs.trust-admission.outputs.base_sha }}
+      PLAN_SHA256: ${{ needs.trust-admission.outputs.plan_sha256 }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      TASK_BRANCH: ${{ github.event.pull_request.head.ref }}
+    steps:
+      - name: Check out trusted base helpers
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.trust-admission.outputs.base_sha }}
+          persist-credentials: false
+          path: trusted-base
+
+      - name: Check out exact trusted candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.trust-admission.outputs.head_sha }}
+          persist-credentials: false
+          fetch-depth: 0
+          path: candidate
+
+      - name: Reject superseded candidate before native execution
+        if: github.event_name == 'pull_request_target'
+        shell: powershell
+        working-directory: candidate
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $current = gh api "repos/$env:GITHUB_REPOSITORY/pulls/$env:PR_NUMBER" --jq .head.sha
+          if ($current.Trim() -ne $env:ATLAS_CODE_REVISION) { throw "superseded-head current=$($current.Trim()) expected=$env:ATLAS_CODE_REVISION" }
+          if ((git rev-parse HEAD).Trim() -ne $env:ATLAS_CODE_REVISION) { throw 'Candidate checkout mismatch.' }
+
+      - name: Run exclusive native GPU proof
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:RUNNER_OS -ne 'Windows') { throw "Unexpected runner OS: $env:RUNNER_OS" }
+          if ($env:RUNNER_NAME -notmatch '^oteryn-molehill-atlas(?:-[0-9]+)?$') { throw "Unexpected runner identity: $env:RUNNER_NAME" }
+          . "$PWD/trusted-base/e2e/heavy-slot-pool.ps1"
+          $lease = $null
+          try {
+            $lease = Acquire-AtlasExclusiveHostAdmission -TimeoutSeconds 21600 -Project "native-gpu-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT" -Revision $env:ATLAS_CODE_REVISION -ResourceClass 'native-gpu' -AuthorityMode 'diagnostic'
+            $browserCandidates = @(
+              "$env:ProgramFiles\Google\Chrome\Application\chrome.exe",
+              "${env:ProgramFiles(x86)}\Google\Chrome\Application\chrome.exe",
+              "$env:LocalAppData\Google\Chrome\Application\chrome.exe",
+              "$env:ProgramFiles\Microsoft\Edge\Application\msedge.exe",
+              "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe"
+            )
+            $browser = @($browserCandidates | Where-Object { $_ -and (Test-Path -LiteralPath $_) } | Select-Object -First 1)
+            if ($browser.Count -ne 1) { throw 'No supported native Chrome/Edge executable found.' }
+            $adapter = @(Get-CimInstance Win32_VideoController | Where-Object { $_.Name -match 'AMD|Radeon' } | Select-Object -First 1)
+            if ($adapter.Count -ne 1 -or [string]::IsNullOrWhiteSpace([string]$adapter[0].DriverVersion)) { throw 'No bounded AMD/Radeon GPU identity with driver version found.' }
+            New-Item -ItemType Directory -Force candidate/artifacts/native-gpu | Out-Null
+            node candidate/tools/verification/native-gpu-probe.mjs `
+              --browser $browser[0] `
+              --adapter-name ([string]$adapter[0].Name) `
+              --driver-version ([string]$adapter[0].DriverVersion) `
+              --atlas-revision $env:ATLAS_CODE_REVISION `
+              --verification-plan-sha256 $env:PLAN_SHA256 `
+              --output candidate/artifacts/native-gpu/evidence.json
+            if ($LASTEXITCODE -ne 0) { throw 'Native GPU probe failed.' }
+            $evidence = Get-Content candidate/artifacts/native-gpu/evidence.json -Raw | ConvertFrom-Json
+            if (-not [bool]$evidence.hardwareAccelerated) { throw 'Native GPU hardware acceleration is not proven.' }
+            if ([string]$evidence.atlasRevision -ne $env:ATLAS_CODE_REVISION) { throw 'Native GPU revision mismatch.' }
+            if ([string]$evidence.verificationPlanSha256 -ne $env:PLAN_SHA256) { throw 'Native GPU plan digest mismatch.' }
+          } finally {
+            Release-AtlasExclusiveHostAdmission $lease
+          }
+
+      - name: Upload bounded native machine evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: atlas-native-gpu-${{ needs.trust-admission.outputs.head_sha }}-${{ github.run_id }}
+          path: candidate/artifacts/native-gpu/evidence.json
+          if-no-files-found: error
+          retention-days: 14
