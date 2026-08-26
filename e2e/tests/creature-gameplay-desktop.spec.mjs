@@ -6,7 +6,7 @@ const FIXTURES = Object.freeze({
   sam: Object.freeze({ entityId: 'npc-entity:f8d4f0200616061ffa4ae0b4c38c6d3e', label: 'Sam' }),
   rat: Object.freeze({ entityId: 'monster-entity:80295e51265b3662bfbea2ea01ee3ccb', label: 'Rat' }),
   sigurd: Object.freeze({ entityId: 'npc-entity:0e7857888218c9081fabdb469aa9349b', label: 'Sigurd' }),
-  yasir: Object.freeze({ entityId: 'npc-entity:b486d5d7292f7acca539899a96e66016', label: 'Yasir' }),
+  hl: Object.freeze({ entityId: 'npc-entity:0c83ae18a907dc7e8f15c37c03e4f04c', label: 'H.L.' }),
 });
 
 async function creatureState(page) {
@@ -145,11 +145,11 @@ test('desktop PARTIAL shop never becomes an authoritative empty claim', async ({
 
 test('desktop real large shop stays bounded at 100 rendered rows', async ({ page }) => {
   const runtime = captureRuntimeFailures(page);
-  await openFixture(page, FIXTURES.yasir, { directClick: false });
+  await openFixture(page, FIXTURES.hl, { directClick: false });
   await page.locator('#creature-card-details').click();
   const buys = page.locator('#gameplay-section-buys .creature-gameplay-row');
   await expect(buys).toHaveCount(50);
-  await expect(page.locator('#gameplay-section-buys')).toContainText('50 of 738');
+  await expect(page.locator('#gameplay-section-buys')).toContainText('50 of 124');
   await page.locator('#gameplay-section-buys .creature-gameplay-more').click();
   await expect(buys).toHaveCount(100);
   await expect(page.locator('#gameplay-section-buys')).toContainText(/Refine the search or sort/i);

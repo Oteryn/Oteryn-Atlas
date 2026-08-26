@@ -74,3 +74,15 @@ test('Rat loot row count stays separate from per-drop max count', () => {
   assert.equal(gold.min_count, 1);
   assert.equal(gold.max_count, 4);
 });
+
+test('large-shop browser fixture stays on the map-reachable H.L. profile', () => {
+  const browser = readFileSync(join(ROOT, 'e2e', 'tests', 'creature-gameplay-desktop.spec.mjs'), 'utf8');
+  assert.match(browser, /npc-entity:0c83ae18a907dc7e8f15c37c03e4f04c/);
+  assert.doesNotMatch(browser, /npc-entity:b486d5d7292f7acca539899a96e66016|FIXTURES\.yasir/);
+  assert.match(browser, /50 of 124/);
+  const shard = JSON.parse(readFileSync(join(PRODUCT, 'shards', 'npc-0c.json')));
+  const profile = shard.profiles.find((row) => row.entity_id === 'npc-entity:0c83ae18a907dc7e8f15c37c03e4f04c');
+  assert.ok(profile, 'missing committed H.L. gameplay profile');
+  assert.equal(profile.name, 'H.L.');
+  assert.equal(profile.shop.buys.length, 124);
+});
