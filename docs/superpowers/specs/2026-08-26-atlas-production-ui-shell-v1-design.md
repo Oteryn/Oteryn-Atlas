@@ -691,11 +691,11 @@ The intended execution order is:
 ```text
 Phase 0: refresh main + #162/#170 + freeze shell interfaces
                      |
-          +----------+----------+
-          |          |          |
-       Lane A     Lane B     Lane D     Lane F
-          |          |          |          |
-          +------ first parallel wave -----+
+      +--------------+--------------+--------------+
+      |              |              |              |
+   Lane A         Lane B         Lane D         Lane F
+      |              |              |              |
+      +----------- first parallel wave -----------+
                      |
              stable A interfaces
                  /       \
