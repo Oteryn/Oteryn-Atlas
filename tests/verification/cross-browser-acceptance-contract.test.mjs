@@ -212,3 +212,14 @@ test('same-document refresh invalidates stale PASS before async qualification', 
   assert.match(app, /publishQualification\('PASS'\)/);
   assert.match(app, /function failClosed\(error\)[\s\S]{0,500}publishQualification\('FAIL', error\)/);
 });
+
+
+test('same-document semantic selection dismisses transient results before inspector acceptance', async () => {
+  const search = await read('web/fullworld-search.mjs');
+  const desktop = await read('e2e/tests/cross-browser-desktop.spec.mjs');
+  const mobile = await read('e2e/tests/cross-browser-mobile.spec.mjs');
+  assert.match(search, /function navigate\(record, rawQuery, host\)[\s\S]{0,220}hideResults\(host\)[\s\S]{0,220}history\.pushState/);
+  assert.match(search, /navigate\(record, query, host\)/);
+  assert.match(desktop, /await expect\(results\)\.toBeHidden\(\)/);
+  assert.match(mobile, /await expect\(results\)\.toBeHidden\(\)/);
+});

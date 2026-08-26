@@ -110,6 +110,7 @@ test('secondary desktop engine preserves semantic inspector through reload and h
   ]);
   runtime = await semanticRuntime;
   await waitForAtlas(page);
+  await expect(results).toBeHidden();
   await expect(page.locator('#inspector-content')).toContainText('Thais');
   const selectedUrl = page.url();
 

@@ -100,10 +100,11 @@ function queryAll(raw) {
     .slice(0, MAX_RESULTS);
 }
 
-function navigate(record, rawQuery) {
+function navigate(record, rawQuery, host) {
   const params = navigationSearchParams(record, location.search, state.index, rawQuery);
   if (record.record_id) params.set('creature', record.record_id);
   else params.delete('creature');
+  hideResults(host);
   history.pushState(null, '', `${location.pathname}?${params.toString()}${location.hash}`);
   state.active = record;
   renderActiveInspector();
@@ -189,7 +190,7 @@ function renderResults(host, raw) {
     const coords = document.createElement('small');
     coords.textContent = `${record.position.x}, ${record.position.y}, ${displayFloor(record.position.floor, state.index)}`;
     button.append(label, kind, coords);
-    button.addEventListener('click', () => navigate(record, query));
+    button.addEventListener('click', () => navigate(record, query, host));
     host.append(button);
   }
   host.hidden = false;

@@ -130,6 +130,7 @@ test('secondary mobile-like engine supports touch drawers, search and inspector 
   ]);
   runtime = await semanticRuntime;
   await waitForAtlas(page);
+  await expect(results).toBeHidden();
   await expect(page.locator('#inspector-content')).toContainText('Thais');
   await expect(page.locator('#inspector-content')).toContainText('Stable public id');
 
