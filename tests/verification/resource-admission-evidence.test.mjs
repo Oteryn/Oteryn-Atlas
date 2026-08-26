@@ -37,6 +37,7 @@ test('publisher resource evidence accepts only exact authoritative measured admi
     slotId: 1,
   });
 });
+
 test('diagnostic, stale, copied or unmeasured resource evidence is rejected', async () => {
   assert.equal(fs.existsSync(moduleUrl), true, 'missing resource evidence validator');
   const { validateResourceAdmissionEvidence } = await import(moduleUrl);
@@ -59,4 +60,10 @@ test('status publisher invokes resource evidence validation from the summary art
   assert.match(source, /resource-admission\.json/);
   assert.match(source, /validate-resource-admission\.mjs/);
   assert.match(source, /ATLAS resource admission evidence validation failed/);
+});
+
+test('run lifetime releases every partially acquired lease on preflight or later failure', () => {
+  const source = fs.readFileSync(new URL('../../e2e/run.ps1', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
+  assert.match(source, /\$projectLease\s*=\s*\$null[\s\S]*\$artifactLease\s*=\s*\$null[\s\S]*\$legacyFence\s*=\s*\$null[\s\S]*\$hostAdmissionLease\s*=\s*\$null[\s\S]*\$slotLease\s*=\s*\$null[\s\S]*\$publicationForwarder\s*=\s*\$null[\s\S]*try\s*\{[\s\S]*Acquire-AtlasProjectLock/);
+  assert.match(source, /finally\s*\{[\s\S]*if \(\$slotLease -and \$slotLease\.Stream\)[\s\S]*Release-AtlasHostAdmission \$hostAdmissionLease[\s\S]*if \(\$legacyFence -and \$legacyFence\.Stream\)[\s\S]*if \(\$artifactLease -and \$artifactLease\.Stream\)[\s\S]*if \(\$projectLease -and \$projectLease\.Stream\)/);
 });
