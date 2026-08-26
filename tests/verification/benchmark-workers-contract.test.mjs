@@ -46,3 +46,15 @@ test('benchmark outer cleanup removes a partially started active Compose project
   assert.match(script, /finally\s*\{[\s\S]*if \(\$activeProject\)[\s\S]*docker compose -p \$activeProject -f e2e\\compose\.yml down --remove-orphans/);
   assert.match(script, /docker compose -p \$project -f e2e\\compose\.yml down --remove-orphans[\s\S]*\$activeProject\s*=\s*\$null/);
 });
+
+test('worker benchmark explicitly compares host IPC with per-container private shared memory', () => {
+  const script = fs.readFileSync(scriptPath, 'utf8').replace(/\r\n/g, '\n');
+  assert.match(script, /ValidateSet\('host', 'private'\).*\$IpcModes/);
+  assert.match(script, /foreach \(\$ipcMode in \$IpcModes\)/);
+  assert.match(script, /\$env:ATLAS_E2E_IPC_MODE\s*=\s*\$ipcMode/);
+  assert.match(script, /\$env:ATLAS_E2E_SHM_SIZE\s*=\s*\$ShmSize/);
+  assert.match(script, /ipcMode\s*=\s*\$ipcMode/);
+  assert.match(script, /requestedIpcModes\s*=\s*@\(\$IpcModes\)/);
+  assert.match(script, /ATLAS_E2E_IPC_MODE/);
+  assert.match(script, /ATLAS_E2E_SHM_SIZE/);
+});
