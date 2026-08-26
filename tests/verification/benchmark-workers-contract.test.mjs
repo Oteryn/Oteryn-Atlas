@@ -10,14 +10,18 @@ test('worker benchmark is measurement-only, repeatable and uses non-null telemet
 
   assert.match(script, /\[switch\]\$SelfTest/);
   assert.match(script, /ValidateSet\(1, 2, 4, 6, 8\)/);
+  assert.match(script, /ValidateSet\('full', 'targeted', 'broad'\)/);
   assert.match(script, /ValidateRange\(3, 5\)/);
   assert.match(script, /Get-Counter/);
   assert.match(script, /Get-CimInstance Win32_OperatingSystem/);
   assert.match(script, /docker stats --no-stream --format/);
   assert.match(script, /docker version --format/);
+  assert.match(script, /docker info --format/);
   assert.match(script, /Get-ComputerInfo/);
   assert.match(script, /memoryPressurePercent/);
-  assert.match(script, /dockerBlockIo/);
+  assert.match(script, /diskQueueLength/);
+  assert.match(script, /sharedMemory/);
+  assert.match(script, /dockerStats/);
   assert.match(script, /dockerContainerCount/);
   assert.match(script, /Start-Process/);
   assert.match(script, /resourceSamples/);
@@ -25,9 +29,10 @@ test('worker benchmark is measurement-only, repeatable and uses non-null telemet
   assert.doesNotMatch(script, /Select-Object -First 1 Id, Path, StartTime/);
   assert.match(script, /\[IO\.Path\]::GetDirectoryName\(\[IO\.Path\]::GetFullPath\(\$OutputPath\)\)/);
   assert.doesNotMatch(script, /Split-Path -LiteralPath \$OutputPath -Parent/);
-  assert.doesNotMatch(script, /PhysicalDisk\(_Total\)/);
+  assert.match(script, /PhysicalDisk\(_Total\)|LogicalDisk\(C:/);
   assert.doesNotMatch(script, /\$values\['\\\\Processor Information/);
   assert.match(script, /ATLAS_E2E_WORKERS/);
+  assert.match(script, /ATLAS_E2E_BENCHMARK_WORKLOAD/);
   assert.match(script, /if \(\$SelfTest\)/);
   assert.doesNotMatch(script, /LoadPercentage/);
   assert.doesNotMatch(script, /Set-Content.*playwright\.config/i);
