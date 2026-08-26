@@ -46,6 +46,12 @@ if ($actualMergeBase -ne $plan.mergeBaseSha) { throw 'Verification plan merge ba
 $evidenceValidator = Join-Path $root 'tools\verification\validate-e2e-evidence.mjs'
 node $evidenceValidator --plan $resolvedPlan --summary $resolvedSummary --head-sha $sha
 if ($LASTEXITCODE -ne 0) { throw "Plan-bound E2E evidence validation failed with exit code $LASTEXITCODE." }
+$artifactRoot = Split-Path $resolvedSummary -Parent
+$resourceAdmissionPath = Join-Path $artifactRoot 'resource-admission.json'
+$resolvedResourceAdmission = (Resolve-Path $resourceAdmissionPath).Path
+$resourceValidator = Join-Path $root 'tools\verification\validate-resource-admission.mjs'
+node $resourceValidator --evidence $resolvedResourceAdmission --head-sha $sha --plan-sha256 $summary.metadata.verificationPlanSha256
+if ($LASTEXITCODE -ne 0) { throw "ATLAS resource admission evidence validation failed with exit code $LASTEXITCODE." }
 $scenarios = @($summary.scenarios)
 
 if (-not $VisualReviewPath) { $VisualReviewPath = Join-Path (Split-Path $resolvedSummary -Parent) 'visual-review.json' }

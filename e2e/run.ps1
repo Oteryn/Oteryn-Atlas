@@ -87,6 +87,7 @@ $resourceEvidence = [ordered]@{
   slotCount = $slotLease.SlotCount
   project = $project
   revision = $env:ATLAS_CODE_REVISION
+  verificationPlanSha256 = $env:ATLAS_VERIFICATION_PLAN_SHA256
   acquiredAtUtc = [DateTime]::UtcNow.ToString('o')
 }
 $resourceEvidence | ConvertTo-Json | Set-Content -Encoding utf8 (Join-Path $artifactDir 'resource-admission.json')
