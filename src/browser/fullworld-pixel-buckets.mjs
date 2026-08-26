@@ -5,6 +5,8 @@ export const RUNTIME_PIXEL_BUCKET_PROFILE = 'oteryn-atlas-runtime-pixel-buckets-
 export const RUNTIME_PIXEL_BUCKET_DOMAIN = 'OTERYN-ATLAS-RUNTIME-PIXEL-BUCKETS-V0\0';
 const MAX_MANIFEST_BYTES = 16 * 1024 * 1024;
 const MAX_BUCKET_BYTES = 8 * 1024 * 1024;
+const DEFAULT_PIXEL_FETCH_TIMEOUT_MS = 30_000;
+const MAX_PIXEL_FETCH_TIMEOUT_MS = 120_000;
 
 export class RuntimePixelBucketError extends Error {}
 
@@ -33,6 +35,49 @@ function canonicalDecode(bytes, label) {
   const canonical = canonicalJsonBytes(value);
   requireValue(canonical.length === bytes.length && canonical.every((byte, index) => byte === bytes[index]), `${label} is not canonical JSON`);
   return value;
+}
+function pixelFetchTimeoutMs(options) {
+  const timeoutMs = options.timeoutMs ?? DEFAULT_PIXEL_FETCH_TIMEOUT_MS;
+  requireValue(Number.isSafeInteger(timeoutMs) && timeoutMs > 0 && timeoutMs <= MAX_PIXEL_FETCH_TIMEOUT_MS, 'runtime pixel fetch timeout invalid');
+  return timeoutMs;
+}
+function callerAbortReason(signal) {
+  if (signal?.reason) return signal.reason;
+  const error = new Error('aborted');
+  error.name = 'AbortError';
+  return error;
+}
+async function fetchWithDeadline(fetcher, url, options, label) {
+  const timeoutMs = pixelFetchTimeoutMs(options);
+  const controller = new AbortController();
+  let timeoutId = null;
+  let callerAbort = null;
+  const fetchPromise = Promise.resolve().then(() => fetcher(url, { cache: 'no-store', signal: controller.signal }));
+  const deadlinePromise = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => {
+      const error = new RuntimePixelBucketError(`${label} fetch timed out after ${timeoutMs}ms`);
+      controller.abort(error);
+      reject(error);
+    }, timeoutMs);
+  });
+  const races = [fetchPromise, deadlinePromise];
+  if (options.signal) {
+    races.push(new Promise((_, reject) => {
+      callerAbort = () => {
+        const reason = callerAbortReason(options.signal);
+        controller.abort(reason);
+        reject(reason);
+      };
+      if (options.signal.aborted) callerAbort();
+      else options.signal.addEventListener('abort', callerAbort, { once: true });
+    }));
+  }
+  try {
+    return await Promise.race(races);
+  } finally {
+    if (timeoutId != null) clearTimeout(timeoutId);
+    if (callerAbort) options.signal?.removeEventListener?.('abort', callerAbort);
+  }
 }
 
 export async function loadRuntimePixelBuckets(baseUrl, trust, fetcher = fetch) {
@@ -88,7 +133,7 @@ export async function loadVerifiedPixelBucket(catalog, bucketId, fetcher = fetch
   let bytes = await options.persistentCache?.get?.(descriptor.contentId, descriptor.bytes) ?? null;
   if (bytes) options.onLoad?.({ source: 'cache', bytes: bytes.byteLength, bucketId });
   if (!bytes) {
-    const response = await fetcher(new URL(safeRelativePath(descriptor.path), catalog.baseUrl), { cache: 'no-store', signal: options.signal ?? null });
+    const response = await fetchWithDeadline(fetcher, new URL(safeRelativePath(descriptor.path), catalog.baseUrl), options, `runtime pixel bucket ${bucketId}`);
     bytes = await bounded(response, MAX_BUCKET_BYTES, `runtime pixel bucket ${bucketId}`, descriptor.bytes);
     requireValue(await sha256ContentId(bytes) === descriptor.contentId, `runtime pixel bucket ${bucketId} identity mismatch`);
     await options.persistentCache?.put?.(descriptor.contentId, bytes);
@@ -115,7 +160,7 @@ export async function loadVerifiedPixelBundle(catalog, fetcher = fetch, options 
   let bytes = await options.persistentCache?.get?.(descriptor.contentId, descriptor.bytes) ?? null;
   if (bytes) options.onLoad?.({ source: 'cache', bytes: bytes.byteLength });
   if (!bytes) {
-    const response = await fetcher(new URL(safeRelativePath(descriptor.path), catalog.baseUrl), { cache: 'no-store', signal: options.signal ?? null });
+    const response = await fetchWithDeadline(fetcher, new URL(safeRelativePath(descriptor.path), catalog.baseUrl), options, 'runtime local-max pixel bundle');
     bytes = await bounded(response, Math.max(MAX_BUCKET_BYTES, descriptor.bytes), 'runtime local-max pixel bundle', descriptor.bytes);
     requireValue(await sha256ContentId(bytes) === descriptor.contentId, 'runtime local-max pixel bundle identity mismatch');
     await options.persistentCache?.put?.(descriptor.contentId, bytes);
