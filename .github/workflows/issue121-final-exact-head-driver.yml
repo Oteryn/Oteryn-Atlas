@@ -1,0 +1,335 @@
+name: Issue 121 Final Exact-Head Qualification
+
+on:
+  push:
+    branches:
+      - test/issue-121-cross-browser-acceptance
+
+permissions:
+  contents: read
+  actions: read
+  pull-requests: read
+  statuses: write
+
+concurrency:
+  group: issue-121-final-exact-head-qualification
+  cancel-in-progress: false
+
+jobs:
+  qualify:
+    name: Molehill exact-head browser qualification
+    runs-on:
+      group: atlas-runners
+      labels: oteryn-atlas-pc
+    timeout-minutes: 240
+    outputs:
+      target_sha: ${{ steps.target.outputs.sha }}
+      short_sha: ${{ steps.target.outputs.short }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: Oteryn/Oteryn-Atlas
+      PR_NUMBER: '141'
+      TASK_BRANCH: test/issue-121-cross-browser-acceptance
+      ATLAS_PUBLICATION_ORIGIN: http://192.168.1.2:8097
+      ATLAS_E2E_WORKERS: '1'
+    steps:
+      - name: Resolve self-removed final target
+        id: target
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $deadline = [DateTime]::UtcNow.AddMinutes(10)
+          $target = $null
+          do {
+            $pr = gh api "repos/$env:REPO/pulls/$env:PR_NUMBER" | ConvertFrom-Json
+            if ([string]$pr.head.ref -ne $env:TASK_BRANCH) { throw "Unexpected PR head ref: $($pr.head.ref)" }
+            $candidate = [string]$pr.head.sha
+            if ($candidate -and $candidate -ne $env:GITHUB_SHA) { $target = $candidate; break }
+            Start-Sleep -Seconds 5
+          } while ([DateTime]::UtcNow -lt $deadline)
+          if (-not $target) { throw 'Timed out waiting for the self-removed final task head.' }
+          $short = $target.Substring(0, 7)
+          "sha=$target" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "short=$short" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "TARGET_SHA=$target" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "SHORT_SHA=$short" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Write-Output "Final target: $target"
+
+      - name: Check out exact self-removed target
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.target.outputs.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Fence exact target and workflow removal
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ((git rev-parse HEAD).Trim() -ne $env:TARGET_SHA) { throw 'Checkout does not equal resolved target.' }
+          git merge-base --is-ancestor $env:GITHUB_SHA $env:TARGET_SHA
+          if ($LASTEXITCODE -ne 0) { throw 'Final target is not descended from the workflow source commit.' }
+          if (Test-Path '.github/workflows/issue121-final-exact-head-driver.yml') { throw 'Transient driver still exists in the final target tree.' }
+          if (@(git status --porcelain).Count -ne 0) { throw 'Final target checkout is dirty.' }
+          $pr = gh api "repos/$env:REPO/pulls/$env:PR_NUMBER" | ConvertFrom-Json
+          if ([string]$pr.head.sha -ne $env:TARGET_SHA) { throw 'PR head moved before qualification.' }
+
+      - name: Download exact hosted shadow plan
+        id: plan
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $deadline = [DateTime]::UtcNow.AddMinutes(20)
+          $ciRun = $null
+          $artifact = $null
+          do {
+            $runs = gh api "repos/$env:REPO/actions/runs?head_sha=$env:TARGET_SHA&event=pull_request&per_page=100" | ConvertFrom-Json
+            $ciRun = @($runs.workflow_runs | Where-Object { $_.name -eq 'CI' } | Sort-Object created_at -Descending | Select-Object -First 1)
+            if ($ciRun.Count -eq 1) {
+              $artifacts = gh api "repos/$env:REPO/actions/runs/$($ciRun[0].id)/artifacts?per_page=100" | ConvertFrom-Json
+              $artifact = @($artifacts.artifacts | Where-Object { $_.name -like "atlas-shadow-plan-$($ciRun[0].id)-*" } | Select-Object -First 1)
+              if ($artifact.Count -eq 1) { break }
+            }
+            Start-Sleep -Seconds 5
+          } while ([DateTime]::UtcNow -lt $deadline)
+          if ($ciRun.Count -ne 1 -or $artifact.Count -ne 1) { throw 'Timed out waiting for exact-head hosted CI shadow plan.' }
+          $planDir = Join-Path (Get-Location) 'artifacts/driver-plan'
+          if (Test-Path $planDir) { Remove-Item $planDir -Recurse -Force }
+          New-Item -ItemType Directory -Force $planDir | Out-Null
+          gh run download $ciRun[0].id --repo $env:REPO --name $artifact[0].name --dir $planDir
+          if ($LASTEXITCODE -ne 0) { throw 'Hosted shadow plan download failed.' }
+          $planPath = Join-Path $planDir 'shadow-verification-plan.json'
+          $plan = Get-Content $planPath -Raw | ConvertFrom-Json
+          if ([string]$plan.repository -ne $env:REPO) { throw 'Shadow plan repository mismatch.' }
+          if ([string]$plan.headSha -ne $env:TARGET_SHA) { throw 'Shadow plan head mismatch.' }
+          if (-not [bool]$plan.shadowOnly) { throw 'Shadow plan is not marked shadowOnly.' }
+          if ([int]$plan.retryPolicy.retries -ne 0) { throw 'Shadow plan retry policy is not zero.' }
+          if (@($plan.stableTestIds).Count -eq 0) { throw 'Shadow plan contains no stable test IDs.' }
+          "CI_RUN_ID=$($ciRun[0].id)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "PLAN_ARTIFACT=$($artifact[0].name)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "PLAN_PATH=$planPath" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Write-Output "Hosted plan: run=$($ciRun[0].id) artifact=$($artifact[0].name) scenarios=$(@($plan.stableTestIds).Count)"
+
+      - name: Run canonical Firefox and WebKit matrix
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $origin = [Uri]$env:ATLAS_PUBLICATION_ORIGIN
+          $originPort = if ($origin.IsDefaultPort) { if ($origin.Scheme -eq 'https') { 443 } else { 80 } } else { $origin.Port }
+          $forwarder = $null
+          $project = "issue121-cross-$env:SHORT_SHA-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
+          $composeFile = 'e2e/compose.selfhosted.yml'
+          $artifactRoot = Join-Path (Get-Location) "artifacts/e2e/issue121-cross-$env:SHORT_SHA"
+          if (Test-Path $artifactRoot) { Remove-Item $artifactRoot -Recurse -Force }
+          New-Item -ItemType Directory -Force $artifactRoot | Out-Null
+          $lockPath = Join-Path ([IO.Path]::GetTempPath()) 'oteryn-atlas-heavy-e2e.lock'
+          $lockDeadline = [DateTime]::UtcNow.AddSeconds(21600)
+          $lockStream = $null
+          while (-not $lockStream) {
+            $current = gh api "repos/$env:REPO/pulls/$env:PR_NUMBER" --jq '.head.sha'
+            if ($current.Trim() -ne $env:TARGET_SHA) { throw 'PR head superseded while waiting for the browser-depth lease.' }
+            try {
+              $lockStream = [IO.File]::Open($lockPath, [IO.FileMode]::OpenOrCreate, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+            } catch [IO.IOException] {
+              if ([DateTime]::UtcNow -ge $lockDeadline) { throw "Timed out waiting for the machine-wide Atlas heavy E2E lock: $lockPath" }
+              Start-Sleep -Seconds 2
+            }
+          }
+          $lockOwner = [Text.Encoding]::UTF8.GetBytes("pid=$PID project=$project revision=$env:TARGET_SHA`n")
+          $lockStream.SetLength(0)
+          $lockStream.Write($lockOwner, 0, $lockOwner.Length)
+          $lockStream.Flush()
+          try {
+            $python = (Get-Command python -ErrorAction Stop).Source
+            $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
+            $listener.Start()
+            $forwardPort = ([System.Net.IPEndPoint]$listener.LocalEndpoint).Port
+            $listener.Stop()
+            $forwarderOut = Join-Path $artifactRoot 'publication-forwarder.log'
+            $forwarderErr = Join-Path $artifactRoot 'publication-forwarder.err.log'
+            $forwarder = Start-Process -FilePath $python -ArgumentList @(
+              'e2e/local-publication-forwarder.py', '--listen-host', '0.0.0.0', '--listen-port', "$forwardPort",
+              '--upstream-host', $origin.Host, '--upstream-port', "$originPort"
+            ) -WindowStyle Hidden -PassThru -RedirectStandardOutput $forwarderOut -RedirectStandardError $forwarderErr
+            $ready = $false
+            for ($attempt = 0; $attempt -lt 50; $attempt += 1) {
+              if ($forwarder.HasExited) { break }
+              $client = [System.Net.Sockets.TcpClient]::new()
+              try {
+                $connect = $client.ConnectAsync('127.0.0.1', $forwardPort)
+                if ($connect.Wait(200) -and $client.Connected) { $ready = $true; break }
+              } catch { } finally { $client.Dispose() }
+              Start-Sleep -Milliseconds 100
+            }
+            if (-not $ready) { throw "Publication forwarder failed; see $forwarderErr" }
+            $env:ATLAS_CODE_REVISION = $env:TARGET_SHA
+            $env:ATLAS_EXPECTED_REVISION = $env:TARGET_SHA
+            $env:ATLAS_PUBLICATION_SCHEME = $origin.Scheme
+            $env:ATLAS_PUBLICATION_HOST = $origin.Host
+            $env:ATLAS_PUBLICATION_HOST_HEADER = $origin.Authority
+            $env:ATLAS_PUBLICATION_UPSTREAM = "host.docker.internal:$forwardPort"
+            docker compose -p $project -f $composeFile up -d --build atlas-web
+            if ($LASTEXITCODE -ne 0) { throw 'atlas-web build/start failed.' }
+            docker compose -p $project -f $composeFile build e2e
+            if ($LASTEXITCODE -ne 0) { throw 'E2E image build failed.' }
+            function Invoke-CrossCase {
+              param([string]$Label, [string[]]$Command)
+              $args = @('compose', '-p', $project, '-f', $composeFile, 'run', '--rm', '-e', "ATLAS_ARTIFACTS_DIR=/artifacts/$Label", '-e', 'ATLAS_E2E_DEPTH=cross-browser')
+              $args += $Command
+              & docker @args
+              if ($LASTEXITCODE -ne 0) { throw "Cross-browser case failed: $Label" }
+            }
+            Invoke-CrossCase -Label 'browser-availability' -Command @('e2e', 'xvfb-run', '-a', 'node', 'support/browser-availability.mjs')
+            Invoke-CrossCase -Label 'firefox-desktop' -Command @('e2e', 'xvfb-run', '-a', 'npx', 'playwright', 'test', '--config=playwright.config.mjs', '--project=firefox-desktop')
+            Invoke-CrossCase -Label 'firefox-mobile-like' -Command @('e2e', 'xvfb-run', '-a', 'npx', 'playwright', 'test', '--config=playwright.config.mjs', '--project=firefox-mobile-like')
+            Invoke-CrossCase -Label 'webkit-desktop' -Command @('e2e', 'npx', 'playwright', 'test', '--config=playwright.config.mjs', '--project=webkit-desktop')
+            Invoke-CrossCase -Label 'webkit-mobile-like' -Command @('e2e', 'npx', 'playwright', 'test', '--config=playwright.config.mjs', '--project=webkit-mobile-like')
+          } finally {
+            $previous = $ErrorActionPreference
+            $ErrorActionPreference = 'Continue'
+            $exportName = "$project-artifact-export"
+            docker compose -p $project -f $composeFile run --no-deps -d --name $exportName e2e sleep 600 | Out-Null
+            if ($LASTEXITCODE -eq 0) {
+              docker cp "${exportName}:/artifacts/." "$artifactRoot/" | Out-Null
+              docker rm -f $exportName | Out-Null
+            }
+            docker compose -p $project -f $composeFile down -v --remove-orphans | Out-Null
+            if ($forwarder -and -not $forwarder.HasExited) { Stop-Process -Id $forwarder.Id -Force }
+            if ($lockStream) { $lockStream.Dispose(); $lockStream = $null }
+            $ErrorActionPreference = $previous
+          }
+          $probe = Get-Content (Join-Path $artifactRoot 'browser-availability/browser-availability.json') -Raw | ConvertFrom-Json
+          if ($probe.status -ne 'passed' -or $probe.atlasRevision -ne $env:TARGET_SHA) { throw 'Pinned browser availability probe is not exact-head PASS.' }
+          $expected = [ordered]@{ 'firefox-desktop' = 3; 'firefox-mobile-like' = 1; 'webkit-desktop' = 3; 'webkit-mobile-like' = 1 }
+          foreach ($entry in $expected.GetEnumerator()) {
+            $summary = Get-Content (Join-Path $artifactRoot "$($entry.Key)/summary.json") -Raw | ConvertFrom-Json
+            if ($summary.status -ne 'passed') { throw "$($entry.Key) summary is not passed." }
+            if ($summary.metadata.expectedRevision -ne $env:TARGET_SHA) { throw "$($entry.Key) revision mismatch." }
+            if (@($summary.scenarios).Count -ne [int]$entry.Value) { throw "$($entry.Key) scenario census mismatch." }
+            if (@($summary.scenarios | Where-Object { $_.status -ne 'passed' }).Count -ne 0) { throw "$($entry.Key) contains non-passed scenarios." }
+            if (@($summary.scenarios | Where-Object { [int]$_.retry -ne 0 }).Count -ne 0) { throw "$($entry.Key) contains retries." }
+          }
+          Write-Output 'Canonical Firefox/WebKit matrix: 8/8 PASS, retries=0.'
+
+      - name: Run plan-bound Chromium required gate
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $artifactRoot = Join-Path (Get-Location) "artifacts/e2e/issue121-primary-$env:SHORT_SHA"
+          if (Test-Path $artifactRoot) { Remove-Item $artifactRoot -Recurse -Force }
+          $env:ATLAS_CODE_REVISION = $env:TARGET_SHA
+          $env:ATLAS_EXPECTED_REVISION = $env:TARGET_SHA
+          $env:ATLAS_E2E_PROJECT = "issue121-primary-$env:SHORT_SHA-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
+          $env:ATLAS_E2E_ARTIFACTS_HOST = "../artifacts/e2e/issue121-primary-$env:SHORT_SHA"
+          $env:ATLAS_E2E_WORKERS = '1'
+          $env:ATLAS_VERIFICATION_PLAN_PATH = (Resolve-Path $env:PLAN_PATH).Path
+          $env:ATLAS_E2E_LOCK_TIMEOUT_SECONDS = '21600'
+          Remove-Item Env:ATLAS_E2E_SLOT -ErrorAction SilentlyContinue
+          .\e2e\run.ps1
+          if ($LASTEXITCODE -ne 0) { throw "Primary Chromium gate exited $LASTEXITCODE." }
+          $summaryPath = Join-Path $artifactRoot 'summary.json'
+          $summary = Get-Content $summaryPath -Raw | ConvertFrom-Json
+          $plan = Get-Content $env:PLAN_PATH -Raw | ConvertFrom-Json
+          if ($summary.status -ne 'passed') { throw 'Primary summary is not passed.' }
+          if ($summary.metadata.expectedRevision -ne $env:TARGET_SHA) { throw 'Primary expectedRevision mismatch.' }
+          if ($summary.metadata.targetMode -ne 'checkout-overlay') { throw 'Primary targetMode is not checkout-overlay.' }
+          if ([int]$summary.metadata.workers -ne 1) { throw 'Primary worker count is not one.' }
+          if (@($summary.scenarios).Count -ne @($plan.stableTestIds).Count) { throw 'Primary scenario count does not match hosted plan.' }
+          if (@($summary.scenarios | Where-Object { $_.status -ne 'passed' }).Count -ne 0) { throw 'Primary summary contains non-passed scenarios.' }
+          if (@($summary.scenarios | Where-Object { [int]$_.retry -ne 0 }).Count -ne 0) { throw 'Primary summary contains retries.' }
+          node tools/verification/validate-e2e-evidence.mjs --plan $env:PLAN_PATH --summary $summaryPath --head-sha $env:TARGET_SHA
+          if ($LASTEXITCODE -ne 0) { throw 'Plan-bound E2E evidence validation failed.' }
+          Write-Output "Plan-bound Chromium gate: $(@($summary.scenarios).Count)/$(@($plan.stableTestIds).Count) PASS, retries=0."
+
+      - name: Fence final PR head after qualification
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $pr = gh api "repos/$env:REPO/pulls/$env:PR_NUMBER" | ConvertFrom-Json
+          if ([string]$pr.head.sha -ne $env:TARGET_SHA) { throw 'PR head moved during exact-head qualification.' }
+          if (@(git status --porcelain).Count -ne 0) { throw 'Qualification dirtied the checkout.' }
+
+      - name: Upload cross-browser evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: issue121-cross-${{ steps.target.outputs.short }}
+          path: artifacts/e2e/issue121-cross-${{ steps.target.outputs.short }}/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload primary visual evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: issue121-primary-${{ steps.target.outputs.short }}
+          path: artifacts/e2e/issue121-primary-${{ steps.target.outputs.short }}/
+          if-no-files-found: warn
+          retention-days: 14
+
+  publish:
+    name: Publish reviewed exact-head local evidence
+    needs: qualify
+    if: ${{ needs.qualify.result == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: Oteryn/Oteryn-Atlas
+      PR_NUMBER: '141'
+      TASK_BRANCH: test/issue-121-cross-browser-acceptance
+      TARGET_SHA: ${{ needs.qualify.outputs.target_sha }}
+      SHORT_SHA: ${{ needs.qualify.outputs.short_sha }}
+    steps:
+      - name: Require explicit completed visual review marker
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $pr = gh api "repos/$env:REPO/pulls/$env:PR_NUMBER" | ConvertFrom-Json
+          if ([string]$pr.head.sha -ne $env:TARGET_SHA) { throw 'PR head moved before visual publication.' }
+          $marker = "Visual-Review-Approved-For: $env:TARGET_SHA"
+          if (-not ([string]$pr.body).Contains($marker)) { throw "Manual visual review marker is absent: $marker" }
+
+      - name: Check out reviewed exact target
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.qualify.outputs.target_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Download exact primary evidence and hosted shadow plan
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force 'artifacts/publish-primary','artifacts/publish-plan' | Out-Null
+          gh run download $env:GITHUB_RUN_ID --repo $env:REPO --name "issue121-primary-$env:SHORT_SHA" --dir 'artifacts/publish-primary'
+          if ($LASTEXITCODE -ne 0) { throw 'Primary artifact download failed.' }
+          $runs = gh api "repos/$env:REPO/actions/runs?head_sha=$env:TARGET_SHA&event=pull_request&per_page=100" | ConvertFrom-Json
+          $ci = @($runs.workflow_runs | Where-Object { $_.name -eq 'CI' } | Sort-Object created_at -Descending | Select-Object -First 1)
+          if ($ci.Count -ne 1) { throw 'Exact-head CI run not found.' }
+          $artifacts = gh api "repos/$env:REPO/actions/runs/$($ci[0].id)/artifacts?per_page=100" | ConvertFrom-Json
+          $planArtifact = @($artifacts.artifacts | Where-Object { $_.name -like "atlas-shadow-plan-$($ci[0].id)-*" } | Select-Object -First 1)
+          if ($planArtifact.Count -ne 1) { throw 'Exact-head shadow plan artifact not found.' }
+          gh run download $ci[0].id --repo $env:REPO --name $planArtifact[0].name --dir 'artifacts/publish-plan'
+          if ($LASTEXITCODE -ne 0) { throw 'Shadow plan artifact download failed.' }
+
+      - name: Create digest-bound visual approval and publish atlas-local-e2e
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $summary = (Resolve-Path 'artifacts/publish-primary/summary.json').Path
+          $plan = (Resolve-Path 'artifacts/publish-plan/shadow-verification-plan.json').Path
+          .\e2e\approve-visual-user-acceptance.ps1 -SummaryPath $summary -Reviewer 'OpenAI ChatGPT' -ConfirmReviewedAllScreenshots
+          if ($LASTEXITCODE -ne 0) { throw 'Visual approval manifest generation failed.' }
+          $review = (Resolve-Path 'artifacts/publish-primary/visual-review.json').Path
+          .\e2e\publish-local-e2e-status.ps1 -SummaryPath $summary -VerificationPlanPath $plan -VisualReviewPath $review -RemoteBranch $env:TASK_BRANCH
+          if ($LASTEXITCODE -ne 0) { throw 'atlas-local-e2e publisher failed.' }
+
+      - name: Upload visual review manifest
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: issue121-visual-review-${{ needs.qualify.outputs.short_sha }}
+          path: artifacts/publish-primary/visual-review.json
+          if-no-files-found: warn
+          retention-days: 14
