@@ -60,6 +60,30 @@ test('planner selects a deterministic targeted union across current and rename-s
   assert(Object.isFrozen(plan));
 });
 
+test('planner composes every applicable impact prefix instead of allowing longest-prefix override', () => {
+  const overlappingManifest = {
+    schemaVersion: 1,
+    entries: [
+      { pathPrefix: 'src/browser/', domains: ['browser-runtime'], minimumProfile: 'broad', requiredGroups: ['e2e.common-smoke'] },
+      { pathPrefix: 'src/browser/creature-', domains: ['creatures'], minimumProfile: 'targeted', requiredGroups: ['e2e.creatures', 'visual.creatures'] },
+    ],
+  };
+  const plan = buildVerificationPlan({
+    repository: 'Oteryn/Oteryn-Atlas',
+    headSha: 'a'.repeat(40),
+    integrationBaseSha: 'b'.repeat(40),
+    mergeBaseSha: 'c'.repeat(40),
+    changedFiles: [{ path: 'src/browser/creature-interaction.mjs' }],
+    trustedImpactManifest: overlappingManifest,
+    candidateImpactManifest: overlappingManifest,
+    verificationCatalog: catalog,
+  });
+
+  assert.equal(plan.profile, 'broad');
+  assert.deepEqual(plan.requiredGroupIds, ['e2e.common-smoke', 'e2e.creatures', 'visual.creatures']);
+  assert.deepEqual(plan.impactDomains, ['browser-runtime', 'creatures']);
+});
+
 test('planner fails closed to full for unknown, empty, malformed and governance evidence', () => {
   for (const changedFiles of [
     [],
