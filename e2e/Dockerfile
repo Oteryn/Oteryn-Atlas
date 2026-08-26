@@ -6,7 +6,7 @@ COPY e2e/package.json e2e/package-lock.json ./
 RUN npm ci --ignore-scripts --no-audit --no-fund \
     && npm cache clean --force
 
-COPY e2e/playwright.config.mjs e2e/summary-reporter.mjs ./
+COPY e2e/playwright.config.mjs e2e/summary-reporter.mjs e2e/benchmark-workloads.json ./
 COPY e2e/tests ./tests
 COPY e2e/support ./support
 
