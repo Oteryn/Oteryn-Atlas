@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
   [Parameter(Mandatory = $true)][string]$SummaryPath,
+  [Parameter(Mandatory = $true)][string]$VerificationPlanPath,
   [Parameter(Mandatory = $true)][string]$RemoteBranch,
   [string]$Repository = 'Oteryn/Oteryn-Atlas',
   [string]$Context = 'atlas-local-e2e',
@@ -8,7 +9,6 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$ExpectedScenarioCount = 71
 $VisualContractPath = Join-Path $PSScriptRoot 'user-visual-scenarios.json'
 $VisualContract = Get-Content $VisualContractPath -Raw | ConvertFrom-Json
 if ([int]$VisualContract.version -ne 1) { throw 'Unsupported visual user acceptance contract version.' }
@@ -29,18 +29,24 @@ $remoteSha = ($remoteLine -split '\s+')[0]
 if ($remoteSha -ne $sha) { throw "Remote branch head $remoteSha does not match tested HEAD $sha." }
 
 $resolvedSummary = (Resolve-Path $SummaryPath).Path
+$resolvedPlan = (Resolve-Path $VerificationPlanPath).Path
 $summary = Get-Content $resolvedSummary -Raw | ConvertFrom-Json
 if ($summary.status -ne 'passed') { throw "Playwright summary status is $($summary.status), not passed." }
 if ($summary.metadata.expectedRevision -ne $sha) { throw 'Playwright expectedRevision does not match tested HEAD.' }
 if ($summary.metadata.targetMode -ne 'checkout-overlay') { throw 'Playwright summary is not checkout-overlay evidence.' }
 if ([int]$summary.metadata.workers -ne 1) { throw 'Playwright summary was not produced with workers=1.' }
-
+$plan = Get-Content $resolvedPlan -Raw | ConvertFrom-Json
+if ($plan.repository -ne $Repository) { throw 'Verification plan repository does not match status repository.' }
+if ($plan.headSha -ne $sha) { throw 'Verification plan head SHA does not match tested HEAD.' }
+if ($plan.integrationBaseSha -notmatch '^[a-f0-9]{40}$' -or $plan.mergeBaseSha -notmatch '^[a-f0-9]{40}$') { throw 'Verification plan has invalid integration identity.' }
+git cat-file -e "$($plan.integrationBaseSha)^{commit}"
+if ($LASTEXITCODE -ne 0) { throw 'Verification plan integration base is unavailable in the checkout.' }
+$actualMergeBase = (git merge-base $sha $plan.integrationBaseSha).Trim()
+if ($actualMergeBase -ne $plan.mergeBaseSha) { throw 'Verification plan merge base does not match tested checkout.' }
+$evidenceValidator = Join-Path $root 'tools\verification\validate-e2e-evidence.mjs'
+node $evidenceValidator --plan $resolvedPlan --summary $resolvedSummary --head-sha $sha
+if ($LASTEXITCODE -ne 0) { throw "Plan-bound E2E evidence validation failed with exit code $LASTEXITCODE." }
 $scenarios = @($summary.scenarios)
-if ($scenarios.Count -ne $ExpectedScenarioCount) { throw "Playwright summary contains $($scenarios.Count) scenarios; expected $ExpectedScenarioCount." }
-$notPassed = @($scenarios | Where-Object { $_.status -ne 'passed' })
-if ($notPassed.Count -ne 0) { throw "Playwright summary contains $($notPassed.Count) non-passed scenarios." }
-$retried = @($scenarios | Where-Object { [int]$_.retry -ne 0 })
-if ($retried.Count -ne 0) { throw "Playwright summary contains $($retried.Count) retried scenarios." }
 
 if (-not $VisualReviewPath) { $VisualReviewPath = Join-Path (Split-Path $resolvedSummary -Parent) 'visual-review.json' }
 $resolvedReview = (Resolve-Path $VisualReviewPath).Path
@@ -70,7 +76,7 @@ foreach ($required in $RequiredVisualScenarios) {
   if ($digest -ne $entries[0].screenshotSha256) { throw "Visual review screenshot changed after approval for $scenarioId." }
 }
 
-$description = "Local Docker Playwright $($scenarios.Count)/$($scenarios.Count) PASS; visual review approved"
+$description = "Local Docker Playwright $($scenarios.Count) exact planned IDs PASS; visual review approved"
 $targetUrl = "https://github.com/$Repository/commit/$sha"
 $payload = @{
   state = 'success'

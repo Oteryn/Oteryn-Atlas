@@ -13,6 +13,7 @@ const synology = readText(new URL('../../.github/workflows/synology-live-accepta
 const playwrightConfig = readText(new URL('../../e2e/playwright.config.mjs', import.meta.url));
 const agents = readText(new URL('../../AGENTS.md', import.meta.url));
 const localRunPs1 = readText(new URL('../../e2e/run.ps1', import.meta.url));
+const localCompose = readText(new URL('../../e2e/compose.yml', import.meta.url));
 const heavySlotPool = readText(new URL('../../e2e/heavy-slot-pool.ps1', import.meta.url));
 
 function block(source, start, end) {
@@ -70,16 +71,20 @@ test('local Docker status publisher only accepts exact clean all-pass evidence',
   assert.match(publisher, /git status --porcelain/);
   assert.match(publisher, /git ls-remote --heads origin/);
   assert.match(publisher, /metadata\.expectedRevision/);
-  assert.match(publisher, /^\$ExpectedScenarioCount = 71$/m);
+  assert.doesNotMatch(publisher, /\$ExpectedScenarioCount\s*=/);
+  assert.match(publisher, /VerificationPlanPath/);
+  assert.match(publisher, /validate-e2e-evidence\.mjs/);
+  assert.match(publisher, /merge-base/);
   assert.match(publisher, /targetMode -ne 'checkout-overlay'/);
   assert.match(publisher, /metadata\.workers -ne 1/);
   assert.match(playwrightConfig, /metadata:\s*\{[\s\S]*workers,/);
   assert.match(publisher, /status -ne 'passed'/);
-  assert.match(publisher, /\.status -ne 'passed'/);
-  assert.match(publisher, /\.retry -ne 0/);
   assert.match(publisher, /atlas-local-e2e/);
   assert.match(publisher, /state = 'success'/);
   assert.match(publisher, /statuses\/\$sha/);
+  assert.match(playwrightConfig, /verificationPlanSha256/);
+  assert.match(localRunPs1, /ATLAS_VERIFICATION_PLAN_PATH/);
+  assert.match(localCompose, /ATLAS_VERIFICATION_PLAN_SHA256:\s*\$\{ATLAS_VERIFICATION_PLAN_SHA256:-\}/);
 });
 
 test('required workflows verify the exact pull-request head rather than a synthetic merge ref', () => {
@@ -215,4 +220,32 @@ test('docs-only PR classification skips heavy browser proof only when proven saf
   assert.match(gate, /REQUIRES_E2E:.*needs\.change-classification\.outputs\.requires_e2e/);
   assert.match(gate, /false:true[\s\S]*VERIFICATION_BROWSER[\s\S]*skipped/);
   assert.match(gate, /true:false[\s\S]*VERIFICATION_BROWSER[\s\S]*success/);
+});
+
+test('classification emits a trusted-base shadow plan without changing legacy gating', () => {
+  const classifierJob = block(ci, '  change-classification:\n', '  verification-browser:\n');
+
+  assert.match(classifierJob, /shadow_plan_digest:.*steps\.classify\.outputs\.shadow_plan_digest/);
+  assert.match(classifierJob, /ATLAS_INTEGRATION_BASE_REF: \$\{\{ github\.event\.pull_request\.base\.ref \}\}/);
+  assert.match(classifierJob, /fetch-depth: 0/);
+  assert.match(classifierJob, /git fetch --no-tags origin "\$ATLAS_INTEGRATION_BASE_REF"/);
+  assert.match(classifierJob, /integration_base_sha="\$\(git rev-parse "origin\/\$ATLAS_INTEGRATION_BASE_REF"\)"/);
+  assert.match(classifierJob, /git merge-base "\$ATLAS_CODE_REVISION" "\$integration_base_sha"/);
+  assert.match(classifierJob, /git diff --name-status -z --find-renames "\$merge_base_sha" "\$ATLAS_CODE_REVISION"/);
+  assert.match(classifierJob, /GitHub changed-file evidence does not match exact merge-base diff/);
+  assert.match(classifierJob, /git cat-file -e "\$integration_base_sha:tools\/verification\/impact-manifest\.json"/);
+  assert.match(classifierJob, /Initial bootstrap policy has no path exemptions/);
+  assert.match(classifierJob, /git show "\$integration_base_sha:tools\/verification\/impact-manifest\.json"/);
+  assert.match(classifierJob, /--trusted-impact/);
+  assert.match(classifierJob, /--candidate-impact/);
+  assert.match(classifierJob, /--trusted-catalog/);
+  assert.match(classifierJob, /--candidate-catalog/);
+  assert.match(classifierJob, /--merge-base-sha "\$merge_base_sha"/);
+  assert.match(classifierJob, /npm ci --prefix e2e/);
+  assert.match(classifierJob, /ATLAS_ARTIFACTS_DIR="\$PWD\/artifacts\/verification\/playwright-list"/);
+  assert.match(classifierJob, /playwright test --config=e2e\/playwright\.config\.mjs --list/);
+  assert.match(classifierJob, /parse-playwright-test-list\.mjs/);
+  assert.match(classifierJob, /--stable-test-ids artifacts\/verification\/stable-test-ids\.json/);
+  assert.match(classifierJob, /shadow_plan_digest=/);
+  assert.match(classifierJob, /node tools\/verification\/classify-pr-changes\.mjs < "\$paths"/);
 });
