@@ -59,6 +59,18 @@ test('successful visual evidence is exact-revision qualified and must be reviewe
   assert.match(publisher, /approved/);
 });
 
+test('visual approver and status publisher support trusted-base policy checkout for an exact candidate SHA', async () => {
+  const publisher = await read('e2e/publish-local-e2e-status.ps1');
+  const approver = await read('e2e/approve-visual-user-acceptance.ps1');
+  assert.match(approver, /ReviewedHeadSha/);
+  assert.match(approver, /\$policySha\s*=\s*\(git rev-parse HEAD\)/);
+  assert.match(approver, /\$sha\s*=\s*if \(\$ReviewedHeadSha\)/);
+  assert.match(publisher, /TestedHeadSha/);
+  assert.match(publisher, /\$policySha\s*=\s*\(git rev-parse HEAD\)/);
+  assert.match(publisher, /\$sha\s*=\s*if \(\$TestedHeadSha\)/);
+  assert.match(publisher, /integrationBaseSha[\s\S]*policySha/);
+  assert.match(publisher, /Remote branch head[\s\S]*tested HEAD/);
+});
 
 test('visual user acceptance contract enumerates complete primary user-facing states', async () => {
   const contractPath = path.join(root, 'e2e/user-visual-scenarios.json');
