@@ -4,7 +4,7 @@
 issue: 165
 repository: Oteryn/Oteryn-Atlas
 base_branch: main
-base_sha: e7c9a9c830bdd0697efb643da437a378b8409f29
+base_sha: 16ed4707c770d07b5a6134d2ecde0a0bd6836c32
 branch: feat/creature-gameplay-profiles-165
 pr: 170
 status: verifying
@@ -23,11 +23,12 @@ Consume the exact merged Game gameplay-profile projection through a bounded lazy
 
 ## Integration state
 
-- Current `main@e7c9a9c830bdd0697efb643da437a378b8409f29` includes #180 plan-bound shadow verification reconciled with the bounded Molehill slot pool; merged #163/#184 runtime dependencies remain preserved.
+- Current `main@16ed4707c770d07b5a6134d2ecde0a0bd6836c32` includes #180 plan-bound shadow verification and #192 META execution-routing authority; merged #163/#184 runtime dependencies remain preserved.
 - PR #162 / Issue #145 remains a separate draft for walking-in-place animation and is not imported into this task.
 - Issue #113 remains the canonical quick-card/interaction seam.
 - Farm Explorer remains a consumer and never becomes gameplay-fact authority.
 - Shared runtime was integrated by normal non-force merge-up; no open draft branch was cherry-picked.
+- #192 is a governing-authority reconciliation only: unaffected implementation and prior deterministic/visual findings remain valid; ordinary Remote Desktop build/test/Git polling is no longer an accepted execution route.
 
 ## Acceptance
 
@@ -41,7 +42,7 @@ Consume the exact merged Game gameplay-profile projection through a bounded lazy
 
 ## Verification checkpoint
 
-- Integrated current main by normal non-force merge-up at `e7c9a9c830bdd0697efb643da437a378b8409f29`; #180 plan-bound verification authority is preserved and the branch full required census remains 77 Gameplay-inclusive scenarios.
+- Integrated protected main through `16ed4707c770d07b5a6134d2ecde0a0bd6836c32`; #180 plan-bound verification remains applicable and #192 META execution routing is now governing authority. The required branch full census remains 77 Gameplay-inclusive scenarios.
 - Exact Game publication: 1049 NPC / 1800 monster profiles / 508 shards / `sha256:7ac7c08949aa498cb843ca26e3417e537b3409d89e4f265861f3f94855b96d28`.
 - CI-equivalent deterministic Node matrix after #180 integration and browser-found regression guards: 396/396 PASS, 0 fail, 0 skip.
 - Extraction provenance verifier: PASS, 144 mapped rows against exact legacy `e417c5e7c22986bf4acef0495eb47f7b72c97cce`.
@@ -55,7 +56,8 @@ Consume the exact merged Game gameplay-profile projection through a bounded lazy
 - Exact-head browser qualification rejected out-of-bounds Yasir as a large-shop map fixture; the stress journey now uses exact map-reachable H.L. (`npc-entity:0c83ae18a907dc7e8f15c37c03e4f04c`) with 124 authoritative buy rows, guarded deterministically.
 - Plan-bound visual regression caught the stale desktop inspector baseline; the old two-tab + empty creature placeholder image was manually compared against the intended Gameplay/Semantic/Live inspector and replaced with the reviewed exact frame (`sha256:9a06890661417258a65aa75902ab752dc4d8cdf2973e5bd1c5e36373508737ee`).
 - Exact-head visual qualification also caught the stale mobile inspector snapshot; manual actual/baseline/diff review confirmed the same intentional Gameplay/Semantic/Live-state tab delta with no clipping, and only that reviewed mobile baseline was refreshed.
-- Final exact-head Molehill browser qualification and visual review remain pending through the bounded machine-wide slot pool.
+- The most recent pre-#192 full browser run proved 76/77 with zero retries; its sole failure was the now-reviewed and refreshed mobile inspector baseline. A fresh exact-head authoritative browser qualification remains required after routing reconciliation.
+- Under #192/META policy, final heavy browser qualification must be initiated through GitHub Actions/repository-approved runner routing; ordinary RDC execution or polling is not acceptable. Current merged main does not yet contain the base-owned PR-to-Molehill admission implemented by draft PR #190, so no copied/stale `atlas-local-e2e` status may be published.
 
 ## Excluded
 

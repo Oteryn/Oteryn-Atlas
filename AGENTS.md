@@ -33,6 +33,14 @@ The organization baseline is META ADR 0004 plus the central agent execution/cont
 - A lost merge race returns the task to integration/reconciliation, not to implementation from scratch.
 - Invalidate affected work only when verified task cancellation/supersession/rescope, incompatible governing authority, semantic contract/API/schema/invariant conflict, an unresolvable authorized reconciliation, or required tests prove prior assumptions no longer hold. Textual overlap or a changed filename alone is not sufficient proof.
 
+## META execution-routing policy
+
+The canonical organization policy is [`Oteryn/Oteryn@8fac1d55805fc3372351ea0a55ad7728b3570ebc:ecosystem/agent-execution-routing-policy.json`](https://github.com/Oteryn/Oteryn/blob/8fac1d55805fc3372351ea0a55ad7728b3570ebc/ecosystem/agent-execution-routing-policy.json). Atlas adopts it by reference and must not create a weaker local copy.
+
+Route project work through GitHub state, GitHub Actions or the repository-approved runner, and an isolated worktree first. Remote Desktop/Desktop Commander is default-deny; a host exception requires a closed recorded reason and a least-privilege recorded action. It is not a route for ordinary builds, tests, Git inspection or manual polling. Equivalent CI prohibits RDC polling of process output, Docker logs, workflow state and Git state.
+
+Before resuming, refresh GitHub repository/default-branch SHA/governing Issue/PR/task-head state; a local worktree or handoff is evidence only. Substantial task packets must plan parallel-first with independent lanes, exclusive branch/worktree and owned paths, dependencies, needed shared-resource leases and integration order. Serial work needs an explicit reason.
+
 ## Work boundary
 
 - Use a GitHub Issue as lifecycle authority for substantial work.
@@ -62,10 +70,10 @@ Before editing, inspect the current default-branch head, this file, the active I
 
 - GitHub-hosted CI owns deterministic Node/contract/property checks, provenance, security/CodeQL, lightweight browser/WebGL verification and `atlas-gate` fan-in; it does not replace the heavy physical browser qualification.
 - Molehill-PC (`oteryn-molehill-atlas`, custom label `oteryn-atlas-pc`) owns heavy exact-head browser verification: the full Docker Playwright PR gate and scheduled/manual browser-depth work including repeated geometry/render probes, replayable stress, extra viewport/DPR profiles and stable performance/visual/accessibility/race/soak depth.
-- Heavy Molehill qualification must enter through e2e/run.ps1, which owns a bounded machine-wide slot pool for isolated concurrent full 77-scenario gates. The measured safe default is 2 slots; 3 remains explicit opt-in capacity only. Each active slot must keep a unique Compose project/artifact namespace and independent local publication forwarder; legacy single-lock runners remain fenced during migration. Do not bypass the pool or exceed the repository-selected slot capacity.
+- Heavy Molehill qualification must enter through `e2e/run.ps1`, which owns a bounded machine-wide slot pool for isolated concurrent full 71-scenario gates. The measured safe default is 2 slots; 3 remains explicit opt-in capacity only. Each active slot must keep a unique Compose project/artifact namespace and independent local publication forwarder; legacy single-lock runners remain fenced during migration. Do not bypass the pool or exceed the repository-selected slot capacity.
 - A pull request may skip heavy Molehill qualification only when the repository CI change classifier proves every current/previous changed path is safe lowercase-Markdown under `docs/**`. Mixed, empty, malformed, non-Markdown, root-doc, workflow, test, runtime, package, data or unknown changes fail closed to requiring exact-head `atlas-local-e2e`.
 - Synology (`oteryn-synology-atlas`, custom label `oteryn-atlas`) owns trusted merged-main deployment and live acceptance only: exact revision/container/header identity, publication/product checks, bounded desktop/mobile real-browser smoke, cutover and rollback proof.
-- Synology must not run the 77-scenario full PR matrix, broad stress matrices, soak, performance depth or visual-regression depth as a substitute for Molehill-PC capacity.
+- Synology must not run the 71-scenario full PR matrix, broad stress matrices, soak, performance depth or visual-regression depth as a substitute for Molehill-PC capacity.
 - Nightly browser depth is additive to the exact-head PR gate and must not duplicate the generic full required matrix that already produced `atlas-local-e2e=success`.
 - If Molehill-PC is unavailable, the corresponding heavy browser proof remains blocked. Do not move that workload to Synology, reuse stale evidence, weaken timeouts/retries/tolerances or publish a copied `atlas-local-e2e` status.
 - Molehill GitHub Actions steps must use the Windows PowerShell shell actually installed on the runner (powershell), not assume PowerShell 7 (pwsh).
