@@ -176,7 +176,7 @@ try {
     Stop-Process -Id $publicationForwarder.Id -Force
   }
   if ($slotLease -and $slotLease.Stream) { $slotLease.Stream.Dispose() }
-  if ($hostAdmissionLease -and $hostAdmissionLease.Stream) { $hostAdmissionLease.Stream.Dispose() }
+  Release-AtlasHostAdmission $hostAdmissionLease
   if ($legacyFence -and $legacyFence.Stream) { $legacyFence.Stream.Dispose() }
   if ($artifactLease -and $artifactLease.Stream) { $artifactLease.Stream.Dispose() }
   if ($projectLease -and $projectLease.Stream) { $projectLease.Stream.Dispose() }

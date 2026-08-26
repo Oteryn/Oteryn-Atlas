@@ -237,7 +237,7 @@ jobs:
             }
             docker compose -p $project -f $composeFile down -v --remove-orphans | Out-Null
             if ($forwarder -and -not $forwarder.HasExited) { Stop-Process -Id $forwarder.Id -Force }
-            if ($hostAdmission -and $hostAdmission.Stream) { $hostAdmission.Stream.Dispose() }
+            Release-AtlasHostAdmission $hostAdmission
             $ErrorActionPreference = $previous
           }
 

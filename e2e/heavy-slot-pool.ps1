@@ -119,7 +119,8 @@ function Acquire-AtlasHostAdmission {
     [string]$Revision,
     [string]$ResourceClass = 'browser-full',
     [string]$AuthorityMode = 'authoritative',
-    [string]$HostPrefix = 'oteryn-atlas-host-admission-'
+    [string]$HostPrefix = 'oteryn-atlas-host-admission-',
+    [string]$DiagnosticSlotFencePath = ''
   )
   if ($HostCapacity -ne 2) {
     throw 'Bootstrap Molehill host capacity must remain at the measured value 2 until a versioned measured policy replaces it.'
@@ -129,25 +130,63 @@ function Acquire-AtlasHostAdmission {
   }
 
   $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
-  while ($true) {
-    foreach ($tokenId in 1..$HostCapacity) {
-      $tokenPath = Join-Path ([IO.Path]::GetTempPath()) "$HostPrefix$tokenId.lock"
-      try {
-        $stream = [IO.File]::Open($tokenPath, [IO.FileMode]::OpenOrCreate, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
-        Write-AtlasLeaseOwner $stream "pid=$PID token=$tokenId/$HostCapacity class=$ResourceClass authority=$AuthorityMode project=$Project revision=$Revision"
-        return [pscustomobject]@{
-          TokenId = $tokenId
-          HostCapacity = $HostCapacity
-          ResourceClass = $ResourceClass
-          AuthorityMode = $AuthorityMode
-          Stream = $stream
-          Path = $tokenPath
-        }
-      } catch [IO.IOException] { }
-    }
-    if ([DateTime]::UtcNow -ge $deadline) {
-      throw "Timed out waiting for $HostCapacity shared Molehill host-admission tokens."
-    }
-    Start-Sleep -Milliseconds 500
+  $diagnosticFencePath = if ($DiagnosticSlotFencePath) {
+    [IO.Path]::GetFullPath($DiagnosticSlotFencePath)
+  } else {
+    Join-Path ([IO.Path]::GetTempPath()) 'oteryn-atlas-heavy-e2e-slot-3.lock'
   }
+  $diagnosticFenceStream = $null
+  while ($null -eq $diagnosticFenceStream) {
+    try {
+      # New Phase-D runners share this handle with each other, while historical slot-3
+      # runners use FileShare.None and therefore cannot enter during migration.
+      $diagnosticFenceStream = [IO.File]::Open(
+        $diagnosticFencePath,
+        [IO.FileMode]::OpenOrCreate,
+        [IO.FileAccess]::ReadWrite,
+        [IO.FileShare]::ReadWrite
+      )
+    } catch [IO.IOException] {
+      if ([DateTime]::UtcNow -ge $deadline) {
+        throw "Timed out waiting for historical diagnostic slot-3 migration fence: $diagnosticFencePath"
+      }
+      Start-Sleep -Milliseconds 500
+    }
+  }
+
+  try {
+    while ($true) {
+      foreach ($tokenId in 1..$HostCapacity) {
+        $tokenPath = Join-Path ([IO.Path]::GetTempPath()) "$HostPrefix$tokenId.lock"
+        try {
+          $stream = [IO.File]::Open($tokenPath, [IO.FileMode]::OpenOrCreate, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+          Write-AtlasLeaseOwner $stream "pid=$PID token=$tokenId/$HostCapacity class=$ResourceClass authority=$AuthorityMode project=$Project revision=$Revision"
+          return [pscustomobject]@{
+            TokenId = $tokenId
+            HostCapacity = $HostCapacity
+            ResourceClass = $ResourceClass
+            AuthorityMode = $AuthorityMode
+            Stream = $stream
+            Path = $tokenPath
+            DiagnosticFenceStream = $diagnosticFenceStream
+            DiagnosticFencePath = $diagnosticFencePath
+          }
+        } catch [IO.IOException] { }
+      }
+      if ([DateTime]::UtcNow -ge $deadline) {
+        throw "Timed out waiting for $HostCapacity shared Molehill host-admission tokens."
+      }
+      Start-Sleep -Milliseconds 500
+    }
+  } catch {
+    if ($diagnosticFenceStream) { $diagnosticFenceStream.Dispose() }
+    throw
+  }
+}
+
+function Release-AtlasHostAdmission {
+  param($Lease)
+  if (-not $Lease) { return }
+  if ($Lease.Stream) { $Lease.Stream.Dispose() }
+  if ($Lease.DiagnosticFenceStream) { $Lease.DiagnosticFenceStream.Dispose() }
 }

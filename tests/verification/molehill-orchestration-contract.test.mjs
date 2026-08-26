@@ -44,7 +44,7 @@ test('machine-wide host admission is independent from diagnostic slot numbering'
   assert.match(run, /Acquire-AtlasHostAdmission[\s\S]*Acquire-AtlasHeavySlot/);
   assert.match(run, /resource-admission\.json/);
   assert.match(run, /evidenceEligibility/);
-  assert.match(run, /hostAdmissionLease\.Stream\.Dispose/);
+  assert.match(run, /Release-AtlasHostAdmission \$hostAdmissionLease/);
 });
 
 test('authoritative evidence cannot opt into the historical unsafe third slot', () => {
@@ -60,7 +60,7 @@ test('nightly browser depth participates in the same Molehill host admission', (
   assert.match(browserDepth, /heavy-slot-pool\.ps1/);
   assert.match(browserDepth, /Acquire-AtlasHostAdmission/);
   assert.match(browserDepth, /browser-full/);
-  assert.match(browserDepth, /hostAdmission.*Dispose/i);
+  assert.match(browserDepth, /Release-AtlasHostAdmission \$hostAdmission/);
 });
 
 
@@ -70,4 +70,17 @@ test('host-admission self-test proves exhaustion and reuse independently of slot
   assert.match(selfTest, /host-selftest-/);
   assert.match(selfTest, /third host admission/i);
   assert.match(selfTest, /released host admission/i);
+});
+
+
+test('new host admission fences historical diagnostic slot three during migration', () => {
+  const selfTest = read('e2e/test-heavy-slot-pool.ps1');
+  assert.match(helper, /DiagnosticSlotFencePath/);
+  assert.match(helper, /oteryn-atlas-heavy-e2e-slot-3\.lock/);
+  assert.match(helper, /FileShare\]::ReadWrite/);
+  assert.match(helper, /Release-AtlasHostAdmission/);
+  assert.match(selfTest, /diagnostic-slot3-migration-fence/);
+  assert.match(selfTest, /legacy diagnostic slot three entered/i);
+  assert.match(selfTest, /host admission entered while legacy diagnostic slot three was active/i);
+  assert.match(run, /Release-AtlasHostAdmission/);
 });
