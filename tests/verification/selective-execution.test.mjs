@@ -4,6 +4,7 @@ import test from 'node:test';
 
 const modulePath = '../../tools/verification/selective-execution.mjs';
 const rolloutPath = 'tools/verification/selective-rollout.json';
+const digest = `sha256:${'a'.repeat(64)}`;
 
 function plan(profile, groups = []) {
   return { schemaVersion: 1, profile, requiredGroupIds: groups, stableTestIds: ['desktop-chromium::tests/x.spec.mjs::x'], retryPolicy: { retries: 0 } };
@@ -14,24 +15,28 @@ test('rollout contract is versioned and cannot activate without calibration evid
   const rollout = JSON.parse(fs.readFileSync(rolloutPath, 'utf8'));
   assert.equal(rollout.schemaVersion, 1);
   assert.equal(typeof rollout.enabled, 'boolean');
-  assert.match(rollout.workerPolicyDigest ?? '', /^sha256:[a-f0-9]{64}$/);
-  assert.match(rollout.calibrationEvidenceDigest ?? '', /^sha256:[a-f0-9]{64}$/);
+  if (rollout.enabled) {
+    assert.match(rollout.workerPolicyDigest ?? '', /^sha256:[a-f0-9]{64}$/);
+    assert.match(rollout.calibrationEvidenceDigest ?? '', /^sha256:[a-f0-9]{64}$/);
+  } else {
+    assert.equal(rollout.workerPolicyDigest, null);
+    assert.equal(rollout.calibrationEvidenceDigest, null);
+  }
 });
 
 test('disabled rollout preserves legacy full-heavy authority and force-full only widens', async () => {
   const { decideSelectiveExecution } = await import(modulePath);
-  const rollout = { schemaVersion: 1, enabled: false };
-  const disabled = decideSelectiveExecution({ plan: plan('none'), rollout, forceFull: false });
+  const disabled = decideSelectiveExecution({ plan: plan('none'), rollout: { schemaVersion: 1, enabled: false, workerPolicyDigest: null, calibrationEvidenceDigest: null }, forceFull: false });
   assert.equal(disabled.executionProfile, 'full');
   assert.equal(disabled.requiresHeavyBrowser, true);
-  const forced = decideSelectiveExecution({ plan: plan('targeted', ['e2e.common-smoke']), rollout: { ...rollout, enabled: true }, forceFull: true });
+  const forced = decideSelectiveExecution({ plan: plan('targeted', ['e2e.common-smoke']), rollout: { schemaVersion: 1, enabled: true, workerPolicyDigest: digest, calibrationEvidenceDigest: digest }, forceFull: true });
   assert.equal(forced.executionProfile, 'full');
   assert.equal(forced.requiresHeavyBrowser, true);
 });
 
 test('enabled rollout follows exact plan profiles while unknown/malformed input fails closed', async () => {
   const { decideSelectiveExecution } = await import(modulePath);
-  const rollout = { schemaVersion: 1, enabled: true };
+  const rollout = { schemaVersion: 1, enabled: true, workerPolicyDigest: digest, calibrationEvidenceDigest: digest };
   assert.equal(decideSelectiveExecution({ plan: plan('none'), rollout }).requiresHeavyBrowser, false);
   assert.equal(decideSelectiveExecution({ plan: plan('focused', ['deterministic.core']), rollout }).requiresHeavyBrowser, false);
   assert.equal(decideSelectiveExecution({ plan: plan('targeted', ['e2e.common-smoke']), rollout }).executionProfile, 'targeted');
