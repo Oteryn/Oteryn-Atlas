@@ -2,7 +2,7 @@ name: Molehill PR E2E
 
 on:
   pull_request_target:
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [opened, synchronize, reopened, ready_for_review, edited]
 
 permissions:
   contents: read
@@ -68,7 +68,7 @@ jobs:
   heavy-e2e:
     name: Run exact-head Molehill E2E
     needs: trust-admission
-    if: needs.trust-admission.outputs.admitted == 'true' && github.event.pull_request.draft == false
+    if: needs.trust-admission.outputs.admitted == 'true' && github.event.pull_request.draft == false && github.event.action != 'edited'
     runs-on:
       group: atlas-runners
       labels: oteryn-atlas-pc
@@ -80,6 +80,7 @@ jobs:
       ATLAS_EXPECTED_REVISION: ${{ needs.trust-admission.outputs.head_sha }}
       ATLAS_BASE_SHA: ${{ github.event.pull_request.base.sha }}
       ATLAS_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+      ATLAS_PR_NUMBER: ${{ github.event.pull_request.number }}
       ATLAS_PUBLICATION_ORIGIN: http://192.168.1.2:8097
       ATLAS_E2E_WORKERS: '1'
       ATLAS_E2E_RESOURCE_CLASS: browser-full
@@ -174,6 +175,17 @@ jobs:
           $evidenceRoot = Join-Path $env:ATLAS_TRUSTED_EVIDENCE_ROOT (Join-Path $env:ATLAS_CODE_REVISION "$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT")
           New-Item -ItemType Directory -Force $evidenceRoot | Out-Null
           Copy-Item artifacts/verification/pr-verification-plan.json (Join-Path $evidenceRoot 'pr-verification-plan.json') -Force
+          $runMetadata = [ordered]@{
+            version = 1
+            repository = $env:GITHUB_REPOSITORY
+            prNumber = [int]$env:ATLAS_PR_NUMBER
+            headSha = $env:ATLAS_CODE_REVISION
+            baseSha = $env:ATLAS_BASE_SHA
+            headRef = $env:ATLAS_HEAD_REF
+            workflowRunId = [long]$env:GITHUB_RUN_ID
+            workflowRunAttempt = [int]$env:GITHUB_RUN_ATTEMPT
+          }
+          $runMetadata | ConvertTo-Json | Set-Content -Encoding utf8 (Join-Path $evidenceRoot 'run-metadata.json')
           $env:ATLAS_VERIFICATION_PLAN_PATH = "$PWD/artifacts/verification/pr-verification-plan.json"
           $env:ATLAS_E2E_PROJECT = "atlas-pr-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
           $env:ATLAS_E2E_ARTIFACTS_HOST = Join-Path $evidenceRoot 'run'
@@ -194,7 +206,8 @@ jobs:
             @{ Source = (Join-Path $runRoot 'summary.json'); Name = 'summary.json' },
             @{ Source = (Join-Path $runRoot 'resource-admission.json'); Name = 'resource-admission.json' },
             @{ Source = (Join-Path $runRoot 'slot-lease.json'); Name = 'slot-lease.json' },
-            @{ Source = (Join-Path $evidenceRoot 'pr-verification-plan.json'); Name = 'pr-verification-plan.json' }
+            @{ Source = (Join-Path $evidenceRoot 'pr-verification-plan.json'); Name = 'pr-verification-plan.json' },
+            @{ Source = (Join-Path $evidenceRoot 'run-metadata.json'); Name = 'run-metadata.json' }
           )
           foreach ($copy in $copies) {
             if (Test-Path -LiteralPath $copy.Source) { Copy-Item -LiteralPath $copy.Source -Destination (Join-Path $safeRoot $copy.Name) -Force }
@@ -212,5 +225,106 @@ jobs:
             candidate/artifacts/github-evidence/resource-admission.json
             candidate/artifacts/github-evidence/slot-lease.json
             candidate/artifacts/github-evidence/pr-verification-plan.json
+            candidate/artifacts/github-evidence/run-metadata.json
           if-no-files-found: warn
           retention-days: 7
+
+  review-publish:
+    name: Publish reviewed exact-head status
+    needs: trust-admission
+    if: >-
+      needs.trust-admission.outputs.admitted == 'true' &&
+      github.event.action == 'edited' &&
+      contains(github.event.pull_request.body || '', format('Visual-Review-Approved-For: {0}', needs.trust-admission.outputs.head_sha)) &&
+      contains(github.event.pull_request.body || '', 'Visual-Evidence-Run:') &&
+      contains(github.event.pull_request.body || '', 'Visual-Reviewed-By:')
+    runs-on:
+      group: atlas-runners
+      labels: oteryn-atlas-pc
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      pull-requests: read
+      statuses: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      ATLAS_CODE_REVISION: ${{ needs.trust-admission.outputs.head_sha }}
+      ATLAS_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      ATLAS_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+      ATLAS_PR_NUMBER: ${{ github.event.pull_request.number }}
+      ATLAS_TRUSTED_EVIDENCE_ROOT: C:\Oteryn\evidence\atlas-pr-e2e
+    steps:
+      - name: Verify Molehill publisher identity
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:GITHUB_REPOSITORY -ne 'Oteryn/Oteryn-Atlas') { throw 'Unexpected repository.' }
+          if ($env:RUNNER_NAME -notmatch '^oteryn-molehill-atlas(?:-[0-9]+)?$') { throw "Unexpected runner: $env:RUNNER_NAME" }
+          if ($env:RUNNER_OS -ne 'Windows') { throw "Unexpected runner OS: $env:RUNNER_OS" }
+
+      - name: Check out exact trusted base policy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+          path: trusted-base
+
+      - name: Validate review marker and local evidence identity
+        id: review
+        shell: powershell
+        working-directory: trusted-base
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $pr = gh api "repos/$env:GITHUB_REPOSITORY/pulls/$env:ATLAS_PR_NUMBER" | ConvertFrom-Json
+          if ([string]$pr.head.sha -ne $env:ATLAS_CODE_REVISION) { throw 'superseded-head before reviewed status publication.' }
+          if ([string]$pr.base.sha -ne $env:ATLAS_BASE_SHA) { throw 'PR base moved after review event.' }
+          if ((git rev-parse HEAD).Trim() -ne $env:ATLAS_BASE_SHA) { throw 'Trusted base checkout mismatch.' }
+          $body = [string]$pr.body
+          $approvalMarker = "Visual-Review-Approved-For: $env:ATLAS_CODE_REVISION"
+          if (-not $body.Contains($approvalMarker)) { throw 'Exact visual approval marker is missing.' }
+          $runMatch = [regex]::Match($body, '(?m)^Visual-Evidence-Run:\s*([0-9]+)-([1-9][0-9]*)\s*$')
+          if (-not $runMatch.Success) { throw 'Visual-Evidence-Run marker is missing or malformed.' }
+          $reviewerMatch = [regex]::Match($body, '(?m)^Visual-Reviewed-By:\s*([A-Za-z0-9 ._@-]{1,80})\s*$')
+          if (-not $reviewerMatch.Success) { throw 'Visual-Reviewed-By marker is missing or malformed.' }
+          $runId = [long]$runMatch.Groups[1].Value
+          $runAttempt = [int]$runMatch.Groups[2].Value
+          $reviewer = $reviewerMatch.Groups[1].Value.Trim()
+          $evidenceRoot = Join-Path $env:ATLAS_TRUSTED_EVIDENCE_ROOT (Join-Path $env:ATLAS_CODE_REVISION "$runId-$runAttempt")
+          $metadataPath = Join-Path $evidenceRoot 'run-metadata.json'
+          $metadata = Get-Content $metadataPath -Raw | ConvertFrom-Json
+          if ([string]$metadata.repository -ne $env:GITHUB_REPOSITORY) { throw 'Evidence repository mismatch.' }
+          if ([int]$metadata.prNumber -ne [int]$env:ATLAS_PR_NUMBER) { throw 'Evidence PR mismatch.' }
+          if ([string]$metadata.headSha -ne $env:ATLAS_CODE_REVISION) { throw 'Evidence head mismatch.' }
+          if ([string]$metadata.baseSha -ne $env:ATLAS_BASE_SHA) { throw 'Evidence base mismatch.' }
+          if ([string]$metadata.headRef -ne $env:ATLAS_HEAD_REF) { throw 'Evidence head ref mismatch.' }
+          if ([long]$metadata.workflowRunId -ne $runId -or [int]$metadata.workflowRunAttempt -ne $runAttempt) { throw 'Evidence workflow identity mismatch.' }
+          git fetch --no-tags origin $env:ATLAS_CODE_REVISION
+          if ($LASTEXITCODE -ne 0) { throw 'Unable to fetch tested candidate object for merge-base validation.' }
+          $summary = Join-Path $evidenceRoot 'run\summary.json'
+          $plan = Join-Path $evidenceRoot 'pr-verification-plan.json'
+          if (-not (Test-Path -LiteralPath $summary) -or -not (Test-Path -LiteralPath $plan)) { throw 'Exact local review evidence is incomplete.' }
+          "EVIDENCE_ROOT=$evidenceRoot" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "SUMMARY_PATH=$summary" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "PLAN_PATH=$plan" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "REVIEWER=$reviewer" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Bind perceptual approval and publish exact status
+        shell: powershell
+        working-directory: trusted-base
+        run: |
+          $ErrorActionPreference = 'Stop'
+          .\e2e\approve-visual-user-acceptance.ps1 `
+            -SummaryPath $env:SUMMARY_PATH `
+            -Reviewer $env:REVIEWER `
+            -ConfirmReviewedAllScreenshots `
+            -ReviewedHeadSha $env:ATLAS_CODE_REVISION
+          if ($LASTEXITCODE -ne 0) { throw 'Visual review binding failed.' }
+          $reviewPath = Join-Path $env:EVIDENCE_ROOT 'run\visual-review.json'
+          .\e2e\publish-local-e2e-status.ps1 `
+            -SummaryPath $env:SUMMARY_PATH `
+            -VerificationPlanPath $env:PLAN_PATH `
+            -VisualReviewPath $reviewPath `
+            -RemoteBranch $env:ATLAS_HEAD_REF `
+            -TestedHeadSha $env:ATLAS_CODE_REVISION
+          if ($LASTEXITCODE -ne 0) { throw 'Reviewed atlas-local-e2e publication failed.' }
