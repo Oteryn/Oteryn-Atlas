@@ -47,6 +47,17 @@ test('machine-wide host admission is independent from diagnostic slot numbering'
   assert.match(run, /Release-AtlasHostAdmission \$hostAdmissionLease/);
 });
 
+test('exclusive host admission physically reserves both measured tokens and legacy slots', () => {
+  const selfTest = read('e2e/test-heavy-slot-pool.ps1');
+  assert.match(helper, /Acquire-AtlasExclusiveHostAdmission/);
+  assert.match(helper, /Release-AtlasExclusiveHostAdmission/);
+  assert.match(helper, /Acquire-AtlasHostAdmission[\s\S]*Acquire-AtlasHostAdmission/);
+  assert.match(helper, /Acquire-AtlasHeavySlot[\s\S]*RequestedSlot 1[\s\S]*Acquire-AtlasHeavySlot[\s\S]*RequestedSlot 2/);
+  assert.match(selfTest, /exclusive host admission/i);
+  assert.match(selfTest, /browser admission entered while exclusive host admission was active/i);
+  assert.match(selfTest, /exclusive host admission was not reusable/i);
+});
+
 test('authoritative evidence cannot opt into the historical unsafe third slot', () => {
   assert.match(run, /ATLAS_E2E_AUTHORITY_MODE/);
   assert.match(run, /authoritative/i);
@@ -63,7 +74,6 @@ test('nightly browser depth participates in the same Molehill host admission', (
   assert.match(browserDepth, /Release-AtlasHostAdmission \$hostAdmission/);
 });
 
-
 test('host-admission self-test proves exhaustion and reuse independently of slot ids', () => {
   const selfTest = read('e2e/test-heavy-slot-pool.ps1');
   assert.match(selfTest, /Acquire-AtlasHostAdmission/);
@@ -71,7 +81,6 @@ test('host-admission self-test proves exhaustion and reuse independently of slot
   assert.match(selfTest, /third host admission/i);
   assert.match(selfTest, /released host admission/i);
 });
-
 
 test('new host admission fences historical diagnostic slot three during migration', () => {
   const selfTest = read('e2e/test-heavy-slot-pool.ps1');
@@ -84,7 +93,6 @@ test('new host admission fences historical diagnostic slot three during migratio
   assert.match(selfTest, /host admission entered while legacy diagnostic slot three was active/i);
   assert.match(run, /Release-AtlasHostAdmission/);
 });
-
 
 test('Molehill plan census captures Playwright list without PowerShell transcoding', () => {
   const planStep = workflow.slice(workflow.indexOf('      - name: Build exact trusted-base lower-bound plan'));
