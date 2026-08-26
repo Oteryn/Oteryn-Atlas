@@ -14,6 +14,7 @@ const playwrightConfig = readText(new URL('../../e2e/playwright.config.mjs', imp
 const agents = readText(new URL('../../AGENTS.md', import.meta.url));
 const localRunPs1 = readText(new URL('../../e2e/run.ps1', import.meta.url));
 const localCompose = readText(new URL('../../e2e/compose.yml', import.meta.url));
+const heavySlotPool = readText(new URL('../../e2e/heavy-slot-pool.ps1', import.meta.url));
 
 function block(source, start, end) {
   const begin = source.indexOf(start);
@@ -183,14 +184,18 @@ test('self-hosted nightly browser depth does not require host Python', () => {
 });
 
 
-test('Molehill local heavy qualification is machine-serialized to prevent publication overload', () => {
+test('Molehill local heavy qualification uses a bounded isolated slot pool', () => {
   assert.match(localRunPs1, /ATLAS_E2E_LOCK_TIMEOUT_SECONDS/);
-  assert.match(localRunPs1, /oteryn-atlas-heavy-e2e\.lock/);
-  assert.match(localRunPs1, /FileShare\]::None/);
-  assert.match(localRunPs1, /Start-Sleep/);
-  assert.match(localRunPs1, /Dispose\(\)/);
-  assert.match(agents, /serializ/i);
-  assert.match(agents, /concurrent.*71-scenario|71-scenario.*concurrent/i);
+  assert.match(localRunPs1, /heavy-slot-pool\.ps1/);
+  assert.match(heavySlotPool, /ATLAS_E2E_SLOT_COUNT/);
+  assert.match(heavySlotPool, /oteryn-atlas-heavy-e2e-slot-/);
+  assert.match(heavySlotPool, /FileShare\]::None/);
+  assert.match(heavySlotPool, /FileShare\]::ReadWrite/);
+  assert.match(heavySlotPool, /oteryn-atlas-e2e-project-/);
+  assert.match(heavySlotPool, /oteryn-atlas-e2e-artifacts-/);
+  assert.match(agents, /bounded.*concurrent|concurrent.*bounded/i);
+  assert.match(agents, /isolat/i);
+  assert.match(agents, /71-scenario/i);
 });
 
 test('docs-only PR classification skips heavy browser proof only when proven safe', () => {
