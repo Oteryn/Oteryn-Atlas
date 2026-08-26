@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "enabled": false,
+  "workerPolicyDigest": null,
+  "calibrationEvidenceDigest": null,
+  "forceFullLabel": "atlas-force-full",
+  "reason": "awaiting measured worker policy and shadow calibration evidence"
+}
