@@ -30,6 +30,28 @@ Consume the exact merged Game gameplay-profile projection through a bounded lazy
 - Shared runtime was integrated by normal non-force merge-up; no open draft branch was cherry-picked.
 - #192 is a governing-authority reconciliation only: unaffected implementation and prior deterministic/visual findings remain valid; ordinary Remote Desktop build/test/Git polling is no longer an accepted execution route.
 
+## Execution routing / lanes
+
+Strategy: `parallel_first`. No implementation writer remains; final verification lanes are read-only and can run in parallel once their required execution route is available. Final integration/merge is serial because it mutates the single canonical task branch/protected-main lifecycle.
+
+- `hosted-gates`
+  - owned_paths: none (read-only exact-head CI/provenance/security evidence)
+  - depends_on: governance-reconciled task head
+  - branch_and_worktree: GitHub Actions exact task head; no writable worktree
+  - shared_leases: none
+- `molehill-browser`
+  - owned_paths: none (read-only full browser/visual evidence)
+  - depends_on: governance-reconciled task head + repository-approved GitHub-to-Molehill admission
+  - branch_and_worktree: exact task head checked out by the repository-approved Molehill runner
+  - shared_leases: bounded Molehill heavy-E2E admission/slot pool
+- `live-closeout`
+  - owned_paths: none (read-only merged-main deployment/live evidence)
+  - depends_on: protected squash merge
+  - branch_and_worktree: exact merged `main` SHA on Synology runner
+  - shared_leases: Synology live-acceptance/deployment concurrency
+- integration order: hosted-gates + molehill-browser -> digest-bound 17-frame review/status -> Ready/fenced squash merge -> live-closeout.
+- current external dependency: merged `main` does not yet contain the base-owned PR-to-Molehill admission implemented by draft PR #190. The existing `Verification Nightly Depth` manual runner is GitHub-Actions-owned but this agent has no workflow-dispatch action in the available GitHub control plane. Do not substitute RDC ordinary execution, stale evidence, Synology, or copied status.
+
 ## Acceptance
 
 - [x] Exact merged Game SHA/digest are pinned and committed publication bytes rebuild exactly.
