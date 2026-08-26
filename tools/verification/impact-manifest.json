@@ -2,6 +2,12 @@
   "schemaVersion": 1,
   "entries": [
     {
+      "pathPrefix": ".github/workflows/atlas-native-hardware.yml",
+      "domains": ["native-hardware", "verification-governance"],
+      "minimumProfile": "full",
+      "requiredGroups": ["deterministic.core", "e2e.full", "native.gpu"]
+    },
+    {
       "pathPrefix": "docs/",
       "domains": ["documentation"],
       "minimumProfile": "none",
@@ -24,6 +30,12 @@
       "domains": ["browser-runtime"],
       "minimumProfile": "broad",
       "requiredGroups": ["deterministic.core", "e2e.common-smoke"]
+    },
+    {
+      "pathPrefix": "tools/verification/native-gpu-probe.mjs",
+      "domains": ["native-hardware", "verification-governance"],
+      "minimumProfile": "full",
+      "requiredGroups": ["deterministic.core", "e2e.full", "native.gpu"]
     },
     {
       "pathPrefix": "tools/verification/",
