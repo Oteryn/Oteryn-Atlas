@@ -58,114 +58,120 @@ if ($authorityMode -eq 'authoritative' -and $slotConfig.SlotCount -gt 2) {
 if ($authorityMode -eq 'authoritative' -and $null -ne $slotConfig.RequestedSlot -and $slotConfig.RequestedSlot -gt 2) {
   throw 'Authoritative browser-full evidence cannot use requestedSlot above the measured two-slot capacity.'
 }
-$projectLease = Acquire-AtlasProjectLock -Project $project -Revision $env:ATLAS_CODE_REVISION
-$artifactLease = Acquire-AtlasArtifactLock -ArtifactPath $artifactDir -Project $project -Revision $env:ATLAS_CODE_REVISION
-New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
-$legacyFence = Acquire-AtlasLegacyFence -TimeoutSeconds $lockTimeoutSeconds -Project $project -Revision $env:ATLAS_CODE_REVISION
-$hostAdmissionLease = Acquire-AtlasHostAdmission -HostCapacity 2 -TimeoutSeconds $lockTimeoutSeconds -Project $project -Revision $env:ATLAS_CODE_REVISION -ResourceClass $resourceClass -AuthorityMode $authorityMode
-$slotLease = Acquire-AtlasHeavySlot -SlotCount $slotConfig.SlotCount -RequestedSlot $slotConfig.RequestedSlot -TimeoutSeconds $lockTimeoutSeconds -Project $project -Revision $env:ATLAS_CODE_REVISION
-$env:ATLAS_E2E_SLOT_ID = [string]$slotLease.SlotId
-$slotEvidence = [ordered]@{
-  version = 1
-  slotId = $slotLease.SlotId
-  slotCount = $slotLease.SlotCount
-  project = $project
-  revision = $env:ATLAS_CODE_REVISION
-  acquiredAtUtc = [DateTime]::UtcNow.ToString('o')
-}
-$slotEvidence | ConvertTo-Json | Set-Content -Encoding utf8 (Join-Path $artifactDir 'slot-lease.json')
-$evidenceEligibility = if ($authorityMode -eq 'authoritative') { 'authoritative' } else { 'diagnostic-only' }
-$resourceEvidence = [ordered]@{
-  version = 1
-  policyId = 'molehill-bootstrap-safe-v1'
-  resourceClass = $resourceClass
-  authorityMode = $authorityMode
-  evidenceEligibility = $evidenceEligibility
-  hostAdmissionToken = $hostAdmissionLease.TokenId
-  hostCapacity = $hostAdmissionLease.HostCapacity
-  slotId = $slotLease.SlotId
-  slotCount = $slotLease.SlotCount
-  project = $project
-  revision = $env:ATLAS_CODE_REVISION
-  verificationPlanSha256 = $env:ATLAS_VERIFICATION_PLAN_SHA256
-  acquiredAtUtc = [DateTime]::UtcNow.ToString('o')
-}
-$resourceEvidence | ConvertTo-Json | Set-Content -Encoding utf8 (Join-Path $artifactDir 'resource-admission.json')
-Write-Output "Acquired Atlas host admission $($hostAdmissionLease.TokenId)/$($hostAdmissionLease.HostCapacity), heavy slot $($slotLease.SlotId)/$($slotLease.SlotCount); evidenceEligibility=$evidenceEligibility"
 
+$projectLease = $null
+$artifactLease = $null
+$legacyFence = $null
+$hostAdmissionLease = $null
+$slotLease = $null
 $publicationForwarder = $null
-if ($env:ATLAS_PUBLICATION_ORIGIN) {
-  $origin = [Uri]$env:ATLAS_PUBLICATION_ORIGIN
-  $originPort = if ($origin.IsDefaultPort) { if ($origin.Scheme -eq 'https') { 443 } else { 80 } } else { $origin.Port }
-  $env:ATLAS_PUBLICATION_SCHEME = $origin.Scheme
-  $env:ATLAS_PUBLICATION_HOST = $origin.Host
-  $env:ATLAS_PUBLICATION_HOST_HEADER = $origin.Authority
-  $publicationPreflightPaths = @(
-    '/fullworld/publication/publication.json',
-    '/fullworld/animation/manifest.json',
-    '/fullworld/minimap/world.json'
-  )
-  $publicationPreflightDeadline = [DateTime]::UtcNow.AddSeconds(60)
-  $publicationPreflightFailures = @()
-  do {
-    $publicationPreflightFailures = @()
-    foreach ($path in $publicationPreflightPaths) {
-      try {
-        $response = Invoke-WebRequest -UseBasicParsing -Uri "$($origin.AbsoluteUri.TrimEnd('/'))$path" -TimeoutSec 10
-        if ($response.StatusCode -ne 200 -or [string]::IsNullOrWhiteSpace($response.Content)) {
-          $publicationPreflightFailures += "$path status=$($response.StatusCode)"
-        }
-      } catch {
-        $publicationPreflightFailures += "$path error=$($_.Exception.Message)"
-      }
-    }
-    if ($publicationPreflightFailures.Count -eq 0) { break }
-    Start-Sleep -Seconds 2
-  } while ([DateTime]::UtcNow -lt $publicationPreflightDeadline)
-  if ($publicationPreflightFailures.Count -ne 0) {
-    throw "Publication origin preflight did not become healthy: $($publicationPreflightFailures -join '; ')"
-  }
-
-  if (-not $env:ATLAS_BASE_URL) {
-    $python = (Get-Command python -ErrorAction Stop).Source
-    $probe = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
-    $probe.Start()
-    $forwardPort = ([System.Net.IPEndPoint]$probe.LocalEndpoint).Port
-    $probe.Stop()
-    $forwarderScript = Join-Path $PSScriptRoot 'local-publication-forwarder.py'
-    $forwarderOut = Join-Path $artifactDir 'publication-forwarder.log'
-    $forwarderErr = Join-Path $artifactDir 'publication-forwarder.err.log'
-    $publicationForwarder = Start-Process -FilePath $python -ArgumentList @(
-      $forwarderScript, '--listen-host', '0.0.0.0', '--listen-port', "$forwardPort",
-      '--upstream-host', $origin.Host, '--upstream-port', "$originPort"
-    ) -WindowStyle Hidden -PassThru -RedirectStandardOutput $forwarderOut -RedirectStandardError $forwarderErr
-
-    $forwarderReady = $false
-    for ($attempt = 0; $attempt -lt 50; $attempt += 1) {
-      if ($publicationForwarder.HasExited) { break }
-      $client = [System.Net.Sockets.TcpClient]::new()
-      try {
-        $connect = $client.ConnectAsync('127.0.0.1', $forwardPort)
-        if ($connect.Wait(200) -and $client.Connected) { $forwarderReady = $true; break }
-      } catch { } finally { $client.Dispose() }
-      Start-Sleep -Milliseconds 100
-    }
-    if (-not $forwarderReady) {
-      throw "Local publication forwarder failed to listen; see $forwarderErr"
-    }
-    $env:ATLAS_PUBLICATION_UPSTREAM = "host.docker.internal:$forwardPort"
-  } else {
-    $env:ATLAS_PUBLICATION_UPSTREAM = "$($origin.Host):$originPort"
-  }
-} else {
-  $env:ATLAS_PUBLICATION_SCHEME = 'http'
-  $env:ATLAS_PUBLICATION_HOST = '127.0.0.1'
-  $env:ATLAS_PUBLICATION_UPSTREAM = '127.0.0.1:9'
-  $env:ATLAS_PUBLICATION_HOST_HEADER = '127.0.0.1:9'
-}
-
 $testExitCode = 1
 try {
+  $projectLease = Acquire-AtlasProjectLock -Project $project -Revision $env:ATLAS_CODE_REVISION
+  $artifactLease = Acquire-AtlasArtifactLock -ArtifactPath $artifactDir -Project $project -Revision $env:ATLAS_CODE_REVISION
+  New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
+  $legacyFence = Acquire-AtlasLegacyFence -TimeoutSeconds $lockTimeoutSeconds -Project $project -Revision $env:ATLAS_CODE_REVISION
+  $hostAdmissionLease = Acquire-AtlasHostAdmission -HostCapacity 2 -TimeoutSeconds $lockTimeoutSeconds -Project $project -Revision $env:ATLAS_CODE_REVISION -ResourceClass $resourceClass -AuthorityMode $authorityMode
+  $slotLease = Acquire-AtlasHeavySlot -SlotCount $slotConfig.SlotCount -RequestedSlot $slotConfig.RequestedSlot -TimeoutSeconds $lockTimeoutSeconds -Project $project -Revision $env:ATLAS_CODE_REVISION
+  $env:ATLAS_E2E_SLOT_ID = [string]$slotLease.SlotId
+  $slotEvidence = [ordered]@{
+    version = 1
+    slotId = $slotLease.SlotId
+    slotCount = $slotLease.SlotCount
+    project = $project
+    revision = $env:ATLAS_CODE_REVISION
+    acquiredAtUtc = [DateTime]::UtcNow.ToString('o')
+  }
+  $slotEvidence | ConvertTo-Json | Set-Content -Encoding utf8 (Join-Path $artifactDir 'slot-lease.json')
+  $evidenceEligibility = if ($authorityMode -eq 'authoritative') { 'authoritative' } else { 'diagnostic-only' }
+  $resourceEvidence = [ordered]@{
+    version = 1
+    policyId = 'molehill-bootstrap-safe-v1'
+    resourceClass = $resourceClass
+    authorityMode = $authorityMode
+    evidenceEligibility = $evidenceEligibility
+    hostAdmissionToken = $hostAdmissionLease.TokenId
+    hostCapacity = $hostAdmissionLease.HostCapacity
+    slotId = $slotLease.SlotId
+    slotCount = $slotLease.SlotCount
+    project = $project
+    revision = $env:ATLAS_CODE_REVISION
+    verificationPlanSha256 = $env:ATLAS_VERIFICATION_PLAN_SHA256
+    acquiredAtUtc = [DateTime]::UtcNow.ToString('o')
+  }
+  $resourceEvidence | ConvertTo-Json | Set-Content -Encoding utf8 (Join-Path $artifactDir 'resource-admission.json')
+  Write-Output "Acquired Atlas host admission $($hostAdmissionLease.TokenId)/$($hostAdmissionLease.HostCapacity), heavy slot $($slotLease.SlotId)/$($slotLease.SlotCount); evidenceEligibility=$evidenceEligibility"
+
+  if ($env:ATLAS_PUBLICATION_ORIGIN) {
+    $origin = [Uri]$env:ATLAS_PUBLICATION_ORIGIN
+    $originPort = if ($origin.IsDefaultPort) { if ($origin.Scheme -eq 'https') { 443 } else { 80 } } else { $origin.Port }
+    $env:ATLAS_PUBLICATION_SCHEME = $origin.Scheme
+    $env:ATLAS_PUBLICATION_HOST = $origin.Host
+    $env:ATLAS_PUBLICATION_HOST_HEADER = $origin.Authority
+    $publicationPreflightPaths = @(
+      '/fullworld/publication/publication.json',
+      '/fullworld/animation/manifest.json',
+      '/fullworld/minimap/world.json'
+    )
+    $publicationPreflightDeadline = [DateTime]::UtcNow.AddSeconds(60)
+    $publicationPreflightFailures = @()
+    do {
+      $publicationPreflightFailures = @()
+      foreach ($path in $publicationPreflightPaths) {
+        try {
+          $response = Invoke-WebRequest -UseBasicParsing -Uri "$($origin.AbsoluteUri.TrimEnd('/'))$path" -TimeoutSec 10
+          if ($response.StatusCode -ne 200 -or [string]::IsNullOrWhiteSpace($response.Content)) {
+            $publicationPreflightFailures += "$path status=$($response.StatusCode)"
+          }
+        } catch {
+          $publicationPreflightFailures += "$path error=$($_.Exception.Message)"
+        }
+      }
+      if ($publicationPreflightFailures.Count -eq 0) { break }
+      Start-Sleep -Seconds 2
+    } while ([DateTime]::UtcNow -lt $publicationPreflightDeadline)
+    if ($publicationPreflightFailures.Count -ne 0) {
+      throw "Publication origin preflight did not become healthy: $($publicationPreflightFailures -join '; ')"
+    }
+
+    if (-not $env:ATLAS_BASE_URL) {
+      $python = (Get-Command python -ErrorAction Stop).Source
+      $probe = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
+      $probe.Start()
+      $forwardPort = ([System.Net.IPEndPoint]$probe.LocalEndpoint).Port
+      $probe.Stop()
+      $forwarderScript = Join-Path $PSScriptRoot 'local-publication-forwarder.py'
+      $forwarderOut = Join-Path $artifactDir 'publication-forwarder.log'
+      $forwarderErr = Join-Path $artifactDir 'publication-forwarder.err.log'
+      $publicationForwarder = Start-Process -FilePath $python -ArgumentList @(
+        $forwarderScript, '--listen-host', '0.0.0.0', '--listen-port', "$forwardPort",
+        '--upstream-host', $origin.Host, '--upstream-port', "$originPort"
+      ) -WindowStyle Hidden -PassThru -RedirectStandardOutput $forwarderOut -RedirectStandardError $forwarderErr
+
+      $forwarderReady = $false
+      for ($attempt = 0; $attempt -lt 50; $attempt += 1) {
+        if ($publicationForwarder.HasExited) { break }
+        $client = [System.Net.Sockets.TcpClient]::new()
+        try {
+          $connect = $client.ConnectAsync('127.0.0.1', $forwardPort)
+          if ($connect.Wait(200) -and $client.Connected) { $forwarderReady = $true; break }
+        } catch { } finally { $client.Dispose() }
+        Start-Sleep -Milliseconds 100
+      }
+      if (-not $forwarderReady) {
+        throw "Local publication forwarder failed to listen; see $forwarderErr"
+      }
+      $env:ATLAS_PUBLICATION_UPSTREAM = "host.docker.internal:$forwardPort"
+    } else {
+      $env:ATLAS_PUBLICATION_UPSTREAM = "$($origin.Host):$originPort"
+    }
+  } else {
+    $env:ATLAS_PUBLICATION_SCHEME = 'http'
+    $env:ATLAS_PUBLICATION_HOST = '127.0.0.1'
+    $env:ATLAS_PUBLICATION_UPSTREAM = '127.0.0.1:9'
+    $env:ATLAS_PUBLICATION_HOST_HEADER = '127.0.0.1:9'
+  }
+
   docker compose -p $project -f e2e\compose.yml up --build --abort-on-container-exit --exit-code-from e2e e2e
   $testExitCode = $LASTEXITCODE
 } finally {
@@ -176,7 +182,7 @@ try {
     Stop-Process -Id $publicationForwarder.Id -Force
   }
   if ($slotLease -and $slotLease.Stream) { $slotLease.Stream.Dispose() }
-  Release-AtlasHostAdmission $hostAdmissionLease
+  if ($hostAdmissionLease) { Release-AtlasHostAdmission $hostAdmissionLease }
   if ($legacyFence -and $legacyFence.Stream) { $legacyFence.Stream.Dispose() }
   if ($artifactLease -and $artifactLease.Stream) { $artifactLease.Stream.Dispose() }
   if ($projectLease -and $projectLease.Stream) { $projectLease.Stream.Dispose() }
