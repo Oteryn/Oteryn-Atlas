@@ -384,6 +384,7 @@ function scheduleRender(reason = 'view') {
 
 function scheduleRefresh(delay = 100) {
   clearTimeout(refreshTimer);
+  publishQualification('PENDING');
   refreshTimer = setTimeout(() => refreshScene().catch((error) => {
     if (error?.name !== 'AbortError') failClosed(error);
   }), delay);
