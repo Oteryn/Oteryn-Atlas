@@ -1,0 +1,187 @@
+name: Molehill PR E2E
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: atlas-molehill-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  trust-admission:
+    name: Trust admission
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      admitted: ${{ steps.trust.outputs.admitted }}
+      head_sha: ${{ steps.trust.outputs.head_sha }}
+      reason: ${{ steps.trust.outputs.reason }}
+    steps:
+      - name: Check out trusted protected base
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+
+      - name: Evaluate same-repository trust
+        id: trust
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          CANDIDATE_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          CANDIDATE_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          CANDIDATE_AUTHOR: ${{ github.event.pull_request.user.login }}
+          AUTHOR_ASSOCIATION: ${{ github.event.pull_request.author_association }}
+          EVENT_ACTOR: ${{ github.actor }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          set -euo pipefail
+          current_head_sha="$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" --jq .head.sha)"
+          export current_head_sha
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import { decideTrustAdmission } from './tools/verification/trust-admission.mjs';
+          const result = decideTrustAdmission({
+            repository: process.env.GITHUB_REPOSITORY,
+            eventName: process.env.GITHUB_EVENT_NAME,
+            baseRef: process.env.BASE_REF,
+            headRepository: process.env.CANDIDATE_HEAD_REPO,
+            headSha: process.env.CANDIDATE_HEAD_SHA,
+            currentHeadSha: process.env.current_head_sha,
+            actor: process.env.EVENT_ACTOR,
+            author: process.env.CANDIDATE_AUTHOR,
+            authorAssociation: process.env.AUTHOR_ASSOCIATION,
+            resourceClass: 'browser-full',
+          });
+          fs.appendFileSync(process.env.GITHUB_OUTPUT,
+            `admitted=${result.state === 'admitted'}\nhead_sha=${result.headSha ?? ''}\nreason=${result.reason}\n`);
+          if (result.reason === 'superseded-head') process.exitCode = 1;
+          NODE
+
+  heavy-e2e:
+    name: Run exact-head Molehill E2E
+    needs: trust-admission
+    if: needs.trust-admission.outputs.admitted == 'true' && github.event.pull_request.draft == false
+    runs-on:
+      group: atlas-runners
+      labels: oteryn-atlas-pc
+    timeout-minutes: 180
+    permissions:
+      contents: read
+    env:
+      ATLAS_CODE_REVISION: ${{ needs.trust-admission.outputs.head_sha }}
+      ATLAS_EXPECTED_REVISION: ${{ needs.trust-admission.outputs.head_sha }}
+      ATLAS_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      ATLAS_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+      ATLAS_PUBLICATION_ORIGIN: http://192.168.1.2:8097
+      ATLAS_E2E_WORKERS: '1'
+      ATLAS_E2E_RESOURCE_CLASS: browser-full
+      ATLAS_E2E_AUTHORITY_MODE: authoritative
+    steps:
+      - name: Verify Molehill runner identity
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:GITHUB_REPOSITORY -ne 'Oteryn/Oteryn-Atlas') { throw 'Unexpected repository.' }
+          if ($env:RUNNER_NAME -notmatch '^oteryn-molehill-atlas(?:-[0-9]+)?$') { throw "Unexpected runner: $env:RUNNER_NAME" }
+          if ($env:RUNNER_OS -ne 'Windows') { throw "Unexpected runner OS: $env:RUNNER_OS" }
+          docker version | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw 'Docker is unavailable.' }
+
+      - name: Check out trusted base contracts
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+          path: trusted-base
+
+      - name: Check out exact trusted candidate head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.trust-admission.outputs.head_sha }}
+          persist-credentials: false
+          fetch-depth: 0
+          path: candidate
+
+      - name: Reject a superseded candidate before execution
+        shell: powershell
+        working-directory: candidate
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $remote = ((git ls-remote --heads origin "refs/heads/$env:ATLAS_HEAD_REF") -split '\s+')[0]
+          if ($remote -ne $env:ATLAS_CODE_REVISION) { throw "superseded-head remote=$remote expected=$env:ATLAS_CODE_REVISION" }
+          if ((git rev-parse HEAD).Trim() -ne $env:ATLAS_CODE_REVISION) { throw 'Candidate checkout mismatch.' }
+
+      - name: Build exact trusted-base lower-bound plan
+        shell: powershell
+        working-directory: candidate
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force artifacts/verification | Out-Null
+          npm ci --prefix e2e
+          $env:ATLAS_ARTIFACTS_DIR = "$PWD/artifacts/verification/playwright-list"
+          npm exec --prefix e2e -- playwright test --config=e2e/playwright.config.mjs --list |
+            Set-Content -Encoding utf8 artifacts/verification/playwright-test-list.txt
+          node ../trusted-base/tools/verification/parse-playwright-test-list.mjs `
+            artifacts/verification/playwright-test-list.txt > artifacts/verification/stable-test-ids.json
+          $mergeBase = (git merge-base $env:ATLAS_CODE_REVISION $env:ATLAS_BASE_SHA).Trim()
+          $env:ATLAS_MERGE_BASE = $mergeBase
+          node --input-type=module - artifacts/verification/changed-files.json <<'NODE'
+          import fs from 'node:fs';
+          import { execFileSync } from 'node:child_process';
+          const output = execFileSync('git', ['diff', '--name-status', '-z', '--find-renames', process.env.ATLAS_MERGE_BASE, process.env.ATLAS_CODE_REVISION]);
+          const fields = output.toString('utf8').split('\0');
+          const changes = [];
+          for (let i = 0; i < fields.length && fields[i];) {
+            const status = fields[i++];
+            if (/^[RC]/.test(status)) {
+              const previousPath = fields[i++];
+              const path = fields[i++];
+              changes.push({ path, previousPath });
+            } else {
+              changes.push({ path: fields[i++] });
+            }
+          }
+          fs.writeFileSync(process.argv[2], `${JSON.stringify(changes)}\n`);
+          NODE
+          node ../trusted-base/tools/verification/build-verification-plan.mjs `
+            --changed-files artifacts/verification/changed-files.json `
+            --trusted-impact ../trusted-base/tools/verification/impact-manifest.json `
+            --candidate-impact tools/verification/impact-manifest.json `
+            --trusted-catalog ../trusted-base/tools/verification/verification-catalog.json `
+            --candidate-catalog tools/verification/verification-catalog.json `
+            --repository Oteryn/Oteryn-Atlas `
+            --head-sha $env:ATLAS_CODE_REVISION `
+            --integration-base-sha $env:ATLAS_BASE_SHA `
+            --merge-base-sha $mergeBase `
+            --stable-test-ids artifacts/verification/stable-test-ids.json `
+            > artifacts/verification/pr-verification-plan.json
+
+      - name: Run exact-head Molehill E2E
+        shell: powershell
+        working-directory: candidate
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $env:ATLAS_VERIFICATION_PLAN_PATH = "$PWD/artifacts/verification/pr-verification-plan.json"
+          $env:ATLAS_E2E_PROJECT = "atlas-pr-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
+          $env:ATLAS_E2E_ARTIFACTS_HOST = "../artifacts/e2e/$env:ATLAS_E2E_PROJECT"
+          .\e2e\run.ps1
+          exit $LASTEXITCODE
+
+      - name: Publish restricted machine and visual evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: atlas-molehill-e2e-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            candidate/artifacts/e2e/
+            candidate/artifacts/verification/
+          if-no-files-found: error
+          retention-days: 7
