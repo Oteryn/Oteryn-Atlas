@@ -49,3 +49,10 @@ test('Semantic provenance rows remain present after Gameplay integration', () =>
     assert.match(source, new RegExp(`createTextRow\\('${label}'`));
   }
 });
+
+test('Details keeps the inspector tablist visible when Gameplay opens', () => {
+  const source = read('web/fullworld-creatures.mjs');
+  assert.doesNotMatch(source, /state\.inspector\?\.scrollIntoView/);
+  assert.match(source, /closest\(['"]\.inspector['"]\)/);
+  assert.match(source, /scrollTo\(\{\s*top:\s*0/);
+});

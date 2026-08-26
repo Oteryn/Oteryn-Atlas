@@ -501,7 +501,7 @@ function openCreatureDetails() {
   persist();
   renderCreatureInspector(record);
   window.dispatchEvent(new CustomEvent('oteryn-atlas-open-inspector', { detail: { recordId, tab: 'gameplay' } }));
-  requestAnimationFrame(() => state.inspector?.scrollIntoView({ block: 'nearest' }));
+  requestAnimationFrame(() => state.inspector?.closest('.inspector')?.scrollTo({ top: 0, behavior: 'auto' }));
 }
 
 function clearCreatureHover() {
