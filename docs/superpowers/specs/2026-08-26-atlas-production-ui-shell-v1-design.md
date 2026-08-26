@@ -684,6 +684,12 @@ Every parallel worker receives a self-contained prompt containing:
 
 The coordinator must review each lane's full diff and interface output before integration. A passing lane-local test is not permission to integrate an incompatible interface.
 
+#### Lane ownership invariant
+
+At dispatch time every mutable implementation path must be in exactly one of three states: owned by one active lane, owned by the coordinator/integration lane, or read-only for this programme. No path may be writable by two simultaneous agents. Ownership changes require coordinator acknowledgement before either worker mutates the path.
+
+If a lane depends on a shared interface that is still changing, the producing lane publishes a reviewed interface commit first; consumers then start from that exact interface identity. Consumers must not guess forthcoming signatures or duplicate provisional implementations.
+
 #### Integration waves
 
 The intended execution order is:
