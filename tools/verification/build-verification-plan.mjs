@@ -145,6 +145,7 @@ function mergeCatalogs(trusted, candidate) {
       specs: unionStrings(left.specs, right.specs),
       projects: unionStrings(left.projects, right.projects),
       stableTestIds: unionStrings(left.stableTestIds, right.stableTestIds),
+      dependsOn: unionStrings(left.dependsOn, right.dependsOn),
       resourceClass,
       evidence: left.evidence === 'restricted-visual-review' || right.evidence === 'restricted-visual-review'
         ? 'restricted-visual-review' : 'machine-summary',
@@ -153,6 +154,22 @@ function mergeCatalogs(trusted, candidate) {
     };
   }
   return freeze({ schemaVersion: 1, groups });
+}
+
+function dependencyClosure(groupIds, catalog) {
+  const selected = new Set(groupIds);
+  const queue = [...groupIds];
+  while (queue.length > 0) {
+    const id = queue.shift();
+    const group = catalog.groups[id];
+    if (!group) throw new TypeError(`verification group missing from merged catalog: ${id}`);
+    for (const dependency of group.dependsOn) {
+      if (selected.has(dependency)) continue;
+      selected.add(dependency);
+      queue.push(dependency);
+    }
+  }
+  return [...selected].sort();
 }
 
 function selectedGroups(groupIds, catalog) {
@@ -172,7 +189,8 @@ export function buildVerificationPlan(input) {
   const trusted = classify(changedPaths, trustedImpactManifest);
   const candidate = classify(changedPaths, candidateImpactManifest);
   const result = unionClassification(trusted, candidate, bootstrapChanged(changedPaths));
-  const groups = selectedGroups(result.groups, verificationCatalog);
+  const requiredGroupIds = dependencyClosure(result.groups, verificationCatalog);
+  const groups = selectedGroups(requiredGroupIds, verificationCatalog);
   const visualGroupIds = groups.filter((group) => group.evidence === 'restricted-visual-review').map((group) => group.id);
   const resourceClasses = [...new Set(groups.map((group) => group.resourceClass))].sort();
   const stableTestIds = suppliedStableTestIds(input.stableTestIds)
@@ -193,7 +211,7 @@ export function buildVerificationPlan(input) {
     verificationCatalogDigest: digest({ trustedVerificationCatalog, candidateVerificationCatalog }),
     profile: result.profile,
     impactDomains: result.domains,
-    requiredGroupIds: result.groups,
+    requiredGroupIds,
     groups,
     stableTestIds,
     stableTestIdsDigest: digest(stableTestIds),

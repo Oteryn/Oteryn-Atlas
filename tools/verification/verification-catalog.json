@@ -20,6 +20,7 @@
       "projects": ["desktop-chromium", "mobile-chromium"],
       "resourceClass": "browser-targeted",
       "evidence": "machine-summary",
+      "dependsOn": ["e2e.common-smoke"],
       "fullSafetyNet": true
     },
     "e2e.full": {
@@ -34,6 +35,7 @@
       "projects": ["desktop-chromium", "mobile-chromium"],
       "resourceClass": "browser-targeted",
       "evidence": "restricted-visual-review",
+      "dependsOn": ["e2e.creatures"],
       "fullSafetyNet": true
     }
   }

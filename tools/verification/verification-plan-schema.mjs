@@ -45,6 +45,28 @@ export function profileRank(profile) {
   return rank;
 }
 
+function validateDependencyGraph(groups, kind) {
+  for (const [id, group] of Object.entries(groups)) {
+    for (const dependency of group.dependsOn) {
+      if (!GROUP_ID.test(dependency) || !Object.hasOwn(groups, dependency)) {
+        invalid(kind, `${id}.dependsOn references unknown group ${dependency}`);
+      }
+      if (dependency === id) invalid(kind, `${id}.dependsOn cannot reference itself`);
+    }
+  }
+  const visiting = new Set();
+  const visited = new Set();
+  function visit(id) {
+    if (visiting.has(id)) invalid(kind, `dependency cycle includes ${id}`);
+    if (visited.has(id)) return;
+    visiting.add(id);
+    for (const dependency of groups[id].dependsOn) visit(dependency);
+    visiting.delete(id);
+    visited.add(id);
+  }
+  for (const id of Object.keys(groups)) visit(id);
+}
+
 export function validateVerificationCatalog(candidate) {
   const kind = 'verification catalog';
   if (!isPlainObject(candidate) || candidate.schemaVersion !== 1 || !isPlainObject(candidate.groups)) {
@@ -59,10 +81,12 @@ export function validateVerificationCatalog(candidate) {
     if (!RESOURCE_CLASSES.has(value.resourceClass)) invalid(kind, `${id}.resourceClass is not allowlisted`);
     if (!EVIDENCE_CLASSES.has(value.evidence)) invalid(kind, `${id}.evidence is not allowlisted`);
     const stableTestIds = uniqueStrings(value.stableTestIds ?? [], kind, `${id}.stableTestIds`);
+    const dependsOn = uniqueStrings(value.dependsOn ?? [], kind, `${id}.dependsOn`);
     groups[id] = {
       specs,
       projects,
       stableTestIds,
+      dependsOn,
       resourceClass: value.resourceClass,
       evidence: value.evidence,
       sequential: Boolean(value.sequential),
@@ -70,6 +94,7 @@ export function validateVerificationCatalog(candidate) {
     };
   }
   if (Object.keys(groups).length === 0) invalid(kind, 'requires at least one group');
+  validateDependencyGraph(groups, kind);
   return freeze({ schemaVersion: 1, groups });
 }
 
