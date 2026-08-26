@@ -4,7 +4,7 @@
 issue: 165
 repository: Oteryn/Oteryn-Atlas
 base_branch: main
-base_sha: abb799b5bb0905c8f2e8b57e67950334db39d5f7
+base_sha: fc2a952169e15c070b4a2bc66095624d63798435
 branch: feat/creature-gameplay-profiles-165
 pr: 170
 status: verifying
@@ -41,7 +41,7 @@ Consume the exact merged Game gameplay-profile projection through a bounded lazy
 
 ## Verification checkpoint
 
-- Integrated current main by normal non-force merge-up at `abb799b5bb0905c8f2e8b57e67950334db39d5f7`; targeted Gameplay/slot-pool/live-readiness integration contracts: 52/52 PASS.
+- Integrated current main by normal non-force merge-up at `fc2a952169e15c070b4a2bc66095624d63798435` (docs-only #186 delta; no runtime/policy overlap); targeted Gameplay/slot-pool/live-readiness integration contracts: 52/52 PASS.
 - Exact Game publication: 1049 NPC / 1800 monster profiles / 508 shards / `sha256:7ac7c08949aa498cb843ca26e3417e537b3409d89e4f265861f3f94855b96d28`.
 - CI-equivalent deterministic Node matrix after current-main integration and browser-found regression guards: 374/374 PASS, 0 fail, 0 skip.
 - Extraction provenance verifier: PASS, 144 mapped rows against exact legacy `e417c5e7c22986bf4acef0495eb47f7b72c97cce`.
