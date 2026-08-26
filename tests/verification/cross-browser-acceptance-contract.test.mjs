@@ -191,3 +191,17 @@ test('cross-browser journeys wait for settled mobile geometry and rotate strict 
   assert.match(desktop, /captureRuntimeFailures/);
   assert.match(mobile, /captureRuntimeFailures/);
 });
+
+test('semantic cross-browser navigation keeps same-document history state coherent', async () => {
+  const app = await read(fullworldAppPath);
+  const search = await read('web/fullworld-search.mjs');
+  assert.doesNotMatch(search, /location\.search\s*=\s*params\.toString\(\)/);
+  assert.match(search, /history\.pushState\(/);
+  assert.match(search, /function activeRecordFromLocation\(\)/);
+  assert.match(search, /function syncActiveFromLocation\(\)/);
+  assert.match(search, /window\.addEventListener\('popstate',\s*syncActiveFromLocation\)/);
+  assert.match(search, /if \(!record\)[\s\S]{0,160}removeActiveLayer\(\)/);
+  assert.match(app, /syncViewUi\(\{ preserveExternalParams: options\.preserveExternalParams \?\? false \}\)/);
+  assert.match(app, /window\.addEventListener\('popstate',\s*syncHistoryView\)/);
+  assert.match(app, /window\.addEventListener\('oteryn-atlas-semantic-navigation',\s*syncHistoryView\)/);
+});
