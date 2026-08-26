@@ -41,11 +41,19 @@ test('native Windows checkout overlay bridges Docker Desktop to LAN through the 
 
 test('Windows checkout-overlay waits for the required publication products before starting Playwright', () => {
   assert.match(runPs, /\$publicationPreflightPaths = @\(/);
-  for (const path of ['/fullworld/publication/publication.json', '/fullworld/animation/manifest.json', '/fullworld/minimap/world.json']) {
+  for (const path of ['/fullworld/publication/publication.json', '/fullworld/animation/manifest.json', '/fullworld/minimap/world.json', '/fullworld/overview/world.json']) {
     assert.match(runPs, new RegExp(path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   }
   assert.match(runPs, /Invoke-WebRequest -UseBasicParsing/);
   assert.match(runPs, /Publication origin preflight did not become healthy/);
+});
+
+test('Windows checkout-overlay verifies the reference overview fan-out through its Docker bridge', () => {
+  assert.match(runPs, /Invoke-AtlasOverviewBurstPreflight/);
+  assert.match(runPs, /overviewConcurrency/);
+  assert.match(runPs, /GetResponseAsync/);
+  assert.match(runPs, /Publication overview burst preflight did not become healthy/);
+  assert.match(runPs, /host\.docker\.internal/);
 });
 
 test('local publication forwarder passes its executable relay self-test', () => {
