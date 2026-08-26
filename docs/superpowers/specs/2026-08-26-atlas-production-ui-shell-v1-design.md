@@ -632,6 +632,109 @@ Specifically:
 
 The docs-only programme package may merge independently because it does not mutate runtime/UI implementation paths.
 
+### 21.1 Parallel execution topology
+
+The eventual implementation is explicitly designed for bounded multi-agent execution. Parallelism is allowed only across independently owned domains with stable interfaces; it is not permission for multiple workers to edit the same shell hot files concurrently.
+
+One coordinator owns the canonical implementation branch, integration order, shared-file composition, candidate freeze and final protected PR lifecycle. Subordinate agents work on isolated worker branches/worktrees and return reviewed commits/evidence to the coordinator. Subordinate workers must never merge directly to protected `main` and must not share writable worktrees.
+
+Before dispatching implementation lanes, the coordinator must complete Phase 0 and freeze the current cross-lane interface contract after resolving the terminal/reconciled state of #162 and #170. Shared runtime/UI mutation must not begin while those lifecycles still have unresolved ownership over the same `web/fullworld*` surfaces unless ownership is explicitly transferred or the implementation plan proves the lane is disjoint.
+
+#### Parallel lanes
+
+The implementation plan should decompose the work into these ownership domains, adjusting exact filenames only after the Phase 0 refresh:
+
+| Lane | Primary responsibility | May run in parallel | Hard dependencies |
+| --- | --- | --- | --- |
+| A — Capability + shell state | product capability registry, top-level product-context state, stable readiness/trust vocabulary | yes | Phase 0 interface freeze |
+| B — Design system | semantic tokens, typography, surfaces, spacing/radius/elevation and reusable presentation primitives | yes | Phase 0 interface freeze |
+| C — Navigation + left context | global rail, context navigation model and contextual left-panel composition using existing search/filter services | yes, after A contract | A public interfaces |
+| D — Map HUD | presentation adapters for zoom/floor/view/layer controls and minimap placement; no renderer/camera duplication | yes | Phase 0 interface freeze |
+| E — Right context / inspector | product-first right panel, Gameplay/Semantic/Provenance composition and selection routing | yes, after #170 contract is terminal/reconciled | A interfaces and merged/reconciled Gameplay inspector contract |
+| F — Developer Mode | on-demand read-only diagnostics/provenance surface and removal of permanent debug chrome from the product composition | yes | Phase 0 interface freeze |
+| G — Responsive/a11y/visual acceptance | integrated tablet/mobile behavior, focus/dismissal semantics, final user journeys and formal visual evidence | later integration wave | integrated A–F candidate |
+
+A, B, D and F are the preferred first parallel wave because they can be implemented behind new focused modules/primitives without independently owning the same product composition. C and E form the second wave after their upstream interfaces are fixed. G is not an independent early lane; it qualifies and polishes the integrated shell.
+
+#### Shared hot-file ownership
+
+The following file families are shared composition surfaces and are coordinator/integration-owned unless the implementation plan explicitly narrows ownership to a non-overlapping region with an executable contract:
+
+- `web/fullworld.html`;
+- `web/fullworld.css`;
+- `web/style.css` when used as global shell composition rather than a new isolated token file;
+- `web/fullworld-app.mjs`;
+- `web/fullworld-mobile.mjs`;
+- primary E2E orchestration/configuration and shared visual-acceptance manifests.
+
+Parallel lanes should prefer creating focused new modules/styles/tests and exposing explicit APIs/events. The coordinator performs the final wiring into shared hot files after reviewing each lane. A worker that discovers it must modify another lane's owned file or a coordinator-owned hot file must stop that mutation and request ownership reconciliation rather than editing opportunistically.
+
+Creature renderer/geometry files remain outside Production Shell lane ownership unless the implementation plan proves a shell regression requires a bounded compatibility fix. In particular, no lane may use the redesign to reimplement #113 hit testing, #115 presentation bounds/labels/badges, #162 animation semantics or #170 gameplay data authority.
+
+#### Worker contract
+
+Every parallel worker receives a self-contained prompt containing:
+
+- exact admission/integration `main` SHA and current root/nearer instructions;
+- exact lane-owned paths and explicit forbidden shared paths;
+- public interfaces it consumes and must produce;
+- lane-specific deterministic tests and acceptance evidence;
+- requirement to preserve unrelated work and avoid force-push/reset of shared history;
+- required return package: commit SHA(s), changed-file list, interface summary, tests executed with exact results, and unresolved risks/blockers.
+
+The coordinator must review each lane's full diff and interface output before integration. A passing lane-local test is not permission to integrate an incompatible interface.
+
+#### Integration waves
+
+The intended execution order is:
+
+```text
+Phase 0: refresh main + #162/#170 + freeze shell interfaces
+                     |
+          +----------+----------+
+          |          |          |
+       Lane A     Lane B     Lane D     Lane F
+          |          |          |          |
+          +------ first parallel wave -----+
+                     |
+             stable A interfaces
+                 /       \
+              Lane C    Lane E
+                 \       /
+              second parallel wave
+                     |
+          coordinator shared-file wiring
+                     |
+                   Lane G
+                     |
+        candidate freeze + full qualification
+```
+
+The implementation plan may reduce the number of live workers when actual post-#162/#170 file ownership proves less independent than this design. It must not increase parallelism by allowing concurrent edits to the same mutable state or hot files.
+
+#### Testing concurrency
+
+Targeted deterministic/unit tests may run concurrently per lane when they do not share mutable fixtures or generated output directories.
+
+Heavy Molehill browser qualification remains governed by the live repository contract. At the planning baseline `e2e/run.ps1` has a measured safe default of **2 concurrent isolated heavy E2E slots**. No coordinator or worker may exceed the current repository-selected capacity, bypass the slot pool, share Compose/origin/artifact state, or interpret a third experimental slot as safe default capacity.
+
+Full final qualification is performed against one frozen integrated candidate. Lane-local heavy E2E results are supporting evidence only and never substitute for exact-final-head integration qualification. Any post-freeze code change creates a new candidate and invalidates final qualification evidence that depended on the prior head.
+
+#### Merge and completion authority
+
+Only the coordinator may declare the integrated implementation ready for protected merge. Readiness requires:
+
+- every accepted lane commit present in the canonical implementation head;
+- no unresolved worker ownership/interface conflict;
+- complete changed-file and full-diff review;
+- exact-final-head deterministic/browser/visual/accessibility/geometry/applicable performance evidence;
+- required `atlas-local-e2e`, `atlas-gate` and `provenance-gate` success under the then-current repository policy;
+- actual visual-frame review;
+- expected-head squash merge and branch cleanup;
+- merged-main Synology Live Acceptance on the resulting protected `main` SHA.
+
+This topology is a speed optimization with isolation, not a relaxation of final integration authority or verification depth.
+
 ## 22. Non-goals
 
 Production UI Shell V1 does not itself:
