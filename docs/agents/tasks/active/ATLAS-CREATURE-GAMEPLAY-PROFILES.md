@@ -49,6 +49,7 @@ Consume the exact merged Game gameplay-profile projection through a bounded lazy
 - Synology candidate/live gameplay manifest contract and live Chromium Sam/Rat gameplay contract: 8/8 PASS locally; merged-main execution remains pending until PR merge.
 - Exact-head browser qualification caught and corrected a stale Rat quick-card oracle: authoritative loot has 2 entries while gold coin max_count is 4; deterministic regression guard now preserves that distinction.
 - Exact-head visual qualification caught and corrected content-level inspector scrolling that hid the Gameplay/Semantic tablist; Details now keeps the inspector container at top and the tab remains hit-testable.
+- Formal Gameplay screenshot evidence uses the exact unique battle axe filter (235 gold sell / 80 gold buy) so both trade directions are simultaneously unclipped; full unfiltered lists remain covered by the functional journeys.
 - Final exact-head Molehill browser qualification and visual review remain pending through the bounded machine-wide slot pool.
 
 ## Excluded

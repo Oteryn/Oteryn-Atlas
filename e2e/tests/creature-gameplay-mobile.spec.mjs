@@ -78,6 +78,9 @@ test('mobile Sam direct tap reaches readable Gameplay trade data and tabs', asyn
   await gameplayTab.tap();
   await expect(page.locator('#gameplay-section-sells')).toContainText('20 gold');
   await expect(liveTab).toBeDisabled();
+  await page.locator('.creature-gameplay-search').fill('battle axe');
+  await expect(page.locator('#gameplay-section-sells')).toContainText('235 gold');
+  await expect(page.locator('#gameplay-section-buys')).toContainText('80 gold');
   const gameplayMetrics = await assertUserVisibleSurface(page, {
     label: 'Mobile creature Gameplay inspector',
     elements: [

@@ -77,6 +77,11 @@ test('desktop Sam direct activation opens exact Gameplay shop, preserves Semanti
   await expect(page.locator('#gameplay-section-buys')).toContainText('axe');
   await expect(page.locator('#gameplay-section-buys')).toContainText('7 gold');
   await expect(page.locator('#gameplay-section-services')).toContainText(/partially published/i);
+  await page.locator('.creature-gameplay-search').fill('battle axe');
+  await expect(page.locator('#gameplay-section-sells')).toContainText('battle axe');
+  await expect(page.locator('#gameplay-section-sells')).toContainText('235 gold');
+  await expect(page.locator('#gameplay-section-buys')).toContainText('battle axe');
+  await expect(page.locator('#gameplay-section-buys')).toContainText('80 gold');
   const gameplayMetrics = await assertUserVisibleSurface(page, {
     label: 'Desktop creature Gameplay inspector',
     elements: [
