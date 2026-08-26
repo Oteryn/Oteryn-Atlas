@@ -38,3 +38,11 @@ test('worker benchmark is measurement-only, repeatable and uses non-null telemet
   assert.doesNotMatch(script, /Set-Content.*playwright\.config/i);
   assert.doesNotMatch(script, /git (?:commit|push|reset)/i);
 });
+
+test('benchmark outer cleanup removes a partially started active Compose project', () => {
+  const script = fs.readFileSync(scriptPath, 'utf8').replace(/\r\n/g, '\n');
+  assert.match(script, /\$activeProject\s*=\s*\$null/);
+  assert.match(script, /\$activeProject\s*=\s*\$project/);
+  assert.match(script, /finally\s*\{[\s\S]*if \(\$activeProject\)[\s\S]*docker compose -p \$activeProject -f e2e\\compose\.yml down --remove-orphans/);
+  assert.match(script, /docker compose -p \$project -f e2e\\compose\.yml down --remove-orphans[\s\S]*\$activeProject\s*=\s*\$null/);
+});
