@@ -59,6 +59,20 @@ test('summary scenario emits a path-normalized stable test identity', () => {
   assert(Object.isFrozen(scenario));
 });
 
+test('summary stable IDs preserve bounded long-component identity with digest suffixes', () => {
+  const scenario = normalizeSummaryScenario({
+    project: 'desktop-chromium',
+    file: `e2e/tests/${'nested/'.repeat(80)}long-boundary.spec.mjs`,
+    title: `scenario ${'x'.repeat(700)}`,
+    status: 'passed',
+    durationMs: 1,
+    retry: 0,
+  });
+
+  assert(scenario.stableTestId.length <= 1156);
+  assert.match(scenario.stableTestId, /~sha256:[a-f0-9]{64}/);
+});
+
 test('Playwright reporter excludes project and spec path from the stable scenario title', () => {
   const reporter = new AtlasSummaryReporter();
   reporter.onBegin({ metadata: {}, projects: [] });
