@@ -84,8 +84,15 @@ class DocumentationIATests(unittest.TestCase):
             self.assertTrue(item["lifecycle_issue"].startswith("https://github.com/Oteryn/Oteryn-Atlas/issues/"))
             self.assertIn(item["terminal_disposition"], {"ARCHIVE_HISTORICAL", "ON_ISSUE_CLOSE_ARCHIVE_HISTORICAL"})
             if item["status"] == "HISTORICAL":
-                self.assertEqual(item["class"], "PROMPT_ONE_SHOT")
                 self.assertEqual(item["terminal_disposition"], "ARCHIVE_HISTORICAL")
+
+    def test_historical_execution_prompt_retains_execution_class(self) -> None:
+        data = load_registry()
+        interaction = next(item for item in data["prompts"] if item["id"] == "ATLAS-CREATURE-INTERACTION-CARDS")
+        self.assertEqual(interaction["status"], "HISTORICAL")
+        self.assertEqual(interaction["class"], "PROMPT_TASK_EXECUTION")
+        self.assertEqual(interaction["issue_state_at_audit"], "closed")
+        self.assertEqual(interaction["terminal_disposition"], "ARCHIVE_HISTORICAL")
 
     def test_every_active_task_is_registered_once_with_issue_authority(self) -> None:
         data = load_registry()
