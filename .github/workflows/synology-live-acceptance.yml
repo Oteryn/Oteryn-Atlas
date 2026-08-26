@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   live-atlas:
-    name: Publish and qualify Atlas on Synology
+    name: Verify, deploy and smoke Atlas on Synology
     if: github.ref == 'refs/heads/main'
     runs-on:
       group: atlas-runners
@@ -22,11 +22,8 @@ jobs:
     timeout-minutes: 45
     env:
       ATLAS_REV: ${{ github.sha }}
-      GAME_REV: 0161b80c351b644b47c28b290a6f54b44f775de7
-      LEGACY_REV: e417c5e7c22986bf4acef0495eb47f7b72c97cce
       PREVIEW_CONTAINER: oteryn-atlas-fullworld-preview
       PREVIEW_URL: http://192.168.1.2:8097
-      PYTHON_IMAGE: docker.io/library/python@sha256:2c941e860699f878900b0edc2403613c234d4b32eda3cc9fa7036991a2a63c4a
       CREATURE_SEMANTIC_DIGEST: sha256:7dc951874c95424279737eaaf51cf2d50940162ef4799daea39a187a581ef0e8
       PUBLICATION_ROOT: sha256:9d0d2f3bb16a5a90f9b51a21366e4ed42963f5cb12366c404a20d9502ec4857f
       SEMANTIC_ROOT: sha256:27d7a83a7d9f498ea614b440ab4216cae5e6d11ea0527482410e40948cade5a9
@@ -52,7 +49,6 @@ jobs:
           grep -F '"gitHubUrl": "https://github.com/Oteryn"' /runner/.runner
           grep -F '"workFolder": "/work"' /runner/.runner
           echo 'atlas-runner-identity=PASS'
-          docker version --format 'docker-client={{.Client.Version}} docker-server={{.Server.Version}}'
 
       - name: Check out exact Atlas workflow revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -71,6 +67,60 @@ jobs:
           test "$(git rev-parse FETCH_HEAD)" = "$ATLAS_REV"
           test -z "$(git status --porcelain)"
           echo 'main-only deployment authority=PASS'
+
+      - name: Acquire and verify exact immutable release artifact
+        id: release
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          shopt -s nullglob
+          roots=(/volume*/OTS)
+          test "${#roots[@]}" -eq 1
+          store="${roots[0]}/oteryn-atlas/releases/$ATLAS_REV"
+          manifest="$store/manifest.json"
+          deadline=$((SECONDS + 2700))
+          while [[ ! -s "$manifest" && "$SECONDS" -lt "$deadline" ]]; do sleep 5; done
+          test -s "$manifest"
+          manifest_rev="$(node -e 'const m=require(process.argv[1]);process.stdout.write(m.atlasRevision)' "$manifest")"
+          artifact_sha="$(node -e 'const m=require(process.argv[1]);process.stdout.write(m.artifactSha256)' "$manifest")"
+          artifact_bytes="$(node -e 'const m=require(process.argv[1]);process.stdout.write(String(m.artifactBytes))' "$manifest")"
+          source_tree_sha="$(node -e 'const m=require(process.argv[1]);process.stdout.write(m.sourceTreeSha256)' "$manifest")"
+          test "$manifest_rev" = "$ATLAS_REV"
+          [[ "$artifact_sha" =~ ^sha256:[0-9a-f]{64}$ ]]
+          [[ "$source_tree_sha" =~ ^sha256:[0-9a-f]{64}$ ]]
+          [[ "$artifact_bytes" =~ ^[1-9][0-9]*$ ]]
+          digest_name="${artifact_sha#sha256:}"
+          artifact="$store/$digest_name.tar"
+          test -s "$artifact"
+          test "$(stat -c %s "$artifact")" = "$artifact_bytes"
+          test "sha256:$(sha256sum "$artifact" | awk '{print $1}')" = "$artifact_sha"
+          rm -rf -- release-payload creature-index-a animation-runtime-a e2e-targets.json first-chunk.txt first-bucket.txt
+          mkdir release-payload
+          tar -xf "$artifact" -C release-payload
+          test -s release-payload/repo/web/fullworld.html
+          test -s release-payload/evidence/creature-index/index.json
+          test -s release-payload/evidence/animation-runtime/manifest.json
+          test -s release-payload/evidence/animation-runtime/programs.json
+          test -s release-payload/evidence/e2e-targets.json
+          actual_tree="$(node --input-type=module - "$source_tree_sha" <<'NODE'
+          import { sourceTreeDigest } from './tools/verification/release-artifact-manifest.mjs';
+          process.stdout.write(sourceTreeDigest('release-payload/repo'));
+          NODE
+          )"
+          test "$actual_tree" = "$source_tree_sha"
+          cp -a release-payload/evidence/creature-index creature-index-a
+          cp -a release-payload/evidence/animation-runtime animation-runtime-a
+          cp release-payload/evidence/e2e-targets.json e2e-targets.json
+          cp release-payload/evidence/first-chunk.txt first-chunk.txt
+          cp release-payload/evidence/first-bucket.txt first-bucket.txt
+          grep -F "$CREATURE_SEMANTIC_DIGEST" creature-index-a/index.json >/dev/null
+          grep -F 'sha256:413de22b245288da68153e2c0e9d4efe4ee011421b56a09532c8119829079540' animation-runtime-a/manifest.json >/dev/null
+          {
+            echo "artifact=$artifact"
+            echo "artifact_sha256=$artifact_sha"
+            echo "source_tree_sha256=$source_tree_sha"
+          } >> "$GITHUB_OUTPUT"
+          echo "release-artifact-revision-digest-integrity=PASS $artifact_sha"
 
       - name: Stage exact merged main candidate
         id: stage
@@ -91,156 +141,33 @@ jobs:
           test "$(docker port "$C" 8080/tcp)" = '192.168.1.2:8097'
           test -n "$IMAGE"; test -n "$OLD_REV"; test -n "$DATA_ROOT"; test -n "$MINIMAP_ROOT_PATH"; test -n "$OLD_NGINX"
           {
-            echo "image=$IMAGE"
-            echo "old_revision=$OLD_REV"
-            echo "data_root=$DATA_ROOT"
-            echo "minimap_root=$MINIMAP_ROOT_PATH"
-            echo "revision_root=$REVISION_ROOT"
-            echo "new_root=$NEW_ROOT"
+            echo "image=$IMAGE"; echo "old_revision=$OLD_REV"; echo "data_root=$DATA_ROOT"; echo "minimap_root=$MINIMAP_ROOT_PATH"; echo "revision_root=$REVISION_ROOT"; echo "new_root=$NEW_ROOT"
           } >> "$GITHUB_OUTPUT"
           docker rm -f "${C}-candidate-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" "${C}-rollback-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" >/dev/null 2>&1 || true
           STAGE_NAME="$(basename "$NEW_ROOT")"
           docker run --rm --user 0:0 --entrypoint sh -e STAGE_NAME="$STAGE_NAME" -v "$REVISION_ROOT:/revisions" "$IMAGE" -c 'rm -rf "/revisions/$STAGE_NAME"; mkdir -p "/revisions/$STAGE_NAME/repo"'
-          tar --exclude=.git -cf - . | docker run --rm -i --user 0:0 --entrypoint sh -v "$NEW_ROOT/repo:/repo" "$IMAGE" -c 'tar -xf - -C /repo'
+          tar -C release-payload/repo -cf - . | docker run --rm -i --user 0:0 --entrypoint sh -v "$NEW_ROOT/repo:/repo" "$IMAGE" -c 'tar -xf - -C /repo; test -s /repo/web/fullworld.html'
           docker run --rm --user 0:0 --entrypoint sh -v "$OLD_NGINX:/old:ro" -v "$NEW_ROOT:/new" -e OLD_REV="$OLD_REV" -e NEW_REV="$ATLAS_REV" "$IMAGE" -c 'sed "s/$OLD_REV/$NEW_REV/g" /old > /new/nginx.conf; test -s /new/nginx.conf'
-          echo 'exact-main-candidate-staged=PASS'
-
-      - name: Build exact animated Game and Atlas products
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          rm -rf -- atlas-source game-source legacy-source asset-15.32.zip appearance-a appearance-b spatial-a spatial-b animated-creatures-a.json animated-creatures-b.json creature-index-a creature-index-b animation-runtime-a animation-runtime-b e2e-targets.json first-chunk.txt first-bucket.txt e2e-evidence
-          fetch_exact() {
-            local directory="$1" repository="$2" revision="$3"
-            git init "$directory" >/dev/null
-            git -C "$directory" remote add origin "$repository"
-            git -C "$directory" fetch --depth=1 origin "$revision"
-            git -C "$directory" checkout --detach --quiet FETCH_HEAD
-            test "$(git -C "$directory" rev-parse HEAD)" = "$revision"
-          }
-          fetch_exact atlas-source https://github.com/Oteryn/Oteryn-Atlas.git "$ATLAS_REV"
-          fetch_exact game-source https://github.com/Oteryn/Oteryn-Game.git "$GAME_REV"
-          git init legacy-source >/dev/null
-          git -C legacy-source remote add origin https://github.com/blakinio/Otheryn.git
-          git -C legacy-source sparse-checkout init --cone
-          git -C legacy-source fetch --depth=1 --filter=blob:none origin "$LEGACY_REV"
-          git -C legacy-source checkout --detach --quiet FETCH_HEAD
-          git -C legacy-source sparse-checkout set vendor/map-analysis/crystalserver/data-global/world vendor/map-analysis/crystalserver/data-global/npc vendor/map-analysis/crystalserver/data-global/monster
-          test "$(git -C legacy-source rev-parse HEAD)" = "$LEGACY_REV"
-          curl -fL --retry 5 --retry-delay 2 'https://drive.usercontent.google.com/download?id=1Dlo3bS4K1nS3mw4BhPZdlHT7lX5zRAvv&export=download&confirm=t' -o asset-15.32.zip
-          test "$(sha256sum asset-15.32.zip | awk '{print $1}')" = '1a6bad8b7598cd874f534cd4aae2d249fb3d9b4458b3ccfa75754f91bb27870f'
-          if find atlas-source -type f \( -name '*.otbm' -o -name '*.otb' -o -name '*.spr' -o -name '*.dat' \) -print -quit | grep -q .; then echo 'Forbidden raw runtime input in Atlas checkout' >&2; exit 1; fi
-          rm -rf -- atlas-source/.git game-source/.git legacy-source/.git
-          python_container="oteryn-atlas-python-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          docker rm -f "$python_container" >/dev/null 2>&1 || true
-          trap 'docker rm -f "$python_container" >/dev/null 2>&1 || true' EXIT
-          docker create --name "$python_container" --network none --entrypoint python3 "$PYTHON_IMAGE" -c 'import time; time.sleep(2700)' >/dev/null
-          docker cp atlas-source "$python_container:/atlas-source"
-          docker cp game-source "$python_container:/game-source"
-          docker cp legacy-source "$python_container:/legacy-source"
-          docker cp asset-15.32.zip "$python_container:/asset-15.32.zip"
-          docker start "$python_container" >/dev/null
-          for suffix in a b; do
-            docker exec "$python_container" python3 /game-source/tools/game-atlas-appearances/export.py /asset-15.32.zip "/appearance-$suffix"
-            docker exec "$python_container" python3 /game-source/tools/game-atlas-appearances/verify.py "/appearance-$suffix"
-            docker exec "$python_container" python3 /game-source/tools/game-atlas-outfit-spatial/export.py /asset-15.32.zip "/spatial-$suffix"
-            docker exec "$python_container" python3 /game-source/tools/game-atlas-creatures/animated.py /legacy-source/vendor/map-analysis/crystalserver/data-global/world /legacy-source/vendor/map-analysis/crystalserver/data-global/npc /legacy-source/vendor/map-analysis/crystalserver/data-global/monster "/appearance-$suffix" "/spatial-$suffix" "/animated-creatures-$suffix.json"
-            docker exec "$python_container" python3 /atlas-source/tools/build-creature-index.py "/animated-creatures-$suffix.json" "/creature-index-$suffix"
-            docker exec "$python_container" python3 /atlas-source/tools/animation-runtime/build.py /asset-15.32.zip "/appearance-$suffix" "/animated-creatures-$suffix.json" "/animation-runtime-$suffix"
-          done
-          for path in appearance-a appearance-b spatial-a spatial-b creature-index-a creature-index-b animation-runtime-a animation-runtime-b; do mkdir -p "$path"; docker cp "$python_container:/$path/." "$path/"; done
-          docker cp "$python_container:/animated-creatures-a.json" animated-creatures-a.json
-          docker cp "$python_container:/animated-creatures-b.json" animated-creatures-b.json
-          diff -qr appearance-a appearance-b
-          diff -qr spatial-a spatial-b
-          cmp animated-creatures-a.json animated-creatures-b.json
-          diff -qr creature-index-a creature-index-b
-          diff -qr animation-runtime-a animation-runtime-b
-          docker exec -i "$python_container" sh -c 'cd / && python3 -' <<'PY'
-          import json
-          from pathlib import Path
-          creatures=json.loads(Path('animated-creatures-a.json').read_text())
-          index=json.loads(Path('creature-index-a/index.json').read_text())
-          animation=json.loads(Path('animation-runtime-a/manifest.json').read_text())
-          programs=json.loads(Path('animation-runtime-a/programs.json').read_text())
-          assert creatures['capability']=='animated-creatures-v1'
-          assert creatures['npc_role_schema_version']==1
-          assert creatures['semantic_digest']=='sha256:7dc951874c95424279737eaaf51cf2d50940162ef4799daea39a187a581ef0e8'
-          assert index['source']['capability']=='animated-creatures-v1'
-          assert index['source']['npc_role_schema_version']==1
-          assert index['counts']=={'records':88633,'chunks':5746,'search_records':1945}
-          assert animation['rootContentId']=='sha256:413de22b245288da68153e2c0e9d4efe4ee011421b56a09532c8119829079540'
-          assert animation['counts']['object_programs']==5190 and animation['counts']['creature_programs']==1377 and animation['counts']['buckets']==43
-          search=json.loads(Path('creature-index-a/search.json').read_text())['records']
-          by_id={r['record_id']:r for r in search}
-          role_counts={role:sum(role in r.get('roles',[]) for r in creatures['npcs']) for role in ('bank','travel','shop','quest','blessing','trainer')}
-          assert role_counts=={'bank':25,'travel':51,'shop':313,'quest':432,'blessing':26,'trainer':54}
-          assert sum(bool(r.get('roles')) for r in creatures['npcs'])==705
-          assert sum(r.get('role_resolution_state')=='AMBIGUOUS' for r in creatures['npcs'])==10
-          dynamic_presentations={p['outfit_presentation_id'] for p in programs['creature_programs'] if p['phase_count']>1 and len(set(p['phase_content_ids']))>1}
-          assert len(dynamic_presentations)==100
-          def presentation_id(record):
-              presentation=record.get('outfit_presentation') or {}
-              return presentation.get('outfit_presentation_id')
-          npc_source=next(r for r in creatures['npcs'] if 'shop' in r.get('roles',[]) and r.get('presentation_resolution_state')=='RESOLVED' and presentation_id(r) in dynamic_presentations)
-          monster_source=next(r for r in creatures['monster_spawns'] if r.get('presentation_resolution_state')=='RESOLVED' and presentation_id(r) in dynamic_presentations)
-          npc_item=by_id[npc_source['record_id']]; monster_item=by_id[monster_source['record_id']]
-          targets={'npc':{'kind':'npc','label':npc_item['label'],'record_id':npc_item['record_id'],'position':npc_item['position'],'roles':npc_item['roles']},'monster':{'kind':'monster','label':monster_item['label'],'record_id':monster_item['record_id'],'position':monster_item['position']}}
-          Path('e2e-targets.json').write_text(json.dumps(targets,indent=2,sort_keys=True)+chr(10))
-          Path('first-chunk.txt').write_text(index['chunks'][0]['path']+chr(10))
-          Path('first-bucket.txt').write_text(animation['buckets'][0]['path']+chr(10))
-          print(json.dumps({'animation_root':animation['rootContentId'],'creature_digest':creatures['semantic_digest'],'targets':targets},sort_keys=True))
-          PY
-          docker cp "$python_container:/e2e-targets.json" e2e-targets.json
-          docker cp "$python_container:/first-chunk.txt" first-chunk.txt
-          docker cp "$python_container:/first-bucket.txt" first-bucket.txt
-          docker rm -f "$python_container" >/dev/null
-          trap - EXIT
-          rm -rf -- legacy-source asset-15.32.zip appearance-b spatial-b creature-index-b animation-runtime-b animated-creatures-b.json
+          echo 'exact-release-artifact-candidate-staged=PASS'
 
       - name: Atomically publish and cut over qualified animated candidate
         id: product
         shell: bash
         run: |
           set -Eeuo pipefail
-          C="$PREVIEW_CONTAINER"
-          IMAGE="${{ steps.stage.outputs.image }}"
-          OLD_REV="${{ steps.stage.outputs.old_revision }}"
-          DATA_ROOT="${{ steps.stage.outputs.data_root }}"
-          MINIMAP_ROOT_PATH="${{ steps.stage.outputs.minimap_root }}"
-          NEW_ROOT="${{ steps.stage.outputs.new_root }}"
-          REPO_ROOT="$NEW_ROOT/repo"
-          HELPER_IMAGE="$IMAGE"
-          CANDIDATE_CONTAINER="${C}-candidate-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          BACKUP_CONTAINER="${C}-rollback-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          C="$PREVIEW_CONTAINER"; IMAGE="${{ steps.stage.outputs.image }}"; OLD_REV="${{ steps.stage.outputs.old_revision }}"
+          DATA_ROOT="${{ steps.stage.outputs.data_root }}"; MINIMAP_ROOT_PATH="${{ steps.stage.outputs.minimap_root }}"; NEW_ROOT="${{ steps.stage.outputs.new_root }}"
+          REPO_ROOT="$NEW_ROOT/repo"; HELPER_IMAGE="$IMAGE"; CANDIDATE_CONTAINER="${C}-candidate-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"; BACKUP_CONTAINER="${C}-rollback-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           test "$(docker inspect --format '{{.State.Running}}' "$C")" = true
           test "$(docker inspect --format '{{ index .Config.Labels "org.oteryn.revision" }}' "$C")" = "$OLD_REV"
           test "$(docker port "$C" 8080/tcp)" = '192.168.1.2:8097'
-          test -n "$IMAGE"; test -n "$OLD_REV"; test -n "$DATA_ROOT"; test -n "$MINIMAP_ROOT_PATH"
           docker run --rm --entrypoint sh -v "$NEW_ROOT:/candidate:ro" "$IMAGE" -c 'test -s /candidate/nginx.conf'
-          CREATURE_TMP=".creatures-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          ANIMATION_TMP=".animation-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          docker rm -f "$CANDIDATE_CONTAINER" "$BACKUP_CONTAINER" >/dev/null 2>&1 || true
+          CREATURE_TMP=".creatures-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"; ANIMATION_TMP=".animation-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           docker run --rm --user 0:0 --entrypoint sh -v "$REPO_ROOT:/repo" "$HELPER_IMAGE" -c 'mkdir -p /repo/data /repo/fullworld'
-          tar -C creature-index-a -cf - . | docker run --rm -i --user 0:0 --entrypoint sh -e TMP="$CREATURE_TMP" -v "$REPO_ROOT:/repo" "$HELPER_IMAGE" -c '
-            set -eu; rm -rf "/repo/data/$TMP" /repo/data/creatures; mkdir "/repo/data/$TMP"; tar -xf - -C "/repo/data/$TMP"; test -s "/repo/data/$TMP/index.json"; mv "/repo/data/$TMP" /repo/data/creatures'
-          tar -C animation-runtime-a -cf - . | docker run --rm -i --user 0:0 --entrypoint sh -e TMP="$ANIMATION_TMP" -v "$REPO_ROOT:/repo" "$HELPER_IMAGE" -c '
-            set -eu; rm -rf "/repo/fullworld/$TMP" /repo/fullworld/animation; mkdir "/repo/fullworld/$TMP"; tar -xf - -C "/repo/fullworld/$TMP"; test -s "/repo/fullworld/$TMP/manifest.json"; test -s "/repo/fullworld/$TMP/programs.json"; mv "/repo/fullworld/$TMP" /repo/fullworld/animation'
-          {
-            echo "repo_root=$REPO_ROOT"
-            echo "helper_image=$HELPER_IMAGE"
-            echo "published=true"
-            echo "animation_published=true"
-            echo "parent_created=false"
-          } >> "$GITHUB_OUTPUT"
-
-          cleanup_candidate() {
-            rc=$?
-            set +e
-            docker rm -f "$CANDIDATE_CONTAINER" >/dev/null 2>&1 || true
-            exit "$rc"
-          }
-          trap cleanup_candidate ERR INT TERM
+          tar -C creature-index-a -cf - . | docker run --rm -i --user 0:0 --entrypoint sh -e TMP="$CREATURE_TMP" -v "$REPO_ROOT:/repo" "$HELPER_IMAGE" -c 'set -eu; rm -rf "/repo/data/$TMP" /repo/data/creatures; mkdir "/repo/data/$TMP"; tar -xf - -C "/repo/data/$TMP"; test -s "/repo/data/$TMP/index.json"; mv "/repo/data/$TMP" /repo/data/creatures'
+          tar -C animation-runtime-a -cf - . | docker run --rm -i --user 0:0 --entrypoint sh -e TMP="$ANIMATION_TMP" -v "$REPO_ROOT:/repo" "$HELPER_IMAGE" -c 'set -eu; rm -rf "/repo/fullworld/$TMP" /repo/fullworld/animation; mkdir "/repo/fullworld/$TMP"; tar -xf - -C "/repo/fullworld/$TMP"; test -s "/repo/fullworld/$TMP/manifest.json"; mv "/repo/fullworld/$TMP" /repo/fullworld/animation'
+          echo "repo_root=$REPO_ROOT" >> "$GITHUB_OUTPUT"; echo "helper_image=$HELPER_IMAGE" >> "$GITHUB_OUTPUT"; echo "published=true" >> "$GITHUB_OUTPUT"; echo "animation_published=true" >> "$GITHUB_OUTPUT"; echo "parent_created=false" >> "$GITHUB_OUTPUT"
+          docker rm -f "$CANDIDATE_CONTAINER" "$BACKUP_CONTAINER" >/dev/null 2>&1 || true
           docker run -d --name "$CANDIDATE_CONTAINER" --restart no -p 192.168.1.2:18098:8080 --label org.oteryn.preview=fullworld-atlas --label org.oteryn.revision="$ATLAS_REV" -v "$NEW_ROOT/nginx.conf:/etc/nginx/conf.d/default.conf:ro" -v "$DATA_ROOT:/srv/atlas/data:ro" -v "$MINIMAP_ROOT_PATH:/srv/atlas/minimap-product:ro" -v "$REPO_ROOT:/srv/atlas/repo:ro" "$IMAGE" >/dev/null
           for _ in $(seq 1 30); do curl -fsS -D /tmp/candidate.headers http://192.168.1.2:18098/web/fullworld.html -o /tmp/candidate.html && break; sleep 1; done
           grep -qi "X-Oteryn-Atlas-Revision: $ATLAS_REV" /tmp/candidate.headers
@@ -251,12 +178,8 @@ jobs:
           cmp creature-index-a/index.json /tmp/candidate-creatures.json
           cmp animation-runtime-a/manifest.json /tmp/candidate-animation.json
           cmp animation-runtime-a/programs.json /tmp/candidate-programs.json
-          first_bucket="$(cat first-bucket.txt)"
-          curl -fsS "http://192.168.1.2:18098/fullworld/animation/$first_bucket" -o /tmp/candidate-animation-bucket.rgba
-          cmp "animation-runtime-a/$first_bucket" /tmp/candidate-animation-bucket.rgba
-          first_chunk="$(cat first-chunk.txt)"
-          curl -fsS "http://192.168.1.2:18098/data/creatures/$first_chunk" -o /tmp/candidate-first-chunk.json
-          cmp "creature-index-a/$first_chunk" /tmp/candidate-first-chunk.json
+          first_bucket="$(cat first-bucket.txt)"; curl -fsS "http://192.168.1.2:18098/fullworld/animation/$first_bucket" -o /tmp/candidate-animation-bucket.rgba; cmp "animation-runtime-a/$first_bucket" /tmp/candidate-animation-bucket.rgba
+          first_chunk="$(cat first-chunk.txt)"; curl -fsS "http://192.168.1.2:18098/data/creatures/$first_chunk" -o /tmp/candidate-first-chunk.json; cmp "creature-index-a/$first_chunk" /tmp/candidate-first-chunk.json
           grep -F "$PUBLICATION_ROOT" <(curl -fsS http://192.168.1.2:18098/fullworld/publication/publication.json) >/dev/null
           grep -F "$SEMANTIC_ROOT" <(curl -fsS http://192.168.1.2:18098/fullworld/publication/semantic/world.json) >/dev/null
           grep -F "$PIXEL_ROOT" <(curl -fsS http://192.168.1.2:18098/fullworld/publication/pixels/manifest.json) >/dev/null
@@ -266,49 +189,22 @@ jobs:
           grep -F "$MINIMAP_ROOT" <(curl -fsS http://192.168.1.2:18098/fullworld/minimap/world.json) >/dev/null
           echo 'qualified-candidate-products=PASS'
           docker rm -f "$CANDIDATE_CONTAINER" >/dev/null
-          trap - ERR INT TERM
-
-          echo "backup_container=$BACKUP_CONTAINER" >> "$GITHUB_OUTPUT"
-          echo "previous_revision=$OLD_REV" >> "$GITHUB_OUTPUT"
-          docker stop "$C" >/dev/null
-          docker rename "$C" "$BACKUP_CONTAINER"
-          rollback_live() {
-            rc=$?
-            set +e
-            docker rm -f "$C" >/dev/null 2>&1 || true
-            docker rename "$BACKUP_CONTAINER" "$C" >/dev/null 2>&1 || true
-            docker start "$C" >/dev/null 2>&1 || true
-            exit "$rc"
-          }
-          trap rollback_live ERR INT TERM
-          if ! docker run -d --name "$C" --restart unless-stopped -p 192.168.1.2:8097:8080 --label org.oteryn.preview=fullworld-atlas --label org.oteryn.revision="$ATLAS_REV" -v "$NEW_ROOT/nginx.conf:/etc/nginx/conf.d/default.conf:ro" -v "$DATA_ROOT:/srv/atlas/data:ro" -v "$MINIMAP_ROOT_PATH:/srv/atlas/minimap-product:ro" -v "$REPO_ROOT:/srv/atlas/repo:ro" "$IMAGE" >/dev/null; then
-            docker rename "$BACKUP_CONTAINER" "$C"; docker start "$C" >/dev/null; exit 1
-          fi
+          echo "backup_container=$BACKUP_CONTAINER" >> "$GITHUB_OUTPUT"; echo "previous_revision=$OLD_REV" >> "$GITHUB_OUTPUT"
+          docker stop "$C" >/dev/null; docker rename "$C" "$BACKUP_CONTAINER"
+          rollback_live(){ rc=$?; set +e; docker rm -f "$C" >/dev/null 2>&1 || true; docker rename "$BACKUP_CONTAINER" "$C" >/dev/null 2>&1 || true; docker start "$C" >/dev/null 2>&1 || true; exit "$rc"; }; trap rollback_live ERR INT TERM
+          docker run -d --name "$C" --restart unless-stopped -p 192.168.1.2:8097:8080 --label org.oteryn.preview=fullworld-atlas --label org.oteryn.revision="$ATLAS_REV" -v "$NEW_ROOT/nginx.conf:/etc/nginx/conf.d/default.conf:ro" -v "$DATA_ROOT:/srv/atlas/data:ro" -v "$MINIMAP_ROOT_PATH:/srv/atlas/minimap-product:ro" -v "$REPO_ROOT:/srv/atlas/repo:ro" "$IMAGE" >/dev/null
           for _ in $(seq 1 30); do curl -fsS -D /tmp/live-new.headers "$PREVIEW_URL/web/fullworld.html" -o /tmp/live-new.html && break; sleep 1; done
           grep -qi "X-Oteryn-Atlas-Revision: $ATLAS_REV" /tmp/live-new.headers
           cmp web/fullworld.html /tmp/live-new.html
           test "$(docker inspect --format '{{ index .Config.Labels "org.oteryn.revision" }}' "$C")" = "$ATLAS_REV"
-          curl -fsS "$PREVIEW_URL/data/creatures/index.json" -o /tmp/live-creatures.json
-          curl -fsS "$PREVIEW_URL/fullworld/animation/manifest.json" -o /tmp/live-animation.json
-          curl -fsS "$PREVIEW_URL/fullworld/animation/programs.json" -o /tmp/live-programs.json
-          cmp creature-index-a/index.json /tmp/live-creatures.json
-          cmp animation-runtime-a/manifest.json /tmp/live-animation.json
-          cmp animation-runtime-a/programs.json /tmp/live-programs.json
-          curl -fsS "$PREVIEW_URL/fullworld/animation/$first_bucket" -o /tmp/live-animation-bucket.rgba
-          cmp "animation-runtime-a/$first_bucket" /tmp/live-animation-bucket.rgba
-          curl -fsS "$PREVIEW_URL/data/creatures/$first_chunk" -o /tmp/live-first-chunk.json
-          cmp "creature-index-a/$first_chunk" /tmp/live-first-chunk.json
-          grep -F "$PUBLICATION_ROOT" <(curl -fsS "$PREVIEW_URL/fullworld/publication/publication.json") >/dev/null
-          grep -F "$SEMANTIC_ROOT" <(curl -fsS "$PREVIEW_URL/fullworld/publication/semantic/world.json") >/dev/null
-          grep -F "$PIXEL_ROOT" <(curl -fsS "$PREVIEW_URL/fullworld/publication/pixels/manifest.json") >/dev/null
-          grep -F "$OVERVIEW_ROOT" <(curl -fsS "$PREVIEW_URL/fullworld/overview/world.json") >/dev/null
-          grep -F "$RUNTIME_ROOT" <(curl -fsS "$PREVIEW_URL/fullworld/runtime-index/world.json") >/dev/null
-          grep -F "$PIXEL_BUCKET_ROOT" <(curl -fsS "$PREVIEW_URL/fullworld/pixel-buckets/manifest.json") >/dev/null
-          grep -F "$MINIMAP_ROOT" <(curl -fsS "$PREVIEW_URL/fullworld/minimap/world.json") >/dev/null
+          curl -fsS "$PREVIEW_URL/data/creatures/index.json" -o /tmp/live-creatures.json; cmp creature-index-a/index.json /tmp/live-creatures.json
+          curl -fsS "$PREVIEW_URL/fullworld/animation/manifest.json" -o /tmp/live-animation.json; cmp animation-runtime-a/manifest.json /tmp/live-animation.json
+          curl -fsS "$PREVIEW_URL/fullworld/animation/programs.json" -o /tmp/live-programs.json; cmp animation-runtime-a/programs.json /tmp/live-programs.json
+          curl -fsS "$PREVIEW_URL/fullworld/animation/$first_bucket" -o /tmp/live-animation-bucket.rgba; cmp "animation-runtime-a/$first_bucket" /tmp/live-animation-bucket.rgba
+          curl -fsS "$PREVIEW_URL/data/creatures/$first_chunk" -o /tmp/live-first-chunk.json; cmp "creature-index-a/$first_chunk" /tmp/live-first-chunk.json
+          for pair in "$PUBLICATION_ROOT fullworld/publication/publication.json" "$SEMANTIC_ROOT fullworld/publication/semantic/world.json" "$PIXEL_ROOT fullworld/publication/pixels/manifest.json" "$OVERVIEW_ROOT fullworld/overview/world.json" "$RUNTIME_ROOT fullworld/runtime-index/world.json" "$PIXEL_BUCKET_ROOT fullworld/pixel-buckets/manifest.json" "$MINIMAP_ROOT fullworld/minimap/world.json"; do root="${pair%% *}"; url="${pair#* }"; curl -fsS "$PREVIEW_URL/$url" | grep -F "$root" >/dev/null; done
           trap - ERR INT TERM
-          echo "changed=true" >> "$GITHUB_OUTPUT"
-          echo 'exact-main-deployment=PASS'
-          echo 'live-animated-products-and-roots=PASS'
+          echo "changed=true" >> "$GITHUB_OUTPUT"; echo 'exact-main-deployment=PASS'; echo 'live-animated-products-and-roots=PASS'
 
       - name: Build bounded Chromium acceptance image
         id: browser
@@ -317,14 +213,6 @@ jobs:
           set -Eeuo pipefail
           image="oteryn-atlas-live-e2e:${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           docker build --pull -t "$image" -f e2e/Dockerfile .
-          docker run --rm --ipc host --shm-size 1g --entrypoint node "$image" -e '
-            const { chromium } = require("@playwright/test");
-            (async () => {
-              const browser = await chromium.launch({headless:true,args:["--no-sandbox","--disable-dev-shm-usage"]});
-              console.log(`chromium-runtime=${browser.version()}`);
-              await browser.close();
-            })().catch((error) => { console.error(error); process.exit(1); });
-          '
           printf 'image=%s\n' "$image" >> "$GITHUB_OUTPUT"
 
       - name: Run live desktop and mobile Chromium E2E
@@ -334,36 +222,15 @@ jobs:
           BROWSER_IMAGE: ${{ steps.browser.outputs.image }}
         run: |
           set -Eeuo pipefail
-          rm -rf -- e2e-evidence
-          mkdir -p e2e-evidence
+          rm -rf -- e2e-evidence; mkdir -p e2e-evidence
           container="oteryn-atlas-live-e2e-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          docker create \
-            --name "$container" \
-            --network bridge \
-            --ipc host \
-            --shm-size 1g \
-            --entrypoint node \
-            -e "PREVIEW_URL=$PREVIEW_URL" \
-            -e "ATLAS_REV=$ATLAS_REV" \
-            -e "CREATURE_SEMANTIC_DIGEST=$CREATURE_SEMANTIC_DIGEST" \
-            "$BROWSER_IMAGE" tests/live-creature-preview.cjs >/dev/null
+          docker create --name "$container" --network bridge --ipc host --shm-size 1g --entrypoint node -e "PREVIEW_URL=$PREVIEW_URL" -e "ATLAS_REV=$ATLAS_REV" -e "CREATURE_SEMANTIC_DIGEST=$CREATURE_SEMANTIC_DIGEST" "$BROWSER_IMAGE" tests/live-creature-preview.cjs >/dev/null
           docker cp e2e-targets.json "$container:/targets.json"
-
-          set +e
-          docker start -a "$container" 2>&1 | tee e2e-evidence/browser.log
-          rc="${PIPESTATUS[0]}"
-          set -e
+          set +e; docker start -a "$container" 2>&1 | tee e2e-evidence/browser.log; rc="${PIPESTATUS[0]}"; set -e
           docker cp "$container:/evidence/." e2e-evidence/ 2>/dev/null || true
-          if [[ "$rc" -ne 0 ]]; then
-            exit "$rc"
-          fi
-
-          grep -Fx 'desktop=PASS' e2e-evidence/browser.log
-          grep -Fx 'mobile=PASS' e2e-evidence/browser.log
-          test -s e2e-evidence/result.json
-          grep -F '"status": "PASS"' e2e-evidence/result.json
-          grep -F "$ATLAS_REV" e2e-evidence/result.json
-          grep -F "$CREATURE_SEMANTIC_DIGEST" e2e-evidence/result.json
+          test "$rc" -eq 0
+          grep -Fx 'desktop=PASS' e2e-evidence/browser.log; grep -Fx 'mobile=PASS' e2e-evidence/browser.log
+          test -s e2e-evidence/result.json; grep -F '"status": "PASS"' e2e-evidence/result.json; grep -F "$ATLAS_REV" e2e-evidence/result.json; grep -F "$CREATURE_SEMANTIC_DIGEST" e2e-evidence/result.json
           echo 'live-e2e=PASS'
 
       - name: Publish bounded browser evidence
@@ -380,11 +247,6 @@ jobs:
         shell: bash
         env:
           BROWSER_IMAGE: ${{ steps.browser.outputs.image }}
-          PRODUCT_PUBLISHED: ${{ steps.product.outputs.published }}
-          ANIMATION_PUBLISHED: ${{ steps.product.outputs.animation_published }}
-          PRODUCT_PARENT_CREATED: ${{ steps.product.outputs.parent_created }}
-          PRODUCT_REPO_ROOT: ${{ steps.product.outputs.repo_root }}
-          HELPER_IMAGE: ${{ steps.product.outputs.helper_image }}
           E2E_OUTCOME: ${{ steps.e2e.outcome }}
           DEPLOY_CHANGED: ${{ steps.product.outputs.changed }}
           BACKUP_CONTAINER: ${{ steps.product.outputs.backup_container }}
@@ -394,54 +256,18 @@ jobs:
           STAGE_IMAGE: ${{ steps.stage.outputs.image }}
         run: |
           set -Eeuo pipefail
-          container="oteryn-atlas-live-e2e-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          docker rm -f "$container" >/dev/null 2>&1 || true
-
+          container="oteryn-atlas-live-e2e-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"; docker rm -f "$container" >/dev/null 2>&1 || true
           if [[ "$DEPLOY_CHANGED" = true ]]; then
             test -n "$BACKUP_CONTAINER"
-            if [[ "$JOB_STATUS" = success ]]; then
-              docker rm -f "$BACKUP_CONTAINER" >/dev/null
-              echo 'deployment-finalize=PASS'
+            if [[ "$JOB_STATUS" = success ]]; then docker rm -f "$BACKUP_CONTAINER" >/dev/null; echo 'deployment-finalize=PASS';
             else
-              docker rm -f "$PREVIEW_CONTAINER" >/dev/null 2>&1 || true
-              docker rename "$BACKUP_CONTAINER" "$PREVIEW_CONTAINER"
-              docker start "$PREVIEW_CONTAINER" >/dev/null
-              test -n "$PREVIOUS_REVISION"
-              docker inspect --format '{{ index .Config.Labels "org.oteryn.revision" }}' "$PREVIEW_CONTAINER" | grep -Fx "$PREVIOUS_REVISION"
-              curl -fsS -D /tmp/atlas-rollback.headers "$PREVIEW_URL/web/fullworld.html" -o /tmp/atlas-rollback.html
-              grep -qi "X-Oteryn-Atlas-Revision: $PREVIOUS_REVISION" /tmp/atlas-rollback.headers
-              echo 'deployment-rollback=PASS'
-              echo 'deployment-rollback-revision=PASS'
+              docker rm -f "$PREVIEW_CONTAINER" >/dev/null 2>&1 || true; docker rename "$BACKUP_CONTAINER" "$PREVIEW_CONTAINER"; docker start "$PREVIEW_CONTAINER" >/dev/null
+              test -n "$PREVIOUS_REVISION"; docker inspect --format '{{ index .Config.Labels "org.oteryn.revision" }}' "$PREVIEW_CONTAINER" | grep -Fx "$PREVIOUS_REVISION"
+              curl -fsS -D /tmp/atlas-rollback.headers "$PREVIEW_URL/web/fullworld.html" -o /tmp/atlas-rollback.html; grep -qi "X-Oteryn-Atlas-Revision: $PREVIOUS_REVISION" /tmp/atlas-rollback.headers
+              echo 'deployment-rollback=PASS'; echo 'deployment-rollback-revision=PASS'
             fi
           fi
-
-          if [[ "$PRODUCT_PUBLISHED" = true && "$E2E_OUTCOME" != success ]]; then
-            test -n "$PRODUCT_REPO_ROOT"
-            test -n "$HELPER_IMAGE"
-            docker run --rm --user 0:0 --entrypoint sh \
-              -e PARENT_CREATED="$PRODUCT_PARENT_CREATED" -e ANIMATION_PUBLISHED="$ANIMATION_PUBLISHED" \
-              -v "$PRODUCT_REPO_ROOT:/repo" "$HELPER_IMAGE" -c '
-                test -s /repo/data/creatures/index.json
-                rm -rf /repo/data/creatures
-                test ! -e /repo/data/creatures
-                if test "$ANIMATION_PUBLISHED" = true; then
-                  rm -rf /repo/fullworld/animation
-                  test ! -e /repo/fullworld/animation
-                fi
-                if test "$PARENT_CREATED" = true; then rmdir /repo/data 2>/dev/null || true; fi
-              '
-            echo 'animated-product-rollback=PASS'
-          fi
-
-          if [[ "$JOB_STATUS" != success && -n "$STAGED_ROOT" && -n "$STAGE_IMAGE" ]]; then
-            revision_root="$(dirname "$STAGED_ROOT")"
-            stage_name="$(basename "$STAGED_ROOT")"
-            docker run --rm --user 0:0 --entrypoint sh -e STAGE_NAME="$stage_name" -v "$revision_root:/revisions" "$STAGE_IMAGE" -c 'rm -rf "/revisions/$STAGE_NAME"'
-            echo 'staged-root-cleanup=PASS'
-          fi
-
-          if [[ -n "$BROWSER_IMAGE" ]]; then
-            docker image rm -f "$BROWSER_IMAGE" >/dev/null 2>&1 || true
-          fi
-          rm -rf -- atlas-source game-source legacy-source asset-15.32.zip appearance-a appearance-b spatial-a spatial-b animated-creatures-a.json animated-creatures-b.json creature-index-a creature-index-b animation-runtime-a animation-runtime-b e2e-targets.json first-chunk.txt first-bucket.txt e2e-evidence
+          if [[ "$JOB_STATUS" != success && -n "$STAGED_ROOT" && -n "$STAGE_IMAGE" ]]; then revision_root="$(dirname "$STAGED_ROOT")"; stage_name="$(basename "$STAGED_ROOT")"; docker run --rm --user 0:0 --entrypoint sh -e STAGE_NAME="$stage_name" -v "$revision_root:/revisions" "$STAGE_IMAGE" -c 'rm -rf "/revisions/$STAGE_NAME"'; echo 'staged-root-cleanup=PASS'; fi
+          if [[ -n "$BROWSER_IMAGE" ]]; then docker image rm -f "$BROWSER_IMAGE" >/dev/null 2>&1 || true; fi
+          rm -rf -- release-payload creature-index-a animation-runtime-a e2e-targets.json first-chunk.txt first-bucket.txt e2e-evidence
           echo 'task-owned-cleanup=PASS'
