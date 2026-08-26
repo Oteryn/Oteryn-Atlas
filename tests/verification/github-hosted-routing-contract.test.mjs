@@ -18,7 +18,9 @@ test('ordinary PR Playwright runs on GitHub-hosted CI instead of external atlas-
   assert.match(browserJob, /docker compose/);
   assert.match(browserJob, /summary\.json/);
   assert.match(browserJob, /ATLAS_EXPECTED_REVISION/);
-  assert.match(browserJob, /retries|retry/);
+  assert.match(browserJob, /validate-github-hosted-e2e\.mjs/);
+  assert.match(browserJob, /--head-sha/);
+  assert.match(browserJob, /--workers/);
   assert.doesNotMatch(browserJob, /atlas-local-e2e/);
   assert.doesNotMatch(browserJob, /statuses:\s*read/);
 });
