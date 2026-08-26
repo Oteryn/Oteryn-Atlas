@@ -30,10 +30,12 @@ test('parallel slots fail closed on duplicate Compose and artifact namespaces', 
   assert.match(source, /Dispose\(\)/);
 });
 
-test('repository policy permits only bounded isolated concurrent full gates', () => {
+test('repository policy keeps the bounded isolated slot pool specialist-only', () => {
   const agents = fs.readFileSync('AGENTS.md', 'utf8');
-  assert.match(agents, /bounded.*concurrent|concurrent.*bounded/i);
+  assert.match(agents, /Molehill[^\n]*(specialist|exception)/i);
+  assert.match(agents, /bounded machine-wide slot pool/i);
   assert.match(agents, /isolat/i);
+  assert.match(agents, /not an ordinary-PR concurrency policy/i);
   assert.doesNotMatch(agents, /never launch concurrent 64-scenario local gates/i);
 });
 
