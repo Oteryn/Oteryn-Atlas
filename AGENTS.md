@@ -33,6 +33,14 @@ The organization baseline is META ADR 0004 plus the central agent execution/cont
 - A lost merge race returns the task to integration/reconciliation, not to implementation from scratch.
 - Invalidate affected work only when verified task cancellation/supersession/rescope, incompatible governing authority, semantic contract/API/schema/invariant conflict, an unresolvable authorized reconciliation, or required tests prove prior assumptions no longer hold. Textual overlap or a changed filename alone is not sufficient proof.
 
+## META execution-routing policy
+
+The canonical organization policy is [`Oteryn/Oteryn@8fac1d55805fc3372351ea0a55ad7728b3570ebc:ecosystem/agent-execution-routing-policy.json`](https://github.com/Oteryn/Oteryn/blob/8fac1d55805fc3372351ea0a55ad7728b3570ebc/ecosystem/agent-execution-routing-policy.json). Atlas adopts it by reference and must not create a weaker local copy.
+
+Route project work through GitHub state, GitHub Actions or the repository-approved runner, and an isolated worktree first. Remote Desktop/Desktop Commander is default-deny; a host exception requires a closed recorded reason and a least-privilege recorded action. It is not a route for ordinary builds, tests, Git inspection or manual polling. Equivalent CI prohibits RDC polling of process output, Docker logs, workflow state and Git state.
+
+Before resuming, refresh GitHub repository/default-branch SHA/governing Issue/PR/task-head state; a local worktree or handoff is evidence only. Substantial task packets must plan parallel-first with independent lanes, exclusive branch/worktree and owned paths, dependencies, needed shared-resource leases and integration order. Serial work needs an explicit reason.
+
 ## Work boundary
 
 - Use a GitHub Issue as lifecycle authority for substantial work.
