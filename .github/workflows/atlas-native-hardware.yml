@@ -145,7 +145,7 @@ jobs:
   native-gpu:
     name: Native Windows GPU truth
     needs: trust-admission
-    if: needs.trust-admission.outputs.admitted == 'true' && needs.trust-admission.outputs.requires_native == 'true'
+    if: needs.trust-admission.outputs.admitted == 'true' && needs.trust-admission.outputs.requires_native == 'true' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false)
     runs-on:
       group: atlas-runners
       labels: oteryn-atlas-pc
