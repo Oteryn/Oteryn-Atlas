@@ -196,6 +196,7 @@ export function buildVerificationPlan(input) {
     requiredGroupIds: result.groups,
     groups,
     stableTestIds,
+    stableTestIdsDigest: digest(stableTestIds),
     requiredVisualGroupIds: visualGroupIds,
     resourceClasses,
     workerPolicyId: SHADOW_WORKER_POLICY.id,

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
 import test from 'node:test';
 import { validateGithubHostedE2eSummary } from '../../tools/verification/validate-github-hosted-e2e.mjs';
 
@@ -8,6 +9,7 @@ const expectedStableTestIds = [
   'desktop-chromium::tests/a-desktop.spec.mjs::works',
   'mobile-chromium::tests/a-mobile.spec.mjs::works',
 ];
+const expectedStableTestIdsDigest = `sha256:${crypto.createHash('sha256').update(JSON.stringify(expectedStableTestIds)).digest('hex')}`;
 
 function summary(overrides = {}) {
   return {
@@ -43,6 +45,7 @@ test('accepts exact-head all-pass zero-retry GitHub-hosted direct-preview eviden
     workers: 1,
     scenarioCount: 2,
     stableTestIds: expectedStableTestIds,
+    stableTestIdsDigest: expectedStableTestIdsDigest,
     browserContainer,
   });
 });

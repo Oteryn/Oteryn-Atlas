@@ -57,6 +57,7 @@ test('planner selects a deterministic compositional union across current and ren
   assert.match(plan.changedPathsDigest, /^sha256:[a-f0-9]{64}$/);
   assert.match(plan.impactPolicyDigest, /^sha256:[a-f0-9]{64}$/);
   assert.match(plan.verificationCatalogDigest, /^sha256:[a-f0-9]{64}$/);
+  assert.match(plan.stableTestIdsDigest, /^sha256:[a-f0-9]{64}$/);
   assert(Object.isFrozen(plan));
 });
 
