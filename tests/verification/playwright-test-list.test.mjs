@@ -6,6 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
+import { normalizeSummaryScenario } from '../../e2e/summary-reporter.mjs';
 import { parsePlaywrightStableTestIds } from '../../tools/verification/parse-playwright-test-list.mjs';
 
 test('Playwright list parser emits sorted path-normalized stable IDs', () => {
@@ -14,6 +15,22 @@ test('Playwright list parser emits sorted path-normalized stable IDs', () => {
     'desktop-chromium::e2e/tests/desktop.spec.mjs::desktop FullWorld qualifies',
     'mobile-chromium::e2e/tests/mobile.spec.mjs::mobile FullWorld exposes drawers',
   ]);
+});
+
+test('census and runtime reporter use the same stable-ID boundaries for long paths and titles', () => {
+  const spec = `${'nested/'.repeat(80)}long-boundary.spec.mjs`;
+  const title = `scenario ${'x'.repeat(700)}`;
+  const ids = parsePlaywrightStableTestIds(`  [desktop-chromium] › ${spec}:10:1 › ${title}\n`);
+  const scenario = normalizeSummaryScenario({
+    project: 'desktop-chromium',
+    file: `C:\\work\\Oteryn-Atlas\\e2e\\tests\\${spec.replaceAll('/', '\\')}`,
+    title,
+    status: 'passed',
+    durationMs: 1,
+    retry: 0,
+  });
+
+  assert.equal(ids[0], scenario.stableTestId);
 });
 
 test('Playwright list parser rejects an empty or duplicate census', () => {
