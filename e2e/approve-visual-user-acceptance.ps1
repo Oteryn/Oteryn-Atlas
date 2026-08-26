@@ -3,7 +3,8 @@ param(
   [Parameter(Mandatory = $true)][string]$SummaryPath,
   [Parameter(Mandatory = $true)][string]$Reviewer,
   [switch]$ConfirmReviewedAllScreenshots,
-  [string]$OutputPath
+  [string]$OutputPath,
+  [string]$ReviewedHeadSha
 )
 
 $ErrorActionPreference = 'Stop'
@@ -21,8 +22,10 @@ if ([string]::IsNullOrWhiteSpace($Reviewer)) { throw 'Reviewer is required.' }
 
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 Set-Location $root
-$sha = (git rev-parse HEAD).Trim()
-if (-not $sha) { throw 'Unable to resolve Atlas HEAD.' }
+$policySha = (git rev-parse HEAD).Trim()
+if (-not $policySha) { throw 'Unable to resolve Atlas policy HEAD.' }
+$sha = if ($ReviewedHeadSha) { $ReviewedHeadSha.Trim().ToLowerInvariant() } else { $policySha }
+if ($sha -notmatch '^[a-f0-9]{40}$') { throw 'ReviewedHeadSha must be an exact 40-character lowercase commit SHA.' }
 if (@(git status --porcelain).Count -ne 0) { throw 'Refusing visual approval from a dirty working tree.' }
 
 $resolvedSummary = (Resolve-Path $SummaryPath).Path
@@ -85,4 +88,4 @@ if (-not $OutputPath) { $OutputPath = Join-Path $artifactRoot 'visual-review.jso
 $resolvedOutputDir = (Resolve-Path (Split-Path $OutputPath -Parent)).Path
 $resolvedOutput = Join-Path $resolvedOutputDir (Split-Path $OutputPath -Leaf)
 $review | ConvertTo-Json -Depth 8 | Set-Content -Encoding utf8 $resolvedOutput
-Write-Output "Approved user-facing visual evidence for ${sha}: $resolvedOutput"
+Write-Output "Approved user-facing visual evidence for ${sha}: $resolvedOutput (policyHead=$policySha)"
