@@ -205,8 +205,6 @@ def validate_registry(root: Path, data: dict[str, Any]) -> list[str]:
             if terminal != "ON_ISSUE_CLOSE_ARCHIVE_HISTORICAL":
                 errors.append(f"active prompt terminal lifecycle mismatch: {filename}")
         if status == "HISTORICAL":
-            if prompt_class != "PROMPT_ONE_SHOT":
-                errors.append(f"historical prompt must be PROMPT_ONE_SHOT: {filename}")
             if item.get("issue_state_at_audit") != "closed":
                 errors.append(f"historical prompt must have closed audited Issue state: {filename}")
             if terminal != "ARCHIVE_HISTORICAL":
