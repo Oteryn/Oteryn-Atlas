@@ -5,7 +5,8 @@ param(
   [Parameter(Mandatory = $true)][string]$RemoteBranch,
   [string]$Repository = 'Oteryn/Oteryn-Atlas',
   [string]$Context = 'atlas-local-e2e',
-  [string]$VisualReviewPath
+  [string]$VisualReviewPath,
+  [string]$TestedHeadSha
 )
 
 $ErrorActionPreference = 'Stop'
@@ -18,8 +19,11 @@ $visualContractSha256 = 'sha256:' + (Get-FileHash $VisualContractPath -Algorithm
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 Set-Location $root
 
-$sha = (git rev-parse HEAD).Trim()
-if (-not $sha) { throw 'Unable to resolve Atlas HEAD.' }
+$policySha = (git rev-parse HEAD).Trim()
+if (-not $policySha) { throw 'Unable to resolve Atlas policy HEAD.' }
+$sha = if ($TestedHeadSha) { $TestedHeadSha.Trim().ToLowerInvariant() } else { $policySha }
+if ($sha -notmatch '^[a-f0-9]{40}$') { throw 'TestedHeadSha must be an exact 40-character lowercase commit SHA.' }
+$trustedBaseMode = -not [string]::IsNullOrWhiteSpace($TestedHeadSha)
 $dirty = @(git status --porcelain)
 if ($dirty.Count -ne 0) { throw 'Refusing to publish E2E status from a dirty working tree.' }
 
@@ -39,6 +43,9 @@ $plan = Get-Content $resolvedPlan -Raw | ConvertFrom-Json
 if ($plan.repository -ne $Repository) { throw 'Verification plan repository does not match status repository.' }
 if ($plan.headSha -ne $sha) { throw 'Verification plan head SHA does not match tested HEAD.' }
 if ($plan.integrationBaseSha -notmatch '^[a-f0-9]{40}$' -or $plan.mergeBaseSha -notmatch '^[a-f0-9]{40}$') { throw 'Verification plan has invalid integration identity.' }
+if ($trustedBaseMode -and $plan.integrationBaseSha -ne $policySha) { throw "Verification plan integrationBaseSha $($plan.integrationBaseSha) does not match trusted policySha $policySha." }
+git cat-file -e "$sha^{commit}"
+if ($LASTEXITCODE -ne 0) { throw 'Tested candidate commit is unavailable in the trusted policy checkout.' }
 git cat-file -e "$($plan.integrationBaseSha)^{commit}"
 if ($LASTEXITCODE -ne 0) { throw 'Verification plan integration base is unavailable in the checkout.' }
 $actualMergeBase = (git merge-base $sha $plan.integrationBaseSha).Trim()
@@ -93,4 +100,4 @@ $payload = @{
 
 $payload | gh api --method POST "repos/$Repository/statuses/$sha" --input - | Out-Null
 if ($LASTEXITCODE -ne 0) { throw "GitHub status publication failed with exit code $LASTEXITCODE." }
-Write-Output "Published $Context=success for $sha ($description)"
+Write-Output "Published $Context=success for $sha ($description; policyHead=$policySha)"
