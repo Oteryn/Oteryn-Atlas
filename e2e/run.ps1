@@ -2,6 +2,7 @@ $ErrorActionPreference = 'Stop'
 
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 Set-Location $root
+. (Join-Path $PSScriptRoot 'heavy-slot-pool.ps1')
 $env:ATLAS_USER_VISUAL_EVIDENCE = '1'
 New-Item -ItemType Directory -Force -Path 'artifacts\e2e' | Out-Null
 
@@ -24,8 +25,11 @@ $env:ATLAS_E2E_PROJECT = $project
 if (-not $env:ATLAS_E2E_ARTIFACTS_HOST) {
   $env:ATLAS_E2E_ARTIFACTS_HOST = "../artifacts/e2e/$project"
 }
-$artifactDir = Join-Path $root "artifacts\e2e\$project"
-New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
+$artifactDir = if ([IO.Path]::IsPathRooted($env:ATLAS_E2E_ARTIFACTS_HOST)) {
+  [IO.Path]::GetFullPath($env:ATLAS_E2E_ARTIFACTS_HOST)
+} else {
+  [IO.Path]::GetFullPath((Join-Path $PSScriptRoot $env:ATLAS_E2E_ARTIFACTS_HOST))
+}
 
 $lockTimeoutSeconds = 7200
 if ($env:ATLAS_E2E_LOCK_TIMEOUT_SECONDS) {
@@ -35,24 +39,24 @@ if ($env:ATLAS_E2E_LOCK_TIMEOUT_SECONDS) {
   }
   $lockTimeoutSeconds = $parsedLockTimeout
 }
-$lockPath = Join-Path ([IO.Path]::GetTempPath()) 'oteryn-atlas-heavy-e2e.lock'
-$lockDeadline = [DateTime]::UtcNow.AddSeconds($lockTimeoutSeconds)
-$lockStream = $null
-while (-not $lockStream) {
-  try {
-    $lockStream = [IO.File]::Open($lockPath, [IO.FileMode]::OpenOrCreate, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
-  } catch [IO.IOException] {
-    if ([DateTime]::UtcNow -ge $lockDeadline) {
-      throw "Timed out waiting for the machine-wide Atlas heavy E2E lock: $lockPath"
-    }
-    Start-Sleep -Seconds 2
-  }
+
+$slotConfig = Resolve-AtlasHeavySlotConfig -DefaultSlotCount 2
+$projectLease = Acquire-AtlasProjectLock -Project $project -Revision $env:ATLAS_CODE_REVISION
+$artifactLease = Acquire-AtlasArtifactLock -ArtifactPath $artifactDir -Project $project -Revision $env:ATLAS_CODE_REVISION
+New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
+$legacyFence = Acquire-AtlasLegacyFence -TimeoutSeconds $lockTimeoutSeconds -Project $project -Revision $env:ATLAS_CODE_REVISION
+$slotLease = Acquire-AtlasHeavySlot -SlotCount $slotConfig.SlotCount -RequestedSlot $slotConfig.RequestedSlot -TimeoutSeconds $lockTimeoutSeconds -Project $project -Revision $env:ATLAS_CODE_REVISION
+$env:ATLAS_E2E_SLOT_ID = [string]$slotLease.SlotId
+$slotEvidence = [ordered]@{
+  version = 1
+  slotId = $slotLease.SlotId
+  slotCount = $slotLease.SlotCount
+  project = $project
+  revision = $env:ATLAS_CODE_REVISION
+  acquiredAtUtc = [DateTime]::UtcNow.ToString('o')
 }
-$lockOwner = [Text.Encoding]::UTF8.GetBytes("pid=$PID project=$project revision=$env:ATLAS_CODE_REVISION`n")
-$lockStream.SetLength(0)
-$lockStream.Write($lockOwner, 0, $lockOwner.Length)
-$lockStream.Flush()
-Write-Output "Acquired machine-wide Atlas heavy E2E lock: $lockPath"
+$slotEvidence | ConvertTo-Json | Set-Content -Encoding utf8 (Join-Path $artifactDir 'slot-lease.json')
+Write-Output "Acquired Atlas heavy E2E slot $($slotLease.SlotId)/$($slotLease.SlotCount): $($slotLease.Path)"
 
 $publicationForwarder = $null
 if ($env:ATLAS_PUBLICATION_ORIGIN) {
@@ -111,10 +115,10 @@ try {
   if ($publicationForwarder -and -not $publicationForwarder.HasExited) {
     Stop-Process -Id $publicationForwarder.Id -Force
   }
-  if ($lockStream) {
-    $lockStream.Dispose()
-    $lockStream = $null
-  }
+  if ($slotLease -and $slotLease.Stream) { $slotLease.Stream.Dispose() }
+  if ($legacyFence -and $legacyFence.Stream) { $legacyFence.Stream.Dispose() }
+  if ($artifactLease -and $artifactLease.Stream) { $artifactLease.Stream.Dispose() }
+  if ($projectLease -and $projectLease.Stream) { $projectLease.Stream.Dispose() }
   $ErrorActionPreference = $previousPreference
 }
 exit $testExitCode
