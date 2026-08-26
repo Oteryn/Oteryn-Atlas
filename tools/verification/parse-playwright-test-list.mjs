@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { pathToFileURL } from 'node:url';
 
 const LIST_ROW = /^\s*\[([^\]]+)\]\s+›\s+([^:]+):\d+:\d+\s+›\s+(.+)$/;
 
@@ -17,7 +18,7 @@ export function parsePlaywrightStableTestIds(text) {
   return stable;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
   const pathname = process.argv[2];
   if (!pathname || process.argv.length !== 3) throw new TypeError('usage: parse-playwright-test-list.mjs <list-output>');
   process.stdout.write(`${JSON.stringify(parsePlaywrightStableTestIds(fs.readFileSync(pathname, 'utf8')))}\n`);
