@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "workloads": {
+    "full": {
+      "profile": "full",
+      "fullSuite": true,
+      "specs": []
+    },
+    "targeted": {
+      "profile": "targeted",
+      "fullSuite": false,
+      "specs": [
+        "tests/accessibility-desktop.spec.mjs",
+        "tests/accessibility-mobile.spec.mjs",
+        "tests/degraded-search-desktop.spec.mjs",
+        "tests/layer-audit-desktop.spec.mjs",
+        "tests/mobile.spec.mjs",
+        "tests/workflows-desktop.spec.mjs"
+      ]
+    },
+    "broad": {
+      "profile": "broad",
+      "fullSuite": false,
+      "specs": [
+        "tests/geometry-desktop.spec.mjs",
+        "tests/geometry-mobile.spec.mjs",
+        "tests/race-desktop.spec.mjs",
+        "tests/render-probes-desktop.spec.mjs",
+        "tests/stress-desktop.spec.mjs",
+        "tests/user-journey-desktop.spec.mjs",
+        "tests/user-journey-mobile.spec.mjs"
+      ]
+    }
+  }
+}
