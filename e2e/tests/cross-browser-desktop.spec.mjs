@@ -97,6 +97,7 @@ test('secondary desktop engine preserves semantic inspector through reload and h
   let runtime = captureRuntimeFailures(page);
   await gotoAtlas(page, DESKTOP_ENTRY);
   await waitForAtlas(page);
+  const initialUrl = page.url();
   await page.locator('#search-input').fill('Thais');
   const results = page.locator('#semantic-search-results-desktop');
   await expect(results).toBeVisible();
@@ -112,19 +113,26 @@ test('secondary desktop engine preserves semantic inspector through reload and h
   await expect(page.locator('#inspector-content')).toContainText('Thais');
   const selectedUrl = page.url();
 
-  const reloadRuntime = beginMainFrameNavigationRuntime(page, runtime);
-  await page.reload({ waitUntil: 'domcontentloaded' });
-  runtime = await reloadRuntime;
-  await waitForAtlas(page);
-  await expect(page.locator('#inspector-content')).toContainText('Thais');
   const backRuntime = beginMainFrameNavigationRuntime(page, runtime);
   await page.goBack({ waitUntil: 'domcontentloaded' });
   runtime = await backRuntime;
   await waitForAtlas(page);
-  expect(page.url()).not.toBe(selectedUrl);
+  expect(page.url()).toBe(initialUrl);
+  await expect.poll(() => page.evaluate(() => globalThis.__OTERYN_ATLAS_SEMANTIC_SEARCH__?.activeId)).toBeNull();
+  await expect(page.locator('#semantic-layer-list [data-semantic-search-layer]')).toHaveCount(0);
+  await expect(page.locator('#inspector-content')).not.toContainText('Thais');
+
   const forwardRuntime = beginMainFrameNavigationRuntime(page, runtime);
   await page.goForward({ waitUntil: 'domcontentloaded' });
   runtime = await forwardRuntime;
+  await waitForAtlas(page);
+  expect(page.url()).toBe(selectedUrl);
+  await expect.poll(() => page.evaluate(() => globalThis.__OTERYN_ATLAS_SEMANTIC_SEARCH__?.activeId)).toBe(new URL(selectedUrl).searchParams.get('semantic'));
+  await expect(page.locator('#inspector-content')).toContainText('Thais');
+
+  const reloadRuntime = beginMainFrameNavigationRuntime(page, runtime);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  runtime = await reloadRuntime;
   await waitForAtlas(page);
   await expect(page.locator('#inspector-content')).toContainText('Thais');
   await assertUserVisibleSurface(page, {

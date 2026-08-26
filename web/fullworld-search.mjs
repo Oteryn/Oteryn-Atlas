@@ -104,7 +104,27 @@ function navigate(record, rawQuery) {
   const params = navigationSearchParams(record, location.search, state.index, rawQuery);
   if (record.record_id) params.set('creature', record.record_id);
   else params.delete('creature');
-  location.search = params.toString();
+  history.pushState(null, '', `${location.pathname}?${params.toString()}${location.hash}`);
+  state.active = record;
+  renderActiveInspector();
+  publish();
+  window.dispatchEvent(new CustomEvent('oteryn-atlas-semantic-navigation'));
+}
+
+function activeRecordFromLocation() {
+  const params = new URLSearchParams(location.search);
+  const activeId = params.get('semantic');
+  const creatureId = params.get('creature');
+  const semanticRecord = activeId
+    ? state.index.records.find((record) => record.id === activeId) ?? findCreatureById(state.creatureSearch, activeId)
+    : null;
+  return semanticRecord ?? (creatureId ? findCreatureById(state.creatureSearch, creatureId) : null);
+}
+
+function syncActiveFromLocation() {
+  state.active = activeRecordFromLocation();
+  renderActiveInspector();
+  publish();
 }
 
 function hideResults(host) {
@@ -216,11 +236,19 @@ function addActiveLayer(record) {
   row.append(input, name, status); host.append(row);
 }
 
+function removeActiveLayer() {
+  document.querySelector('#semantic-layer-list [data-semantic-search-layer]')?.remove();
+}
+
 function renderActiveInspector() {
   const record = state.active;
   const inspector = document.querySelector('#inspector-content');
   const pill = document.querySelector('#inspector-pill');
-  if (!record || !inspector || !pill) return;
+  if (!record) {
+    removeActiveLayer();
+    return;
+  }
+  if (!inspector || !pill) return;
   pill.textContent = kindLabel(record.kind).toUpperCase();
   pill.className = 'pill ok';
   const card = document.createElement('div'); card.className = 'position-card';
@@ -259,16 +287,13 @@ async function boot() {
   const raw = await boundedJson(INDEX_URL, MAX_INDEX_BYTES);
   state.index = validateSemanticSearchIndex(raw);
   state.creatureSearch = await loadCreatureSearch();
-  const params = new URLSearchParams(location.search);
-  const activeId = params.get('semantic');
-  const creatureId = params.get('creature');
-  state.active = activeId ? state.index.records.find((record) => record.id === activeId) ?? findCreatureById(state.creatureSearch, activeId) : null;
-  if (!state.active && creatureId) state.active = findCreatureById(state.creatureSearch, creatureId);
+  state.active = activeRecordFromLocation();
   state.status = 'PASS';
   state.error = null;
   renderActiveInspector();
   window.addEventListener('oteryn-atlas-view', () => renderActiveInspector());
   window.addEventListener('oteryn-atlas-inspector-rendered', () => renderActiveInspector());
+  window.addEventListener('popstate', syncActiveFromLocation);
   publish();
 }
 

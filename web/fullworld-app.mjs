@@ -826,7 +826,7 @@ function applyView(next, options = {}) {
     selected = null;
     setRendererRecords([]);
   }
-  syncViewUi();
+  syncViewUi({ preserveExternalParams: options.preserveExternalParams ?? false });
   syncAnimationLoop();
   scheduleRender('view');
   renderInspector();
@@ -834,6 +834,12 @@ function applyView(next, options = {}) {
 }
 
 function wireInteraction() {
+  const syncHistoryView = () => applyView(parseFullWorldViewState(location.search, runtimeWorld), {
+    delay: 0,
+    preserveExternalParams: true,
+  });
+  window.addEventListener('popstate', syncHistoryView);
+  window.addEventListener('oteryn-atlas-semantic-navigation', syncHistoryView);
   for (const button of document.querySelectorAll('#view-mode-control [data-mode]')) button.addEventListener('click', () => {
     const mode = button.dataset.mode;
     const zoom = mode === 'map' && view.zoom < LOD_POLICY.detailZoom ? LOD_POLICY.detailZoom : view.zoom;
