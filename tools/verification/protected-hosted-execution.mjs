@@ -1,3 +1,7 @@
+import crypto from 'node:crypto';
+
+import { canonicalJson } from './verification-plan-schema.mjs';
+
 const SHA = /^[a-f0-9]{40}$/;
 const SHA256 = /^sha256:[a-f0-9]{64}$/;
 
@@ -7,6 +11,10 @@ function freeze(value) {
     Object.freeze(value);
   }
   return value;
+}
+
+function digest(value) {
+  return `sha256:${crypto.createHash('sha256').update(canonicalJson(value)).digest('hex')}`;
 }
 
 function exactSha(value, label) {
@@ -42,6 +50,21 @@ function matchesSpecPattern(pattern, spec) {
   return new RegExp(`^${expression}$`).test(spec);
 }
 
+function isSpecialistGroup(group) {
+  return group.capabilities.browser
+    && !group.capabilities.hosted
+    && group.capabilities.dataCapability === 'real_fullworld'
+    && group.capabilities.specialistReason === 'real-fullworld-product';
+}
+
+function isReviewGroup(group) {
+  return group.capabilities.browser
+    && !group.capabilities.hosted
+    && group.capabilities.dataCapability !== 'real_fullworld'
+    && group.capabilities.visualReview === true
+    && group.capabilities.specialistReason === 'private-visual';
+}
+
 function validateGroup(group, requiredIds) {
   if (!group || typeof group !== 'object' || Array.isArray(group) || typeof group.id !== 'string' || !requiredIds.has(group.id)) {
     throw new TypeError('selected execution group is invalid');
@@ -56,9 +79,8 @@ function validateGroup(group, requiredIds) {
     throw new TypeError(`selected execution group ${group.id} capabilities are malformed`);
   }
   if (!capabilities.browser && group.projects.length) throw new TypeError(`selected execution group ${group.id} browser capability conflicts with projects`);
-  if (!capabilities.hosted && capabilities.browser
-    && (capabilities.dataCapability !== 'real_fullworld' || capabilities.specialistReason !== 'real-fullworld-product')) {
-    throw new TypeError(`non-hosted browser group ${group.id} must be explicit real_fullworld specialist work`);
+  if (capabilities.browser && !capabilities.hosted && !isSpecialistGroup(group) && !isReviewGroup(group)) {
+    throw new TypeError(`non-hosted browser group ${group.id} must be explicit real_fullworld specialist work or bounded visual review`);
   }
   return group;
 }
@@ -104,8 +126,9 @@ export function buildProtectedHostedExecutionContract(plan, { currentHeadSha } =
   }
 
   const hostedGroups = groups.filter((group) => group.capabilities.browser && group.capabilities.hosted);
-  const specialistGroups = groups.filter((group) => group.capabilities.browser && !group.capabilities.hosted);
-  const requiresRealFullWorld = specialistGroups.some((group) => group.capabilities.dataCapability === 'real_fullworld');
+  const specialistGroups = groups.filter(isSpecialistGroup);
+  const reviewGroups = groups.filter(isReviewGroup);
+  const requiresRealFullWorld = specialistGroups.length > 0;
   if (Boolean(plan.requiresRealFullWorld) !== requiresRealFullWorld) {
     throw new TypeError('protected hosted execution real_fullworld placement conflicts with plan');
   }
@@ -113,15 +136,23 @@ export function buildProtectedHostedExecutionContract(plan, { currentHeadSha } =
   const stableTestIds = exactStableIds(plan.stableTestIds, 'planned stable IDs');
   const hostedStableTestIds = [];
   const specialistStableTestIds = [];
+  const reviewStableTestIds = [];
   for (const id of stableTestIds) {
     const placements = new Set();
     if (hostedGroups.some((group) => groupMatchesStableId(group, id))) placements.add('hosted');
     if (specialistGroups.some((group) => groupMatchesStableId(group, id))) placements.add('specialist');
-    if (placements.size === 0) throw new TypeError(`planned stable ID has no selected execution placement: ${id}`);
-    if (placements.size !== 1) throw new TypeError(`planned stable ID has ambiguous execution placement: ${id}`);
+    if (reviewGroups.some((group) => groupMatchesStableId(group, id))) reviewStableTestIds.push(id);
+    if (placements.size === 0) throw new TypeError(`planned stable ID has no selected machine execution placement: ${id}`);
+    if (placements.size !== 1) throw new TypeError(`planned stable ID has ambiguous machine execution placement: ${id}`);
     if (placements.has('hosted')) hostedStableTestIds.push(id);
     else specialistStableTestIds.push(id);
   }
+
+  hostedStableTestIds.sort();
+  specialistStableTestIds.sort();
+  reviewStableTestIds.sort();
+  const hostedExpectedStableTestIdsDigest = digest(hostedStableTestIds);
+  const specialistExpectedStableTestIdsDigest = digest(specialistStableTestIds);
 
   return freeze({
     schemaVersion: 1,
@@ -129,6 +160,8 @@ export function buildProtectedHostedExecutionContract(plan, { currentHeadSha } =
     candidateHeadSha,
     planDigest,
     expectedStableTestIdsDigest,
+    hostedExpectedStableTestIdsDigest,
+    specialistExpectedStableTestIdsDigest,
     productIdentitiesDigest,
     workerPolicyDigest,
     executionPolicyDigest,
@@ -136,11 +169,15 @@ export function buildProtectedHostedExecutionContract(plan, { currentHeadSha } =
     selectiveExecution: false,
     hosted: {
       groupIds: hostedGroups.map((group) => group.id).sort(),
-      stableTestIds: hostedStableTestIds.sort(),
+      stableTestIds: hostedStableTestIds,
     },
     specialist: {
       groupIds: specialistGroups.map((group) => group.id).sort(),
-      stableTestIds: specialistStableTestIds.sort(),
+      stableTestIds: specialistStableTestIds,
+    },
+    review: {
+      groupIds: reviewGroups.map((group) => group.id).sort(),
+      stableTestIds: reviewStableTestIds,
     },
   });
 }
