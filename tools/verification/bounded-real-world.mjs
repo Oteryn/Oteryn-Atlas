@@ -22,7 +22,7 @@ import { computeOverviewRoot, overviewDomains, overviewProfiles } from '../../sr
 export const BOUNDED_REAL_WORLD_ID = 'atlas-bounded-real-world-v1';
 export const BOUNDED_REAL_SOURCE_CONTRACT = 'oteryn-atlas-bounded-real-runtime-v1';
 export const BOUNDED_REAL_CREATURE_CAPABILITY = 'bounded-real-creatures-v1';
-const BOUNDED_GAME_SHA = 'bounded-fixture';
+const BOUNDED_GAME_SHA = 'fixture';
 const FLOORS = Object.freeze(Array.from({ length: 16 }, (_, index) => index - 15));
 const INITIAL_ANCHOR = Object.freeze({ x: 32369, y: 32241, floor: -7 });
 const TARGET_ENTITY_IDS = Object.freeze([
