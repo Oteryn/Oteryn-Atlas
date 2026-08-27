@@ -94,11 +94,30 @@ function normalizeJobs(jobs) {
       invalid(`job ${jobIndex} identity is malformed`);
     }
     const createdMs = parseTimestamp(job.created_at, `job ${job.id}.created_at`);
+    if (!Array.isArray(job.steps)) invalid(`job ${job.id} steps are missing`);
+
+    const startedMissing = job.started_at == null;
+    const completedMissing = job.completed_at == null;
+    if (startedMissing !== completedMissing) {
+      invalid(`job ${job.id} has partial started/completed timing`);
+    }
+    if (startedMissing) {
+      return {
+        raw: job,
+        createdMs,
+        startedMs: null,
+        completedMs: null,
+        queueProvisioningMs: null,
+        wallTimeMs: null,
+        timingStatus: 'NOT_STARTED',
+        order: jobIndex,
+      };
+    }
+
     const startedMs = parseTimestamp(job.started_at, `job ${job.id}.started_at`);
     const completedMs = parseTimestamp(job.completed_at, `job ${job.id}.completed_at`);
     if (startedMs < createdMs) invalid(`negative queue/provisioning duration for job ${job.id}`);
     if (completedMs < startedMs) invalid(`negative duration for job ${job.id}`);
-    if (!Array.isArray(job.steps)) invalid(`job ${job.id} steps are missing`);
     return {
       raw: job,
       createdMs,
@@ -106,6 +125,7 @@ function normalizeJobs(jobs) {
       completedMs,
       queueProvisioningMs: startedMs - createdMs,
       wallTimeMs: completedMs - startedMs,
+      timingStatus: 'STARTED',
       order: jobIndex,
     };
   });
@@ -123,6 +143,7 @@ function collectPhaseObservations(normalizedJobs, phaseMap, runConclusion) {
       const step = job.raw.steps[stepIndex];
       if (!isPlainObject(step) || typeof step.name !== 'string' || step.name.length === 0) invalid(`job ${job.raw.id} step ${stepIndex} is malformed`);
       if (step.started_at == null || step.completed_at == null) continue;
+      const stepStartedMs = parseTimestamp(step.started_at, `job ${job.raw.id} step ${stepIndex}.started_at`);
       const stepDuration = durationMs(step.started_at, step.completed_at, `job ${job.raw.id} step ${stepIndex}`);
       const matching = phases.filter((phase) => phase.patterns.some((pattern) => pattern.test(step.name)));
       if (matching.length > 1) invalid(`step ${JSON.stringify(step.name)} matches multiple benchmark phases`);
@@ -133,6 +154,7 @@ function collectPhaseObservations(normalizedJobs, phaseMap, runConclusion) {
           stepIndex,
           jobId: job.raw.id,
           stepName: step.name,
+          startedMs: stepStartedMs,
           durationMs: stepDuration,
         });
         matchedPhaseIds.push(phase.id);
@@ -145,6 +167,7 @@ function collectPhaseObservations(normalizedJobs, phaseMap, runConclusion) {
       startedAt: job.raw.started_at,
       completedAt: job.raw.completed_at,
       conclusion: job.raw.conclusion ?? null,
+      timingStatus: job.timingStatus,
       queueProvisioningMs: job.queueProvisioningMs,
       wallTimeMs: job.wallTimeMs,
       matchedPhaseIds,
@@ -170,7 +193,11 @@ function collectPhaseObservations(normalizedJobs, phaseMap, runConclusion) {
 
   let duplicateSetupMs = 0;
   for (const metricId of DUPLICATED_SETUP_METRICS) {
-    const matches = matchesByMetric.get(metricId) ?? [];
+    const matches = [...(matchesByMetric.get(metricId) ?? [])].sort((left, right) => (
+      left.startedMs - right.startedMs
+      || left.jobId - right.jobId
+      || left.stepIndex - right.stepIndex
+    ));
     for (const match of matches.slice(1)) duplicateSetupMs += match.durationMs;
   }
 
@@ -191,6 +218,10 @@ function copySupplementalMetrics(supplementalMetrics) {
 
 function validateRunIdentity(run, identity) {
   if (!isPlainObject(run) || !isPlainObject(identity)) invalid('run and identity are required objects');
+  if (!isPlainObject(run.repository) || typeof run.repository.full_name !== 'string' || run.repository.full_name.length === 0) {
+    invalid('GitHub run repository.full_name is missing');
+  }
+  if (identity.repository !== run.repository.full_name) invalid('repository does not match GitHub run repository.full_name');
   if (identity.workflowRunId !== run.id) invalid('workflowRunId does not match GitHub run id');
   if (identity.workflowRunAttempt !== run.run_attempt) invalid('workflowRunAttempt does not match GitHub run_attempt');
   if (identity.candidateSha !== run.head_sha) invalid('candidateSha does not match GitHub run head_sha');
@@ -215,17 +246,20 @@ export function collectHostedBenchmarkEvidence({
 
   const normalizedJobs = normalizeJobs(jobs);
   const { observations, duplicateSetupMs, sourceJobs } = collectPhaseObservations(normalizedJobs, phaseMap, run.conclusion);
-  const queueProvisioningMs = Math.max(...normalizedJobs.map((job) => job.queueProvisioningMs));
-  const totalJobMs = normalizedJobs.reduce((sum, job) => sum + job.wallTimeMs, 0);
+  const startedJobs = normalizedJobs.filter((job) => job.timingStatus === 'STARTED');
+  const queueProvisioning = startedJobs.length > 0
+    ? measured('queueProvisioningMs', Math.max(...startedJobs.map((job) => job.queueProvisioningMs)), 'github-jobs:max(created_at->started_at)')
+    : notApplicable('queueProvisioningMs', `github-jobs:no-started-jobs:${run.conclusion}`);
+  const totalJobMs = startedJobs.reduce((sum, job) => sum + job.wallTimeMs, 0);
   const supplemental = copySupplementalMetrics(supplementalMetrics);
 
   const metrics = {
-    queueProvisioningMs: measured('queueProvisioningMs', queueProvisioningMs, 'github-jobs:max(created_at->started_at)'),
+    queueProvisioningMs: queueProvisioning,
     ...observations,
     ...supplemental,
-    duplicateSetupMs: measured('duplicateSetupMs', duplicateSetupMs, 'phase-map:repeated-setup-step-time'),
+    duplicateSetupMs: measured('duplicateSetupMs', duplicateSetupMs, 'phase-map:chronological-repeated-setup-step-time'),
     verdictWallClockMs: measured('verdictWallClockMs', runCompletedMs - runCreatedMs, 'github-run:created_at->updated_at'),
-    jobMinutes: measured('jobMinutes', Math.round((totalJobMs / 60000) * 1_000_000) / 1_000_000, 'github-jobs:sum(started_at->completed_at)'),
+    jobMinutes: measured('jobMinutes', Math.round((totalJobMs / 60000) * 1_000_000) / 1_000_000, startedJobs.length > 0 ? 'github-jobs:sum(started_at->completed_at)' : 'github-jobs:no-executed-jobs'),
   };
 
   const resolvedFailureClass = run.conclusion === 'success'
