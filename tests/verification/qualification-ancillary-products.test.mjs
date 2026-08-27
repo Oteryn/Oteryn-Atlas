@@ -33,7 +33,7 @@ const expectedCreatureLabels = Object.freeze([
   'Fixture Raider Five',
 ]);
 
-test('qualification world publishes neutral ancillary products and binds them to product verification', async () => {
+test('qualification world publishes neutral ancillary products and binds them to product verification', async (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-q-ancillary-'));
   const product = path.join(root, 'product');
   try {
@@ -43,6 +43,7 @@ test('qualification world publishes neutral ancillary products and binds them to
     }
 
     assert.equal((await verifyQualificationWorld(product)).productDigest, manifest.productDigest);
+    t.diagnostic(`qualification fixture: id=${manifest.fixtureId} productDigest=${manifest.productDigest} files=${manifest.files.length}`);
 
     const search = JSON.parse(fs.readFileSync(path.join(product, 'data/creatures/search.json'), 'utf8'));
     assert.deepEqual(search.records.map((row) => row.label), expectedCreatureLabels);
