@@ -6,6 +6,12 @@ import { buildVerificationPlan } from '../../tools/verification/build-verificati
 const catalog = {
   schemaVersion: 1,
   groups: {
+    'deterministic.core': {
+      specs: ['tests/verification/*.test.mjs'],
+      projects: [],
+      resourceClass: 'cpu-light',
+      evidence: 'machine-summary',
+    },
     'producer.verify': {
       specs: ['tests/verification/producer.test.mjs'],
       projects: [],
@@ -117,7 +123,7 @@ test('planner applies explicit cross-domain escalation only when all trigger dom
   ], manifest);
   assert.equal(crossDomain.profile, 'full');
   assert.deepEqual(crossDomain.impactDomains, ['browser-runtime', 'cross-domain-risk', 'generator']);
-  assert.deepEqual(crossDomain.requiredGroupIds, ['consumer.verify', 'e2e.full', 'producer.verify']);
+  assert.deepEqual(crossDomain.requiredGroupIds, ['consumer.verify', 'deterministic.core', 'e2e.full', 'producer.verify']);
 });
 
 test('impact dependency rules fail closed when they reference an unknown verification group', () => {
