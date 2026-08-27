@@ -59,7 +59,6 @@ test('successful visual evidence is exact-revision qualified and must be reviewe
   assert.match(publisher, /approved/);
 });
 
-
 test('visual user acceptance contract enumerates complete primary user-facing states', async () => {
   const contractPath = path.join(root, 'e2e/user-visual-scenarios.json');
   assert.equal(existsSync(contractPath), true, 'visual scenario contract must exist');
@@ -95,18 +94,19 @@ test('visual user acceptance contract enumerates complete primary user-facing st
   const resilience = await read('e2e/tests/resilience-desktop.spec.mjs');
   const gameplayDesktop = await read('e2e/tests/creature-gameplay-desktop.spec.mjs');
   const gameplayMobile = await read('e2e/tests/creature-gameplay-mobile.spec.mjs');
+  const gameplayRealDesktop = await read('e2e/tests/creature-gameplay-real-desktop.spec.mjs');
   for (const id of ['desktop.minimap', 'desktop.classic', 'desktop.floor-mode', 'desktop.coordinate-pan']) {
     assert.ok(audit.includes(id), `visual audit must cover ${id}`);
   }
   assert.match(degraded, /desktop\.search-degraded/);
   assert.match(resilience, /desktop\.fail-closed/);
-  assert.match(gameplayDesktop, /desktop\.creature-gameplay/);
-  assert.match(gameplayMobile, /mobile\.creature-gameplay/);
-  assert.ok(gameplayDesktop.includes(".fill('battle axe')"));
-  assert.match(gameplayDesktop, /captureUserVisualEvidence[\s\S]*?\.fill\(''\)[\s\S]*?#inspector-tab-semantic/);
-  assert.ok(gameplayMobile.includes(".fill('battle axe')"));
-  assert.match(gameplayDesktop, /235 gold/);
-  assert.match(gameplayDesktop, /80 gold/);
-  assert.match(gameplayMobile, /235 gold/);
-  assert.match(gameplayMobile, /80 gold/);
+  assert.match(gameplayDesktop, /captureUserVisualEvidence[\s\S]*?desktop\.creature-gameplay/);
+  assert.match(gameplayMobile, /captureUserVisualEvidence[\s\S]*?mobile\.creature-gameplay/);
+  assert.doesNotMatch(gameplayDesktop, /battle axe|235 gold|80 gold/,
+    'primary desktop visual acceptance must remain qualification-fixture backed');
+  assert.doesNotMatch(gameplayMobile, /battle axe|235 gold|80 gold/,
+    'primary mobile visual acceptance must remain qualification-fixture backed');
+  assert.ok(gameplayRealDesktop.includes(".fill('battle axe')"));
+  assert.match(gameplayRealDesktop, /235 gold/);
+  assert.match(gameplayRealDesktop, /80 gold/);
 });

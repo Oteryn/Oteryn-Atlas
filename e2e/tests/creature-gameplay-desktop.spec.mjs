@@ -68,7 +68,7 @@ test('desktop fixture creature activation preserves Gameplay and Semantic inspec
       { selector: '#inspector-tab-semantic', label: 'Semantic tab', interactive: true },
     ],
   });
-  await captureUserVisualEvidence(page, testInfo, 'desktop.creature-gameplay-fixture', {
+  await captureUserVisualEvidence(page, testInfo, 'desktop.creature-gameplay', {
     surfaceMetrics: gameplayMetrics,
     note: 'Desktop fixture-backed Gameplay inspector shell and tab navigation.',
   });

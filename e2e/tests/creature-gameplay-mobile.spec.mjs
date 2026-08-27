@@ -77,7 +77,7 @@ test('mobile fixture NPC tap reaches Gameplay shell with touch-sized tabs', asyn
       { selector: '#inspector-tab-semantic', label: 'Semantic tab', interactive: true, minWidth: 44, minHeight: 44 },
     ],
   });
-  await captureUserVisualEvidence(page, testInfo, 'mobile.creature-gameplay-fixture', {
+  await captureUserVisualEvidence(page, testInfo, 'mobile.creature-gameplay', {
     surfaceMetrics: gameplayMetrics,
     note: 'Mobile fixture-backed Gameplay drawer with touch-sized tab navigation.',
   });
