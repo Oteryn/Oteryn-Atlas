@@ -10,6 +10,12 @@ const { liveCreatureReady } = require('../support/live-creature-readiness.cjs');
 const preview = process.env.PREVIEW_URL;
 const expectedRevision = process.env.ATLAS_REV;
 const expectedDigest = process.env.CREATURE_SEMANTIC_DIGEST;
+const expectedGameplayDigest = process.env.CREATURE_GAMEPLAY_DIGEST;
+const expectedGameplayGameRev = process.env.GAMEPLAY_GAME_REV;
+const GAMEPLAY_FIXTURES = Object.freeze({
+  sam: Object.freeze({ entityId: 'npc-entity:f8d4f0200616061ffa4ae0b4c38c6d3e', label: 'Sam', kind: 'npc' }),
+  rat: Object.freeze({ entityId: 'monster-entity:80295e51265b3662bfbea2ea01ee3ccb', label: 'Rat', kind: 'monster' }),
+});
 const targets = JSON.parse(fs.readFileSync('/targets.json', 'utf8'));
 const evidenceDir = '/evidence';
 const STATIC_EQUIVALENT_PRESENTATION = 'outfit-presentation:sha256:b16bfc92e9d9e9c8f790507f987a11b25a169c4343c9d68471de76a5f3565c88';
@@ -26,6 +32,8 @@ fs.mkdirSync(evidenceDir, { recursive: true });
 assert.match(preview ?? '', /^https?:\/\/[A-Za-z0-9.-]+(?::[0-9]{1,5})?$/);
 assert.match(expectedRevision ?? '', /^[0-9a-f]{40}$/);
 assert.match(expectedDigest ?? '', /^sha256:[0-9a-f]{64}$/);
+assert.match(expectedGameplayDigest ?? '', /^sha256:[0-9a-f]{64}$/);
+assert.match(expectedGameplayGameRev ?? '', /^[0-9a-f]{40}$/);
 assert.equal(targets.npc.kind, 'npc');
 assert.ok(Array.isArray(targets.npc.roles) && targets.npc.roles.includes('shop'));
 assert.equal(targets.monster.kind, 'monster');
@@ -37,7 +45,7 @@ function escapeRegex(value) {
 function isRelevantRuntimeUrl(value) {
   try {
     const { pathname } = new URL(value);
-    return pathname.startsWith('/data/creatures/') || pathname.startsWith('/fullworld/') || pathname === '/web/fullworld.html' || pathname.startsWith('/web/fullworld-');
+    return pathname.startsWith('/data/creatures/') || pathname.startsWith('/fullworld/') || pathname.startsWith('/web/creature-gameplay/') || pathname === '/web/fullworld.html' || pathname.startsWith('/web/fullworld-');
   } catch {
     return false;
   }
@@ -247,6 +255,64 @@ function assertCreatureInspector(text, target, kindText) {
   assert.match(text, /Verified outfit pixels/i);
 }
 
+async function assertGameplayPublication(page) {
+  const response = await page.request.get(`${preview}/web/creature-gameplay/manifest.json`);
+  assert.equal(response.status(), 200);
+  const manifest = await response.json();
+  assert.equal(manifest.capability, 'creature-gameplay-profiles-v1');
+  assert.equal(manifest.producer_repository_sha, expectedGameplayGameRev);
+  assert.equal(manifest.semantic_digest, expectedGameplayDigest);
+  assert.deepEqual(manifest.counts, { monster_profiles: 1800, npc_profiles: 1049, referenced_items: 0 });
+  return manifest;
+}
+
+async function gameplayRecord(page, fixture) {
+  const response = await page.request.get(`${preview}/data/creatures/search.json`);
+  assert.equal(response.status(), 200);
+  const product = await response.json();
+  const record = product.records.find((row) => row.entity_id === fixture.entityId);
+  assert.ok(record, `missing live gameplay fixture ${fixture.label}`);
+  assert.equal(record.label, fixture.label);
+  assert.equal(record.kind, fixture.kind);
+  return record;
+}
+
+function gameplayUrl(record) {
+  const params = new URLSearchParams({ x: String(record.position.x), y: String(record.position.y), floor: String(record.position.floor), zoom: '2', mode: 'map', creatures: 'npc,monster', animation: 'off', creature: record.record_id, inspector: 'gameplay' });
+  return `${preview}/web/fullworld.html?${params}`;
+}
+
+async function proveGameplay(page, fixture, surface) {
+  const record = await gameplayRecord(page, fixture);
+  await page.goto(gameplayUrl(record), { waitUntil: 'domcontentloaded', timeout: 60_000 });
+  await assertRevisionResponse(page);
+  await waitSemanticReady(page);
+  await waitReady(page, { selectedId: record.record_id });
+  const card = page.locator('#creature-quick-card');
+  await card.waitFor({ state: 'visible', timeout: 30_000 });
+  await page.locator('#creature-card-details').click();
+  const gameplayTab = page.locator('#inspector-tab-gameplay');
+  await gameplayTab.waitFor({ state: 'visible', timeout: 30_000 });
+  assert.equal(await gameplayTab.getAttribute('aria-selected'), 'true');
+  if (fixture.kind === 'npc') {
+    const sells = page.locator('#gameplay-section-sells');
+    const buys = page.locator('#gameplay-section-buys');
+    await sells.waitFor({ state: 'visible', timeout: 30_000 });
+    assert.match(await sells.innerText(), /axe/i);
+    assert.match(await sells.innerText(), /20 gold/i);
+    assert.match(await buys.innerText(), /7 gold/i);
+  } else {
+    const loot = page.locator('#gameplay-section-loot');
+    const stats = page.locator('#gameplay-section-stats');
+    await loot.waitFor({ state: 'visible', timeout: 30_000 });
+    assert.match(await loot.innerText(), /gold coin/i);
+    assert.match(await loot.innerText(), /100%/);
+    assert.match(await stats.innerText(), /Health\s*20/i);
+  }
+  await page.screenshot({ path: `${evidenceDir}/${surface}-gameplay-${fixture.label.toLowerCase()}.png`, fullPage: true });
+  return { entityId: fixture.entityId, recordId: record.record_id };
+}
+
 async function runDesktop(browser) {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const page = await context.newPage();
@@ -254,6 +320,7 @@ async function runDesktop(browser) {
   await page.goto(targetUrl(targets.npc, 'npc,monster', 'shop'), { waitUntil: 'domcontentloaded', timeout: 60_000 });
   await assertRevisionResponse(page);
   const animationCoverage = await publishedAnimationCoverage(page);
+  await assertGameplayPublication(page);
   await waitSemanticReady(page);
   const initial = await waitReady(page, { requireNpcBadge: true });
   assert.ok(initial.visibleRecords > 0);
@@ -312,9 +379,10 @@ async function runDesktop(browser) {
   await waitReady(page, { selectedId: targets.npc.record_id, npc: true, monster: false });
   assert.equal(new URL(page.url()).searchParams.get('creatures'), 'npc');
   await page.screenshot({ path: `${evidenceDir}/desktop-npc-only.png`, fullPage: true });
+  const gameplay = await proveGameplay(page, GAMEPLAY_FIXTURES.sam, 'desktop');
   assert.deepEqual(errors, []);
   await context.close();
-  return { animationCoverage, initialVisibleRecords: initial.visibleRecords, selected: targets.npc.record_id };
+  return { animationCoverage, initialVisibleRecords: initial.visibleRecords, selected: targets.npc.record_id, gameplay };
 }
 
 async function runMobile(browser) {
@@ -323,6 +391,7 @@ async function runMobile(browser) {
   const errors = watchRelevantErrors(page);
   await page.goto(targetUrl(targets.monster), { waitUntil: 'domcontentloaded', timeout: 60_000 });
   await assertRevisionResponse(page);
+  await assertGameplayPublication(page);
   await waitSemanticReady(page);
   const initial = await waitReady(page);
   assert.ok(initial.visibleRecords > 0);
@@ -364,9 +433,10 @@ async function runMobile(browser) {
   const text = await inspector.innerText();
   assertCreatureInspector(text, targets.monster, 'Monster / Spawn');
   await page.screenshot({ path: `${evidenceDir}/mobile-monster-only.png`, fullPage: true });
+  const gameplay = await proveGameplay(page, GAMEPLAY_FIXTURES.rat, 'mobile');
   assert.deepEqual(errors, []);
   await context.close();
-  return { initialVisibleRecords: initial.visibleRecords, selected: targets.monster.record_id };
+  return { initialVisibleRecords: initial.visibleRecords, selected: targets.monster.record_id, gameplay };
 }
 
 (async () => {
@@ -388,6 +458,8 @@ async function runMobile(browser) {
       status: 'PASS',
       atlasRevision: expectedRevision,
       gameSemanticDigest: expectedDigest,
+      gameplayGameRevision: expectedGameplayGameRev,
+      gameplaySemanticDigest: expectedGameplayDigest,
       desktop,
       mobile,
     };
