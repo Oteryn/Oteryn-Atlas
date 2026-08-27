@@ -108,6 +108,29 @@ function safePrefix(value) {
     && !value.split('/').includes('.');
 }
 
+function validateDependencyRules(candidate, catalog, kind) {
+  if (!Array.isArray(candidate)) invalid(kind, 'dependencyRules must be an array');
+  return candidate.map((rule, index) => {
+    const field = `dependencyRules[${index}]`;
+    if (!isPlainObject(rule)) invalid(kind, `${field} must be an object`);
+    const whenAllDomains = uniqueStrings(rule.whenAllDomains, kind, `${field}.whenAllDomains`);
+    if (whenAllDomains.length === 0 || whenAllDomains.some((domain) => !GROUP_ID.test(domain))) {
+      invalid(kind, `${field}.whenAllDomains are invalid`);
+    }
+    const addDomains = uniqueStrings(rule.addDomains ?? [], kind, `${field}.addDomains`);
+    if (addDomains.some((domain) => !GROUP_ID.test(domain))) invalid(kind, `${field}.addDomains are invalid`);
+    if (!PROFILE_ORDER.includes(rule.minimumProfile)) invalid(kind, `${field}.minimumProfile is invalid`);
+    const requiredGroups = uniqueStrings(rule.requiredGroups ?? [], kind, `${field}.requiredGroups`);
+    if (requiredGroups.some((group) => !Object.hasOwn(catalog.groups, group))) {
+      invalid(kind, `${field} references unknown group`);
+    }
+    if (addDomains.length === 0 && requiredGroups.length === 0 && rule.minimumProfile === 'none') {
+      invalid(kind, `${field} must widen domains, groups or profile`);
+    }
+    return { whenAllDomains, addDomains, minimumProfile: rule.minimumProfile, requiredGroups };
+  });
+}
+
 export function validateImpactManifest(candidate, catalogCandidate) {
   const kind = 'impact manifest';
   const catalog = validateVerificationCatalog(catalogCandidate);
@@ -131,7 +154,8 @@ export function validateImpactManifest(candidate, catalogCandidate) {
       requiredGroups,
     };
   });
-  return freeze({ schemaVersion: 1, entries });
+  const dependencyRules = validateDependencyRules(candidate.dependencyRules ?? [], catalog, kind);
+  return freeze({ schemaVersion: 1, entries, dependencyRules });
 }
 
 export function canonicalJson(value) {
