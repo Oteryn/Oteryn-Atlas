@@ -8,6 +8,7 @@ const compose = fs.readFileSync('e2e/compose.yml', 'utf8');
 const runSh = fs.readFileSync('e2e/run.sh', 'utf8');
 const runPs = fs.readFileSync('e2e/run.ps1', 'utf8');
 const nightly = fs.readFileSync('.github/workflows/verification-depth.yml', 'utf8');
+const dockerHarness = fs.readFileSync('.github/workflows/docker-e2e.yml', 'utf8');
 const forwarderPath = 'e2e/local-publication-forwarder.py';
 
 test('checkout overlay reuses publication upstream connections without masking failures', () => {
@@ -26,6 +27,17 @@ test('all checkout-overlay launch paths provide normalized publication upstream 
     assert.match(runPs, new RegExp(key));
     assert.match(nightly, new RegExp(key));
   }
+});
+
+test('non-authoritative Docker harness uses an explicit isolated publication sentinel only for static overlay validation', () => {
+  assert.match(dockerHarness, /Non-authoritative static-overlay sentinel/);
+  assert.match(dockerHarness, /ATLAS_PUBLICATION_ORIGIN:\s*http:\/\/127\.0\.0\.1:9/);
+  assert.match(dockerHarness, /ATLAS_PUBLICATION_SCHEME:\s*http/);
+  assert.match(dockerHarness, /ATLAS_PUBLICATION_UPSTREAM:\s*127\.0\.0\.1:9/);
+  assert.match(dockerHarness, /ATLAS_PUBLICATION_HOST_HEADER:\s*127\.0\.0\.1/);
+  assert.match(dockerHarness, /ATLAS_PUBLICATION_HOST:\s*127\.0\.0\.1/);
+  assert.doesNotMatch(dockerHarness, /docker compose -f e2e\/compose\.yml run --rm e2e/);
+  assert.match(dockerHarness, /playwright test --config=playwright\.config\.mjs --list/);
 });
 
 test('GitHub-hosted Compose fails closed before browser allocation when publication identity is missing', () => {

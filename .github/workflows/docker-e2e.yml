@@ -24,7 +24,14 @@ jobs:
     timeout-minutes: 15
     env:
       ATLAS_CODE_REVISION: ${{ github.event.pull_request.head.sha || github.sha }}
+      # Non-authoritative static-overlay sentinel. This harness never executes
+      # Playwright against publication routes; ordinary browser evidence must
+      # still provide a validated immutable publication and readiness manifest.
       ATLAS_PUBLICATION_ORIGIN: http://127.0.0.1:9
+      ATLAS_PUBLICATION_SCHEME: http
+      ATLAS_PUBLICATION_UPSTREAM: 127.0.0.1:9
+      ATLAS_PUBLICATION_HOST_HEADER: 127.0.0.1
+      ATLAS_PUBLICATION_HOST: 127.0.0.1
     steps:
       - name: Check out exact repository revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
