@@ -14,10 +14,13 @@ test('qualification world is deterministic, complete for the 16-floor runtime co
   const second = await buildQualificationWorld(right);
 
   assert.deepEqual(second, first);
-  assert.equal(first.fixtureId, 'atlas-qualification-world-v1');
+  assert.equal(first.fixtureId, 'atlas-qualification-world-v2');
   assert.equal(first.semanticFloorCount, 16);
   assert.equal(first.runtimeFloorCount, 16);
   assert.equal(first.dataCapability, 'qualification_fixture');
+  for (const field of ['publicationRoot', 'semanticRoot', 'runtimeIndexRoot', 'pixelRoot', 'pixelBucketRoot', 'overviewRoot', 'productDigest']) {
+    assert.match(first[field], /^sha256:[a-f0-9]{64}$/, `${field} must be content-addressed`);
+  }
   assert.deepEqual(await verifyQualificationWorld(left), first);
 
   fs.appendFileSync(path.join(left, 'publication', 'semantic', 'chunks', 'f-7-r1008-c1004.jsonl'), 'forged');
