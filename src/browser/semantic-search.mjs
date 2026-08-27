@@ -7,6 +7,7 @@ const PREFIXES = new Map([
 const MAX_QUERY = 256;
 const MAX_RESULTS = 50;
 const MAX_RECORDS = 250000;
+export const PRODUCTION_SEMANTIC_SEARCH_SOURCE = Object.freeze({ authority: 'Oteryn/Oteryn-Game', repository: 'Oteryn/Oteryn-Game', contractId: 'oteryn-game-atlas-export-v1', capability: 'semantic-search-source-v1', profileId: 'oteryn-game-atlas-semantic-search-v1' });
 
 export class SemanticSearchError extends Error {}
 
@@ -32,13 +33,18 @@ function validateBounds(bounds, label) {
   requireValue(bounds.x_min < bounds.x_max_exclusive && bounds.y_min < bounds.y_max_exclusive, `${label} bounds empty`);
 }
 
-export function validateSemanticSearchIndex(index) {
+export function validateSemanticSearchIndex(index, expectedSource = PRODUCTION_SEMANTIC_SEARCH_SOURCE) {
   requireValue(index?.schema_version === 1, 'semantic search index schema unsupported');
-  requireValue(index.source?.authority === 'Oteryn/Oteryn-Game' && index.source?.repository === 'Oteryn/Oteryn-Game', 'semantic search source authority invalid');
-  requireValue(index.source?.contract_id === 'oteryn-game-atlas-export-v1' && index.source?.capability === 'semantic-search-source-v1', 'semantic search source contract unsupported');
-  requireValue(index.source?.profile_id === 'oteryn-game-atlas-semantic-search-v1', 'semantic search source profile unsupported');
-  requireValue(/^[0-9a-f]{40}$/.test(index.source?.game_revision ?? ''), 'semantic search Game revision invalid');
+  requireValue(expectedSource && typeof expectedSource === 'object' && !Array.isArray(expectedSource), 'semantic search source expectations invalid');
+  requireValue(index.source?.authority === expectedSource.authority && index.source?.repository === expectedSource.repository, 'semantic search source authority invalid');
+  requireValue(index.source?.contract_id === expectedSource.contractId && index.source?.capability === expectedSource.capability, 'semantic search source contract unsupported');
+  requireValue(index.source?.profile_id === expectedSource.profileId, 'semantic search source profile unsupported');
+  if (expectedSource.gameRevision == null) requireValue(/^[0-9a-f]{40}$/.test(index.source?.game_revision ?? ''), 'semantic search Game revision invalid');
+  else requireValue(index.source?.game_revision === expectedSource.gameRevision, 'semantic search fixture revision invalid');
+  if (expectedSource.fixtureId == null) requireValue(index.source?.fixture_id == null, 'production semantic search source must not claim fixture identity');
+  else requireValue(index.source?.fixture_id === expectedSource.fixtureId, 'semantic search fixture identity invalid');
   requireValue(/^sha256:[0-9a-f]{64}$/.test(index.source?.semantic_digest ?? '') && /^sha256:[0-9a-f]{64}$/.test(index.index_digest ?? ''), 'semantic search digest identity invalid');
+  if (expectedSource.semanticDigest != null) requireValue(index.source.semantic_digest === expectedSource.semanticDigest, 'semantic search semantic digest mismatch');
   requireValue(index.input_floor_aliases && typeof index.input_floor_aliases === 'object' && Object.keys(index.input_floor_aliases).length <= 64, 'semantic search floor aliases invalid');
   for (const [key, value] of Object.entries(index.input_floor_aliases)) {
     requireValue(/^-?\d+$/.test(key) && Number.isSafeInteger(value), 'semantic search floor alias invalid');

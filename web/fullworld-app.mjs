@@ -14,7 +14,7 @@ import {
   serializeFullWorldViewState,
   viewportTileBounds,
 } from '../src/browser/fullworld.mjs';
-import { FULLWORLD_CAPABILITIES, FULLWORLD_PATHS, FULLWORLD_TRUST } from '../src/browser/fullworld-trust.mjs';
+import { FULLWORLD_CAPABILITIES, FULLWORLD_PATHS, FULLWORLD_TRUST, ancillarySourceExpectations } from '../src/browser/fullworld-trust.mjs';
 import { loadFullWorldPixelCatalog } from '../src/browser/fullworld-pixels.mjs';
 import { loadRuntimePixelBuckets, loadVerifiedPixelBucket, loadVerifiedPixelBundle, requiredRuntimePixelBuckets } from '../src/browser/fullworld-pixel-buckets.mjs';
 import { recordsForResidentBuckets } from '../src/browser/fullworld-progressive.mjs';
@@ -29,6 +29,7 @@ import { LOD_POLICY, detailStreamWanted, lodBlend, normalizeViewMode } from '../
 import { createWorldQueryApi } from '../src/browser/world-query.mjs';
 import { dispatchMapActivation } from '../src/browser/map-activation.mjs';
 
+const ancillarySources = ancillarySourceExpectations(FULLWORLD_TRUST);
 const bootStartedMs = performance.now();
 const performanceProfile = resolvePerformanceProfile(location.search);
 const PREFETCH_TILES = performanceProfile.prefetchTiles;
@@ -939,7 +940,7 @@ async function boot() {
   const overviewBase = new URL(FULLWORLD_PATHS.overview, location.href);
   const pixelBucketBase = new URL(FULLWORLD_PATHS.pixelBuckets, location.href);
   const animationBase = new URL(FULLWORLD_PATHS.animation, location.href);
-  try { animationRuntime = await getAnimationRuntime(animationBase); }
+  try { animationRuntime = await getAnimationRuntime(animationBase, fetch, ancillarySources.animation); }
   catch (error) { animationRuntimeError = error; animationRuntime = null; }
   $('#animation-toggle').disabled = !animationRuntime;
   if (animationRuntimeError) $('#animation-note').textContent = `Static fallback: ${animationRuntimeError.message}`;

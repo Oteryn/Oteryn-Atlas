@@ -7,15 +7,16 @@ import {
 import {
   findCreatureById,
   searchCreatureRecords,
-  validateCreatureSearchRecords,
+  validateCreatureSearchCatalog,
 } from '../src/browser/creature-search.mjs';
+import { FULLWORLD_TRUST, ancillarySourceExpectations } from '../src/browser/fullworld-trust.mjs';
 
 const INDEX_URL = new URL('./semantic-search/index.json', import.meta.url);
 const CREATURE_SEARCH_URL = new URL('./semantic-search/creatures.json', import.meta.url);
 const MAX_INDEX_BYTES = 2 * 1024 * 1024;
-const EXPECTED_CREATURE_SEMANTIC_DIGEST = 'sha256:81505e91d7089f91e71813ec43f97118932db9cc7fd76d291fa399447ee2dfa4';
 const MAX_CREATURE_SEARCH_BYTES = 2 * 1024 * 1024;
 const MAX_RESULTS = 12;
+const ancillarySources = ancillarySourceExpectations(FULLWORLD_TRUST);
 const state = { index: null, creatureSearch: [], active: null, lastQuery: '', lastResults: 0, status: 'LOADING', error: null };
 
 function requireValue(condition, message) {
@@ -233,9 +234,11 @@ function renderActiveInspector() {
   if (recordId) recordId.textContent = `Placement record id: ${record.record_id}`;
   const caps = document.createElement('p'); caps.textContent = `Public capabilities: ${record.capabilities.length ? record.capabilities.join(', ') : 'none published'}`;
   const source = document.createElement('p');
-  source.textContent = record.provenance?.source_capability === 'static-creatures-v1'
-    ? 'Source: Oteryn/Oteryn-Game · static-creatures-v1'
-    : `Source: Oteryn/Oteryn-Game@${state.index.source.game_revision.slice(0, 12)} · ${state.index.source.profile_id}`;
+  const provenanceAuthority = record.provenance?.authority ?? state.index.source.authority;
+  const provenanceCapability = record.provenance?.source_capability;
+  source.textContent = provenanceCapability
+    ? `Source: ${provenanceAuthority} ? ${provenanceCapability}`
+    : `Source: ${state.index.source.repository}@${state.index.source.game_revision.slice(0, 12)} ? ${state.index.source.profile_id}`;
   const bounds = document.createElement('p'); bounds.textContent = record.bounds ? 'Authoritative bounds published.' : 'Authoritative bounds: not published by Game.';
   inspector.replaceChildren(card, position, id);
   if (recordId) inspector.append(recordId);
@@ -245,11 +248,7 @@ function renderActiveInspector() {
 
 async function loadCreatureSearch() {
   const catalog = await boundedJson(CREATURE_SEARCH_URL, MAX_CREATURE_SEARCH_BYTES);
-  requireValue(catalog.schema_version === 1, 'unsupported creature search catalog schema');
-  requireValue(catalog.source?.contract_id === 'oteryn-game-atlas-export-v1' && catalog.source?.capability === 'static-creatures-v1', 'creature search source unsupported');
-  requireValue(catalog.source?.semantic_digest === EXPECTED_CREATURE_SEMANTIC_DIGEST, 'untrusted creature search semantic digest');
-  requireValue(catalog.source?.coordinate_profile === 'oteryn-native-floor-v1', 'creature search coordinate profile unsupported');
-  return validateCreatureSearchRecords(catalog.records);
+  return validateCreatureSearchCatalog(catalog, ancillarySources.semanticSearch).records;
 }
 
 async function boot() {
@@ -257,7 +256,7 @@ async function boot() {
   wireForm('#search-form', '#search-input', 'desktop');
   wireForm('#mobile-search-form', '#mobile-search-input', 'mobile');
   const raw = await boundedJson(INDEX_URL, MAX_INDEX_BYTES);
-  state.index = validateSemanticSearchIndex(raw);
+  state.index = validateSemanticSearchIndex(raw, ancillarySources.semanticSearch);
   state.creatureSearch = await loadCreatureSearch();
   const params = new URLSearchParams(location.search);
   const activeId = params.get('semantic');

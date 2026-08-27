@@ -85,8 +85,8 @@ export function ancillarySourceExpectations(trust = PRODUCTION_FULLWORLD_TRUST) 
   return Object.freeze({
     mode: 'qualification_fixture', contractId: QUALIFICATION_SOURCE_CONTRACT,
     animation: Object.freeze({ gameSha: 'fixture', appearanceProductRoot: trust.pixelRoot, outfitSpatialProductRoot: trust.semanticRoot }),
-    creatures: Object.freeze({ contractId: QUALIFICATION_SOURCE_CONTRACT, capability: 'qualification-creatures-v1', semanticDigest: trust.semanticRoot, npcRoleSchemaVersion: 1 }),
-    semanticSearch: Object.freeze({ authority: 'Oteryn/Oteryn-Atlas', repository: 'Oteryn/Oteryn-Atlas', contractId: QUALIFICATION_SOURCE_CONTRACT, capability: 'qualification-semantic-search-v1', profileId: 'oteryn-atlas-qualification-semantic-search-v1', fixtureId: QUALIFICATION_FIXTURE_ID, semanticDigest: trust.semanticRoot, creatureContractId: QUALIFICATION_SOURCE_CONTRACT, creatureCapability: 'qualification-creatures-v1', creatureSemanticDigest: trust.semanticRoot }),
+    creatures: Object.freeze({ contractId: QUALIFICATION_SOURCE_CONTRACT, capability: 'qualification-creatures-v1', semanticDigest: trust.semanticRoot, npcRoleSchemaVersion: 1, fixtureId: QUALIFICATION_FIXTURE_ID }),
+    semanticSearch: Object.freeze({ authority: 'Oteryn/Oteryn-Atlas', repository: 'Oteryn/Oteryn-Atlas', contractId: QUALIFICATION_SOURCE_CONTRACT, capability: 'qualification-semantic-search-v1', profileId: 'oteryn-atlas-qualification-semantic-search-v1', fixtureId: QUALIFICATION_FIXTURE_ID, gameRevision: 'fixture', semanticDigest: trust.semanticRoot, creatureContractId: QUALIFICATION_SOURCE_CONTRACT, creatureCapability: 'qualification-creatures-v1', creatureSemanticDigest: trust.semanticRoot }),
   });
 }
 
