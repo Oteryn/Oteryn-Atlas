@@ -12,6 +12,7 @@ const productDigest = `sha256:${'3'.repeat(64)}`;
 const workerDigest = `sha256:${'4'.repeat(64)}`;
 const executionDigest = `sha256:${'5'.repeat(64)}`;
 const hostedId = 'desktop-chromium::e2e/tests/desktop.spec.mjs::hosted';
+const boundedHostedId = 'desktop-chromium::e2e/tests/creature-gameplay-real-desktop.spec.mjs::bounded real';
 const candidateAdditionalId = 'desktop-chromium::e2e/tests/desktop.spec.mjs::candidate addition';
 const specialistId = 'desktop-chromium::e2e/tests/fullworld-animation-census-desktop.spec.mjs::specialist';
 
@@ -38,6 +39,16 @@ function hostedGroup() {
     projects: ['desktop-chromium'],
     stableTestIds: [],
     capabilities: capabilities(),
+  };
+}
+
+function boundedHostedGroup() {
+  return {
+    id: 'integration.creature-gameplay',
+    specs: ['e2e/tests/creature-gameplay-real-desktop.spec.mjs'],
+    projects: ['desktop-chromium'],
+    stableTestIds: [],
+    capabilities: capabilities({ dataCapability: 'bounded_real_world' }),
   };
 }
 
@@ -117,6 +128,46 @@ test('candidate-addition identity must be unique and belong to the exact planned
 
 test('executor rejects a stale PR head before execution', () => {
   assert.throws(() => buildProtectedHostedExecutionContract(plan(), { currentHeadSha: 'c'.repeat(40) }), /stale|current.*head/i);
+});
+
+test('hosted execution partitions exact stable IDs by data capability', () => {
+  const result = buildProtectedHostedExecutionContract(plan({
+    requiredGroupIds: ['e2e.full', 'integration.creature-gameplay'],
+    groups: [hostedGroup(), boundedHostedGroup()],
+    stableTestIds: [hostedId, boundedHostedId],
+    requiredDataCapabilities: ['bounded_real_world', 'qualification_fixture'],
+  }), { currentHeadSha: head });
+
+  assert.deepEqual(result.hosted.partitions, [
+    {
+      dataCapability: 'bounded_real_world',
+      groupIds: ['integration.creature-gameplay'],
+      stableTestIds: [boundedHostedId],
+      protectedStableTestIds: [boundedHostedId],
+      candidateAdditionalStableTestIds: [],
+    },
+    {
+      dataCapability: 'qualification_fixture',
+      groupIds: ['e2e.full'],
+      stableTestIds: [hostedId],
+      protectedStableTestIds: [hostedId],
+      candidateAdditionalStableTestIds: [],
+    },
+  ]);
+});
+
+test('hosted stable ID cannot span multiple data capabilities', () => {
+  const overlappingBounded = {
+    ...boundedHostedGroup(),
+    id: 'integration.overlapping-bounded',
+    specs: ['e2e/tests/desktop.spec.mjs'],
+  };
+  assert.throws(() => buildProtectedHostedExecutionContract(plan({
+    requiredGroupIds: ['e2e.full', overlappingBounded.id],
+    groups: [hostedGroup(), overlappingBounded],
+    stableTestIds: [hostedId],
+    requiredDataCapabilities: ['bounded_real_world', 'qualification_fixture'],
+  }), { currentHeadSha: head }), /data.*capability|ambiguous/i);
 });
 
 test('only explicit real_fullworld groups become specialist execution', () => {

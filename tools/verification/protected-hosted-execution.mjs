@@ -98,6 +98,32 @@ function partitionByCandidateAdditions(stableTestIds, candidateAdditionSet) {
   return { protectedStableTestIds, candidateAdditionalStableTestIds };
 }
 
+function partitionHostedByDataCapability(hostedGroups, hostedStableTestIds, candidateAdditionSet) {
+  const stableIdCapability = new Map();
+  for (const id of hostedStableTestIds) {
+    const capabilities = [...new Set(hostedGroups
+      .filter((group) => groupMatchesStableId(group, id))
+      .map((group) => group.capabilities.dataCapability))]
+      .sort();
+    if (capabilities.length !== 1) {
+      throw new TypeError(`planned stable ID has ambiguous hosted data capability: ${id}`);
+    }
+    stableIdCapability.set(id, capabilities[0]);
+  }
+
+  return [...new Set(hostedGroups.map((group) => group.capabilities.dataCapability))]
+    .sort()
+    .map((dataCapability) => {
+      const stableTestIds = hostedStableTestIds.filter((id) => stableIdCapability.get(id) === dataCapability);
+      return {
+        dataCapability,
+        groupIds: hostedGroups.filter((group) => group.capabilities.dataCapability === dataCapability).map((group) => group.id).sort(),
+        stableTestIds,
+        ...partitionByCandidateAdditions(stableTestIds, candidateAdditionSet),
+      };
+    });
+}
+
 export function buildProtectedHostedExecutionContract(plan, { currentHeadSha } = {}) {
   if (!plan || typeof plan !== 'object' || Array.isArray(plan) || plan.schemaVersion !== 2) {
     throw new TypeError('protected hosted execution requires plan schemaVersion 2');
@@ -169,6 +195,7 @@ export function buildProtectedHostedExecutionContract(plan, { currentHeadSha } =
   const specialistExpectedStableTestIdsDigest = digest(specialistStableTestIds);
   const hostedSourcePartition = partitionByCandidateAdditions(hostedStableTestIds, candidateAdditionSet);
   const specialistSourcePartition = partitionByCandidateAdditions(specialistStableTestIds, candidateAdditionSet);
+  const hostedPartitions = partitionHostedByDataCapability(hostedGroups, hostedStableTestIds, candidateAdditionSet);
 
   return freeze({
     schemaVersion: 1,
@@ -187,6 +214,7 @@ export function buildProtectedHostedExecutionContract(plan, { currentHeadSha } =
       groupIds: hostedGroups.map((group) => group.id).sort(),
       stableTestIds: hostedStableTestIds,
       ...hostedSourcePartition,
+      partitions: hostedPartitions,
     },
     specialist: {
       groupIds: specialistGroups.map((group) => group.id).sort(),
