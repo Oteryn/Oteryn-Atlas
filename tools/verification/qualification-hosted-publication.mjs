@@ -131,6 +131,13 @@ export async function startReadyQualificationPublicationServer({ publicationDir,
       response.end();
       return;
     }
+    try {
+      validateReadyPublication({ publicationDir: root, manifest: validatedReadiness, ...identity });
+    } catch {
+      response.writeHead(503, { 'Cache-Control': 'no-store' });
+      response.end();
+      return;
+    }
     if (request.url === '/__atlas/readiness') {
       const bytes = Buffer.from(`${JSON.stringify(validatedReadiness)}\n`);
       response.writeHead(200, {
