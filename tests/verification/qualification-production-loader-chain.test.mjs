@@ -72,7 +72,7 @@ test('qualification world traverses production manifests, floors, authenticated 
     assert.equal(selected.length, 1);
 
     const rangeStore = new SemanticRangeStore(new URL('semantic/', publicationBase), runtimeWorld, { fetcher });
-    const tiles = await rangeStore.loadGroup(runtimeFloor, selected[0].chunk, selected[0].group);
+    const tiles = await rangeStore.loadGroup(runtimeFloor.floor, selected[0].chunk, selected[0].group);
     assert.equal(tiles.length, 1);
     assert.deepEqual(rangeStore.stats(), {
       cacheBytes: selected[0].group.bytes,
