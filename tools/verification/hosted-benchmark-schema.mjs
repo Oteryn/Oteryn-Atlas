@@ -123,7 +123,12 @@ function validateOutcome(outcome) {
 }
 
 function validateMetrics(metrics) {
-  exactKeys(metrics, contract.requiredMetricIds, 'metrics');
+  if (!isPlainObject(metrics)) invalid('metrics must be an object');
+  for (const metricId of contract.requiredMetricIds) {
+    if (!Object.hasOwn(metrics, metricId)) invalid(`missing metric ${metricId}`);
+  }
+  const unexpected = Object.keys(metrics).filter((metricId) => !contract.requiredMetricIds.includes(metricId));
+  if (unexpected.length > 0) invalid(`unexpected metric ${unexpected.sort()[0]}`);
   for (const metricId of contract.requiredMetricIds) {
     const observation = metrics[metricId];
     exactKeys(observation, ['status', 'value', 'unit', 'source'], `metrics.${metricId}`);
