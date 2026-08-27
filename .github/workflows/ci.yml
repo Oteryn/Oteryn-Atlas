@@ -396,7 +396,9 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: atlas-shadow-plan-${{ github.run_id }}-${{ github.run_attempt }}
-          path: artifacts/verification/shadow-verification-plan.json
+          path: |
+            artifacts/verification/shadow-verification-plan.json
+            artifacts/verification/stable-test-ids.json
           if-no-files-found: error
           retention-days: 14
 
@@ -419,6 +421,7 @@ jobs:
       ATLAS_PR_NUMBER: ${{ github.event.pull_request.number }}
       ATLAS_CODE_REVISION: ${{ github.event.pull_request.head.sha }}
       ATLAS_EXPECTED_REVISION: ${{ github.event.pull_request.head.sha }}
+      ATLAS_SHADOW_PLAN_DIGEST: ${{ needs.change-classification.outputs.shadow_plan_digest }}
       ATLAS_E2E_WORKERS: '1'
       ATLAS_USER_VISUAL_EVIDENCE: '0'
       ATLAS_E2E_ARTIFACTS_HOST: ${{ github.workspace }}/artifacts/e2e
@@ -429,6 +432,12 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
+
+      - name: Download exact shadow plan and stable-ID census
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: atlas-shadow-plan-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/verification
 
       - name: Fence current PR head before browser execution
         shell: bash
@@ -452,6 +461,12 @@ jobs:
           # Provisional fail-closed setting until Phase E commits measured GitHub-hosted worker/shard policy.
           test "$ATLAS_E2E_WORKERS" = 1
           mkdir -p "$ATLAS_E2E_ARTIFACTS_HOST"
+          node tools/verification/validate-shadow-plan-evidence.mjs \
+            --plan artifacts/verification/shadow-verification-plan.json \
+            --expected-plan-digest "$ATLAS_SHADOW_PLAN_DIGEST" \
+            --head-sha "$ATLAS_CODE_REVISION" \
+            --stable-test-ids artifacts/verification/stable-test-ids.json \
+            > "$ATLAS_E2E_ARTIFACTS_HOST/plan-evidence.json"
           docker compose -f e2e/compose.yml build e2e
           set +e
           docker compose -f e2e/compose.yml run --rm e2e
@@ -461,7 +476,9 @@ jobs:
           node tools/verification/validate-github-hosted-e2e.mjs \
             --summary "$ATLAS_E2E_ARTIFACTS_HOST/summary.json" \
             --head-sha "$ATLAS_CODE_REVISION" \
-            --workers "$ATLAS_E2E_WORKERS"
+            --workers "$ATLAS_E2E_WORKERS" \
+            --expected-stable-test-ids artifacts/verification/stable-test-ids.json \
+            > "$ATLAS_E2E_ARTIFACTS_HOST/runtime-validation.json"
           test "$rc" -eq 0
 
       - name: Fence current PR head before evidence acceptance
@@ -490,6 +507,8 @@ jobs:
           path: |
             artifacts/e2e/summary.json
             artifacts/e2e/failure.json
+            artifacts/e2e/plan-evidence.json
+            artifacts/e2e/runtime-validation.json
           if-no-files-found: warn
           retention-days: 14
 
