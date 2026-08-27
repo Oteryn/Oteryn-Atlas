@@ -31,5 +31,19 @@
       "minimumProfile": "full",
       "requiredGroups": ["deterministic.core", "e2e.full"]
     }
+  ],
+  "dependencyRules": [
+    {
+      "whenAllDomains": ["generator"],
+      "addDomains": ["browser-runtime"],
+      "minimumProfile": "broad",
+      "requiredGroups": ["e2e.common-smoke"]
+    },
+    {
+      "whenAllDomains": ["browser-runtime", "generator"],
+      "addDomains": ["generated-product-consumers"],
+      "minimumProfile": "full",
+      "requiredGroups": ["deterministic.core", "e2e.full"]
+    }
   ]
 }
