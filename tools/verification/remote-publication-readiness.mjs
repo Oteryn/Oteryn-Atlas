@@ -37,6 +37,26 @@ function requirePositiveInteger(value, label) {
   return value;
 }
 
+function requirePublicationOrigin(value, publicationRoot, label) {
+  const raw = requireString(value, label);
+  let parsed;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    fail(`${label} must be an absolute HTTPS URL`);
+  }
+  if (parsed.protocol !== 'https:') fail(`${label} must use HTTPS`);
+  if (parsed.username || parsed.password || parsed.search || parsed.hash) {
+    fail(`${label} must not contain credentials, query parameters, or fragments`);
+  }
+  const rootHex = requireDigest(publicationRoot, 'publication root').slice('sha256:'.length);
+  const segments = parsed.pathname.split('/').filter(Boolean);
+  if (!segments.includes(rootHex)) {
+    fail(`${label} must be content-addressed by the exact publication root`);
+  }
+  return parsed.href.replace(/\/$/, '');
+}
+
 function readJson(fileInput, label) {
   const file = path.resolve(requireString(fileInput, label));
   try {
@@ -78,6 +98,11 @@ export function validateRemoteReadinessMetadata({
   if (manifest.planDigest !== expected.planDigest) fail('readiness plan digest mismatch');
   if (manifest.browserImage !== expected.browserImage) fail('readiness browser image mismatch');
   if (manifest.publication?.rootContentId !== expected.publicationRoot) fail('readiness publication root mismatch');
+  const publicationOrigin = requirePublicationOrigin(
+    manifest.publication?.origin,
+    expected.publicationRoot,
+    'readiness publication origin',
+  );
   if (manifest.publication?.inventoryAlgorithm !== INVENTORY_ALGORITHM) fail('readiness inventory algorithm mismatch');
   if (manifest.publication?.treeDigest !== expected.treeDigest) fail('readiness publication tree digest mismatch');
   if (manifest.publication?.fileCount !== expected.fileCount) fail('readiness publication file count mismatch');
@@ -94,12 +119,21 @@ export function validateRemoteReadinessMetadata({
   if (observedPublicationRoot !== expected.publicationRoot) {
     fail('publication identity does not match readiness publication root');
   }
+  const observedPublicationOrigin = requirePublicationOrigin(
+    publicationIdentity?.origin,
+    expected.publicationRoot,
+    'observed publication identity origin',
+  );
+  if (observedPublicationOrigin !== publicationOrigin) {
+    fail('publication identity origin does not match readiness publication origin');
+  }
 
   return Object.freeze({
     complete: true,
     repository: expected.repository,
     candidateSha: expected.candidateSha,
     planDigest: expected.planDigest,
+    publicationOrigin,
     publicationRoot: expected.publicationRoot,
     treeDigest: expected.treeDigest,
     fileCount: expected.fileCount,
