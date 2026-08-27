@@ -4,7 +4,7 @@ const RESOURCE_CLASSES = new Set([
   'render-geometry', 'native-gpu', 'performance', 'soak', 'artifact-build',
 ]);
 const EVIDENCE_CLASSES = new Set(['machine-summary', 'restricted-visual-review']);
-const SPECIALIST_REASONS = new Set(['private-visual', 'native-windows-gpu', 'lan-hardware']);
+const SPECIALIST_REASONS = new Set(['private-visual', 'native-windows-gpu', 'lan-hardware', 'real-fullworld-product']);
 const DATA_CAPABILITIES = new Set(['qualification_fixture', 'bounded_real_world', 'real_fullworld']);
 const GROUP_ID = /^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$/;
 const SAFE_PATH = /^(?:tests|e2e)\/[A-Za-z0-9_./*-]+$/;
