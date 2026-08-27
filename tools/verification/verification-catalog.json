@@ -6,6 +6,7 @@
       "projects": [],
       "resourceClass": "cpu-light",
       "evidence": "machine-summary",
+      "capabilities": ["deterministic"],
       "fullSafetyNet": true
     },
     "e2e.common-smoke": {
@@ -13,6 +14,7 @@
       "projects": ["desktop-chromium", "mobile-chromium"],
       "resourceClass": "browser-targeted",
       "evidence": "machine-summary",
+      "capabilities": ["browser-functional"],
       "fullSafetyNet": true
     },
     "e2e.creatures": {
@@ -20,6 +22,7 @@
       "projects": ["desktop-chromium", "mobile-chromium"],
       "resourceClass": "browser-targeted",
       "evidence": "machine-summary",
+      "capabilities": ["browser-functional"],
       "dependsOn": ["e2e.common-smoke"],
       "fullSafetyNet": true
     },
@@ -28,6 +31,7 @@
       "projects": ["desktop-chromium", "mobile-chromium"],
       "resourceClass": "browser-full",
       "evidence": "restricted-visual-review",
+      "capabilities": ["browser-functional", "restricted-visual"],
       "fullSafetyNet": true
     },
     "visual.creatures": {
@@ -35,6 +39,7 @@
       "projects": ["desktop-chromium", "mobile-chromium"],
       "resourceClass": "browser-targeted",
       "evidence": "restricted-visual-review",
+      "capabilities": ["browser-functional", "restricted-visual"],
       "dependsOn": ["e2e.creatures"],
       "fullSafetyNet": true
     }
