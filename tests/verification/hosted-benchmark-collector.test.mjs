@@ -108,6 +108,30 @@ function makeSupplementalMetrics() {
       unit: 'ms',
       source: 'synthetic:supersession-observer:no-superseding-head',
     },
+    runnerLogicalCpuCount: {
+      status: 'MEASURED',
+      value: 4,
+      unit: 'count',
+      source: 'synthetic:runner-resource-sampler:logical-cpu',
+    },
+    runnerMemoryTotalBytes: {
+      status: 'MEASURED',
+      value: 17179869184,
+      unit: 'bytes',
+      source: 'synthetic:runner-resource-sampler:mem-total',
+    },
+    peakCpuPercent: {
+      status: 'MEASURED',
+      value: 82.5,
+      unit: 'percent',
+      source: 'synthetic:runner-resource-sampler:peak-total-capacity',
+    },
+    peakMemoryBytes: {
+      status: 'MEASURED',
+      value: 8589934592,
+      unit: 'bytes',
+      source: 'synthetic:runner-resource-sampler:peak-used',
+    },
     varianceMs: {
       status: 'NOT_APPLICABLE',
       value: null,
@@ -134,7 +158,7 @@ async function loadCollector() {
   return import(collectorUrl.href);
 }
 
-test('hosted benchmark collector derives whole-DAG timings and preserves explicit non-applicable metrics', async () => {
+test('hosted benchmark collector derives whole-DAG timings and preserves explicit resource/non-applicable metrics', async () => {
   const { collectHostedBenchmarkEvidence } = await loadCollector();
   const evidence = collectHostedBenchmarkEvidence({
     run: makeRun(),
@@ -185,10 +209,28 @@ test('hosted benchmark collector derives whole-DAG timings and preserves explici
   assert.equal(evidence.metrics.verdictWallClockMs.value, 120000);
   assert.equal(evidence.metrics.jobMinutes.value, 3.166667);
   assert.equal(evidence.metrics.supersededWasteMs.value, 0);
+  assert.equal(evidence.metrics.runnerLogicalCpuCount.value, 4);
+  assert.equal(evidence.metrics.runnerMemoryTotalBytes.value, 17179869184);
+  assert.equal(evidence.metrics.peakCpuPercent.value, 82.5);
+  assert.equal(evidence.metrics.peakMemoryBytes.value, 8589934592);
   assert.equal(evidence.metrics.varianceMs.status, 'NOT_APPLICABLE');
   assert.equal(evidence.metrics.oomCrashCount.value, 0);
   assert.equal(evidence.metrics.usefulPlansPerHour.status, 'NOT_APPLICABLE');
   assert.equal(evidence.source.jobs.length, 2);
+});
+
+test('hosted benchmark collector fails closed when required telemetry is absent', async () => {
+  const { collectHostedBenchmarkEvidence } = await loadCollector();
+  const supplemental = makeSupplementalMetrics();
+  delete supplemental.peakMemoryBytes;
+  assert.throws(() => collectHostedBenchmarkEvidence({
+    run: makeRun(),
+    jobs: makeJobs(),
+    identity: makeIdentity(),
+    experiment: makeExperiment(),
+    phaseMap,
+    supplementalMetrics: supplemental,
+  }), /missing explicit supplemental metric peakMemoryBytes/i);
 });
 
 test('hosted benchmark collector fails closed when a required timed phase is absent', async () => {
