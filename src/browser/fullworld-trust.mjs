@@ -12,32 +12,47 @@ export const PRODUCTION_FULLWORLD_TRUST = Object.freeze({
 
 const QUALIFICATION_TRUST_MARKER = 'oteryn-atlas-qualification-trust-v1';
 const QUALIFICATION_FIXTURE_ID = 'atlas-qualification-world-v2';
+const BOUNDED_REAL_TRUST_MARKER = 'oteryn-atlas-bounded-real-trust-v1';
+const BOUNDED_REAL_FIXTURE_ID = 'atlas-bounded-real-world-v1';
+const BOUNDED_REAL_SOURCE_CONTRACT = 'oteryn-atlas-bounded-real-runtime-v1';
+const BOUNDED_REAL_CREATURE_CAPABILITY = 'bounded-real-creatures-v1';
+const BOUNDED_REAL_GAME_SHA = 'fixture';
 const CONTENT_ID = /^sha256:[0-9a-f]{64}$/;
-const QUALIFICATION_ID_FIELDS = Object.freeze([
+const TRUST_ID_FIELDS = Object.freeze([
   'publicationRoot', 'semanticRoot', 'pixelRoot', 'overviewRoot', 'minimapRoot',
   'runtimeIndexRoot', 'pixelBucketRoot', 'sourceFingerprint', 'productDigest',
 ]);
-const QUALIFICATION_DESCRIPTOR_KEYS = Object.freeze([
-  'marker', 'fixtureId', 'dataCapability', ...QUALIFICATION_ID_FIELDS,
+const TRUST_DESCRIPTOR_KEYS = Object.freeze([
+  'marker', 'fixtureId', 'dataCapability', ...TRUST_ID_FIELDS,
 ]);
 
 function invalidQualificationTrust(detail) {
   throw new TypeError(`qualification trust invalid: ${detail}`);
 }
-function validateQualificationIdentity(candidate, { exactDescriptor = false } = {}) {
-  if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) {
-    invalidQualificationTrust('descriptor must be an object');
-  }
-  if (candidate.fixtureId !== QUALIFICATION_FIXTURE_ID) invalidQualificationTrust('fixture identity mismatch');
-  if (candidate.dataCapability !== 'qualification_fixture') invalidQualificationTrust('data capability mismatch');
-  if (exactDescriptor) {
-    const actualKeys = Object.keys(candidate).sort();
-    const expectedKeys = [...QUALIFICATION_DESCRIPTOR_KEYS].sort();
-    if (JSON.stringify(actualKeys) !== JSON.stringify(expectedKeys)) invalidQualificationTrust('descriptor fields mismatch');
-  }
-  for (const field of QUALIFICATION_ID_FIELDS) {
+function validateExactDescriptor(candidate) {
+  const actualKeys = Object.keys(candidate).sort();
+  const expectedKeys = [...TRUST_DESCRIPTOR_KEYS].sort();
+  if (JSON.stringify(actualKeys) !== JSON.stringify(expectedKeys)) invalidQualificationTrust('descriptor fields mismatch');
+}
+function validateRoots(candidate) {
+  for (const field of TRUST_ID_FIELDS) {
     if (!CONTENT_ID.test(candidate[field])) invalidQualificationTrust(`${field} must be a sha256 content id`);
   }
+}
+function validateQualificationIdentity(candidate, { exactDescriptor = false } = {}) {
+  if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) invalidQualificationTrust('descriptor must be an object');
+  if (candidate.fixtureId !== QUALIFICATION_FIXTURE_ID) invalidQualificationTrust('fixture identity mismatch');
+  if (candidate.dataCapability !== 'qualification_fixture') invalidQualificationTrust('data capability mismatch');
+  if (exactDescriptor) validateExactDescriptor(candidate);
+  validateRoots(candidate);
+  return candidate;
+}
+function validateBoundedRealIdentity(candidate, { exactDescriptor = false } = {}) {
+  if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) invalidQualificationTrust('descriptor must be an object');
+  if (candidate.fixtureId !== BOUNDED_REAL_FIXTURE_ID) invalidQualificationTrust('bounded-real fixture identity mismatch');
+  if (candidate.dataCapability !== 'bounded_real_world') invalidQualificationTrust('bounded-real data capability mismatch');
+  if (exactDescriptor) validateExactDescriptor(candidate);
+  validateRoots(candidate);
   return candidate;
 }
 
@@ -56,17 +71,41 @@ function qualificationRuntimeTrust(candidate) {
     qualificationProductDigest: candidate.productDigest,
   });
 }
+function boundedRealRuntimeTrust(candidate) {
+  return Object.freeze({
+    gameSha: BOUNDED_REAL_GAME_SHA,
+    publicationRoot: candidate.publicationRoot,
+    semanticRoot: candidate.semanticRoot,
+    pixelRoot: candidate.pixelRoot,
+    overviewRoot: candidate.overviewRoot,
+    minimapRoot: candidate.minimapRoot,
+    runtimeIndexRoot: candidate.runtimeIndexRoot,
+    pixelBucketRoot: candidate.pixelBucketRoot,
+    sourceFingerprint: candidate.sourceFingerprint,
+    boundedRealFixtureId: candidate.fixtureId,
+    boundedRealProductDigest: candidate.productDigest,
+  });
+}
 
 export function resolveQualificationManifestTrust(candidate) {
   return qualificationRuntimeTrust(validateQualificationIdentity(candidate));
+}
+export function resolveBoundedRealManifestTrust(candidate) {
+  return boundedRealRuntimeTrust(validateBoundedRealIdentity(candidate));
 }
 
 export function resolveFullWorldTrust(scope = globalThis) {
   const candidate = scope?.__OTERYN_ATLAS_QUALIFICATION_TRUST__;
   if (candidate == null) return PRODUCTION_FULLWORLD_TRUST;
-  if (candidate.marker !== QUALIFICATION_TRUST_MARKER) invalidQualificationTrust('marker mismatch');
-  validateQualificationIdentity(candidate, { exactDescriptor: true });
-  return qualificationRuntimeTrust(candidate);
+  if (candidate.marker === QUALIFICATION_TRUST_MARKER) {
+    validateQualificationIdentity(candidate, { exactDescriptor: true });
+    return qualificationRuntimeTrust(candidate);
+  }
+  if (candidate.marker === BOUNDED_REAL_TRUST_MARKER) {
+    validateBoundedRealIdentity(candidate, { exactDescriptor: true });
+    return boundedRealRuntimeTrust(candidate);
+  }
+  invalidQualificationTrust('marker mismatch');
 }
 
 export const FULLWORLD_TRUST = resolveFullWorldTrust();
@@ -80,6 +119,15 @@ const PRODUCTION_ANCILLARY_SOURCES = Object.freeze({
 });
 
 export function ancillarySourceExpectations(trust = PRODUCTION_FULLWORLD_TRUST) {
+  if (trust?.boundedRealFixtureId === BOUNDED_REAL_FIXTURE_ID) {
+    if (!CONTENT_ID.test(trust.semanticRoot) || !CONTENT_ID.test(trust.pixelRoot)) invalidQualificationTrust('ancillary source roots are not bounded-real-bound');
+    return Object.freeze({
+      mode: 'bounded_real_world', contractId: BOUNDED_REAL_SOURCE_CONTRACT,
+      animation: Object.freeze({ gameSha: BOUNDED_REAL_GAME_SHA, appearanceProductRoot: trust.pixelRoot, outfitSpatialProductRoot: trust.semanticRoot }),
+      creatures: Object.freeze({ contractId: BOUNDED_REAL_SOURCE_CONTRACT, capability: BOUNDED_REAL_CREATURE_CAPABILITY, semanticDigest: PRODUCTION_ANCILLARY_SOURCES.semanticSearch.creatureSemanticDigest, npcRoleSchemaVersion: 1, fixtureId: BOUNDED_REAL_FIXTURE_ID }),
+      semanticSearch: PRODUCTION_ANCILLARY_SOURCES.semanticSearch,
+    });
+  }
   if (trust?.gameSha !== 'fixture') return PRODUCTION_ANCILLARY_SOURCES;
   if (!CONTENT_ID.test(trust.semanticRoot) || !CONTENT_ID.test(trust.pixelRoot) || trust.qualificationFixtureId !== QUALIFICATION_FIXTURE_ID) invalidQualificationTrust('ancillary source roots are not qualification-bound');
   return Object.freeze({
