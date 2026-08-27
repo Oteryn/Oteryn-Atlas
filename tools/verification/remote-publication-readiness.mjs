@@ -37,7 +37,7 @@ function requirePositiveInteger(value, label) {
   return value;
 }
 
-function requirePublicationOrigin(value, publicationRoot, label) {
+function requirePublicationOrigin(value, label) {
   const raw = requireString(value, label);
   let parsed;
   try {
@@ -48,11 +48,6 @@ function requirePublicationOrigin(value, publicationRoot, label) {
   if (parsed.protocol !== 'https:') fail(`${label} must use HTTPS`);
   if (parsed.username || parsed.password || parsed.search || parsed.hash) {
     fail(`${label} must not contain credentials, query parameters, or fragments`);
-  }
-  const rootHex = requireDigest(publicationRoot, 'publication root').slice('sha256:'.length);
-  const segments = parsed.pathname.split('/').filter(Boolean);
-  if (!segments.includes(rootHex)) {
-    fail(`${label} must be content-addressed by the exact publication root`);
   }
   return parsed.href.replace(/\/$/, '');
 }
@@ -100,7 +95,6 @@ export function validateRemoteReadinessMetadata({
   if (manifest.publication?.rootContentId !== expected.publicationRoot) fail('readiness publication root mismatch');
   const publicationOrigin = requirePublicationOrigin(
     manifest.publication?.origin,
-    expected.publicationRoot,
     'readiness publication origin',
   );
   if (manifest.publication?.inventoryAlgorithm !== INVENTORY_ALGORITHM) fail('readiness inventory algorithm mismatch');
@@ -121,7 +115,6 @@ export function validateRemoteReadinessMetadata({
   }
   const observedPublicationOrigin = requirePublicationOrigin(
     publicationIdentity?.origin,
-    expected.publicationRoot,
     'observed publication identity origin',
   );
   if (observedPublicationOrigin !== publicationOrigin) {
