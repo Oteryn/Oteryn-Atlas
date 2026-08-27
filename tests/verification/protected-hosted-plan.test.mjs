@@ -119,7 +119,7 @@ test('protected hosted plan preserves protected IDs and accepts candidate additi
   assert.deepEqual(plan.workerPolicy, {
     id: 'atlas-protected-hosted-workers-v1',
     version: 1,
-    hostedShards: 2,
+    hostedShards: 1,
     workersPerShard: 1,
   });
   assert.equal(plan.workerPolicyId, 'atlas-protected-hosted-workers-v1');
