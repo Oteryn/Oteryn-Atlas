@@ -30,6 +30,17 @@ function optionalConsoleFailure(message) {
   }
   return null;
 }
+
+function qualificationTrustFromEnvironment() {
+  const raw = process.env.ATLAS_QUALIFICATION_TRUST_JSON?.trim();
+  if (!raw) return null;
+  let value;
+  try { value = JSON.parse(raw); }
+  catch (error) { throw new TypeError(`ATLAS_QUALIFICATION_TRUST_JSON is invalid JSON: ${error.message}`); }
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new TypeError('ATLAS_QUALIFICATION_TRUST_JSON must encode an object');
+  return value;
+}
+
 export function captureRuntimeFailures(page) {
   const state = {
     failures: [],
@@ -65,6 +76,17 @@ export function captureRuntimeFailures(page) {
 }
 
 export async function gotoAtlas(page, entry) {
+  const qualificationTrust = qualificationTrustFromEnvironment();
+  if (qualificationTrust) {
+    await page.addInitScript((descriptor) => {
+      Object.defineProperty(globalThis, '__OTERYN_ATLAS_QUALIFICATION_TRUST__', {
+        value: Object.freeze({ ...descriptor }),
+        writable: false,
+        configurable: false,
+        enumerable: false,
+      });
+    }, qualificationTrust);
+  }
   const response = await page.goto(entry, { waitUntil: 'domcontentloaded' });
   expect(response, 'Atlas navigation did not produce an HTTP response').not.toBeNull();
   expect(response.ok(), `Atlas entry returned HTTP ${response.status()}`).toBeTruthy();
