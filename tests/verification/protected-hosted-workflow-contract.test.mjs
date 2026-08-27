@@ -60,6 +60,13 @@ test('pre-merge hosted proof bootstraps from pull_request isolation and self-dis
   assert.match(executor, /bootstrap_active=false/);
 });
 
+test('hosted artifact downloads bind the repository explicitly outside git worktrees', () => {
+  assert.ok(
+    occurrences(executor, /gh run download[^\n]*--repo "\$GITHUB_REPOSITORY"/g) >= 3,
+    'every hosted artifact download must pass --repo because the workspace root is not a Git checkout',
+  );
+});
+
 test('Phase D hosted execution stays packed until Phase E calibrates sharding', () => {
   assert.match(executor, /matrix:\n\s+include:\n\s+- shard:\s*1\n\s+index:\s*0/);
   assert.doesNotMatch(executor, /- shard:\s*2/);
