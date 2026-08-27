@@ -113,6 +113,34 @@ function unionClassification(left, right, bootstrap) {
   return { profile, groups: [...groups].sort(), domains: [...domains].sort() };
 }
 
+function applyCrossDomainEscalations(classification, manifests) {
+  const domains = new Set(classification.domains);
+  const groups = new Set(classification.groups);
+  let profile = classification.profile;
+  const applied = [];
+  const seen = new Set();
+  for (const manifest of manifests) {
+    for (const rule of manifest.crossDomainEscalations) {
+      if (!rule.whenDomains.every((domain) => domains.has(domain))) continue;
+      if (profileRank(rule.minimumProfile) > profileRank(profile)) profile = rule.minimumProfile;
+      for (const group of rule.requiredGroups) groups.add(group);
+      const normalized = {
+        whenDomains: [...rule.whenDomains].sort(),
+        minimumProfile: rule.minimumProfile,
+        requiredGroups: [...rule.requiredGroups].sort(),
+      };
+      const key = canonicalJson(normalized);
+      if (!seen.has(key)) {
+        seen.add(key);
+        applied.push(normalized);
+      }
+    }
+  }
+  if (profile === 'full') for (const group of FALLBACK_GROUPS) groups.add(group);
+  applied.sort((left, right) => canonicalJson(left).localeCompare(canonicalJson(right)));
+  return { profile, groups: [...groups].sort(), domains: [...domains].sort(), applied };
+}
+
 function unionStrings(...values) {
   return [...new Set(values.flat())].sort();
 }
@@ -143,14 +171,8 @@ function mergeCatalogs(trusted, candidate) {
   for (const id of unionStrings(Object.keys(trusted.groups), Object.keys(candidate.groups))) {
     const left = trusted.groups[id];
     const right = candidate.groups[id];
-    if (!left) {
-      groups[id] = right;
-      continue;
-    }
-    if (!right) {
-      groups[id] = left;
-      continue;
-    }
+    if (!left) { groups[id] = right; continue; }
+    if (!right) { groups[id] = left; continue; }
     const resourceClass = RESOURCE_RANK[left.resourceClass] >= RESOURCE_RANK[right.resourceClass]
       ? left.resourceClass : right.resourceClass;
     groups[id] = {
@@ -181,12 +203,16 @@ function mergeCatalogs(trusted, candidate) {
 
 function selectedGroups(groupIds, catalog) {
   const resolved = new Set();
+  const visiting = new Set();
   const visit = (id) => {
     if (resolved.has(id)) return;
+    if (visiting.has(id)) throw new TypeError(`verification dependency cycle includes ${id}`);
     const group = catalog.groups[id];
     if (!group) throw new TypeError(`verification group ${id} is not catalogued`);
-    resolved.add(id);
+    visiting.add(id);
     for (const dependency of group.dependsOnGroups) visit(dependency);
+    visiting.delete(id);
+    resolved.add(id);
   };
   for (const id of groupIds) visit(id);
   return [...resolved].sort().map((id) => ({ id, ...catalog.groups[id] }));
@@ -204,7 +230,8 @@ export function buildVerificationPlan(input) {
   const changedPaths = allEvidencePaths(input.changedFiles);
   const trusted = classify(changedPaths, trustedImpactManifest);
   const candidate = classify(changedPaths, candidateImpactManifest);
-  const result = unionClassification(trusted, candidate, bootstrapChanged(changedPaths));
+  const baseClassification = unionClassification(trusted, candidate, bootstrapChanged(changedPaths));
+  const result = applyCrossDomainEscalations(baseClassification, [trustedImpactManifest, candidateImpactManifest]);
   const groups = selectedGroups(result.groups, verificationCatalog);
   result.groups = groups.map((group) => group.id);
   const visualGroupIds = groups.filter((group) => group.evidence === 'restricted-visual-review').map((group) => group.id);
@@ -227,6 +254,7 @@ export function buildVerificationPlan(input) {
     verificationCatalogDigest: digest({ trustedVerificationCatalog, candidateVerificationCatalog }),
     profile: result.profile,
     impactDomains: result.domains,
+    appliedCrossDomainEscalations: result.applied,
     requiredGroupIds: result.groups,
     groups,
     stableTestIds,
@@ -260,11 +288,8 @@ function parseCliArguments(argv) {
 }
 
 function readJson(pathname, label) {
-  try {
-    return JSON.parse(fs.readFileSync(pathname, 'utf8'));
-  } catch (error) {
-    throw new TypeError(`planner CLI cannot read ${label}: ${error.message}`);
-  }
+  try { return JSON.parse(fs.readFileSync(pathname, 'utf8')); }
+  catch (error) { throw new TypeError(`planner CLI cannot read ${label}: ${error.message}`); }
 }
 
 function runCli() {
@@ -295,10 +320,6 @@ function runCli() {
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  try {
-    runCli();
-  } catch (error) {
-    process.stderr.write(`${error.message}\n`);
-    process.exitCode = 1;
-  }
+  try { runCli(); }
+  catch (error) { process.stderr.write(`${error.message}\n`); process.exitCode = 1; }
 }
