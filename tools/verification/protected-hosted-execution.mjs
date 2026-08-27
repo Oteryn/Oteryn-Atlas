@@ -27,9 +27,10 @@ function exactDigest(value, label) {
   return value;
 }
 
-function exactStableIds(value, label) {
-  if (!Array.isArray(value) || value.length === 0 || value.some((id) => typeof id !== 'string' || !id.includes('::'))) {
-    throw new TypeError(`${label} must be non-empty stable IDs`);
+function exactStableIds(value, label, { allowEmpty = false } = {}) {
+  if (!Array.isArray(value) || (!allowEmpty && value.length === 0)
+    || value.some((id) => typeof id !== 'string' || !id.includes('::'))) {
+    throw new TypeError(`${label} must contain stable IDs`);
   }
   if (new Set(value).size !== value.length) throw new TypeError(`${label} contains duplicate stable IDs`);
   return [...value].sort();
@@ -91,6 +92,12 @@ function groupMatchesStableId(group, id) {
   return group.projects.includes(project) && group.specs.some((pattern) => matchesSpecPattern(pattern, spec));
 }
 
+function partitionByCandidateAdditions(stableTestIds, candidateAdditionSet) {
+  const protectedStableTestIds = stableTestIds.filter((id) => !candidateAdditionSet.has(id));
+  const candidateAdditionalStableTestIds = stableTestIds.filter((id) => candidateAdditionSet.has(id));
+  return { protectedStableTestIds, candidateAdditionalStableTestIds };
+}
+
 export function buildProtectedHostedExecutionContract(plan, { currentHeadSha } = {}) {
   if (!plan || typeof plan !== 'object' || Array.isArray(plan) || plan.schemaVersion !== 2) {
     throw new TypeError('protected hosted execution requires plan schemaVersion 2');
@@ -134,6 +141,13 @@ export function buildProtectedHostedExecutionContract(plan, { currentHeadSha } =
   }
 
   const stableTestIds = exactStableIds(plan.stableTestIds, 'planned stable IDs');
+  const stableTestIdSet = new Set(stableTestIds);
+  const candidateStableIdAdditions = exactStableIds(plan.candidateStableIdAdditions, 'candidate stable-ID additions', { allowEmpty: true });
+  for (const id of candidateStableIdAdditions) {
+    if (!stableTestIdSet.has(id)) throw new TypeError(`candidate stable-ID addition is not in the exact planned census: ${id}`);
+  }
+  const candidateAdditionSet = new Set(candidateStableIdAdditions);
+
   const hostedStableTestIds = [];
   const specialistStableTestIds = [];
   const reviewStableTestIds = [];
@@ -153,6 +167,8 @@ export function buildProtectedHostedExecutionContract(plan, { currentHeadSha } =
   reviewStableTestIds.sort();
   const hostedExpectedStableTestIdsDigest = digest(hostedStableTestIds);
   const specialistExpectedStableTestIdsDigest = digest(specialistStableTestIds);
+  const hostedSourcePartition = partitionByCandidateAdditions(hostedStableTestIds, candidateAdditionSet);
+  const specialistSourcePartition = partitionByCandidateAdditions(specialistStableTestIds, candidateAdditionSet);
 
   return freeze({
     schemaVersion: 1,
@@ -170,10 +186,12 @@ export function buildProtectedHostedExecutionContract(plan, { currentHeadSha } =
     hosted: {
       groupIds: hostedGroups.map((group) => group.id).sort(),
       stableTestIds: hostedStableTestIds,
+      ...hostedSourcePartition,
     },
     specialist: {
       groupIds: specialistGroups.map((group) => group.id).sort(),
       stableTestIds: specialistStableTestIds,
+      ...specialistSourcePartition,
     },
     review: {
       groupIds: reviewGroups.map((group) => group.id).sort(),
