@@ -156,6 +156,20 @@ test('hosted execution partitions exact stable IDs by data capability', () => {
   ]);
 });
 
+test('hosted stable ID cannot span multiple data capabilities', () => {
+  const overlappingBounded = {
+    ...boundedHostedGroup(),
+    id: 'integration.overlapping-bounded',
+    specs: ['e2e/tests/desktop.spec.mjs'],
+  };
+  assert.throws(() => buildProtectedHostedExecutionContract(plan({
+    requiredGroupIds: ['e2e.full', overlappingBounded.id],
+    groups: [hostedGroup(), overlappingBounded],
+    stableTestIds: [hostedId],
+    requiredDataCapabilities: ['bounded_real_world', 'qualification_fixture'],
+  }), { currentHeadSha: head }), /data.*capability|ambiguous/i);
+});
+
 test('only explicit real_fullworld groups become specialist execution', () => {
   const invalid = hostedGroup();
   invalid.capabilities = capabilities({ hosted: false, dataCapability: 'bounded_real_world', specialistReason: 'private-visual' });
