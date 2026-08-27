@@ -1,0 +1,97 @@
+{
+  "schemaVersion": 1,
+  "kind": "atlas-hosted-e2e-phase-e-benchmark",
+  "measurementOnly": true,
+  "selectionApplied": false,
+  "allowedAuthority": [
+    "NON_AUTHORITATIVE_PRE_PHASE_D",
+    "AUTHORITATIVE_POST_PHASE_D"
+  ],
+  "retryPolicy": {
+    "retries": 0
+  },
+  "requiredIdentityFields": [
+    "repository",
+    "candidateSha",
+    "integrationBaseSha",
+    "protectedPhaseDSha",
+    "planDigest",
+    "stableIdSetDigest",
+    "productDigest",
+    "browserHarnessDigest",
+    "workflowRunId",
+    "workflowRunAttempt",
+    "workflowSha",
+    "profile",
+    "dataCapability"
+  ],
+  "allowedProfiles": [
+    "none",
+    "focused",
+    "targeted",
+    "broad",
+    "full"
+  ],
+  "allowedDataCapabilities": [
+    "qualification_fixture",
+    "bounded_real_world",
+    "real_fullworld"
+  ],
+  "requiredMetricIds": [
+    "queueProvisioningMs",
+    "checkoutFetchMs",
+    "dependencyRestoreInstallMs",
+    "qualificationBuildVerifyReadinessMs",
+    "browserImageMs",
+    "previewStartupMs",
+    "playwrightExecutionMs",
+    "shardFanoutFaninMs",
+    "cacheRestoreMs",
+    "cacheSaveMs",
+    "artifactUploadMs",
+    "artifactDownloadMs",
+    "supersededWasteMs",
+    "duplicateSetupMs",
+    "verdictWallClockMs",
+    "jobMinutes",
+    "varianceMs",
+    "oomCrashCount",
+    "usefulPlansPerHour"
+  ],
+  "metricUnits": {
+    "queueProvisioningMs": "ms",
+    "checkoutFetchMs": "ms",
+    "dependencyRestoreInstallMs": "ms",
+    "qualificationBuildVerifyReadinessMs": "ms",
+    "browserImageMs": "ms",
+    "previewStartupMs": "ms",
+    "playwrightExecutionMs": "ms",
+    "shardFanoutFaninMs": "ms",
+    "cacheRestoreMs": "ms",
+    "cacheSaveMs": "ms",
+    "artifactUploadMs": "ms",
+    "artifactDownloadMs": "ms",
+    "supersededWasteMs": "ms",
+    "duplicateSetupMs": "ms",
+    "verdictWallClockMs": "ms",
+    "jobMinutes": "job-minutes",
+    "varianceMs": "ms",
+    "oomCrashCount": "count",
+    "usefulPlansPerHour": "plans/hour"
+  },
+  "observationStates": [
+    "MEASURED",
+    "NOT_APPLICABLE"
+  ],
+  "aggregateOnlyMetricIds": [
+    "varianceMs",
+    "usefulPlansPerHour"
+  ],
+  "missingMetricPolicy": "FAIL_CLOSED",
+  "zeroDefaultPolicy": "FORBIDDEN",
+  "notes": [
+    "A numeric zero is valid only when directly measured and sourced; absence must never be coerced to zero.",
+    "All evidence created before final protected Phase D is merged must use NON_AUTHORITATIVE_PRE_PHASE_D.",
+    "This contract records measurements only and cannot select or mutate worker/shard policy."
+  ]
+}
