@@ -50,6 +50,16 @@ test('hosted executor consumes a published protected plan under read-only GitHub
   assert.doesNotMatch(executor, /pull_request_target:|atlas-local-e2e|192\.168\.|molehill|synology|secrets:/i);
 });
 
+test('pre-merge hosted proof bootstraps from pull_request isolation and self-disables once protected', () => {
+  assert.match(executor, /pull_request:\n\s+types:\s*\[opened, synchronize, reopened\]/);
+  assert.match(executor, /github\.event_name\s*==\s*'pull_request'/);
+  assert.match(executor, /PROTECTED_BASE_SHA/);
+  assert.match(executor, /contents\/\.github\/workflows\/protected-hosted-executor\.yml\?ref=\$PROTECTED_BASE_SHA/);
+  assert.match(executor, /actions\/workflows\/protected-verification-controller\.yml\/runs\?event=pull_request_target/);
+  assert.match(executor, /controller_run_id/);
+  assert.match(executor, /bootstrap_active=false/);
+});
+
 test('Phase D hosted execution stays packed until Phase E calibrates sharding', () => {
   assert.match(executor, /matrix:\n\s+include:\n\s+- shard:\s*1\n\s+index:\s*0/);
   assert.doesNotMatch(executor, /- shard:\s*2/);
