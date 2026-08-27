@@ -45,9 +45,11 @@ jobs:
             --jq '.[] | [.filename, (.previous_filename // "")] | @tsv' > "$rows"
           test -s "$rows"
 
-          git fetch --no-tags origin "$ATLAS_CANDIDATE_HEAD_SHA"
+          git fetch --no-tags origin "refs/pull/$ATLAS_PR_NUMBER/head"
+          test "$(git rev-parse FETCH_HEAD)" = "$ATLAS_CANDIDATE_HEAD_SHA"
           merge_base_sha="$(git merge-base "$ATLAS_PROTECTED_BASE_SHA" "$ATLAS_CANDIDATE_HEAD_SHA")"
           test -n "$merge_base_sha"
+          git diff --check "$merge_base_sha" "$ATLAS_CANDIDATE_HEAD_SHA"
           git diff --name-status -z --find-renames "$merge_base_sha" "$ATLAS_CANDIDATE_HEAD_SHA" > "$git_changes"
 
           node --input-type=module - "$rows" "$git_changes" artifacts/protected-controller/changed-files.json <<'NODE'
