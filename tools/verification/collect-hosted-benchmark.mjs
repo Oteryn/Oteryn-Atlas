@@ -4,6 +4,10 @@ import { validateHostedBenchmarkEvidence, HOSTED_BENCHMARK_CONTRACT } from './ho
 const defaultPhaseMap = JSON.parse(fs.readFileSync(new URL('./hosted-benchmark-phase-map.json', import.meta.url), 'utf8'));
 const SUPPLEMENTAL_METRICS = Object.freeze([
   'supersededWasteMs',
+  'runnerLogicalCpuCount',
+  'runnerMemoryTotalBytes',
+  'peakCpuPercent',
+  'peakMemoryBytes',
   'varianceMs',
   'oomCrashCount',
   'usefulPlansPerHour',
