@@ -28,6 +28,10 @@ const requiredMetricIds = [
   'duplicateSetupMs',
   'verdictWallClockMs',
   'jobMinutes',
+  'runnerLogicalCpuCount',
+  'runnerMemoryTotalBytes',
+  'peakCpuPercent',
+  'peakMemoryBytes',
   'varianceMs',
   'oomCrashCount',
   'usefulPlansPerHour',
@@ -44,6 +48,7 @@ test('hosted Phase E benchmark contract binds exact identity and complete measur
     'AUTHORITATIVE_POST_PHASE_D',
   ]);
   assert.deepEqual(contract.retryPolicy, { retries: 0 });
+  assert.deepEqual(contract.allowedWorkflowRunAttempts, [1]);
 
   const requiredIdentity = new Set(contract.requiredIdentityFields);
   for (const field of [
@@ -65,6 +70,12 @@ test('hosted Phase E benchmark contract binds exact identity and complete measur
   }
 
   assert.deepEqual(contract.requiredMetricIds, requiredMetricIds);
+  assert.deepEqual(contract.requiredSuccessMeasuredMetricIds, [
+    'runnerLogicalCpuCount',
+    'runnerMemoryTotalBytes',
+    'peakCpuPercent',
+    'peakMemoryBytes',
+  ]);
   assert.deepEqual(contract.observationStates, ['MEASURED', 'NOT_APPLICABLE']);
   assert.equal(contract.missingMetricPolicy, 'FAIL_CLOSED');
   assert.equal(contract.zeroDefaultPolicy, 'FORBIDDEN');
