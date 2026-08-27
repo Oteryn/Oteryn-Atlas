@@ -40,6 +40,7 @@ function makeRun() {
     id: 991,
     run_attempt: 1,
     head_sha: sha('1'),
+    repository: { full_name: 'Oteryn/Oteryn-Atlas' },
     created_at: '2026-08-27T10:00:00.000Z',
     run_started_at: '2026-08-27T10:00:02.000Z',
     updated_at: '2026-08-27T10:02:00.000Z',
@@ -153,6 +154,19 @@ function makeSupplementalMetrics() {
   };
 }
 
+function makeUnreachedSupplementalMetrics() {
+  const metrics = makeSupplementalMetrics();
+  for (const metricId of ['runnerLogicalCpuCount', 'runnerMemoryTotalBytes', 'peakCpuPercent', 'peakMemoryBytes']) {
+    metrics[metricId] = {
+      status: 'NOT_APPLICABLE',
+      value: null,
+      unit: metrics[metricId].unit,
+      source: 'synthetic:run-cancelled-before-resource-sampling',
+    };
+  }
+  return metrics;
+}
+
 async function loadCollector() {
   assert.equal(fs.existsSync(collectorUrl), true, 'missing hosted benchmark collector');
   return import(collectorUrl.href);
@@ -249,8 +263,20 @@ test('hosted benchmark collector fails closed when a required timed phase is abs
   }), /missing required benchmark phase browser-image/i);
 });
 
-test('hosted benchmark collector rejects candidate/run identity drift and malformed timing', async () => {
+test('hosted benchmark collector rejects repository/candidate run identity drift and malformed timing', async () => {
   const { collectHostedBenchmarkEvidence } = await loadCollector();
+
+  const wrongRepository = makeIdentity();
+  wrongRepository.repository = 'Other/Repository';
+  assert.throws(() => collectHostedBenchmarkEvidence({
+    run: makeRun(),
+    jobs: makeJobs(),
+    identity: wrongRepository,
+    experiment: makeExperiment(),
+    phaseMap,
+    supplementalMetrics: makeSupplementalMetrics(),
+  }), /repository.*full_name/i);
+
   const wrongIdentity = makeIdentity();
   wrongIdentity.candidateSha = sha('9');
   assert.throws(() => collectHostedBenchmarkEvidence({
@@ -274,6 +300,21 @@ test('hosted benchmark collector rejects candidate/run identity drift and malfor
   }), /negative.*duration/i);
 });
 
+test('duplicate setup measurement is chronological and independent of GitHub jobs array ordering', async () => {
+  const { collectHostedBenchmarkEvidence } = await loadCollector();
+  const jobs = makeJobs();
+  jobs[0].steps[1].completed_at = '2026-08-27T10:00:19.000Z';
+  const evidence = collectHostedBenchmarkEvidence({
+    run: makeRun(),
+    jobs: [...jobs].reverse(),
+    identity: makeIdentity(),
+    experiment: makeExperiment(),
+    phaseMap,
+    supplementalMetrics: makeSupplementalMetrics(),
+  });
+  assert.equal(evidence.metrics.duplicateSetupMs.value, 45000);
+});
+
 test('hosted benchmark collector records failed and infrastructure runs instead of hiding them', async () => {
   const { collectHostedBenchmarkEvidence } = await loadCollector();
   const run = makeRun();
@@ -291,4 +332,40 @@ test('hosted benchmark collector records failed and infrastructure runs instead 
     conclusion: 'failure',
     failureClass: 'INFRASTRUCTURE',
   });
+});
+
+test('hosted benchmark collector preserves a cancelled failure even when no job ever starts', async () => {
+  const { collectHostedBenchmarkEvidence } = await loadCollector();
+  const run = makeRun();
+  run.conclusion = 'cancelled';
+  run.updated_at = '2026-08-27T10:00:15.000Z';
+  const jobs = [{
+    id: 1003,
+    name: 'hosted-browser / cancelled before runner assignment',
+    created_at: '2026-08-27T10:00:01.000Z',
+    started_at: null,
+    completed_at: null,
+    conclusion: 'cancelled',
+    steps: [],
+  }];
+  const evidence = collectHostedBenchmarkEvidence({
+    run,
+    jobs,
+    identity: makeIdentity(),
+    experiment: makeExperiment(),
+    phaseMap,
+    supplementalMetrics: makeUnreachedSupplementalMetrics(),
+    failureClass: 'CANCELLED',
+  });
+
+  assert.deepEqual(evidence.outcome, { conclusion: 'cancelled', failureClass: 'CANCELLED' });
+  assert.deepEqual(evidence.metrics.queueProvisioningMs, {
+    status: 'NOT_APPLICABLE',
+    value: null,
+    unit: 'ms',
+    source: 'github-jobs:no-started-jobs:cancelled',
+  });
+  assert.equal(evidence.metrics.jobMinutes.value, 0);
+  assert.equal(evidence.metrics.playwrightExecutionMs.status, 'NOT_APPLICABLE');
+  assert.equal(evidence.source.jobs[0].timingStatus, 'NOT_STARTED');
 });
