@@ -4,11 +4,12 @@ services:
     read_only: true
     volumes:
       - ${ATLAS_QUALIFICATION_PUBLICATION_HOST:?ATLAS_QUALIFICATION_PUBLICATION_HOST must identify a ready qualification publication}:/srv/atlas/fullworld:ro
+      - ${ATLAS_QUALIFICATION_PUBLICATION_HOST:?ATLAS_QUALIFICATION_PUBLICATION_HOST must identify a ready qualification publication}/data/creatures:/srv/atlas/data/creatures:ro
       - ./nginx/qualification-publication.conf:/etc/nginx/conf.d/default.conf:ro
     tmpfs:
       - /tmp
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8081/__atlas/readiness && wget -q -O /dev/null http://127.0.0.1:8081/fullworld/publication/publication.json || exit 1"]
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8081/__atlas/readiness && wget -q -O /dev/null http://127.0.0.1:8081/fullworld/publication/publication.json && wget -q -O /dev/null http://127.0.0.1:8081/data/creatures/index.json || exit 1"]
       interval: 2s
       timeout: 2s
       retries: 30
@@ -23,6 +24,9 @@ services:
       ATLAS_PUBLICATION_UPSTREAM: atlas-publication:8081
       ATLAS_PUBLICATION_HOST_HEADER: atlas-publication
       ATLAS_PUBLICATION_HOST: atlas-publication
+    volumes:
+      - ${ATLAS_QUALIFICATION_PUBLICATION_HOST:?ATLAS_QUALIFICATION_PUBLICATION_HOST must identify a ready qualification publication}/web/semantic-search:/usr/share/nginx/html/web/semantic-search:ro
+      - ${ATLAS_QUALIFICATION_PUBLICATION_HOST:?ATLAS_QUALIFICATION_PUBLICATION_HOST must identify a ready qualification publication}/web/creature-gameplay:/usr/share/nginx/html/web/creature-gameplay:ro
 
   e2e:
     environment:
