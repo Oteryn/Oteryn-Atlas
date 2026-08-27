@@ -3,6 +3,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { canonicalJsonBytes, sha256ContentId } from '../../src/browser/loader.mjs';
+import { loadAnimationRuntime } from '../../src/browser/animation-runtime.mjs';
+import { validateCreaturePublicationSource } from '../../src/browser/creature-publication-source.mjs';
+import { validateCreatureSearchCatalog, validateCreatureSearchRecords } from '../../src/browser/creature-search.mjs';
+import { ancillarySourceExpectations, resolveQualificationManifestTrust } from '../../src/browser/fullworld-trust.mjs';
+import { validateSemanticSearchIndex } from '../../src/browser/semantic-search.mjs';
 import {
   FLOOR_DOMAIN, PUBLICATION_DOMAIN, PUBLICATION_PROFILE, RUNTIME_FLOOR_DOMAIN,
   RUNTIME_WORLD_DOMAIN, RUNTIME_WORLD_PROFILE, RUNTIME_FLOOR_PROFILE,
@@ -12,11 +17,15 @@ import { PIXEL_HASH_DOMAIN, PIXEL_PROFILE, PIXEL_ROOT_DOMAIN } from '../../src/b
 import { RUNTIME_PIXEL_BUCKET_DOMAIN, RUNTIME_PIXEL_BUCKET_PROFILE } from '../../src/browser/fullworld-pixel-buckets.mjs';
 import { minimapDomains, minimapProfiles } from '../../src/layers/minimap.mjs';
 import { computeOverviewRoot, overviewDomains, overviewProfiles } from '../../src/layers/overview.mjs';
+import {
+  QUALIFICATION_ACTIVE_FLOOR, QUALIFICATION_CREATURES, QUALIFICATION_FIXTURE_ID,
+  QUALIFICATION_SEMANTIC_RECORD, QUALIFICATION_SOURCE_CONTRACT,
+} from './qualification-fixture-definition.mjs';
 
-const FIXTURE_ID = 'atlas-qualification-world-v2';
+const FIXTURE_ID = QUALIFICATION_FIXTURE_ID;
 const SOURCE_FINGERPRINT = 'sha256:5af8a7b6d6cb61bf6a430842141a658d3ba183f6e2ec5e3d9a7ea39ccf866d72';
 const FLOORS = Object.freeze([-8, -7, -6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7]);
-const ACTIVE_FLOOR = -7;
+const ACTIVE_FLOOR = QUALIFICATION_ACTIVE_FLOOR;
 const CHUNK_PATH = 'chunks/f-7-r1008-c1004.jsonl';
 const BOUNDS = Object.freeze({ x_min: 32256, x_max_exclusive: 32288, y_min: 32128, y_max_exclusive: 32160 });
 const MINIMAP_BOUNDS = Object.freeze({ x_min: 32256, x_max_exclusive: 32512, y_min: 32000, y_max_exclusive: 32256 });
@@ -191,6 +200,172 @@ async function buildMinimap(root, publicationRoot, pixelRoot, sourceContentId) {
   return world;
 }
 
+function creatureSearchRecord(record) {
+  const value = {
+    kind: record.kind,
+    label: record.name,
+    record_id: record.record_id,
+    entity_id: record.entity_id,
+    position: { ...record.position },
+    resolution_state: record.resolution_state,
+    provenance: {
+      authority: 'Oteryn/Oteryn-Atlas',
+      source_capability: 'qualification-creatures-v1',
+      fixture_id: FIXTURE_ID,
+      resolution_state: record.resolution_state,
+    },
+  };
+  if (record.kind === 'npc') {
+    value.role_resolution_state = record.role_resolution_state;
+    value.roles = [...record.roles];
+  }
+  return value;
+}
+
+async function buildQualificationAnimation(root, semanticRoot, pixelRoot, contentId, pixels) {
+  const bucketId = 'q0000';
+  const bucketPath = `buckets/${bucketId}.rgba`;
+  const program = {
+    profile: 'oteryn-atlas-animation-runtime-v1',
+    object_programs: [],
+    creature_programs: [{
+      animation: null,
+      animation_program_id: 'animation-program:qualification-sentinel',
+      displacement: { x: 0, y: 0 },
+      height: 32,
+      outfit_presentation_id: 'outfit-presentation:qualification-sentinel',
+      phase_content_ids: [contentId],
+      phase_count: 1,
+      selection_policy: 'qualification-static-phase-v1',
+      width: 32,
+    }],
+    sprite_index: {},
+    blob_index: { [contentId]: { bucket: bucketId, bytes: pixels.length, height: 32, offset: 0, width: 32 } },
+  };
+  const programBytes = canonicalJsonBytes(program);
+  const manifestCore = {
+    profile: 'oteryn-atlas-animation-runtime-v1',
+    identityAuthority: false,
+    source: {
+      game_sha: 'fixture',
+      fixture_id: FIXTURE_ID,
+      source_contract: QUALIFICATION_SOURCE_CONTRACT,
+      appearance_product_root: pixelRoot,
+      outfit_spatial_product_root: semanticRoot,
+    },
+    buckets: [{ id: bucketId, path: bucketPath, bytes: pixels.length, digest: sha(pixels) }],
+    programs: { path: 'programs.json', bytes: programBytes.length, digest: sha(programBytes) },
+  };
+  const manifest = { ...manifestCore, rootContentId: canonicalDigest(manifestCore) };
+  writeJson(root, 'animation/manifest.json', manifest);
+  writeBytes(root, 'animation/programs.json', programBytes);
+  writeBytes(root, `animation/${bucketPath}`, pixels);
+  return manifest;
+}
+
+async function buildQualificationCreatures(root, semanticRoot, animation) {
+  const chunkX = 504;
+  const chunkY = 502;
+  const chunkPath = `chunks/f${ACTIVE_FLOOR}/${chunkX}_${chunkY}.json`;
+  const chunk = {
+    floor: ACTIVE_FLOOR,
+    chunk_x: chunkX,
+    chunk_y: chunkY,
+    records: QUALIFICATION_CREATURES.map((record) => ({
+      ...record,
+      position: { ...record.position },
+      roles: record.roles ? [...record.roles] : undefined,
+      spawn_area: record.spawn_area ? { center: { ...record.spawn_area.center }, radius: record.spawn_area.radius } : undefined,
+      outfit_presentation: record.outfit_presentation ? { ...record.outfit_presentation } : undefined,
+    })),
+  };
+  for (const record of chunk.records) {
+    if (record.roles === undefined) delete record.roles;
+    if (record.spawn_area === undefined) delete record.spawn_area;
+    if (record.outfit_presentation === undefined) delete record.outfit_presentation;
+  }
+  const chunkBytes = canonicalJsonBytes(chunk);
+  const search = { records: QUALIFICATION_CREATURES.map(creatureSearchRecord) };
+  const searchBytes = canonicalJsonBytes(search);
+  const source = {
+    contract_id: QUALIFICATION_SOURCE_CONTRACT,
+    capability: 'qualification-creatures-v1',
+    semantic_digest: semanticRoot,
+    npc_role_schema_version: 1,
+    fixture_id: FIXTURE_ID,
+    appearance_product_root: animation.source.appearance_product_root,
+    outfit_spatial_product_root: animation.source.outfit_spatial_product_root,
+    coordinate_profile: 'oteryn-native-floor-v1',
+    semantic_revision: 1,
+  };
+  const index = {
+    schema_version: 1,
+    source,
+    chunk_size: 64,
+    counts: { chunks: 1, records: chunk.records.length, search_records: search.records.length },
+    search_path: 'search.json',
+    search_bytes: searchBytes.length,
+    search_digest: sha(searchBytes),
+    chunks: [{
+      floor: ACTIVE_FLOOR,
+      chunk_x: chunkX,
+      chunk_y: chunkY,
+      path: chunkPath,
+      bytes: chunkBytes.length,
+      digest: sha(chunkBytes),
+      records: chunk.records.length,
+    }],
+  };
+  writeJson(root, 'data/creatures/index.json', index);
+  writeBytes(root, 'data/creatures/search.json', searchBytes);
+  writeBytes(root, `data/creatures/${chunkPath}`, chunkBytes);
+  return { index, search };
+}
+
+function semanticRanking() {
+  return {
+    contains_alias: 500, contains_label: 600, exact_alias: 900, exact_id: 1100,
+    exact_label: 1000, prefix_alias: 700, prefix_id: 850, prefix_label: 800,
+  };
+}
+async function buildQualificationSearch(root, semanticRoot, creatureSearch) {
+  const semanticRecord = {
+    ...QUALIFICATION_SEMANTIC_RECORD,
+    aliases: [...QUALIFICATION_SEMANTIC_RECORD.aliases],
+    capabilities: [...QUALIFICATION_SEMANTIC_RECORD.capabilities],
+    position: { ...QUALIFICATION_SEMANTIC_RECORD.position },
+    provenance: { ...QUALIFICATION_SEMANTIC_RECORD.provenance },
+    search_terms: { label: QUALIFICATION_SEMANTIC_RECORD.search_terms.label, aliases: [...QUALIFICATION_SEMANTIC_RECORD.search_terms.aliases] },
+  };
+  const indexCore = {
+    schema_version: 1,
+    source: {
+      authority: 'Oteryn/Oteryn-Atlas', repository: 'Oteryn/Oteryn-Atlas',
+      contract_id: QUALIFICATION_SOURCE_CONTRACT, capability: 'qualification-semantic-search-v1',
+      profile_id: 'oteryn-atlas-qualification-semantic-search-v1', game_revision: 'fixture',
+      fixture_id: FIXTURE_ID, semantic_digest: semanticRoot, records: 1,
+    },
+    input_floor_aliases: Object.fromEntries(FLOORS.map((floor) => [String(floor), floor])),
+    ranking: semanticRanking(), records: [semanticRecord],
+  };
+  const index = { ...indexCore, index_digest: canonicalDigest(indexCore.records) };
+  const catalog = {
+    schema_version: 1,
+    source: {
+      contract_id: QUALIFICATION_SOURCE_CONTRACT,
+      capability: 'qualification-creatures-v1',
+      coordinate_profile: 'oteryn-native-floor-v1',
+      semantic_digest: semanticRoot,
+      fixture_id: FIXTURE_ID,
+      semantic_revision: 1,
+    },
+    records: creatureSearch.records,
+  };
+  writeJson(root, 'web/semantic-search/index.json', index);
+  writeJson(root, 'web/semantic-search/creatures.json', catalog);
+  return { index, catalog };
+}
+
 export async function buildQualificationWorld(destination) {
   const root = path.resolve(destination);
   if (fs.existsSync(root)) throw new TypeError('qualification world destination already exists');
@@ -234,6 +409,10 @@ export async function buildQualificationWorld(destination) {
   const overview = await buildOverview(root, publication.rootContentId, semanticWorld, semanticFloors, chunkContentId);
   const minimap = await buildMinimap(root, publication.rootContentId, pixel.manifest.rootContentId, chunkContentId);
 
+  const animation = await buildQualificationAnimation(root, semanticWorld.rootContentId, pixel.manifest.rootContentId, pixel.pixelContentId, pixel.pixels);
+  const creatures = await buildQualificationCreatures(root, semanticWorld.rootContentId, animation);
+  await buildQualificationSearch(root, semanticWorld.rootContentId, creatures.search);
+
   const files = productEntries(root);
   const result = Object.freeze({
     fixtureId: FIXTURE_ID,
@@ -255,6 +434,22 @@ export async function buildQualificationWorld(destination) {
   return result;
 }
 
+function qualificationFilesystemFetcher(root) {
+  const base = path.resolve(root);
+  return async (url) => {
+    const relative = decodeURIComponent(new URL(url).pathname).replace(/^\/+/, '');
+    const target = path.resolve(base, ...relative.split('/'));
+    if (!target.startsWith(`${base}${path.sep}`)) return { ok: false, status: 404, headers: { get: () => null }, arrayBuffer: async () => new ArrayBuffer(0) };
+    let bytes;
+    try { bytes = fs.readFileSync(target); }
+    catch { return { ok: false, status: 404, headers: { get: () => null }, arrayBuffer: async () => new ArrayBuffer(0) }; }
+    return {
+      ok: true, status: 200,
+      headers: { get: (name) => String(name).toLowerCase() === 'content-length' ? String(bytes.length) : null },
+      arrayBuffer: async () => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
+    };
+  };
+}
 export async function verifyQualificationWorld(root) {
   const manifest = JSON.parse(fs.readFileSync(path.join(root, 'fixture-manifest.json'), 'utf8'));
   const files = productEntries(root);
@@ -263,5 +458,16 @@ export async function verifyQualificationWorld(root) {
   for (const field of ['publicationRoot', 'semanticRoot', 'pixelRoot', 'runtimeIndexRoot', 'pixelBucketRoot', 'overviewRoot', 'minimapRoot', 'sourceFingerprint']) {
     if (!/^sha256:[0-9a-f]{64}$/.test(manifest[field])) throw new TypeError(`qualification world ${field} invalid`);
   }
-  return Object.freeze(manifest);
+  const trust = resolveQualificationManifestTrust(manifest);
+  const ancillary = ancillarySourceExpectations(trust);
+  const fetcher = qualificationFilesystemFetcher(root);
+  const animation = await loadAnimationRuntime(new URL('https://qualification.invalid/animation/'), fetcher, ancillary.animation);
+  const creatureIndex = JSON.parse(fs.readFileSync(path.join(root, 'data/creatures/index.json'), 'utf8'));
+  validateCreaturePublicationSource(creatureIndex.source, animation.manifest.source, ancillary.creatures);
+  const creatureSearch = JSON.parse(fs.readFileSync(path.join(root, 'data/creatures/search.json'), 'utf8'));
+  validateCreatureSearchRecords(creatureSearch.records);
+  const semanticIndex = JSON.parse(fs.readFileSync(path.join(root, 'web/semantic-search/index.json'), 'utf8'));
+  validateSemanticSearchIndex(semanticIndex, ancillary.semanticSearch);
+  const semanticCreatures = JSON.parse(fs.readFileSync(path.join(root, 'web/semantic-search/creatures.json'), 'utf8'));
+  validateCreatureSearchCatalog(semanticCreatures, ancillary.semanticSearch);  return Object.freeze(manifest);
 }
