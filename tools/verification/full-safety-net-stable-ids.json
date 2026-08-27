@@ -11,7 +11,7 @@
     "specPathNormalization": "slash-normalized-e2e-tests-relative"
   },
   "count": 71,
-  "digest": "sha256:0240f75aaa5a72eedcf6066681c22dfcbd1402426f445232e03d8c0e25857d0a",
+  "digest": "sha256:dec22056da8378d4ad3d30009d2fa8a48f872b012126fac46dbb4903ea237964",
   "stableTestIds": [
     "desktop-chromium::e2e/tests/accessibility-desktop.spec.mjs::desktop critical controls expose truthful accessible names and disabled states",
     "desktop-chromium::e2e/tests/accessibility-desktop.spec.mjs::desktop keyboard activates zoom, view mode and playback state",
@@ -66,7 +66,7 @@
     "desktop-chromium::e2e/tests/visual-desktop.spec.mjs::creature overlay never paints previous-floor records during a view event",
     "desktop-chromium::e2e/tests/visual-desktop.spec.mjs::desktop Atlas-owned chrome and user journey retain reviewed visual contracts",
     "desktop-chromium::e2e/tests/visual-desktop.spec.mjs::playback changes only verified animated presentation regions and restores static pixels",
-    "desktop-chromium::e2e/tests/visual-desktop.spec.mjs::published creature animation product passes the full authoritative coverage census",
+    "desktop-chromium::e2e/tests/visual-fullworld-desktop.spec.mjs::published creature animation product passes the full authoritative coverage census",
     "desktop-chromium::e2e/tests/workflows-desktop.spec.mjs::published semantic result navigates, survives reload, and restores through history",
     "mobile-chromium::e2e/tests/accessibility-mobile.spec.mjs::mobile core controls are touch-reachable in portrait and landscape",
     "mobile-chromium::e2e/tests/accessibility-mobile.spec.mjs::mobile drawers expose truthful hidden state and restore keyboard focus",

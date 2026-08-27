@@ -45,11 +45,12 @@ them; this is intentionally finer than a spec-file label.
 - `stress-desktop`: Q seeded renderer/geometry workload.
 - `user-journey-desktop`: Q cross-feature session; Q seeded replayable session.
 - `user-journey-mobile`: Q touch session; Q seeded replayable touch session.
-- `visual-desktop`: B chrome/Thais journey; Q prior-floor isolation; **F full animation coverage census**; Q NPC playback; Q verified-rectangle playback.
+- `visual-desktop`: B chrome/Thais journey; Q prior-floor isolation; Q NPC playback; Q verified-rectangle playback.
+- `visual-fullworld-desktop`: **F full animation coverage census**.
 - `visual-mobile`: B chrome/drawers with Thais result; Q local pixel toggle.
 - `workflows-desktop`: Q dynamically selected record reload/history.
 
-Only `visual-desktop`'s full animation coverage census is
+Only `visual-fullworld-desktop`'s full animation coverage census is
 `real_fullworld`: it downloads all `animation/programs.json` bytes and proves
 their manifest digest plus the exact production coverage counts. Every other
 current oracle either discovers an adequate record or has a bounded asserted

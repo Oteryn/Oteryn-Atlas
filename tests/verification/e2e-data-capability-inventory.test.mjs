@@ -51,21 +51,29 @@ test('every current Playwright spec has one reviewed minimum data capability', (
     assert.equal(typeof entry.rationale, 'string', `${entry.spec} rationale must be a string`);
     assert.ok(entry.rationale.trim().length >= 24, `${entry.spec} rationale must explain the minimum data need`);
     assert.equal(typeof entry.splitRequired, 'boolean', `${entry.spec} splitRequired must be explicit`);
-    if (entry.dataCapability === 'real_fullworld') {
-      assert.equal(entry.splitRequired, true, `${entry.spec} must be split before ordinary functional E2E can depend on real_fullworld`);
+    if (entry.splitRequired) {
+      assert.equal(entry.dataCapability, 'real_fullworld', `${entry.spec} split marker is only valid for a mixed complete-product oracle`);
     }
   }
 });
 
-test('the current mixed visual spec is explicitly isolated for split instead of making full functional E2E require FullWorld', () => {
+test('the complete visual coverage census is isolated without widening ordinary visual E2E', () => {
   const inventory = readJson(INVENTORY_PATH);
   const visual = inventory.specs.find((entry) => entry.spec === 'e2e/tests/visual-desktop.spec.mjs');
-  assert.ok(visual, 'visual desktop spec must be inventoried');
-  assert.equal(visual.dataCapability, 'real_fullworld');
-  assert.equal(visual.splitRequired, true);
-  assert.match(visual.rationale, /coverage census/i);
+  const fullworld = inventory.specs.find((entry) => entry.spec === 'e2e/tests/visual-fullworld-desktop.spec.mjs');
 
-  const remaining = inventory.specs.filter((entry) => entry.spec !== visual.spec);
+  assert.ok(visual, 'ordinary visual desktop spec must be inventoried');
+  assert.equal(visual.dataCapability, 'bounded_real_world');
+  assert.equal(visual.splitRequired, false);
+
+  assert.ok(fullworld, 'isolated complete-product visual spec must be inventoried');
+  assert.equal(fullworld.dataCapability, 'real_fullworld');
+  assert.equal(fullworld.splitRequired, false);
+  assert.match(fullworld.rationale, /coverage census/i);
+
+  const remaining = inventory.specs.filter((entry) => entry.spec !== fullworld.spec);
   assert.equal(remaining.some((entry) => entry.dataCapability === 'real_fullworld'), false,
     'no other current browser spec has a reviewed whole-product FullWorld oracle');
+  assert.equal(inventory.specs.some((entry) => entry.splitRequired), false,
+    'no mixed data-capability spec may remain after the visual split');
 });

@@ -182,9 +182,15 @@
     },
     {
       "spec": "e2e/tests/visual-desktop.spec.mjs",
+      "dataCapability": "bounded_real_world",
+      "rationale": "After isolating the exhaustive animation coverage census, the remaining desktop visual spec contains a bounded real Thais journey plus fixture-sufficient transition and playback oracles; no complete-world claim remains.",
+      "splitRequired": false
+    },
+    {
+      "spec": "e2e/tests/visual-fullworld-desktop.spec.mjs",
       "dataCapability": "real_fullworld",
-      "rationale": "This mixed spec contains the published creature-animation full authoritative coverage census, whose oracle requires complete product coverage; split that census from the fixture and bounded-real-world visual scenarios.",
-      "splitRequired": true
+      "rationale": "The isolated full authoritative animation coverage census verifies the complete published programs product, exact manifest digest and production-wide coverage counts.",
+      "splitRequired": false
     },
     {
       "spec": "e2e/tests/visual-mobile.spec.mjs",

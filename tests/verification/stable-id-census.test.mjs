@@ -7,7 +7,7 @@ import {
   validateStableIdCensus,
 } from '../../tools/verification/stable-id-census.mjs';
 
-const expectedDigest = 'sha256:0240f75aaa5a72eedcf6066681c22dfcbd1402426f445232e03d8c0e25857d0a';
+const expectedDigest = 'sha256:dec22056da8378d4ad3d30009d2fa8a48f872b012126fac46dbb4903ea237964';
 
 test('full safety-net census is exact, versioned and bound to the canonical stable-ID algorithm', () => {
   const census = JSON.parse(fs.readFileSync(new URL('../../tools/verification/full-safety-net-stable-ids.json', import.meta.url), 'utf8'));
