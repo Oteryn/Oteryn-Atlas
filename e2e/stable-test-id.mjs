@@ -5,6 +5,17 @@ const SPEC_PATH_LIMIT = 512;
 const SCENARIO_LIMIT = 512;
 const SEPARATOR_LENGTH = 4;
 
+export const STABLE_TEST_ID_ALGORITHM = Object.freeze({
+  id: 'atlas-stable-test-id',
+  version: 1,
+  separator: '::',
+  projectLimit: PROJECT_LIMIT,
+  specPathLimit: SPEC_PATH_LIMIT,
+  scenarioLimit: SCENARIO_LIMIT,
+  overflowIdentity: 'prefix-plus-sha256',
+  specPathNormalization: 'slash-normalized-e2e-tests-relative',
+});
+
 export const MAX_STABLE_TEST_ID_LENGTH = PROJECT_LIMIT + SPEC_PATH_LIMIT + SCENARIO_LIMIT + SEPARATOR_LENGTH;
 
 function boundedIdentityComponent(value, limit) {
