@@ -1,4 +1,4 @@
-export const FULLWORLD_TRUST = Object.freeze({
+export const PRODUCTION_FULLWORLD_TRUST = Object.freeze({
   gameSha: 'f79fd3b5c239fa13810338f1380539c4eac67d7d',
   publicationRoot: 'sha256:9d0d2f3bb16a5a90f9b51a21366e4ed42963f5cb12366c404a20d9502ec4857f',
   semanticRoot: 'sha256:27d7a83a7d9f498ea614b440ab4216cae5e6d11ea0527482410e40948cade5a9',
@@ -9,6 +9,45 @@ export const FULLWORLD_TRUST = Object.freeze({
   pixelBucketRoot: 'sha256:99cf23b01a0d652ff670a994a2b80cbef8d17036f514522d47f1aa98352d3116',
   sourceFingerprint: 'sha256:52613c4b755bee1ca32608b1b860413c3a9184870ca61114fad5a7670e80aee9',
 });
+
+const QUALIFICATION_TRUST_MARKER = 'oteryn-atlas-qualification-trust-v1';
+const QUALIFICATION_FIXTURE_ID = 'atlas-qualification-world-v2';
+const SHA256_ID = /^sha256:[0-9a-f]{64}$/;
+const QUALIFICATION_ROOT_FIELDS = Object.freeze([
+  'publicationRoot', 'semanticRoot', 'pixelRoot', 'overviewRoot', 'runtimeIndexRoot', 'pixelBucketRoot', 'sourceFingerprint',
+]);
+
+function invalidQualificationTrust(detail) {
+  throw new TypeError(`qualification trust invalid: ${detail}`);
+}
+
+export function resolveFullWorldTrust(scope = globalThis) {
+  const candidate = scope?.__OTERYN_ATLAS_QUALIFICATION_TRUST__;
+  if (candidate == null) return PRODUCTION_FULLWORLD_TRUST;
+  if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) invalidQualificationTrust('descriptor must be an object');
+  if (candidate.marker !== QUALIFICATION_TRUST_MARKER) invalidQualificationTrust('marker mismatch');
+  if (candidate.fixtureId !== QUALIFICATION_FIXTURE_ID) invalidQualificationTrust('fixture identity mismatch');
+  const keys = Object.keys(candidate).sort();
+  const expectedKeys = ['fixtureId', 'marker', ...QUALIFICATION_ROOT_FIELDS].sort();
+  if (JSON.stringify(keys) !== JSON.stringify(expectedKeys)) invalidQualificationTrust('descriptor fields mismatch');
+  for (const field of QUALIFICATION_ROOT_FIELDS) {
+    if (!SHA256_ID.test(candidate[field])) invalidQualificationTrust(`${field} must be a sha256 content id`);
+  }
+  return Object.freeze({
+    gameSha: 'fixture',
+    publicationRoot: candidate.publicationRoot,
+    semanticRoot: candidate.semanticRoot,
+    pixelRoot: candidate.pixelRoot,
+    overviewRoot: candidate.overviewRoot,
+    minimapRoot: null,
+    runtimeIndexRoot: candidate.runtimeIndexRoot,
+    pixelBucketRoot: candidate.pixelBucketRoot,
+    sourceFingerprint: candidate.sourceFingerprint,
+    qualificationFixtureId: QUALIFICATION_FIXTURE_ID,
+  });
+}
+
+export const FULLWORLD_TRUST = resolveFullWorldTrust();
 
 export const FULLWORLD_PATHS = Object.freeze({
   animation: '/fullworld/animation/',
