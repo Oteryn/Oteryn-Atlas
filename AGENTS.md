@@ -1,4 +1,4 @@
-﻿# Oteryn Atlas agent instructions
+# Oteryn Atlas agent instructions
 
 These instructions govern `Oteryn/Oteryn-Atlas`.
 
@@ -88,8 +88,8 @@ Before editing, inspect the current default-branch head, this file, the active I
 - Molehill-PC (`oteryn-molehill-atlas`, custom label `oteryn-atlas-pc`) is specialist execution only. A protected verification plan may route a group there when semantic catalog metadata requires `real_fullworld` (`requiresRealFullWorld`), native Windows/GPU, restricted visual review, or another explicitly approved specialist capability. Mere `profile=full`, browser breadth, stress, accessibility, geometry or test count does not justify Molehill routing.
 - `real_fullworld` is reserved for complete-product properties such as complete publication/census/root linkage, complete generator/compiler determinism, scale/performance/soak against the complete product, complete overview/minimap consistency, or explicit release acceptance. Only the protected plan may establish that need.
 - Synology (`oteryn-synology-atlas`, custom label `oteryn-atlas`) owns trusted merged-main deployment and live acceptance only: exact revision/container/header identity, publication/product checks, bounded desktop/mobile real-browser smoke, cutover and rollback proof. Synology must not be used as an ordinary E2E/build farm or as substitute specialist capacity.
-- Legacy transition only: while current branch protection still consumes `atlas-local-e2e`, that status remains a legacy compatibility gate. If that legacy gate is required before protected-controller cutover, the old heavy browser 71-scenario qualification may run on Molehill-PC through `e2e/run.ps1` using its bounded isolated concurrent slot pool. This is not the target architecture, must not be generalized to new work, and must disappear from ordinary PR routing after the protected hosted fan-in cutover is proven.
-- Synology must not run the legacy 71-scenario matrix, broad specialist stress matrices, complete-product soak/performance depth or restricted visual-regression depth as a substitute for Molehill-PC specialist capability.
+- Legacy transition only: while current branch protection still consumes `atlas-local-e2e`, that status remains a legacy compatibility gate. If that legacy gate is required before protected-controller cutover, the old heavy browser 77-scenario qualification may run on Molehill-PC through `e2e/run.ps1` using its bounded isolated concurrent slot pool. This is not the target architecture, must not be generalized to new work, and must disappear from ordinary PR routing after the protected hosted fan-in cutover is proven.
+- Synology must not run the legacy 77-scenario matrix, broad specialist stress matrices, complete-product soak/performance depth or restricted visual-regression depth as a substitute for Molehill-PC specialist capability.
 - Nightly Molehill browser depth is additive specialist verification only. It must not duplicate a generic ordinary full functional matrix that GitHub-hosted CI already executes, and it must not become an implicit requirement for unrelated PRs.
 - If Molehill-PC is unavailable, only the explicitly selected specialist proof remains blocked. Ordinary GitHub-hosted functional E2E continues. Do not move specialist work to Synology, reuse stale evidence, weaken retries/tolerances, or publish copied evidence.
 
@@ -119,4 +119,3 @@ Before editing, inspect the current default-branch head, this file, the active I
 - Do not publish Tibia/CipSoft-derived pixels without explicit rights/provenance authority for that publication surface.
 - Do not weaken protection, validation or provenance gates to make a task pass.
 - Production deployment, protected environments, secrets and live-system mutation require separate explicit authority.
-
