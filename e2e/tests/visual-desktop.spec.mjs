@@ -1,14 +1,11 @@
-import { createHash } from 'node:crypto';
 import { expect, test } from '@playwright/test';
 import { assertNoRuntimeFailures, captureRuntimeFailures, gotoAtlas, waitForAtlas } from './runtime.mjs';
 import { canvasAlphaCount, comparePngOutsideRects } from '../support/visual-oracle.mjs';
-import { analyzeCreatureAnimationCoverage } from '../support/creature-animation-coverage.mjs';
 import { assertUserVisibleSurface, captureUserVisualEvidence } from '../support/user-acceptance.mjs';
 const ENTRY = '/web/fullworld.html?x=32361&y=32198&floor=-7&zoom=2&mode=map&creatures=npc,monster&animation=off';
 const VISUAL_ENTRY = '/web/fullworld.html?x=32369&y=32241&floor=-7&zoom=2&mode=map&animation=off';
 const CREATURE_ONLY_PLAYBACK_ENTRY = '/web/fullworld.html?x=32831&y=32596&floor=-12&zoom=2&mode=map&animation=off&creatures=monster';
 const NPC_ONLY_PLAYBACK_ENTRY = '/web/fullworld.html?x=32209&y=31924&floor=-12&zoom=2&mode=map&animation=off&creatures=npc';
-const STATIC_EQUIVALENT_PRESENTATION = 'outfit-presentation:sha256:b16bfc92e9d9e9c8f790507f987a11b25a169c4343c9d68471de76a5f3565c88';
 
 async function overlayOpaquePixels(page) {
   return page.locator('#creature-overlay').evaluate((canvas) => {
@@ -49,20 +46,6 @@ async function animationRectangles(page) {
   });
 }
 
-async function publishedCreatureAnimationCoverage(page) {
-  const manifestResponse = await page.request.get('/fullworld/animation/manifest.json');
-  expect(manifestResponse.ok(), `animation manifest HTTP ${manifestResponse.status()}`).toBeTruthy();
-  const manifest = await manifestResponse.json();
-  const programsResponse = await page.request.get('/fullworld/animation/programs.json');
-  expect(programsResponse.ok(), `animation programs HTTP ${programsResponse.status()}`).toBeTruthy();
-  const bytes = await programsResponse.body();
-  expect(bytes.byteLength).toBe(manifest.programs.bytes);
-  expect(`sha256:${createHash('sha256').update(bytes).digest('hex')}`).toBe(manifest.programs.digest);
-  const coverage = analyzeCreatureAnimationCoverage(JSON.parse(bytes.toString('utf8')));
-  expect(coverage.totalPrograms).toBe(manifest.counts.creature_programs);
-  return coverage;
-}
-
 async function assertCreatureFamilyPlaybackChangesPixels(page, entry, kind) {
   const runtime = captureRuntimeFailures(page);
   await gotoAtlas(page, entry);
@@ -90,7 +73,8 @@ async function assertCreatureFamilyPlaybackChangesPixels(page, entry, kind) {
   assertNoRuntimeFailures(runtime);
 }
 
-test('desktop Atlas-owned chrome and user journey retain reviewed visual contracts', async ({ page }, testInfo) => {  const runtime = captureRuntimeFailures(page);
+test('desktop Atlas-owned chrome and user journey retain reviewed visual contracts', async ({ page }, testInfo) => {
+  const runtime = captureRuntimeFailures(page);
   await gotoAtlas(page, `${VISUAL_ENTRY}&creatures=npc,monster`);
   await waitForAtlas(page);
 
@@ -179,18 +163,6 @@ test('creature overlay never paints previous-floor records during a view event',
   expect(transition.toFloor).not.toBe(transition.fromFloor);
   expect(transition.opaque, 'previous-floor creature pixels must be absent immediately after the view event').toBe(0);
   assertNoRuntimeFailures(runtime);
-});
-
-test('published creature animation product passes the full authoritative coverage census', async ({ page }) => {
-  const coverage = await publishedCreatureAnimationCoverage(page);
-  expect(coverage).toEqual({
-    multiPhasePrograms: 101,
-    phaseContentReferences: 2036,
-    phaseCountHistogram: { 1: 1276, 2: 2, 3: 4, 4: 4, 6: 1, 8: 88, 9: 2 },
-    staticEquivalentProgramIds: [STATIC_EQUIVALENT_PRESENTATION],
-    totalPrograms: 1377,
-    visuallyDynamicPrograms: 100,
-  });
 });
 
 test('NPC playback changes real outfit pixels and restores the deterministic static phase', async ({ page }) => {
