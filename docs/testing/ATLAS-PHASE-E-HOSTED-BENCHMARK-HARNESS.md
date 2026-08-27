@@ -8,7 +8,7 @@ The preparation branch predates final protected Phase D. Therefore every timing,
 
 Authoritative Phase E measurement may begin only after the coordinator resolves final protected Phase D on protected `main`, rebuilds/rebases Phase E on that exact state, and confirms that the measured hosted workflow is the final safe controller. A later evidence record may use `AUTHORITATIVE_POST_PHASE_D` only with an exact `protectedPhaseDSha` and `phaseDState=FINAL_PROTECTED_MERGED`.
 
-Retries = 0 for every benchmark run. Retries would hide first-run reliability and corrupt latency evidence.
+Retries = 0 for every benchmark run. `workflowRunAttempt=1` is mandatory; manually rerun attempts are not benchmark-eligible because they would violate the zero-retry first-run reliability objective.
 
 Molehill remains specialist-only evidence for `real_fullworld`, native-GPU, soak, exceptional performance, and similar specialist lanes; Molehill results must not define ordinary GitHub-hosted defaults. Synology remains deployment-only and is not a benchmark authority.
 
@@ -37,7 +37,7 @@ Every evidence record must carry all of these exact identity fields:
 | `productDigest` | Exact `sha256:` digest of the immutable qualification product/artifact used by the run. |
 | `browserHarnessDigest` | Exact `sha256:` digest of the browser/harness image or immutable harness identity. |
 | `workflowRunId` | Exact GitHub Actions run ID. |
-| `workflowRunAttempt` | Exact GitHub Actions run attempt. |
+| `workflowRunAttempt` | Exact GitHub Actions run attempt; it must be `1`. |
 | `workflowSha` | Exact SHA containing the measured workflow definition. |
 | `profile` | Exact verification profile: `none`, `focused`, `targeted`, `broad`, or `full`. |
 | `dataCapability` | Exact data capability: `qualification_fixture`, `bounded_real_world`, or `real_fullworld`. |
@@ -62,6 +62,10 @@ Phase E measures the workflow as a system, not only the Playwright command. The 
 - duplicate setup/work;
 - verdict wall-clock;
 - job-minutes;
+- runner logical CPU count;
+- runner total memory;
+- peak CPU percent;
+- peak memory bytes;
 - variance;
 - OOM/crash;
 - useful plans/hour.
@@ -71,6 +75,8 @@ The collector derives timestamps only from explicit GitHub run/job/step timestam
 Required phase names are mapped through `hosted-benchmark-phase-map.json`. On a successful run, a missing required phase makes collection fail closed. On a failed/cancelled run, an unreached required phase is recorded explicitly as `NOT_APPLICABLE` so the measurement failure remains recordable rather than disappearing.
 
 `duplicateSetupMs` is descriptive duplicated setup time: for checkout/fetch, dependency restore/install, qualification preparation, browser-image preparation, and preview startup, the collector counts repeated mapped occurrences after the first occurrence. It is not itself a policy threshold.
+
+`runnerLogicalCpuCount`, `runnerMemoryTotalBytes`, `peakCpuPercent`, and `peakMemoryBytes` are required `MEASURED` observations for a successful benchmark. `peakCpuPercent` is normalized to 0–100% of total hosted-runner CPU capacity, and `peakMemoryBytes` cannot exceed measured runner total memory. These observations are the guardrail for deciding whether a later `workers=2` or `workers=4` experiment is even eligible to run; they are not themselves a production threshold.
 
 `varianceMs` is an aggregate dispersion field. For comparison summaries use a documented millisecond spread over repeated clean verdict wall-clock observations, consistently across candidates; single-run records keep it explicit `NOT_APPLICABLE`. `usefulPlansPerHour` is likewise aggregate: count only exact-identity, non-superseded plans that reach a valid verdict during the measured observation window.
 
@@ -122,7 +128,7 @@ The pagination equality check is fail-closed: if the run ever exceeds one 100-jo
 
 ## Prepare exact identity and experiment inputs
 
-Write `identity.json` from the controller's exact plan/product/stable-ID evidence and GitHub metadata. All identity fields from the table above are mandatory. Pre-final-D evidence must set `protectedPhaseDSha` to `null`; after final protected Phase D, authoritative measurement must bind its exact SHA.
+Write `identity.json` from the controller's exact plan/product/stable-ID evidence and GitHub metadata. All identity fields from the table above are mandatory. Pre-final-D evidence must set `protectedPhaseDSha` to `null`; after final protected Phase D, authoritative measurement must bind its exact SHA. Confirm `workflowRunAttempt=1`; if GitHub reports a later attempt, do not use that run for calibration.
 
 Write `experiment.json` using one declared candidate from `hosted-benchmark-experiments.json` and exactly one value from each comparison axis. For example, the first baseline is `packed-w1` with workers/shards both one; the actual profile still comes from `identity.profile`.
 
@@ -133,11 +139,15 @@ Do not hand-edit an observed worker or shard count to make a candidate look favo
 `collect-hosted-benchmark.mjs` deliberately cannot infer some facts from GitHub timestamp metadata alone. Supply them explicitly in `supplemental.json`:
 
 - `supersededWasteMs`: `MEASURED` only from an explicit superseding-head observation; a confirmed non-superseded run may record sourced zero;
+- `runnerLogicalCpuCount`: measured logical CPU count from the actual GitHub-hosted runner used by the benchmark;
+- `runnerMemoryTotalBytes`: measured total memory bytes from that runner;
+- `peakCpuPercent`: measured peak CPU utilization normalized to 0–100% of total runner CPU capacity over the benchmark observation window;
+- `peakMemoryBytes`: measured peak used-memory bytes over the same observation window;
 - `varianceMs`: `NOT_APPLICABLE` for one run, then measured in the repeated-run comparison summary;
 - `oomCrashCount`: `MEASURED` only after runner/job/log evidence has been classified; do not infer zero merely because GitHub says `failure` or `success`;
 - `usefulPlansPerHour`: `NOT_APPLICABLE` for one run, then measured over the concurrent observation window.
 
-Every supplemental observation uses the same shape as other metrics: `status`, `value`, `unit`, and non-empty `source`. Missing supplemental metrics fail collection rather than silently becoming zero.
+Every supplemental observation uses the same shape as other metrics: `status`, `value`, `unit`, and non-empty `source`. Missing supplemental metrics fail collection rather than silently becoming zero. A successful run also fails validation if any required runner resource observation is `NOT_APPLICABLE`; a failed run may preserve an unreached resource observation as explicit `NOT_APPLICABLE` with a failure-specific source.
 
 If a workflow does not conclude successfully, pass an explicit `failureClass`/`--failure-class` when known: `ASSERTION`, `INFRASTRUCTURE`, `OOM_CRASH`, `CANCELLED`, or `SUPERSEDED`. If classification is genuinely unavailable, the collector records `UNCLASSIFIED_FAILURE`; measurement failure evidence must be recorded, never hidden by deleting the run.
 
@@ -166,9 +176,10 @@ A later Phase E calibration record should retain every raw evidence file and sum
 3. fixed setup time and useful Playwright execution time;
 4. duplicated setup/work and shard fan-out/fan-in cost;
 5. total job-minutes and artifact/cache transfer cost;
-6. OOM/crash, assertion-failure, infrastructure-failure, cancellation, and superseded-run counts/rates;
-7. useful plans/hour under the measured concurrent workload;
-8. exact coverage/identity equality for plan, product, stable-ID set, candidate head, integration base, harness, and workflow.
+6. runner CPU/memory headroom before any higher-worker experiment;
+7. OOM/crash, assertion-failure, infrastructure-failure, cancellation, and superseded-run counts/rates;
+8. useful plans/hour under the measured concurrent workload;
+9. exact coverage/identity equality for plan, product, stable-ID set, candidate head, integration base, harness, and workflow.
 
 The decision objective is the fastest safe reviewer verdict with bounded CI cost and clean first-run reliability, not maximum parallelism. A faster browser command is not a win if queueing, image/setup duplication, artifact transfer, instability, or job-minutes make the whole DAG worse.
 
