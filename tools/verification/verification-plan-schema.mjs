@@ -4,6 +4,11 @@ const RESOURCE_CLASSES = new Set([
   'render-geometry', 'native-gpu', 'performance', 'soak', 'artifact-build',
 ]);
 const EVIDENCE_CLASSES = new Set(['machine-summary', 'restricted-visual-review']);
+const CAPABILITIES = new Set([
+  'deterministic', 'browser-functional', 'restricted-visual', 'native-windows',
+  'native-gpu', 'lan-smoke', 'hardware-repro', 'specialist-benchmark',
+  'performance', 'soak', 'artifact-build',
+]);
 const GROUP_ID = /^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$/;
 const SAFE_PATH = /^(?:tests|e2e)\/[A-Za-z0-9_./*-]+$/;
 
@@ -80,11 +85,16 @@ export function validateVerificationCatalog(candidate) {
     const projects = uniqueStrings(value.projects ?? [], kind, `${id}.projects`);
     if (!RESOURCE_CLASSES.has(value.resourceClass)) invalid(kind, `${id}.resourceClass is not allowlisted`);
     if (!EVIDENCE_CLASSES.has(value.evidence)) invalid(kind, `${id}.evidence is not allowlisted`);
+    const capabilities = uniqueStrings(value.capabilities ?? [], kind, `${id}.capabilities`);
+    if (capabilities.some((capability) => !CAPABILITIES.has(capability))) {
+      invalid(kind, `${id}.capabilities contains unknown semantic capability`);
+    }
     const stableTestIds = uniqueStrings(value.stableTestIds ?? [], kind, `${id}.stableTestIds`);
     const dependsOn = uniqueStrings(value.dependsOn ?? [], kind, `${id}.dependsOn`);
     groups[id] = {
       specs,
       projects,
+      capabilities,
       stableTestIds,
       dependsOn,
       resourceClass: value.resourceClass,
