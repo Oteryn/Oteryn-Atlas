@@ -38,15 +38,21 @@
     },
     {
       "spec": "e2e/tests/creature-gameplay-desktop.spec.mjs",
-      "dataCapability": "bounded_real_world",
-      "rationale": "Current mixed spec explicitly asserts exact Game-owned Sam/Rat/Sigurd/H.L. facts as well as UI behavior; it remains bounded real-world until final Phase D splits the factual oracle from qualification-fixture UI coverage.",
-      "splitRequired": true
+      "dataCapability": "qualification_fixture",
+      "rationale": "Gameplay inspector activation, tab state, semantic round-trip, URL persistence and desktop surface geometry are UI/runtime oracles over representative fixture creatures.",
+      "splitRequired": false
     },
     {
       "spec": "e2e/tests/creature-gameplay-mobile.spec.mjs",
+      "dataCapability": "qualification_fixture",
+      "rationale": "Touch activation, drawer/tab reachability and topmost Escape behavior need representative fixture NPC/monster records rather than canonical Game facts.",
+      "splitRequired": false
+    },
+    {
+      "spec": "e2e/tests/creature-gameplay-real-desktop.spec.mjs",
       "dataCapability": "bounded_real_world",
-      "rationale": "Current mixed mobile spec asserts exact Game-owned Sam/Rat trade, loot and stat facts together with touch/tab/Escape behavior; it remains bounded real-world until final Phase D splits factual and UI oracles.",
-      "splitRequired": true
+      "rationale": "This isolated compatibility oracle verifies exact Game-owned Sam/Rat/Sigurd/H.L. trade, loot, completeness, stats and large-shop facts against a bounded canonical real product.",
+      "splitRequired": false
     },
     {
       "spec": "e2e/tests/creature-interaction-desktop.spec.mjs",
