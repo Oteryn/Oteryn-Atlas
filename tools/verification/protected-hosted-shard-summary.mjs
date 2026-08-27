@@ -67,6 +67,8 @@ function validateExecution(execution, plan) {
     ['workerPolicyDigest', 'worker policy digest'],
     ['executionPolicyDigest', 'execution policy digest'],
   ]) same(exactDigest(execution[field], `execution ${label}`), plan[field], label);
+  const hostedExpectedStableTestIdsDigest = exactDigest(execution.hostedExpectedStableTestIdsDigest, 'execution hosted stable-ID digest');
+  exactDigest(execution.specialistExpectedStableTestIdsDigest, 'execution specialist stable-ID digest');
   if (execution.retries !== 0 || execution.selectiveExecution !== false) {
     throw new TypeError('protected shard execution must bind zero retries and disabled selective execution');
   }
@@ -74,12 +76,12 @@ function validateExecution(execution, plan) {
   const specialist = stableIds(execution.specialist?.stableTestIds, 'specialist stable IDs', { allowEmpty: true });
   const specialistSet = new Set(specialist);
   if (hosted.some((id) => specialistSet.has(id))) throw new TypeError('hosted and specialist stable-ID placement overlaps');
-  return { hosted, specialist };
+  return { hosted, specialist, hostedExpectedStableTestIdsDigest };
 }
 
 export function buildProtectedHostedShardSummary({ plan, execution, summary, shardIndex, shardCount }) {
   const protectedPlan = validatePlan(plan);
-  const { hosted } = validateExecution(execution, protectedPlan);
+  const { hosted, hostedExpectedStableTestIdsDigest } = validateExecution(execution, protectedPlan);
   if (!Number.isSafeInteger(shardCount) || shardCount !== protectedPlan.workerPolicy.hostedShards
     || !Number.isSafeInteger(shardIndex) || shardIndex < 0 || shardIndex >= shardCount) {
     throw new TypeError('protected shard count/index does not match worker policy');
@@ -120,7 +122,8 @@ export function buildProtectedHostedShardSummary({ plan, execution, summary, sha
     candidateHeadSha: protectedPlan.candidateHeadSha,
     controllerSourceSha: protectedPlan.controller.sourceSha,
     planDigest: protectedPlan.planDigest,
-    expectedStableTestIdsDigest: protectedPlan.expectedStableTestIdsDigest,
+    planExpectedStableTestIdsDigest: protectedPlan.expectedStableTestIdsDigest,
+    expectedStableTestIdsDigest: hostedExpectedStableTestIdsDigest,
     productIdentitiesDigest: protectedPlan.productIdentitiesDigest,
     workerPolicyDigest: protectedPlan.workerPolicyDigest,
     executionPolicyDigest: protectedPlan.executionPolicyDigest,
