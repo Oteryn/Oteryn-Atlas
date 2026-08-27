@@ -87,7 +87,7 @@
 - [x] **Step 1: Document** that this branch is preparation only and cannot approve #200 or #179 cutover.
 - [x] **Step 2: Record** that Phase E final worker/shard policy is still unavailable and therefore matrix guard remains parameterized rather than selecting a threshold.
 - [ ] **Step 3: Run** `git diff --check` equivalent through repository diff inspection, targeted Node tests, full `tests/verification/*.test.mjs`, and exact-head CI where available.
-- [ ] **Step 4: Open a dedicated draft PR** with base/head/test evidence and the mandatory post-Phase-E rerun list.
+- [x] **Step 4: Open dedicated Draft PR #219** with base/head/test evidence and the mandatory post-Phase-E rerun list.
 
 ## Self-Review
 
