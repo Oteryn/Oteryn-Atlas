@@ -63,17 +63,23 @@ export function validateSelectorEscapeState(state) {
   });
 }
 
-export function recordSelectorMiss({ state, evidence, fullSafeStableTestIds } = {}) {
+export function recordSelectorMiss({
+  state,
+  evidence,
+  fullSafeStableTestIds,
+  allowedAdditionalStableTestIds = [],
+} = {}) {
   const current = validateSelectorEscapeState(state);
   const fullSafe = stableIds(fullSafeStableTestIds, 'fullSafeStableTestIds', { allowEmpty: false });
-  const universe = new Set(fullSafe);
+  const additional = stableIds(allowedAdditionalStableTestIds, 'allowedAdditionalStableTestIds');
+  const universe = new Set([...fullSafe, ...additional]);
   if (!evidence || typeof evidence !== 'object' || Array.isArray(evidence)) throw new TypeError('selector miss evidence must be an object');
   if (typeof evidence.caseId !== 'string' || evidence.caseId.length === 0) throw new TypeError('selector miss caseId is required');
   if (!SHA.test(evidence.candidateHeadSha ?? '')) throw new TypeError('selector miss candidateHeadSha must be an exact lowercase SHA');
   if (!SHA256.test(evidence.planDigest ?? '')) throw new TypeError('selector miss planDigest must be sha256:<64 lowercase hex>');
   const falseNegativeStableTestIds = stableIds(evidence.falseNegativeStableTestIds, 'selector miss falseNegativeStableTestIds', { allowEmpty: false });
   const outside = falseNegativeStableTestIds.filter((id) => !universe.has(id));
-  if (outside.length) throw new TypeError(`selector miss stable ID is outside full-safe universe: ${outside.join(', ')}`);
+  if (outside.length) throw new TypeError(`selector miss stable ID is outside full-safe universe and explicit additional set: ${outside.join(', ')}`);
   const eventBytes = {
     caseId: evidence.caseId,
     candidateHeadSha: evidence.candidateHeadSha,

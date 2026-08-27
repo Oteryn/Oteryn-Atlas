@@ -125,3 +125,20 @@ test('force-full and selector escape widen hosted full-safe without dropping sel
   });
   assert.deepEqual(escaped.stableTestIds, [A, B, specialist].sort());
 });
+
+test('selector miss feedback records specialist false negatives from the explicit additional universe', () => {
+  const specialist = 'desktop-chromium::e2e/tests/fullworld-animation-census-desktop.spec.mjs::complete census';
+  const state = recordSelectorMiss({
+    state: inactiveState(),
+    evidence: {
+      caseId: 'specialist-miss',
+      candidateHeadSha: HEAD,
+      planDigest: DIGEST,
+      falseNegativeStableTestIds: [specialist],
+    },
+    fullSafeStableTestIds: [A, B],
+    allowedAdditionalStableTestIds: [specialist],
+  });
+  assert.equal(state.escapeActive, true);
+  assert.deepEqual(state.events[0].falseNegativeStableTestIds, [specialist]);
+});
