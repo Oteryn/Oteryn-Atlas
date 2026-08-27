@@ -27,6 +27,27 @@ const LEGACY_BOOTSTRAP_CATALOG_V1 = {
   },
 };
 
+const PROTECTED_MAIN_CATALOG_V1 = {
+  schemaVersion: 1,
+  groups: {
+    'deterministic.core': {
+      specs: ['tests/verification/*.test.mjs'], projects: [], resourceClass: 'cpu-light', evidence: 'machine-summary', fullSafetyNet: true,
+    },
+    'e2e.common-smoke': {
+      specs: ['e2e/tests/desktop.spec.mjs', 'e2e/tests/mobile.spec.mjs'], projects: ['desktop-chromium', 'mobile-chromium'], resourceClass: 'browser-targeted', evidence: 'machine-summary', fullSafetyNet: true,
+    },
+    'e2e.creatures': {
+      specs: ['e2e/tests/creatures-desktop.spec.mjs', 'e2e/tests/creature-interaction-desktop.spec.mjs', 'e2e/tests/creature-interaction-mobile.spec.mjs'], projects: ['desktop-chromium', 'mobile-chromium'], resourceClass: 'browser-targeted', evidence: 'machine-summary', fullSafetyNet: true,
+    },
+    'e2e.full': {
+      specs: ['e2e/tests/*.spec.mjs'], projects: ['desktop-chromium', 'mobile-chromium'], resourceClass: 'browser-full', evidence: 'restricted-visual-review', fullSafetyNet: true,
+    },
+    'visual.creatures': {
+      specs: ['e2e/tests/visual-desktop.spec.mjs', 'e2e/tests/visual-mobile.spec.mjs'], projects: ['desktop-chromium', 'mobile-chromium'], resourceClass: 'browser-targeted', evidence: 'restricted-visual-review', fullSafetyNet: true,
+    },
+  },
+};
+
 function invalid(kind, detail) {
   throw new TypeError(`${kind} invalid: ${detail}`);
 }
@@ -120,48 +141,111 @@ export function validateVerificationCatalog(candidate) {
   return freeze({ schemaVersion: 2, groups });
 }
 
+function upgradedCatalogV2(groups) {
+  return validateVerificationCatalog({ schemaVersion: 2, groups });
+}
+
+function deterministicCoreV2() {
+  return {
+    specs: ['tests/verification/*.test.mjs'],
+    projects: [],
+    resourceClass: 'cpu-light',
+    evidence: 'machine-summary',
+    capabilities: {
+      browser: false,
+      hosted: true,
+      requiresPublication: false,
+      dataCapability: 'qualification_fixture',
+      visualReview: false,
+      specialistReason: null,
+    },
+    fullSafetyNet: true,
+  };
+}
+
+function conservativeWildcardFullV2() {
+  return {
+    specs: ['e2e/tests/*.spec.mjs'],
+    projects: ['desktop-chromium', 'mobile-chromium'],
+    resourceClass: 'browser-full',
+    evidence: 'restricted-visual-review',
+    capabilities: {
+      browser: true,
+      hosted: false,
+      requiresPublication: true,
+      dataCapability: 'real_fullworld',
+      visualReview: true,
+      specialistReason: 'real-fullworld-product',
+    },
+    fullSafetyNet: true,
+  };
+}
+
 export function normalizeTrustedVerificationCatalog(candidate) {
   if (isPlainObject(candidate) && candidate.schemaVersion === 2) {
     return validateVerificationCatalog(candidate);
   }
-  if (canonicalJson(candidate) !== canonicalJson(LEGACY_BOOTSTRAP_CATALOG_V1)) {
-    invalid('trusted verification catalog', 'legacy schemaVersion 1 is allowed only for the exact protected bootstrap lower bound');
+
+  const canonical = canonicalJson(candidate);
+  if (canonical === canonicalJson(LEGACY_BOOTSTRAP_CATALOG_V1)) {
+    return upgradedCatalogV2({
+      'deterministic.core': deterministicCoreV2(),
+      'e2e.full': conservativeWildcardFullV2(),
+    });
   }
-  return validateVerificationCatalog({
-    schemaVersion: 2,
-    groups: {
-      'deterministic.core': {
-        specs: ['tests/verification/*.test.mjs'],
-        projects: [],
-        resourceClass: 'cpu-light',
+  if (canonical === canonicalJson(PROTECTED_MAIN_CATALOG_V1)) {
+    return upgradedCatalogV2({
+      'deterministic.core': deterministicCoreV2(),
+      'e2e.common-smoke': {
+        specs: ['e2e/tests/desktop.spec.mjs', 'e2e/tests/mobile.spec.mjs'],
+        projects: ['desktop-chromium', 'mobile-chromium'],
+        resourceClass: 'browser-targeted',
         evidence: 'machine-summary',
         capabilities: {
-          browser: false,
+          browser: true,
           hosted: true,
-          requiresPublication: false,
+          requiresPublication: true,
           dataCapability: 'qualification_fixture',
           visualReview: false,
           specialistReason: null,
         },
         fullSafetyNet: true,
       },
-      'e2e.full': {
-        specs: ['e2e/tests/*.spec.mjs'],
+      'e2e.creatures': {
+        specs: ['e2e/tests/creatures-desktop.spec.mjs', 'e2e/tests/creature-interaction-desktop.spec.mjs', 'e2e/tests/creature-interaction-mobile.spec.mjs'],
         projects: ['desktop-chromium', 'mobile-chromium'],
-        resourceClass: 'browser-full',
+        resourceClass: 'browser-targeted',
+        evidence: 'machine-summary',
+        capabilities: {
+          browser: true,
+          hosted: true,
+          requiresPublication: true,
+          dataCapability: 'qualification_fixture',
+          visualReview: false,
+          specialistReason: null,
+        },
+        fullSafetyNet: true,
+      },
+      'e2e.full': conservativeWildcardFullV2(),
+      'visual.creatures': {
+        specs: ['e2e/tests/visual-desktop.spec.mjs', 'e2e/tests/visual-mobile.spec.mjs'],
+        projects: ['desktop-chromium', 'mobile-chromium'],
+        resourceClass: 'browser-targeted',
         evidence: 'restricted-visual-review',
         capabilities: {
           browser: true,
           hosted: false,
           requiresPublication: true,
-          dataCapability: 'real_fullworld',
+          dataCapability: 'bounded_real_world',
           visualReview: true,
-          specialistReason: 'real-fullworld-product',
+          specialistReason: 'private-visual',
         },
         fullSafetyNet: true,
       },
-    },
-  });
+    });
+  }
+
+  invalid('trusted verification catalog', 'legacy schemaVersion 1 is allowed only for an exact known protected catalog');
 }
 
 function safePrefix(value) {
