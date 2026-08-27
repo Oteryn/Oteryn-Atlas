@@ -12,6 +12,7 @@ const expectedDigest = `sha256:${'2'.repeat(64)}`;
 const productDigest = `sha256:${'3'.repeat(64)}`;
 const workerDigest = `sha256:${'4'.repeat(64)}`;
 const executionDigest = `sha256:${'5'.repeat(64)}`;
+const hostedDigest = `sha256:${'6'.repeat(64)}`;
 const controllerSha = 'a'.repeat(40);
 
 function plan() {
@@ -38,6 +39,7 @@ function summary(shardIndex, ids, overrides = {}) {
     candidateHeadSha: head,
     controllerSourceSha: controllerSha,
     planDigest,
+    planExpectedStableTestIdsDigest: expectedDigest,
     expectedStableTestIdsDigest: expectedDigest,
     productIdentitiesDigest: productDigest,
     workerPolicyDigest: workerDigest,
@@ -57,6 +59,20 @@ test('fan-in accepts only complete exact-head exact-ID zero-retry sibling eviden
   assert.equal(result.candidateHeadSha, head);
   assert.equal(result.planDigest, planDigest);
   assert.deepEqual(result.executedStableTestIds, [idA, idB]);
+});
+
+test('fan-in can validate an explicitly bound hosted placement without pretending it is the full plan census', () => {
+  const summaries = [
+    summary(0, [idA], { expectedStableTestIdsDigest: hostedDigest }),
+    summary(1, [], { expectedStableTestIdsDigest: hostedDigest }),
+  ];
+  const result = validateProtectedHostedFanIn(plan(), summaries, {
+    currentHeadSha: head,
+    expectedStableTestIds: [idA],
+    expectedStableTestIdsDigest: hostedDigest,
+  });
+  assert.equal(result.expectedStableTestIdsDigest, hostedDigest);
+  assert.deepEqual(result.executedStableTestIds, [idA]);
 });
 
 test('fan-in rejects stale current head and stale summary head', () => {
@@ -82,16 +98,21 @@ test('fan-in rejects partial or duplicate sibling shard evidence', () => {
   assert.throws(() => validateProtectedHostedFanIn(plan(), [summary(0, [idA]), summary(0, [idB])], { currentHeadSha: head }), /shard|duplicate/i);
 });
 
-test('fan-in rejects wrong plan controller product worker and execution identities', () => {
+test('fan-in rejects wrong plan controller product worker execution and placement identities', () => {
   const cases = [
-    { planDigest: `sha256:${'6'.repeat(64)}` },
+    { planDigest: `sha256:${'7'.repeat(64)}` },
     { controllerSourceSha: 'd'.repeat(40) },
-    { expectedStableTestIdsDigest: `sha256:${'7'.repeat(64)}` },
-    { productIdentitiesDigest: `sha256:${'8'.repeat(64)}` },
-    { workerPolicyDigest: `sha256:${'9'.repeat(64)}` },
-    { executionPolicyDigest: `sha256:${'0'.repeat(64)}` },
+    { expectedStableTestIdsDigest: `sha256:${'8'.repeat(64)}` },
+    { productIdentitiesDigest: `sha256:${'9'.repeat(64)}` },
+    { workerPolicyDigest: `sha256:${'0'.repeat(64)}` },
+    { executionPolicyDigest: `sha256:${'a'.repeat(64)}` },
   ];
   for (const overrides of cases) {
     assert.throws(() => validateProtectedHostedFanIn(plan(), [summary(0, [idA], overrides), summary(1, [idB])], { currentHeadSha: head }), /mismatch|identity|digest|controller/i);
   }
+  assert.throws(() => validateProtectedHostedFanIn(plan(), [summary(0, [idA], { expectedStableTestIdsDigest: hostedDigest }), summary(1, [], { expectedStableTestIdsDigest: hostedDigest })], {
+    currentHeadSha: head,
+    expectedStableTestIds: [idA],
+    expectedStableTestIdsDigest: `sha256:${'b'.repeat(64)}`,
+  }), /digest|mismatch/i);
 });
