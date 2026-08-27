@@ -259,6 +259,13 @@ jobs:
           export ATLAS_VERIFICATION_PLAN_SHA256="$(jq -r .planDigest artifacts/controller/protected-verification-plan.json)"
           export ATLAS_PROTECTED_TEST_LIST="$PWD/artifacts/controller/protected-hosted-test-list.txt"
           export ATLAS_E2E_ARTIFACTS_HOST="$artifacts"
+          cleanup() {
+            docker compose \
+              -f protected-control/e2e/compose.protected-hosted-executor.yml \
+              -f protected-control/e2e/compose.github-hosted.yml \
+              down -v --remove-orphans >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
           docker compose \
             -f protected-control/e2e/compose.protected-hosted-executor.yml \
             -f protected-control/e2e/compose.github-hosted.yml \
@@ -267,10 +274,6 @@ jobs:
             -f protected-control/e2e/compose.protected-hosted-executor.yml \
             -f protected-control/e2e/compose.github-hosted.yml \
             run --rm e2e
-          docker compose \
-            -f protected-control/e2e/compose.protected-hosted-executor.yml \
-            -f protected-control/e2e/compose.github-hosted.yml \
-            down -v --remove-orphans
 
       - name: Convert shard result into protected machine evidence
         if: always()
@@ -355,12 +358,16 @@ jobs:
           };
           walk('artifacts/shards');
           const summaries = files.sort().map((file) => JSON.parse(fs.readFileSync(file, 'utf8')));
-          const hostedPlan = { ...plan, stableTestIds: execution.hosted.stableTestIds };
-          const result = validateProtectedHostedFanIn(hostedPlan, summaries, { currentHeadSha: process.env.CANDIDATE_HEAD_SHA });
+          const result = validateProtectedHostedFanIn(plan, summaries, {
+            currentHeadSha: process.env.CANDIDATE_HEAD_SHA,
+            expectedStableTestIds: execution.hosted.stableTestIds,
+            expectedStableTestIdsDigest: execution.hostedExpectedStableTestIdsDigest,
+          });
           fs.writeFileSync('artifacts/controller/protected-hosted-fan-in.json', `${JSON.stringify({
             ...result,
             evidenceScope: 'hosted-placement',
             specialistStableTestIds: execution.specialist.stableTestIds,
+            reviewGroupIds: execution.review.groupIds,
           }, null, 2)}\n`);
           NODE
 
