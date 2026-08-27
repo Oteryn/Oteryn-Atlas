@@ -1,0 +1,369 @@
+name: Protected Hosted Verification Executor
+
+on:
+  workflow_run:
+    workflows: ["Protected Verification Controller"]
+    types: [completed]
+
+permissions:
+  contents: read
+  actions: read
+  pull-requests: read
+
+concurrency:
+  group: atlas-protected-hosted-pr-${{ github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.head_branch }}
+  cancel-in-progress: true
+
+jobs:
+  preflight:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'pull_request_target'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    outputs:
+      bundle_name: ${{ steps.contract.outputs.bundle_name }}
+      candidate_head_sha: ${{ steps.contract.outputs.candidate_head_sha }}
+      controller_source_sha: ${{ steps.contract.outputs.controller_source_sha }}
+      pr_number: ${{ steps.contract.outputs.pr_number }}
+      hosted_count: ${{ steps.contract.outputs.hosted_count }}
+      specialist_count: ${{ steps.contract.outputs.specialist_count }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      CONTROLLER_RUN_ID: ${{ github.event.workflow_run.id }}
+    steps:
+      - name: Download the unique protected-verification-plan artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/controller
+          mapfile -t names < <(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$CONTROLLER_RUN_ID/artifacts?per_page=100" \
+            --jq '.artifacts[] | select(.expired == false and (.name | startswith("protected-verification-plan-"))) | .name')
+          test "${#names[@]}" -eq 1
+          gh run download "$CONTROLLER_RUN_ID" --name "${names[0]}" --dir artifacts/controller
+          test -s artifacts/controller/protected-verification-plan.json
+
+      - name: Resolve protected controller and candidate identities
+        id: identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module - artifacts/controller/protected-verification-plan.json "$GITHUB_OUTPUT" <<'NODE'
+          import fs from 'node:fs';
+          const [planPath, outputPath] = process.argv.slice(2);
+          const plan = JSON.parse(fs.readFileSync(planPath, 'utf8'));
+          if (plan.schemaVersion !== 2 || plan.controller?.id !== 'atlas-protected-hosted-controller-v2' || plan.controller?.version !== 2) {
+            throw new Error('Protected hosted plan controller identity is invalid.');
+          }
+          for (const [name, value] of [['controller_source_sha', plan.controller.sourceSha], ['candidate_head_sha', plan.candidateHeadSha]]) {
+            if (!/^[a-f0-9]{40}$/.test(value)) throw new Error(`${name} is not an exact SHA.`);
+            fs.appendFileSync(outputPath, `${name}=${value}\n`);
+          }
+          if (!Number.isSafeInteger(plan.prNumber) || plan.prNumber < 1) throw new Error('Protected hosted plan PR number is invalid.');
+          fs.appendFileSync(outputPath, `pr_number=${plan.prNumber}\n`);
+          NODE
+
+      - name: Check out exact protected controller source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.identity.outputs.controller_source_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+          path: protected-control
+
+      - name: Reject superseded head before expensive execution
+        shell: bash
+        env:
+          PR_NUMBER: ${{ steps.identity.outputs.pr_number }}
+          CANDIDATE_HEAD_SHA: ${{ steps.identity.outputs.candidate_head_sha }}
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" > artifacts/controller/current-pr.json
+          node protected-control/tools/verification/assert-current-pr-head.mjs \
+            --payload artifacts/controller/current-pr.json \
+            --repository "$GITHUB_REPOSITORY" \
+            --pr-number "$PR_NUMBER" \
+            --expected-head-sha "$CANDIDATE_HEAD_SHA"
+
+      - name: Derive immutable hosted execution contract from protected plan
+        id: contract
+        shell: bash
+        env:
+          CURRENT_HEAD_SHA: ${{ steps.identity.outputs.candidate_head_sha }}
+          PR_NUMBER: ${{ steps.identity.outputs.pr_number }}
+        run: |
+          set -euo pipefail
+          node --input-type=module - artifacts/controller/protected-verification-plan.json artifacts/controller/protected-hosted-execution.json "$GITHUB_OUTPUT" <<'NODE'
+          import fs from 'node:fs';
+          import { buildProtectedHostedExecutionContract } from './protected-control/tools/verification/protected-hosted-execution.mjs';
+          const [planPath, outputPath, githubOutput] = process.argv.slice(2);
+          const plan = JSON.parse(fs.readFileSync(planPath, 'utf8'));
+          const contract = buildProtectedHostedExecutionContract(plan, { currentHeadSha: process.env.CURRENT_HEAD_SHA });
+          fs.writeFileSync(outputPath, `${JSON.stringify(contract, null, 2)}\n`);
+          const bundleName = `protected-hosted-execution-${process.env.GITHUB_RUN_ID}-${process.env.GITHUB_RUN_ATTEMPT}`;
+          fs.appendFileSync(githubOutput, `bundle_name=${bundleName}\n`);
+          fs.appendFileSync(githubOutput, `candidate_head_sha=${contract.candidateHeadSha}\n`);
+          fs.appendFileSync(githubOutput, `controller_source_sha=${contract.controllerSourceSha}\n`);
+          fs.appendFileSync(githubOutput, `pr_number=${process.env.PR_NUMBER}\n`);
+          fs.appendFileSync(githubOutput, `hosted_count=${contract.hosted.stableTestIds.length}\n`);
+          fs.appendFileSync(githubOutput, `specialist_count=${contract.specialist.stableTestIds.length}\n`);
+          NODE
+
+      - name: Publish protected execution contract
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ steps.contract.outputs.bundle_name }}
+          path: |
+            artifacts/controller/protected-verification-plan.json
+            artifacts/controller/protected-hosted-execution.json
+            artifacts/controller/product-identities.json
+            artifacts/controller/fixture-manifest.json
+          if-no-files-found: error
+          retention-days: 14
+
+  hosted-shards:
+    if: needs.preflight.outputs.hosted_count != '0'
+    needs: [preflight]
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ github.token }}
+      CANDIDATE_HEAD_SHA: ${{ needs.preflight.outputs.candidate_head_sha }}
+      CONTROLLER_SOURCE_SHA: ${{ needs.preflight.outputs.controller_source_sha }}
+      PR_NUMBER: ${{ needs.preflight.outputs.pr_number }}
+      BUNDLE_NAME: ${{ needs.preflight.outputs.bundle_name }}
+      ATLAS_E2E_WORKERS: '1'
+      ATLAS_E2E_SHARD: ${{ matrix.shard }}/2
+    steps:
+      - name: Download protected execution contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/controller
+          gh run download "$GITHUB_RUN_ID" --name "$BUNDLE_NAME" --dir artifacts/controller
+          test -s artifacts/controller/protected-verification-plan.json
+          test -s artifacts/controller/protected-hosted-execution.json
+
+      - name: Check out exact protected controller source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.preflight.outputs.controller_source_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+          path: protected-control
+
+      - name: Fence current head and materialize exact candidate without credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" > artifacts/controller/current-pr.json
+          node protected-control/tools/verification/assert-current-pr-head.mjs \
+            --payload artifacts/controller/current-pr.json \
+            --repository "$GITHUB_REPOSITORY" \
+            --pr-number "$PR_NUMBER" \
+            --expected-head-sha "$CANDIDATE_HEAD_SHA"
+          git -C protected-control fetch --no-tags origin "refs/pull/$PR_NUMBER/head"
+          test "$(git -C protected-control rev-parse FETCH_HEAD)" = "$CANDIDATE_HEAD_SHA"
+          candidate_dir="$RUNNER_TEMP/atlas-candidate-$GITHUB_RUN_ID-${{ matrix.shard }}"
+          git -C protected-control worktree add --detach "$candidate_dir" "$CANDIDATE_HEAD_SHA"
+          printf '%s\n' "$candidate_dir" > artifacts/controller/candidate-dir.txt
+
+      - name: Re-enumerate candidate under protected no-network census sandbox
+        shell: bash
+        run: |
+          set -euo pipefail
+          candidate_dir="$(cat artifacts/controller/candidate-dir.txt)"
+          npm ci --prefix protected-control/e2e --ignore-scripts --no-audit --no-fund
+          timeout --signal=KILL 120s docker run --rm \
+            --network none \
+            --read-only \
+            --cap-drop ALL \
+            --security-opt no-new-privileges \
+            --pids-limit 192 \
+            --memory 1536m \
+            --cpus 2 \
+            --user 1000:1000 \
+            --tmpfs /tmp:rw,nosuid,nodev,size=256m \
+            --mount "type=bind,src=$candidate_dir,dst=/candidate,readonly" \
+            --mount "type=bind,src=$PWD/protected-control/e2e/node_modules,dst=/candidate/e2e/node_modules,readonly" \
+            mcr.microsoft.com/playwright:v1.62.0-noble@sha256:baed2032d533817f3dbe6425de795788430ba345e819a1201337009ba17c9d07 \
+            bash -lc 'cd /candidate && CI=1 /candidate/e2e/node_modules/.bin/playwright test --config=/candidate/e2e/playwright.config.mjs --list' \
+            > artifacts/controller/candidate-playwright-test-list.txt
+          node protected-control/tools/verification/protected-playwright-selection.mjs \
+            --list artifacts/controller/candidate-playwright-test-list.txt \
+            --execution artifacts/controller/protected-hosted-execution.json \
+            > artifacts/controller/protected-hosted-test-list.txt
+
+      - name: Build deterministic qualification product and verify plan identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          qualification="$RUNNER_TEMP/atlas-qualification-$GITHUB_RUN_ID-${{ matrix.shard }}"
+          rm -rf "$qualification"
+          node --input-type=module - "$qualification" artifacts/controller/protected-verification-plan.json <<'NODE'
+          import fs from 'node:fs';
+          import { buildQualificationWorld, verifyQualificationWorld } from './protected-control/tools/verification/qualification-world.mjs';
+          const [destination, planPath] = process.argv.slice(2);
+          await buildQualificationWorld(destination);
+          const manifest = await verifyQualificationWorld(destination);
+          const plan = JSON.parse(fs.readFileSync(planPath, 'utf8'));
+          const expected = plan.productIdentities?.qualification_fixture;
+          if (!expected || expected.id !== manifest.fixtureId || expected.digest !== manifest.productDigest) {
+            throw new Error('Qualification fixture identity does not match protected plan.');
+          }
+          NODE
+          printf '%s\n' "$qualification" > artifacts/controller/qualification-dir.txt
+
+      - name: Build sanitized candidate execution context with protected control files
+        shell: bash
+        run: |
+          set -euo pipefail
+          candidate_dir="$(cat artifacts/controller/candidate-dir.txt)"
+          context="$RUNNER_TEMP/atlas-execution-context-$GITHUB_RUN_ID-${{ matrix.shard }}"
+          rm -rf "$context"
+          mkdir -p "$context"
+          rsync -a --delete --exclude='.git' "$candidate_dir/" "$context/"
+          for path in e2e e2e/tests web src; do
+            test -d "$context/$path"
+            test ! -L "$context/$path"
+          done
+          rm -rf "$context/e2e/node_modules"
+          rm -f "$context/.dockerignore" "$context/e2e/Dockerfile.dockerignore"
+          cp protected-control/e2e/Dockerfile "$context/e2e/Dockerfile"
+          cp protected-control/e2e/package.json protected-control/e2e/package-lock.json "$context/e2e/"
+          cp protected-control/e2e/playwright.config.mjs protected-control/e2e/summary-reporter.mjs "$context/e2e/"
+          mkdir -p "$context/tools/verification"
+          cp protected-control/tools/verification/stable-id.mjs "$context/tools/verification/stable-id.mjs"
+          printf '%s\n' "$context" > artifacts/controller/execution-context.txt
+
+      - name: Run exact protected hosted shard on internal Docker network
+        shell: bash
+        run: |
+          set -euo pipefail
+          context="$(cat artifacts/controller/execution-context.txt)"
+          qualification="$(cat artifacts/controller/qualification-dir.txt)"
+          artifacts="$PWD/artifacts/hosted-shard-${{ matrix.shard }}"
+          mkdir -p "$artifacts"
+          export ATLAS_EXECUTION_CONTEXT="$context"
+          export ATLAS_QUALIFICATION_PUBLICATION_HOST="$qualification"
+          export ATLAS_QUALIFICATION_TRUST_JSON="$(jq -c . "$qualification/fixture-manifest.json")"
+          export ATLAS_CODE_REVISION="$CANDIDATE_HEAD_SHA"
+          export ATLAS_VERIFICATION_PLAN_SHA256="$(jq -r .planDigest artifacts/controller/protected-verification-plan.json)"
+          export ATLAS_PROTECTED_TEST_LIST="$PWD/artifacts/controller/protected-hosted-test-list.txt"
+          export ATLAS_E2E_ARTIFACTS_HOST="$artifacts"
+          docker compose \
+            -f protected-control/e2e/compose.protected-hosted-executor.yml \
+            -f protected-control/e2e/compose.github-hosted.yml \
+            up -d --wait atlas-publication atlas-web
+          docker compose \
+            -f protected-control/e2e/compose.protected-hosted-executor.yml \
+            -f protected-control/e2e/compose.github-hosted.yml \
+            run --rm e2e
+          docker compose \
+            -f protected-control/e2e/compose.protected-hosted-executor.yml \
+            -f protected-control/e2e/compose.github-hosted.yml \
+            down -v --remove-orphans
+
+      - name: Convert shard result into protected machine evidence
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          node protected-control/tools/verification/protected-hosted-shard-summary.mjs \
+            --plan artifacts/controller/protected-verification-plan.json \
+            --execution artifacts/controller/protected-hosted-execution.json \
+            --summary artifacts/hosted-shard-${{ matrix.shard }}/summary.json \
+            --shard-index ${{ matrix.shard - 1 }} \
+            --shard-count 2 \
+            > artifacts/hosted-shard-${{ matrix.shard }}/protected-shard-summary.json
+
+      - name: Publish protected shard evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: protected-hosted-shard-${{ github.event.workflow_run.id }}-${{ matrix.shard }}
+          path: artifacts/hosted-shard-${{ matrix.shard }}/protected-shard-summary.json
+          if-no-files-found: error
+          retention-days: 14
+
+  fan-in:
+    if: always() && needs.preflight.result == 'success' && needs.preflight.outputs.hosted_count != '0'
+    needs: [preflight, hosted-shards]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    env:
+      GH_TOKEN: ${{ github.token }}
+      CANDIDATE_HEAD_SHA: ${{ needs.preflight.outputs.candidate_head_sha }}
+      CONTROLLER_SOURCE_SHA: ${{ needs.preflight.outputs.controller_source_sha }}
+      PR_NUMBER: ${{ needs.preflight.outputs.pr_number }}
+      BUNDLE_NAME: ${{ needs.preflight.outputs.bundle_name }}
+    steps:
+      - name: Download protected plan and all sibling shard evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${{ needs.hosted-shards.result }}" = success
+          mkdir -p artifacts/controller artifacts/shards
+          gh run download "$GITHUB_RUN_ID" --name "$BUNDLE_NAME" --dir artifacts/controller
+          gh run download "$GITHUB_RUN_ID" --pattern 'protected-hosted-shard-*' --dir artifacts/shards
+          test "$(find artifacts/shards -name protected-shard-summary.json -type f | wc -l)" -eq 2
+
+      - name: Check out exact protected controller source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.preflight.outputs.controller_source_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+          path: protected-control
+
+      - name: Reject stale head before evidence acceptance
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" > artifacts/controller/current-pr.json
+          node protected-control/tools/verification/assert-current-pr-head.mjs \
+            --payload artifacts/controller/current-pr.json \
+            --repository "$GITHUB_REPOSITORY" \
+            --pr-number "$PR_NUMBER" \
+            --expected-head-sha "$CANDIDATE_HEAD_SHA"
+
+      - name: Require exact sibling fan-in for the protected hosted placement
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module - <<'NODE'
+          import fs from 'node:fs';
+          import path from 'node:path';
+          import { validateProtectedHostedFanIn } from './protected-control/tools/verification/protected-hosted-fan-in.mjs';
+          const plan = JSON.parse(fs.readFileSync('artifacts/controller/protected-verification-plan.json', 'utf8'));
+          const execution = JSON.parse(fs.readFileSync('artifacts/controller/protected-hosted-execution.json', 'utf8'));
+          const files = [];
+          const walk = (dir) => {
+            for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+              const full = path.join(dir, entry.name);
+              if (entry.isDirectory()) walk(full);
+              else if (entry.name === 'protected-shard-summary.json') files.push(full);
+            }
+          };
+          walk('artifacts/shards');
+          const summaries = files.sort().map((file) => JSON.parse(fs.readFileSync(file, 'utf8')));
+          const hostedPlan = { ...plan, stableTestIds: execution.hosted.stableTestIds };
+          const result = validateProtectedHostedFanIn(hostedPlan, summaries, { currentHeadSha: process.env.CANDIDATE_HEAD_SHA });
+          fs.writeFileSync('artifacts/controller/protected-hosted-fan-in.json', `${JSON.stringify({
+            ...result,
+            evidenceScope: 'hosted-placement',
+            specialistStableTestIds: execution.specialist.stableTestIds,
+          }, null, 2)}\n`);
+          NODE
+
+      - name: Publish protected hosted fan-in evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: protected-hosted-fan-in-${{ github.event.workflow_run.id }}-${{ needs.preflight.outputs.candidate_head_sha }}
+          path: artifacts/controller/protected-hosted-fan-in.json
+          if-no-files-found: error
+          retention-days: 14
