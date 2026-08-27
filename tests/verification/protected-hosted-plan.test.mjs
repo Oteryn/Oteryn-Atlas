@@ -116,6 +116,13 @@ test('protected hosted plan preserves protected IDs and accepts candidate additi
   assert.equal(plan.selectiveExecution, false);
   assert.equal(plan.retryPolicy.retries, 0);
   assert.equal(plan.requiresRealFullWorld, false);
+  assert.deepEqual(plan.workerPolicy, {
+    id: 'atlas-protected-hosted-workers-v1',
+    version: 1,
+    hostedShards: 2,
+    workersPerShard: 1,
+  });
+  assert.equal(plan.workerPolicyId, 'atlas-protected-hosted-workers-v1');
   assert.deepEqual(plan.stableTestIds, [baseId, candidateId].sort());
   assert.deepEqual(plan.candidateStableIdAdditions, [candidateId]);
   assert.deepEqual(plan.productIdentities, {
