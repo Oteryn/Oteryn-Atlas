@@ -464,7 +464,7 @@ Scheduled/manual Molehill depth uses the installed Windows PowerShell execution 
 
 `.github/workflows/verification-depth.yml` provides scheduled/nightly depth and manual dispatch. Its bounded deterministic expansion is:
 
-- no replay of the complete PR-required browser suite; for E2E-required pull requests the exact-head 71-scenario matrix remains the separate `atlas-local-e2e` merge gate;
+- no replay of the complete PR-required browser suite; for E2E-required pull requests the exact-head 77-scenario matrix remains the separate `atlas-local-e2e` merge gate;
 - the critical geometry/framebuffer set repeated three times with retries still fixed at zero;
 - stress seeds `133`, `1096043585`, `2779096485`, and `3735928559`, each with 64 replayable actions;
 - opt-in `nightly-desktop-dpr2` and `nightly-tablet` Chromium profiles;

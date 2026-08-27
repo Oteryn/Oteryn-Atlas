@@ -162,3 +162,40 @@
 .farm-estimate-output { margin-top: 8px; padding-top: 7px; border-top: 1px solid #172330; color: #b7cee1; font-size: 10px; }
 .farm-estimate-output p { margin: 4px 0; }
 @media (max-width: 980px) { .farm-custom input, .farm-custom select, .farm-custom button, .farm-creature-result { min-height: 44px; } }
+
+.creature-inspector-tabs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.creature-inspector-tabs .tab { min-width: 0; }
+.creature-inspector { color: #a9bacb; font-size: 11px; line-height: 1.45; }
+.creature-inspector[hidden] { display: none; }
+.creature-gameplay-header { display: grid; gap: 2px; margin-bottom: 12px; }
+.creature-gameplay-header h3 { margin: 0; color: #c7d7e6; font-size: 15px; }
+.creature-gameplay-kind { margin: 0; color: #8eb4d8; font-size: 9px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.creature-gameplay-provenance { margin: 3px 0 0; color: var(--muted); font: 8px/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; overflow-wrap: anywhere; }
+.creature-gameplay-section { margin-top: 12px; padding-top: 10px; border-top: 1px solid #172330; }
+.creature-gameplay-section h4 { margin: 0 0 7px; color: #a9c4dd; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
+.creature-gameplay-list { display: grid; gap: 4px; }
+.creature-gameplay-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 7px; align-items: center; min-height: 28px; padding: 5px 7px; border: 1px solid #1b2b3b; border-radius: 6px; background: #09131e; }
+.creature-gameplay-row:not(.creature-gameplay-trade-row):not(.creature-gameplay-loot-row) { grid-template-columns: minmax(0, 1fr); }
+.creature-gameplay-item-name, .creature-gameplay-item-action { min-width: 0; overflow-wrap: anywhere; }
+.creature-gameplay-item-action { padding: 0; border: 0; background: transparent; color: #9fcef5; text-align: left; }
+.creature-gameplay-value { color: #d5e4f1; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.creature-gameplay-meta { color: var(--muted); font-size: 9px; white-space: nowrap; }
+.creature-gameplay-notice, .creature-gameplay-empty, .creature-gameplay-meta { margin: 6px 0; }
+.creature-gameplay-notice { color: #d0a86a; }
+.creature-gameplay-empty { color: #8eb7a5; }
+.creature-gameplay-controls { display: grid; gap: 7px; margin: 8px 0; }
+.creature-gameplay-search, .creature-gameplay-sort { width: 100%; min-height: 34px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: #081019; color: var(--text); }
+.creature-gameplay-sort-label { display: grid; gap: 5px; color: var(--muted); font-size: 9px; }
+.creature-gameplay-more { width: 100%; min-height: 34px; margin-top: 7px; }
+.creature-gameplay-tags { display: flex; flex-wrap: wrap; gap: 5px; }
+.creature-gameplay-tag { padding: 4px 6px; border: 1px solid #24415a; border-radius: 999px; background: #0b1926; color: #a9cce9; font-size: 9px; }
+.creature-gameplay-facts { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 5px 9px; margin: 0; }
+.creature-gameplay-facts dt { color: var(--muted); }
+.creature-gameplay-facts dd { margin: 0; color: #c4d4e4; }
+.creature-gameplay-loading { color: var(--muted); }
+
+@media (max-width: 980px) {
+  .creature-inspector-tabs .tab { min-height: 44px; padding: 8px 4px; }
+  .creature-gameplay-row { min-height: 36px; }
+  .creature-gameplay-search, .creature-gameplay-sort, .creature-gameplay-more { min-height: 44px; }
+}

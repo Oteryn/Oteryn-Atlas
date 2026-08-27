@@ -11,6 +11,10 @@
       "project": "desktop-chromium"
     },
     {
+      "id": "desktop.creature-gameplay",
+      "project": "desktop-chromium"
+    },
+    {
       "id": "desktop.layers",
       "project": "desktop-chromium"
     },
@@ -56,6 +60,10 @@
     },
     {
       "id": "mobile.inspector",
+      "project": "mobile-chromium"
+    },
+    {
+      "id": "mobile.creature-gameplay",
       "project": "mobile-chromium"
     },
     {

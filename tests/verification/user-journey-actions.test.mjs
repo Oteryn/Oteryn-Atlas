@@ -61,5 +61,5 @@ test('local E2E status publisher binds the user-journey scenarios through stable
   const readme = fs.readFileSync('e2e/README.md', 'utf8');
   assert.match(publisher, /validate-e2e-evidence\.mjs/);
   assert.doesNotMatch(publisher, /\$ExpectedScenarioCount\s*=/);
-  assert.match(readme, /71-scenario exact-head PR gate/);
+  assert.match(readme, /77-scenario exact-head PR gate/);
 });
