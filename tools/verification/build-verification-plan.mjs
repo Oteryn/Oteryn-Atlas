@@ -27,6 +27,8 @@ const RESOURCE_RANK = Object.freeze({
   soak: 6,
   'artifact-build': 2,
 });
+const EXCLUSIVE_CAPABILITIES = new Set(['native-gpu', 'performance', 'soak']);
+const EXCLUSIVE_RESOURCES = new Set(['native-gpu', 'performance', 'soak']);
 
 function freeze(value) {
   if (value && typeof value === 'object' && !Object.isFrozen(value)) {
@@ -177,6 +179,7 @@ function mergeCatalogs(trusted, candidate) {
     groups[id] = {
       specs: unionStrings(left.specs, right.specs),
       projects: unionStrings(left.projects, right.projects),
+      capabilities: unionStrings(left.capabilities, right.capabilities),
       stableTestIds: unionStrings(left.stableTestIds, right.stableTestIds),
       dependsOn: unionStrings(left.dependsOn, right.dependsOn),
       resourceClass,
@@ -230,6 +233,7 @@ export function buildVerificationPlan(input) {
   const groups = selectedGroups(requiredGroupIds, verificationCatalog);
   const visualGroupIds = groups.filter((group) => group.evidence === 'restricted-visual-review').map((group) => group.id);
   const resourceClasses = [...new Set(groups.map((group) => group.resourceClass))].sort();
+  const requiredCapabilities = unionStrings(...groups.map((group) => group.capabilities));
   const stableTestIds = suppliedStableTestIds(input.stableTestIds)
     ?? groups.flatMap((group) => group.stableTestIds).sort();
   const headSha = sha(input.headSha, 'headSha');
@@ -254,12 +258,15 @@ export function buildVerificationPlan(input) {
     stableTestIdsDigest: digest(stableTestIds),
     requiredVisualGroupIds: visualGroupIds,
     resourceClasses,
+    requiredCapabilities,
+    requiredCapabilitiesDigest: digest(requiredCapabilities),
     workerPolicyId: SHADOW_WORKER_POLICY.id,
     workerPolicyDigest: digest(SHADOW_WORKER_POLICY),
     retryPolicy: { retries: 0 },
     requiredEvidence: [...new Set(groups.map((group) => group.evidence))].sort(),
-    requiresNativeHardware: resourceClasses.includes('native-gpu'),
-    exclusive: resourceClasses.some((resource) => ['native-gpu', 'performance', 'soak'].includes(resource)),
+    requiresNativeHardware: requiredCapabilities.includes('native-gpu'),
+    exclusive: requiredCapabilities.some((capability) => EXCLUSIVE_CAPABILITIES.has(capability))
+      || resourceClasses.some((resource) => EXCLUSIVE_RESOURCES.has(resource)),
     shadowOnly: true,
   });
 }
