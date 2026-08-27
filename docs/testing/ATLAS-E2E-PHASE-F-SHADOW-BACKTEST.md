@@ -12,6 +12,7 @@ Status: **PREPARATION / SHADOW ONLY — SELECTIVE EXECUTION DISABLED**
 - historical Phase E head observed: `#195@10d482a1a9edb94ce90b281a2823c7a32fbbece5`
 - historical Phase F head observed: `#200@88f3b2b8b1e36c03bb86be6102006ac148f8d5ea`
 - dedicated Lane D branch: `feat/issue-179-phase-f-shadow-backtest`
+- implementation code head before documentation-only synchronization: `ebd41f13d8dcf015210155233764b95e6222fabe`
 
 The branch is intentionally based on current final-D integration interfaces instead of the historical #200 implementation. It does not activate #200 and does not choose a worker/shard policy before Phase E is rebuilt on final protected Phase D.
 
@@ -26,13 +27,13 @@ The branch is intentionally based on current final-D integration interfaces inst
 
 ## Full-safe versus specialist identity
 
-`tools/verification/full-safety-net-stable-ids.json` is the exact ordinary hosted functional safety net. It is **not** the universe of every specialist stable ID. The shadow evaluator therefore records specialist IDs as an explicit additional set.
+`tools/verification/full-safety-net-stable-ids.json` is the exact ordinary hosted functional safety net. It is **not** the universe of every specialist stable ID. The shadow evaluator and selector-miss recorder therefore accept specialist IDs only through an explicit additional stable-ID set.
 
 A full-safe fallback is widening-only:
 
 `effective fallback = hosted full-safety stable IDs ∪ already-required specialist stable IDs`
 
-This prevents `force-full` or `SELECTOR_ESCAPE` from accidentally dropping a selected `real_fullworld`/specialist obligation.
+This prevents `force-full` or `SELECTOR_ESCAPE` from accidentally dropping a selected `real_fullworld`/specialist obligation. Proven specialist false negatives are also persistable as selector-escape events; they are not silently discarded merely because they are outside the ordinary hosted safety census.
 
 ## Historical regression provenance
 
@@ -53,11 +54,11 @@ No shard/worker/cardinality threshold is chosen here. `evaluateMatrixCardinality
 
 ## Verification performed before GitHub publication
 
-TDD RED was observed for each newly implemented module before production code was added.
+TDD RED was observed for each newly implemented module before production code was added. Additional RED/GREEN regression cycles were performed for specialist-ID evaluation, widening-only specialist preservation and specialist selector-miss recording.
 
 Current narrow local result before publication:
 
-- Lane D unit/fixture tests: `18/18 PASS`, `0 fail`, `0 skip`
+- Lane D unit/fixture tests: `19/19 PASS`, `0 fail`, `0 skip`
 - `node --check` on `shadow-backtest.mjs`, `selector-escape.mjs`, `run-shadow-backtest.mjs`: PASS
 
 The current-policy integration test and the complete repository `tests/verification/*.test.mjs` suite must run on the actual GitHub branch because the execution container does not contain the full repository checkout. Exact-head CI evidence must be recorded after publication; this paragraph is not a completion claim.
