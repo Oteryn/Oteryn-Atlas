@@ -4,8 +4,8 @@
   "paths": {
     ".github/workflows/ci.yml": {
       "prior_blob": "7720b9c470c9839ec246175c5079a9fb78fcf882",
-      "current_blob": "334f1d255cbf718a9b8c1a3720a65d5571bacff7",
-      "reason": "Phase D reconciles ordinary PR browser qualification from external local status authority to exact-head GitHub-hosted Docker Playwright, then adds PR-scoped cancellation plus fresh remote current-head fencing before expensive browser work, before evidence publication, and before final fan-in while preserving the pinned prior extraction target identity."
+      "current_blob": "cc32582063ac5b2bc63bf6c8280dad8b2858a9e3",
+      "reason": "Phase D reconciles ordinary PR browser qualification from external local status authority to exact-head GitHub-hosted Docker Playwright, adds PR-scoped cancellation plus fresh remote current-head fencing, and binds transported shadow-plan bytes plus the exact stable-ID census into browser validation and bounded evidence while preserving the pinned prior extraction target identity."
     }
   }
 }
