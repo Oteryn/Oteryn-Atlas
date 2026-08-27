@@ -1,0 +1,134 @@
+name: Protected Verification Controller
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: atlas-protected-controller-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  protected-plan:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      ATLAS_PR_NUMBER: ${{ github.event.pull_request.number }}
+      ATLAS_PROTECTED_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      ATLAS_CANDIDATE_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - name: Check out protected controller source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Resolve exact changed-file evidence without executing candidate code
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$ATLAS_PROTECTED_BASE_SHA"
+          mkdir -p artifacts/protected-controller
+          rows="$(mktemp)"
+          git_changes="$(mktemp)"
+          trap 'rm -f "$rows" "$git_changes"' EXIT
+
+          gh api --paginate \
+            "repos/$GITHUB_REPOSITORY/pulls/$ATLAS_PR_NUMBER/files?per_page=100" \
+            --jq '.[] | [.filename, (.previous_filename // "")] | @tsv' > "$rows"
+          test -s "$rows"
+
+          git fetch --no-tags origin "$ATLAS_CANDIDATE_HEAD_SHA"
+          merge_base_sha="$(git merge-base "$ATLAS_PROTECTED_BASE_SHA" "$ATLAS_CANDIDATE_HEAD_SHA")"
+          test -n "$merge_base_sha"
+          git diff --name-status -z --find-renames "$merge_base_sha" "$ATLAS_CANDIDATE_HEAD_SHA" > "$git_changes"
+
+          node --input-type=module - "$rows" "$git_changes" artifacts/protected-controller/changed-files.json artifacts/protected-controller/merge-base.txt <<'NODE'
+          import fs from 'node:fs';
+          const [rowsPath, gitPath, outputPath, mergeBasePath] = process.argv.slice(2);
+          const rows = fs.readFileSync(rowsPath, 'utf8').split(/\r?\n/).filter(Boolean);
+          const api = rows.map((row) => {
+            const fields = row.split('\t');
+            if (fields.length !== 2 || !fields[0]) throw new Error('Malformed GitHub changed-file evidence.');
+            return fields[1] ? { path: fields[0], previousPath: fields[1] } : { path: fields[0] };
+          });
+          const fields = fs.readFileSync(gitPath, 'utf8').split('\0');
+          if (fields.at(-1) === '') fields.pop();
+          const git = [];
+          while (fields.length) {
+            const status = fields.shift();
+            if (!status) throw new Error('Malformed protected merge-base diff evidence.');
+            if (status.startsWith('R')) {
+              const previousPath = fields.shift();
+              const path = fields.shift();
+              if (!previousPath || !path) throw new Error('Malformed protected rename evidence.');
+              git.push({ path, previousPath });
+            } else {
+              const path = fields.shift();
+              if (!path) throw new Error('Malformed protected changed path evidence.');
+              git.push({ path });
+            }
+          }
+          const canonical = (items) => JSON.stringify(items.map((item) => ({ path: item.path, previousPath: item.previousPath ?? null }))
+            .sort((a, b) => `${a.path}\0${a.previousPath}`.localeCompare(`${b.path}\0${b.previousPath}`)));
+          if (canonical(api) !== canonical(git)) throw new Error('GitHub changed-file evidence does not match protected merge-base diff.');
+          fs.writeFileSync(outputPath, `${JSON.stringify(api)}\n`);
+          fs.writeFileSync(mergeBasePath, `${process.env.MERGE_BASE_SHA ?? ''}`);
+          NODE
+          printf '%s\n' "$merge_base_sha" > artifacts/protected-controller/merge-base.txt
+
+      - name: Enumerate exact protected-base Playwright census
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci --prefix e2e
+          ATLAS_ARTIFACTS_DIR="$PWD/artifacts/protected-controller/playwright-list" \
+            npm exec --prefix e2e -- playwright test --config=e2e/playwright.config.mjs --list \
+            > artifacts/protected-controller/playwright-test-list.txt
+          node tools/verification/parse-playwright-test-list.mjs \
+            artifacts/protected-controller/playwright-test-list.txt \
+            > artifacts/protected-controller/stable-test-ids.json
+
+      - name: Build authoritative protected full-safe lower bound
+        shell: bash
+        run: |
+          set -euo pipefail
+          merge_base_sha="$(tr -d '\r\n' < artifacts/protected-controller/merge-base.txt)"
+          node tools/verification/protected-controller-bootstrap.mjs \
+            --repository "$GITHUB_REPOSITORY" \
+            --pr-number "$ATLAS_PR_NUMBER" \
+            --protected-base-sha "$ATLAS_PROTECTED_BASE_SHA" \
+            --candidate-head-sha "$ATLAS_CANDIDATE_HEAD_SHA" \
+            --merge-base-sha "$merge_base_sha" \
+            --changed-files artifacts/protected-controller/changed-files.json \
+            --stable-test-ids artifacts/protected-controller/stable-test-ids.json \
+            > artifacts/protected-controller/protected-verification-plan.json
+
+      - name: Reject superseded head before plan publication
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/pulls/$ATLAS_PR_NUMBER" > artifacts/protected-controller/current-pr.json
+          node tools/verification/assert-current-pr-head.mjs \
+            --payload artifacts/protected-controller/current-pr.json \
+            --repository "$GITHUB_REPOSITORY" \
+            --pr-number "$ATLAS_PR_NUMBER" \
+            --expected-head-sha "$ATLAS_CANDIDATE_HEAD_SHA"
+
+      - name: Publish protected verification plan
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: protected-verification-plan-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+          path: |
+            artifacts/protected-controller/protected-verification-plan.json
+            artifacts/protected-controller/stable-test-ids.json
+            artifacts/protected-controller/changed-files.json
+            artifacts/protected-controller/merge-base.txt
+          if-no-files-found: error
+          retention-days: 14
