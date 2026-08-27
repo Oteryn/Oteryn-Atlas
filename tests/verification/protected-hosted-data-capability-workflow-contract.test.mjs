@@ -16,6 +16,7 @@ test('protected hosted executor binds each hosted partition to its minimum data-
   assert.match(executor, /buildBoundedRealWorld/);
   assert.match(executor, /protected-hosted-product-identities\.json/);
   assert.match(executor, /--data-capability/);
+  assert.match(executor, /--source-manifest/);
 });
 
 test('ordinary hosted executor fails closed instead of treating real FullWorld as a hosted product', () => {
