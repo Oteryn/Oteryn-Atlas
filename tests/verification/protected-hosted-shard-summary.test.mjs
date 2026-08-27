@@ -10,6 +10,8 @@ const expectedDigest = `sha256:${'2'.repeat(64)}`;
 const productDigest = `sha256:${'3'.repeat(64)}`;
 const workerDigest = `sha256:${'4'.repeat(64)}`;
 const executionDigest = `sha256:${'5'.repeat(64)}`;
+const hostedDigest = `sha256:${'6'.repeat(64)}`;
+const specialistDigest = `sha256:${'7'.repeat(64)}`;
 const browserContainer = 'mcr.microsoft.com/playwright:v1.62.0-noble@sha256:baed2032d533817f3dbe6425de795788430ba345e819a1201337009ba17c9d07';
 const idA = 'desktop-chromium::e2e/tests/desktop.spec.mjs::A';
 const idB = 'desktop-chromium::e2e/tests/desktop.spec.mjs::B';
@@ -37,6 +39,8 @@ function execution() {
     candidateHeadSha: head,
     planDigest,
     expectedStableTestIdsDigest: expectedDigest,
+    hostedExpectedStableTestIdsDigest: hostedDigest,
+    specialistExpectedStableTestIdsDigest: specialistDigest,
     productIdentitiesDigest: productDigest,
     workerPolicyDigest: workerDigest,
     executionPolicyDigest: executionDigest,
@@ -44,6 +48,7 @@ function execution() {
     selectiveExecution: false,
     hosted: { groupIds: ['e2e.full'], stableTestIds: [idA, idB] },
     specialist: { groupIds: [], stableTestIds: [] },
+    review: { groupIds: [], stableTestIds: [] },
   };
 }
 
@@ -63,7 +68,7 @@ function summary(overrides = {}) {
   };
 }
 
-test('protected shard summary binds exact plan/controller/product/worker identities and executed IDs', () => {
+test('protected shard summary binds exact plan/controller/product/worker and hosted-placement identities', () => {
   const result = buildProtectedHostedShardSummary({ plan: plan(), execution: execution(), summary: summary(), shardIndex: 0, shardCount: 2 });
   assert.equal(result.schemaVersion, 1);
   assert.equal(result.status, 'success');
@@ -71,7 +76,8 @@ test('protected shard summary binds exact plan/controller/product/worker identit
   assert.equal(result.candidateHeadSha, head);
   assert.equal(result.controllerSourceSha, controllerSha);
   assert.equal(result.planDigest, planDigest);
-  assert.equal(result.expectedStableTestIdsDigest, expectedDigest);
+  assert.equal(result.planExpectedStableTestIdsDigest, expectedDigest);
+  assert.equal(result.expectedStableTestIdsDigest, hostedDigest);
   assert.equal(result.productIdentitiesDigest, productDigest);
   assert.equal(result.workerPolicyDigest, workerDigest);
   assert.equal(result.executionPolicyDigest, executionDigest);
@@ -103,7 +109,11 @@ test('wrong revision plan digest browser container worker count or shard policy 
   assert.throws(() => buildProtectedHostedShardSummary({ plan: plan(), execution: execution(), summary: summary(), shardIndex: 0, shardCount: 1 }), /shard|worker.*policy/i);
 });
 
-test('unexpected or specialist stable IDs cannot satisfy hosted shard evidence', () => {
+test('wrong hosted placement digest and unexpected or specialist stable IDs fail closed', () => {
+  const badExecution = execution();
+  badExecution.hostedExpectedStableTestIdsDigest = 'not-a-digest';
+  assert.throws(() => buildProtectedHostedShardSummary({ plan: plan(), execution: badExecution, summary: summary(), shardIndex: 0, shardCount: 2 }), /hosted.*digest/i);
+
   const unexpected = 'desktop-chromium::e2e/tests/desktop.spec.mjs::C';
   assert.throws(() => buildProtectedHostedShardSummary({ plan: plan(), execution: execution(), summary: summary({ scenarios: [{ stableTestId: unexpected, status: 'passed', retry: 0, skipReason: null }] }), shardIndex: 0, shardCount: 2 }), /unexpected|hosted/i);
   const value = execution();
