@@ -58,3 +58,12 @@ test('legacy transition qualification retains bounded publication-forwarder diag
   assert.match(workflow, /candidate\/artifacts\/github-evidence\/publication-forwarder\.log/);
   assert.match(workflow, /candidate\/artifacts\/github-evidence\/publication-forwarder\.err\.log/);
 });
+
+test('reviewed status fence keeps the candidate checkout clean before protected publication', () => {
+  const workflow = fs.readFileSync(workflowPath, 'utf8');
+  const statusJob = workflow.split('  publish-reviewed-status:')[1] ?? '';
+
+  assert.match(statusJob, /Join-Path \$env:RUNNER_TEMP/);
+  assert.match(statusJob, /--payload \$currentPrPayload/);
+  assert.doesNotMatch(statusJob, /Join-Path \$PWD 'artifacts-current-pr\.json'/);
+});
