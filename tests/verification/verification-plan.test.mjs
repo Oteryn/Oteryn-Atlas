@@ -11,11 +11,11 @@ import { buildVerificationPlan } from '../../tools/verification/build-verificati
 const catalog = {
   schemaVersion: 2,
   groups: {
-    'deterministic.core': { specs: ['tests/verification/*.test.mjs'], projects: [], resourceClass: 'cpu-light', evidence: 'machine-summary', capabilities: { browser: false, hosted: true, requiresPublication: false, visualReview: false, specialistReason: null } },
-    'e2e.common-smoke': { specs: ['e2e/tests/desktop.spec.mjs', 'e2e/tests/mobile.spec.mjs'], projects: ['desktop-chromium', 'mobile-chromium'], resourceClass: 'browser-targeted', evidence: 'machine-summary', capabilities: { browser: true, hosted: true, requiresPublication: true, visualReview: false, specialistReason: null } },
-    'e2e.creatures': { specs: ['e2e/tests/creatures-desktop.spec.mjs'], projects: ['desktop-chromium'], resourceClass: 'browser-targeted', evidence: 'machine-summary', capabilities: { browser: true, hosted: true, requiresPublication: true, visualReview: false, specialistReason: null } },
-    'visual.creatures': { specs: ['e2e/tests/visual-desktop.spec.mjs'], projects: ['desktop-chromium'], resourceClass: 'browser-targeted', evidence: 'restricted-visual-review', capabilities: { browser: true, hosted: false, requiresPublication: true, visualReview: true, specialistReason: 'private-visual' } },
-    'e2e.full': { specs: ['e2e/tests/*.spec.mjs'], projects: ['desktop-chromium', 'mobile-chromium'], resourceClass: 'browser-full', evidence: 'machine-summary', capabilities: { browser: true, hosted: true, requiresPublication: true, visualReview: false, specialistReason: null } },
+    'deterministic.core': { specs: ['tests/verification/*.test.mjs'], projects: [], resourceClass: 'cpu-light', evidence: 'machine-summary', capabilities: { browser: false, hosted: true, requiresPublication: false, dataCapability: 'qualification_fixture', visualReview: false, specialistReason: null } },
+    'e2e.common-smoke': { specs: ['e2e/tests/desktop.spec.mjs', 'e2e/tests/mobile.spec.mjs'], projects: ['desktop-chromium', 'mobile-chromium'], resourceClass: 'browser-targeted', evidence: 'machine-summary', capabilities: { browser: true, hosted: true, requiresPublication: true, dataCapability: 'qualification_fixture', visualReview: false, specialistReason: null } },
+    'e2e.creatures': { specs: ['e2e/tests/creatures-desktop.spec.mjs'], projects: ['desktop-chromium'], resourceClass: 'browser-targeted', evidence: 'machine-summary', capabilities: { browser: true, hosted: true, requiresPublication: true, dataCapability: 'qualification_fixture', visualReview: false, specialistReason: null } },
+    'visual.creatures': { specs: ['e2e/tests/visual-desktop.spec.mjs'], projects: ['desktop-chromium'], resourceClass: 'browser-targeted', evidence: 'restricted-visual-review', capabilities: { browser: true, hosted: false, requiresPublication: true, dataCapability: 'bounded_real_world', visualReview: true, specialistReason: 'private-visual' } },
+    'e2e.full': { specs: ['e2e/tests/*.spec.mjs'], projects: ['desktop-chromium', 'mobile-chromium'], resourceClass: 'browser-full', evidence: 'machine-summary', capabilities: { browser: true, hosted: true, requiresPublication: true, dataCapability: 'qualification_fixture', visualReview: false, specialistReason: null } },
   },
 };
 
@@ -63,10 +63,10 @@ test('planner selects a deterministic targeted union across current and rename-s
 test('planner composes every overlapping rule and expands declared dependency closure', () => {
   const compositionalCatalog = structuredClone(catalog);
   compositionalCatalog.groups['e2e.runtime'] = {
-    specs: ['e2e/tests/state-desktop.spec.mjs'], projects: ['desktop-chromium'], resourceClass: 'browser-broad', evidence: 'machine-summary', capabilities: { browser: true, hosted: true, requiresPublication: true, visualReview: false, specialistReason: null },
+    specs: ['e2e/tests/state-desktop.spec.mjs'], projects: ['desktop-chromium'], resourceClass: 'browser-broad', evidence: 'machine-summary', capabilities: { browser: true, hosted: true, requiresPublication: true, dataCapability: 'qualification_fixture', visualReview: false, specialistReason: null },
   };
   compositionalCatalog.groups['e2e.geometry'] = {
-    specs: ['e2e/tests/geometry-desktop.spec.mjs'], projects: ['desktop-chromium'], resourceClass: 'render-geometry', evidence: 'machine-summary', capabilities: { browser: true, hosted: true, requiresPublication: true, visualReview: false, specialistReason: null },
+    specs: ['e2e/tests/geometry-desktop.spec.mjs'], projects: ['desktop-chromium'], resourceClass: 'render-geometry', evidence: 'machine-summary', capabilities: { browser: true, hosted: true, requiresPublication: true, dataCapability: 'qualification_fixture', visualReview: false, specialistReason: null },
   };
   compositionalCatalog.groups['e2e.creatures'].dependsOnGroups = ['e2e.geometry'];
   const compositionalManifest = structuredClone(trustedImpactManifest);
@@ -84,6 +84,35 @@ test('planner composes every overlapping rule and expands declared dependency cl
 
   assert.deepEqual(plan.requiredGroupIds, ['deterministic.core', 'e2e.creatures', 'e2e.geometry', 'e2e.runtime']);
   assert.equal(plan.profile, 'broad');
+});
+
+test('data capability is independent from verification profile and only real_fullworld routes to specialist execution', () => {
+  const capabilityCatalog = structuredClone(catalog);
+  for (const group of Object.values(capabilityCatalog.groups)) group.capabilities.dataCapability = 'qualification_fixture';
+  capabilityCatalog.groups['e2e.full'].capabilities.dataCapability = 'qualification_fixture';
+  capabilityCatalog.groups['e2e.real-world'] = {
+    specs: ['e2e/tests/overview-scale-desktop.spec.mjs'], projects: ['desktop-chromium'], resourceClass: 'browser-full', evidence: 'machine-summary',
+    capabilities: { browser: true, hosted: false, requiresPublication: true, dataCapability: 'real_fullworld', visualReview: false, specialistReason: 'lan-hardware' },
+  };
+  const capabilityManifest = structuredClone(trustedImpactManifest);
+  capabilityManifest.entries.push({ pathPrefix: 'tools/fullworld-generator/', domains: ['fullworld-generator'], minimumProfile: 'full', requiredGroups: ['deterministic.core', 'e2e.real-world'] });
+
+  const hostedFull = buildVerificationPlan({
+    repository: 'Oteryn/Oteryn-Atlas', headSha: 'a'.repeat(40), integrationBaseSha: 'b'.repeat(40), mergeBaseSha: 'c'.repeat(40),
+    changedFiles: [{ path: 'tools/verification/classify-pr-changes.mjs' }], trustedImpactManifest: capabilityManifest, candidateImpactManifest: capabilityManifest,
+    verificationCatalog: capabilityCatalog,
+  });
+  assert.equal(hostedFull.profile, 'full');
+  assert.equal(hostedFull.requiresRealFullWorld, false);
+  assert.deepEqual(hostedFull.requiredDataCapabilities, ['qualification_fixture']);
+
+  const specialist = buildVerificationPlan({
+    repository: 'Oteryn/Oteryn-Atlas', headSha: 'a'.repeat(40), integrationBaseSha: 'b'.repeat(40), mergeBaseSha: 'c'.repeat(40),
+    changedFiles: [{ path: 'tools/fullworld-generator/change.mjs' }], trustedImpactManifest: capabilityManifest, candidateImpactManifest: capabilityManifest,
+    verificationCatalog: capabilityCatalog,
+  });
+  assert.equal(specialist.requiresRealFullWorld, true);
+  assert.deepEqual(specialist.requiredDataCapabilities, ['qualification_fixture', 'real_fullworld']);
 });
 
 test('planner fails closed to full for unknown, empty, malformed and governance evidence', () => {

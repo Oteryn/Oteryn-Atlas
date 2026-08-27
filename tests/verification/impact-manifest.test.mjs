@@ -14,14 +14,14 @@ const catalog = {
       projects: [],
       resourceClass: 'cpu-light',
       evidence: 'machine-summary',
-      capabilities: { browser: false, hosted: true, requiresPublication: false, visualReview: false, specialistReason: null },
+      capabilities: { browser: false, hosted: true, requiresPublication: false, dataCapability: 'qualification_fixture', visualReview: false, specialistReason: null },
     },
     'e2e.common-smoke': {
       specs: ['e2e/tests/desktop.spec.mjs', 'e2e/tests/mobile.spec.mjs'],
       projects: ['desktop-chromium', 'mobile-chromium'],
       resourceClass: 'browser-targeted',
       evidence: 'machine-summary',
-      capabilities: { browser: true, hosted: true, requiresPublication: true, visualReview: false, specialistReason: null },
+      capabilities: { browser: true, hosted: true, requiresPublication: true, dataCapability: 'qualification_fixture', visualReview: false, specialistReason: null },
     },
   },
 };
@@ -90,4 +90,10 @@ test('verification catalog requires semantic execution capability rather than na
       },
     },
   }), /capabilit|schemaVersion/i);
+});
+
+test('verification catalog rejects a real_fullworld group that could run on GitHub-hosted infrastructure', () => {
+  const invalid = structuredClone(catalog);
+  invalid.groups['e2e.common-smoke'].capabilities.dataCapability = 'real_fullworld';
+  assert.throws(() => validateVerificationCatalog(invalid), /real_fullworld.*specialist/i);
 });

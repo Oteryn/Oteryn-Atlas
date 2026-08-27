@@ -167,6 +167,10 @@ function mergeCatalogs(trusted, candidate) {
         browser: left.capabilities.browser || right.capabilities.browser,
         hosted: left.capabilities.hosted && right.capabilities.hosted,
         requiresPublication: left.capabilities.requiresPublication || right.capabilities.requiresPublication,
+        dataCapability: left.capabilities.dataCapability === 'real_fullworld' || right.capabilities.dataCapability === 'real_fullworld'
+          ? 'real_fullworld'
+          : left.capabilities.dataCapability === 'bounded_real_world' || right.capabilities.dataCapability === 'bounded_real_world'
+            ? 'bounded_real_world' : 'qualification_fixture',
         visualReview: left.capabilities.visualReview || right.capabilities.visualReview,
         specialistReason: left.capabilities.specialistReason ?? right.capabilities.specialistReason,
       },
@@ -205,6 +209,7 @@ export function buildVerificationPlan(input) {
   result.groups = groups.map((group) => group.id);
   const visualGroupIds = groups.filter((group) => group.evidence === 'restricted-visual-review').map((group) => group.id);
   const resourceClasses = [...new Set(groups.map((group) => group.resourceClass))].sort();
+  const requiredDataCapabilities = [...new Set(groups.map((group) => group.capabilities.dataCapability))].sort();
   const stableTestIds = exactStableTestIds(groups, input.protectedStableTestIds ?? input.stableTestIds);
   const headSha = sha(input.headSha, 'headSha');
   const integrationBaseSha = sha(input.integrationBaseSha, 'integrationBaseSha');
@@ -229,6 +234,8 @@ export function buildVerificationPlan(input) {
     stableIdAlgorithm,
     requiredVisualGroupIds: visualGroupIds,
     resourceClasses,
+    requiredDataCapabilities,
+    requiresRealFullWorld: requiredDataCapabilities.includes('real_fullworld'),
     workerPolicyId: SHADOW_WORKER_POLICY.id,
     workerPolicyDigest: digest(SHADOW_WORKER_POLICY),
     retryPolicy: { retries: 0 },

@@ -6,7 +6,7 @@
       "projects": [],
       "resourceClass": "cpu-light",
       "evidence": "machine-summary",
-      "capabilities": { "browser": false, "hosted": true, "requiresPublication": false, "visualReview": false, "specialistReason": null },
+      "capabilities": { "browser": false, "hosted": true, "requiresPublication": false, "dataCapability": "qualification_fixture", "visualReview": false, "specialistReason": null },
       "fullSafetyNet": true
     },
     "e2e.common-smoke": {
@@ -14,7 +14,7 @@
       "projects": ["desktop-chromium", "mobile-chromium"],
       "resourceClass": "browser-targeted",
       "evidence": "machine-summary",
-      "capabilities": { "browser": true, "hosted": true, "requiresPublication": true, "visualReview": false, "specialistReason": null },
+      "capabilities": { "browser": true, "hosted": true, "requiresPublication": true, "dataCapability": "qualification_fixture", "visualReview": false, "specialistReason": null },
       "fullSafetyNet": true
     },
     "e2e.creatures": {
@@ -22,7 +22,7 @@
       "projects": ["desktop-chromium", "mobile-chromium"],
       "resourceClass": "browser-targeted",
       "evidence": "machine-summary",
-      "capabilities": { "browser": true, "hosted": true, "requiresPublication": true, "visualReview": false, "specialistReason": null },
+      "capabilities": { "browser": true, "hosted": true, "requiresPublication": true, "dataCapability": "qualification_fixture", "visualReview": false, "specialistReason": null },
       "fullSafetyNet": true
     },
     "e2e.full": {
@@ -30,7 +30,7 @@
       "projects": ["desktop-chromium", "mobile-chromium"],
       "resourceClass": "browser-full",
       "evidence": "machine-summary",
-      "capabilities": { "browser": true, "hosted": true, "requiresPublication": true, "visualReview": false, "specialistReason": null },
+      "capabilities": { "browser": true, "hosted": true, "requiresPublication": true, "dataCapability": "qualification_fixture", "visualReview": false, "specialistReason": null },
       "fullSafetyNet": true
     },
     "visual.creatures": {
@@ -38,7 +38,7 @@
       "projects": ["desktop-chromium", "mobile-chromium"],
       "resourceClass": "browser-targeted",
       "evidence": "restricted-visual-review",
-      "capabilities": { "browser": true, "hosted": false, "requiresPublication": true, "visualReview": true, "specialistReason": "private-visual" },
+      "capabilities": { "browser": true, "hosted": false, "requiresPublication": true, "dataCapability": "bounded_real_world", "visualReview": true, "specialistReason": "private-visual" },
       "fullSafetyNet": true
     }
   }
