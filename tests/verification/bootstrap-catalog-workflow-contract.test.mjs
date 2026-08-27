@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
 
+import { normalizeTrustedVerificationCatalog } from '../../tools/verification/verification-plan-schema.mjs';
+
 const workflow = fs.readFileSync('.github/workflows/ci.yml', 'utf8');
 
 function bootstrapCatalog() {
@@ -12,16 +14,23 @@ function bootstrapCatalog() {
   return JSON.parse(match[1]);
 }
 
-test('protected-base bootstrap catalog uses the current semantic schema without narrowing full safety', () => {
-  const catalog = bootstrapCatalog();
+test('legacy protected-base bootstrap catalog upgrades only to a fail-closed semantic lower bound', () => {
+  const legacy = bootstrapCatalog();
+  assert.equal(legacy.schemaVersion, 1, 'current protected base is intentionally a legacy bootstrap input');
+
+  const catalog = normalizeTrustedVerificationCatalog(legacy);
   assert.equal(catalog.schemaVersion, 2);
   assert.deepEqual(Object.keys(catalog.groups).sort(), ['deterministic.core', 'e2e.full']);
 
   assert.deepEqual(catalog.groups['deterministic.core'], {
     specs: ['tests/verification/*.test.mjs'],
     projects: [],
+    stableTestIds: [],
     resourceClass: 'cpu-light',
     evidence: 'machine-summary',
+    sequential: false,
+    fullSafetyNet: true,
+    dependsOnGroups: [],
     capabilities: {
       browser: false,
       hosted: true,
@@ -30,22 +39,30 @@ test('protected-base bootstrap catalog uses the current semantic schema without 
       visualReview: false,
       specialistReason: null,
     },
-    fullSafetyNet: true,
   });
 
   assert.deepEqual(catalog.groups['e2e.full'], {
     specs: ['e2e/tests/*.spec.mjs'],
     projects: ['desktop-chromium', 'mobile-chromium'],
+    stableTestIds: [],
     resourceClass: 'browser-full',
-    evidence: 'machine-summary',
+    evidence: 'restricted-visual-review',
+    sequential: false,
+    fullSafetyNet: true,
+    dependsOnGroups: [],
     capabilities: {
       browser: true,
-      hosted: true,
+      hosted: false,
       requiresPublication: true,
-      dataCapability: 'qualification_fixture',
-      visualReview: false,
-      specialistReason: null,
+      dataCapability: 'real_fullworld',
+      visualReview: true,
+      specialistReason: 'real-fullworld-product',
     },
-    fullSafetyNet: true,
   });
+});
+
+test('trusted bootstrap upgrade rejects any non-exact legacy schema-v1 shape', () => {
+  const legacy = bootstrapCatalog();
+  legacy.groups['e2e.full'].specs = ['e2e/tests/desktop.spec.mjs'];
+  assert.throws(() => normalizeTrustedVerificationCatalog(legacy), /trusted verification catalog invalid/);
 });
