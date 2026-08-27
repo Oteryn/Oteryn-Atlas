@@ -1,8 +1,13 @@
 import fs from 'node:fs';
 import http from 'node:http';
+import os from 'node:os';
 import path from 'node:path';
 
-import { publishReadyPublication, validateReadyPublication } from './publication-readiness.mjs';
+import {
+  publicationReadinessManifestName,
+  publishReadyPublication,
+  validateReadyPublication,
+} from './publication-readiness.mjs';
 import { buildQualificationWorld, verifyQualificationWorld } from './qualification-world.mjs';
 
 const SHA256 = /^sha256:[a-f0-9]{64}$/;
@@ -30,6 +35,22 @@ function qualificationTrustDescriptor(manifest) {
   });
 }
 
+async function verifyPublishedQualificationWorld(publicationDir) {
+  const root = path.resolve(publicationDir);
+  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-qualification-verify-'));
+  const product = path.join(scratch, 'product');
+  const readinessPath = path.join(root, publicationReadinessManifestName);
+  try {
+    fs.cpSync(root, product, {
+      recursive: true,
+      filter: (source) => path.resolve(source) !== readinessPath,
+    });
+    return await verifyQualificationWorld(product);
+  } finally {
+    fs.rmSync(scratch, { recursive: true, force: true, maxRetries: 2 });
+  }
+}
+
 export async function prepareReadyQualificationPublication({ sourceDir, publicationDir, ...identity }) {
   const source = path.resolve(sourceDir);
   const publication = path.resolve(publicationDir);
@@ -38,7 +59,7 @@ export async function prepareReadyQualificationPublication({ sourceDir, publicat
   await buildQualificationWorld(source);
   const fixtureManifest = await verifyQualificationWorld(source);
   const readiness = publishReadyPublication({ sourceDir: source, destinationDir: publication, ...identity });
-  const publishedFixture = await verifyQualificationWorld(publication);
+  const publishedFixture = await verifyPublishedQualificationWorld(publication);
   if (JSON.stringify(publishedFixture) !== JSON.stringify(fixtureManifest)) {
     throw new TypeError('published qualification fixture identity does not match its verified source');
   }
@@ -84,7 +105,7 @@ function contentType(target) {
 export async function startReadyQualificationPublicationServer({ publicationDir, readiness, ...identity }) {
   const root = path.resolve(publicationDir);
   const validatedReadiness = validateReadyPublication({ publicationDir: root, manifest: readiness, ...identity });
-  const fixtureManifest = await verifyQualificationWorld(root);
+  const fixtureManifest = await verifyPublishedQualificationWorld(root);
   qualificationTrustDescriptor(fixtureManifest);
 
   const server = http.createServer((request, response) => {
