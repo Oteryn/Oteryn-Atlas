@@ -50,6 +50,13 @@ test('hosted executor consumes a published protected plan under read-only GitHub
   assert.doesNotMatch(executor, /pull_request_target:|atlas-local-e2e|192\.168\.|molehill|synology|secrets:/i);
 });
 
+test('Phase D hosted execution stays packed until Phase E calibrates sharding', () => {
+  assert.match(executor, /matrix:\n\s+include:\n\s+- shard:\s*1\n\s+index:\s*0/);
+  assert.doesNotMatch(executor, /- shard:\s*2/);
+  assert.match(executor, /ATLAS_E2E_WORKERS:\s*'1'/);
+  assert.match(executor, /ATLAS_E2E_SHARD:\s*\$\{\{ matrix\.shard \}\}\/1/);
+});
+
 test('protected-base test implementations and candidate additions execute from separate contexts', () => {
   assert.match(executor, /protected-playwright-test-list\.txt/);
   assert.match(executor, /candidate-additions-test-list\.txt/);
