@@ -4,8 +4,54 @@ const RESOURCE_CLASSES = new Set([
   'render-geometry', 'native-gpu', 'performance', 'soak', 'artifact-build',
 ]);
 const EVIDENCE_CLASSES = new Set(['machine-summary', 'restricted-visual-review']);
+const SPECIALIST_REASONS = new Set(['private-visual', 'native-windows-gpu', 'lan-hardware', 'real-fullworld-product']);
+const DATA_CAPABILITIES = new Set(['qualification_fixture', 'bounded_real_world', 'real_fullworld']);
 const GROUP_ID = /^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$/;
 const SAFE_PATH = /^(?:tests|e2e)\/[A-Za-z0-9_./*-]+$/;
+
+const LEGACY_BOOTSTRAP_CATALOG_V1 = {
+  schemaVersion: 1,
+  groups: {
+    'deterministic.core': {
+      specs: ['tests/verification/*.test.mjs'], projects: [], resourceClass: 'cpu-light', evidence: 'machine-summary',
+    },
+    'e2e.full': {
+      specs: ['e2e/tests/*.spec.mjs'], projects: ['desktop-chromium', 'mobile-chromium'], resourceClass: 'browser-full', evidence: 'restricted-visual-review',
+    },
+  },
+};
+
+const PROTECTED_MAIN_CATALOG_V1 = {
+  schemaVersion: 1,
+  groups: {
+    'deterministic.core': {
+      specs: ['tests/verification/*.test.mjs'], projects: [], resourceClass: 'cpu-light', evidence: 'machine-summary', fullSafetyNet: true,
+    },
+    'e2e.common-smoke': {
+      specs: ['e2e/tests/desktop.spec.mjs', 'e2e/tests/mobile.spec.mjs'], projects: ['desktop-chromium', 'mobile-chromium'], resourceClass: 'browser-targeted', evidence: 'machine-summary', fullSafetyNet: true,
+    },
+    'e2e.creatures': {
+      specs: ['e2e/tests/creatures-desktop.spec.mjs', 'e2e/tests/creature-interaction-desktop.spec.mjs', 'e2e/tests/creature-interaction-mobile.spec.mjs'], projects: ['desktop-chromium', 'mobile-chromium'], resourceClass: 'browser-targeted', evidence: 'machine-summary', fullSafetyNet: true,
+    },
+    'e2e.full': {
+      specs: ['e2e/tests/*.spec.mjs'], projects: ['desktop-chromium', 'mobile-chromium'], resourceClass: 'browser-full', evidence: 'restricted-visual-review', fullSafetyNet: true,
+    },
+    'visual.creatures': {
+      specs: ['e2e/tests/visual-desktop.spec.mjs', 'e2e/tests/visual-mobile.spec.mjs'], projects: ['desktop-chromium', 'mobile-chromium'], resourceClass: 'browser-targeted', evidence: 'restricted-visual-review', fullSafetyNet: true,
+    },
+  },
+};
+
+const PROTECTED_MAIN_IMPACT_V1 = {
+  schemaVersion: 1,
+  entries: [
+    { pathPrefix: 'docs/', domains: ['documentation'], minimumProfile: 'none', requiredGroups: [] },
+    { pathPrefix: 'tools/dyn-atlas-semantic/', domains: ['generator'], minimumProfile: 'focused', requiredGroups: ['deterministic.core'] },
+    { pathPrefix: 'src/browser/creature-', domains: ['creatures'], minimumProfile: 'targeted', requiredGroups: ['deterministic.core', 'e2e.common-smoke', 'e2e.creatures', 'visual.creatures'] },
+    { pathPrefix: 'src/browser/', domains: ['browser-runtime'], minimumProfile: 'broad', requiredGroups: ['deterministic.core', 'e2e.common-smoke'] },
+    { pathPrefix: 'tools/verification/', domains: ['verification-governance'], minimumProfile: 'full', requiredGroups: ['deterministic.core', 'e2e.full'] },
+  ],
+};
 
 function invalid(kind, detail) {
   throw new TypeError(`${kind} invalid: ${detail}`);
@@ -46,9 +92,12 @@ export function profileRank(profile) {
 }
 
 export function validateVerificationCatalog(candidate) {
+  if (isPlainObject(candidate) && candidate.schemaVersion === 1) {
+    return normalizeTrustedVerificationCatalog(candidate);
+  }
   const kind = 'verification catalog';
-  if (!isPlainObject(candidate) || candidate.schemaVersion !== 1 || !isPlainObject(candidate.groups)) {
-    invalid(kind, 'requires schemaVersion 1 and groups object');
+  if (!isPlainObject(candidate) || candidate.schemaVersion !== 2 || !isPlainObject(candidate.groups)) {
+    invalid(kind, 'requires schemaVersion 2 and groups object');
   }
   const groups = {};
   for (const [id, value] of Object.entries(candidate.groups).sort(([left], [right]) => left.localeCompare(right))) {
@@ -58,7 +107,24 @@ export function validateVerificationCatalog(candidate) {
     const projects = uniqueStrings(value.projects ?? [], kind, `${id}.projects`);
     if (!RESOURCE_CLASSES.has(value.resourceClass)) invalid(kind, `${id}.resourceClass is not allowlisted`);
     if (!EVIDENCE_CLASSES.has(value.evidence)) invalid(kind, `${id}.evidence is not allowlisted`);
+    if (!isPlainObject(value.capabilities)
+      || typeof value.capabilities.browser !== 'boolean'
+      || typeof value.capabilities.hosted !== 'boolean'
+      || typeof value.capabilities.requiresPublication !== 'boolean'
+      || !DATA_CAPABILITIES.has(value.capabilities.dataCapability)
+      || typeof value.capabilities.visualReview !== 'boolean'
+      || !(value.capabilities.specialistReason === null || SPECIALIST_REASONS.has(value.capabilities.specialistReason))) {
+      invalid(kind, `${id}.capabilities is not explicit semantic metadata`);
+    }
+    if (value.capabilities.browser !== (projects.length > 0)) invalid(kind, `${id}.capabilities.browser conflicts with projects`);
+    if (value.capabilities.specialistReason !== null && value.capabilities.hosted) invalid(kind, `${id}.capabilities cannot be hosted and specialist-only`);
+    if (value.capabilities.dataCapability === 'real_fullworld'
+      && (value.capabilities.hosted || value.capabilities.specialistReason === null)) {
+      invalid(kind, `${id}.real_fullworld must be specialist-only`);
+    }
     const stableTestIds = uniqueStrings(value.stableTestIds ?? [], kind, `${id}.stableTestIds`);
+    const dependsOnGroups = uniqueStrings(value.dependsOnGroups ?? [], kind, `${id}.dependsOnGroups`);
+    if (dependsOnGroups.includes(id)) invalid(kind, `${id}.dependsOnGroups cannot include itself`);
     groups[id] = {
       specs,
       projects,
@@ -67,10 +133,68 @@ export function validateVerificationCatalog(candidate) {
       evidence: value.evidence,
       sequential: Boolean(value.sequential),
       fullSafetyNet: Boolean(value.fullSafetyNet),
+      dependsOnGroups,
+      capabilities: { ...value.capabilities },
     };
   }
   if (Object.keys(groups).length === 0) invalid(kind, 'requires at least one group');
-  return freeze({ schemaVersion: 1, groups });
+  for (const [id, group] of Object.entries(groups)) {
+    if (group.dependsOnGroups.some((dependency) => !Object.hasOwn(groups, dependency))) {
+      invalid(kind, `${id}.dependsOnGroups references unknown group`);
+    }
+  }
+  return freeze({ schemaVersion: 2, groups });
+}
+
+function upgradedCatalogV2(groups) {
+  return validateVerificationCatalog({ schemaVersion: 2, groups });
+}
+
+function deterministicCoreV2() {
+  return {
+    specs: ['tests/verification/*.test.mjs'], projects: [], resourceClass: 'cpu-light', evidence: 'machine-summary',
+    capabilities: { browser: false, hosted: true, requiresPublication: false, dataCapability: 'qualification_fixture', visualReview: false, specialistReason: null },
+    fullSafetyNet: true,
+  };
+}
+
+function conservativeWildcardFullV2() {
+  return {
+    specs: ['e2e/tests/*.spec.mjs'], projects: ['desktop-chromium', 'mobile-chromium'], resourceClass: 'browser-full', evidence: 'restricted-visual-review',
+    capabilities: { browser: true, hosted: false, requiresPublication: true, dataCapability: 'real_fullworld', visualReview: true, specialistReason: 'real-fullworld-product' },
+    fullSafetyNet: true,
+  };
+}
+
+export function normalizeTrustedVerificationCatalog(candidate) {
+  if (isPlainObject(candidate) && candidate.schemaVersion === 2) return validateVerificationCatalog(candidate);
+
+  const canonical = canonicalJson(candidate);
+  if (canonical === canonicalJson(LEGACY_BOOTSTRAP_CATALOG_V1)) {
+    return upgradedCatalogV2({ 'deterministic.core': deterministicCoreV2(), 'e2e.full': conservativeWildcardFullV2() });
+  }
+  if (canonical === canonicalJson(PROTECTED_MAIN_CATALOG_V1)) {
+    return upgradedCatalogV2({
+      'deterministic.core': deterministicCoreV2(),
+      'e2e.common-smoke': {
+        specs: ['e2e/tests/desktop.spec.mjs', 'e2e/tests/mobile.spec.mjs'], projects: ['desktop-chromium', 'mobile-chromium'], resourceClass: 'browser-targeted', evidence: 'machine-summary',
+        capabilities: { browser: true, hosted: true, requiresPublication: true, dataCapability: 'qualification_fixture', visualReview: false, specialistReason: null },
+        fullSafetyNet: true,
+      },
+      'e2e.creatures': {
+        specs: ['e2e/tests/creatures-desktop.spec.mjs', 'e2e/tests/creature-interaction-desktop.spec.mjs', 'e2e/tests/creature-interaction-mobile.spec.mjs'], projects: ['desktop-chromium', 'mobile-chromium'], resourceClass: 'browser-targeted', evidence: 'machine-summary',
+        capabilities: { browser: true, hosted: true, requiresPublication: true, dataCapability: 'qualification_fixture', visualReview: false, specialistReason: null },
+        fullSafetyNet: true,
+      },
+      'e2e.full': conservativeWildcardFullV2(),
+      'visual.creatures': {
+        specs: ['e2e/tests/visual-desktop.spec.mjs', 'e2e/tests/visual-mobile.spec.mjs'], projects: ['desktop-chromium', 'mobile-chromium'], resourceClass: 'browser-targeted', evidence: 'restricted-visual-review',
+        capabilities: { browser: true, hosted: false, requiresPublication: true, dataCapability: 'bounded_real_world', visualReview: true, specialistReason: 'private-visual' },
+        fullSafetyNet: true,
+      },
+    });
+  }
+  invalid('trusted verification catalog', 'legacy schemaVersion 1 is allowed only for an exact known protected catalog');
 }
 
 function safePrefix(value) {
@@ -83,14 +207,26 @@ function safePrefix(value) {
     && !value.split('/').includes('.');
 }
 
+function normalizeKnownLegacyImpact(candidate) {
+  if (canonicalJson(candidate) !== canonicalJson(PROTECTED_MAIN_IMPACT_V1)) {
+    invalid('impact manifest', 'legacy schemaVersion 1 is allowed only for the exact known protected manifest');
+  }
+  return { schemaVersion: 2, entries: candidate.entries, crossDomainEscalations: [] };
+}
+
 export function validateImpactManifest(candidate, catalogCandidate) {
   const kind = 'impact manifest';
   const catalog = validateVerificationCatalog(catalogCandidate);
-  if (!isPlainObject(candidate) || candidate.schemaVersion !== 1 || !Array.isArray(candidate.entries)) {
-    invalid(kind, 'requires schemaVersion 1 and entries array');
+  const normalized = isPlainObject(candidate) && candidate.schemaVersion === 1
+    ? normalizeKnownLegacyImpact(candidate)
+    : candidate;
+  if (!isPlainObject(normalized) || normalized.schemaVersion !== 2 || !Array.isArray(normalized.entries)
+    || !Array.isArray(normalized.crossDomainEscalations)) {
+    invalid(kind, 'requires schemaVersion 2, entries and crossDomainEscalations arrays');
   }
+
   const prefixes = new Set();
-  const entries = candidate.entries.map((entry) => {
+  const entries = normalized.entries.map((entry) => {
     if (!isPlainObject(entry) || !safePrefix(entry.pathPrefix)) invalid(kind, 'entry pathPrefix is invalid');
     if (prefixes.has(entry.pathPrefix)) invalid(kind, 'contains duplicate pathPrefix');
     prefixes.add(entry.pathPrefix);
@@ -99,14 +235,27 @@ export function validateImpactManifest(candidate, catalogCandidate) {
     if (domains.some((domain) => !GROUP_ID.test(domain))) invalid(kind, 'entry domains are invalid');
     const requiredGroups = uniqueStrings(entry.requiredGroups ?? [], kind, 'entry requiredGroups');
     if (requiredGroups.some((group) => !Object.hasOwn(catalog.groups, group))) invalid(kind, 'entry references unknown group');
-    return {
-      pathPrefix: entry.pathPrefix,
-      domains,
-      minimumProfile: entry.minimumProfile,
-      requiredGroups,
-    };
+    return { pathPrefix: entry.pathPrefix, domains, minimumProfile: entry.minimumProfile, requiredGroups };
   });
-  return freeze({ schemaVersion: 1, entries });
+
+  const declaredDomains = new Set(entries.flatMap((entry) => entry.domains));
+  const escalationKeys = new Set();
+  const crossDomainEscalations = normalized.crossDomainEscalations.map((rule) => {
+    if (!isPlainObject(rule)) invalid(kind, 'cross-domain escalation must be an object');
+    const whenDomains = uniqueStrings(rule.whenDomains, kind, 'crossDomainEscalations.whenDomains').sort();
+    if (whenDomains.length < 2 || whenDomains.some((domain) => !GROUP_ID.test(domain) || !declaredDomains.has(domain))) {
+      invalid(kind, 'cross-domain escalation requires at least two declared domains');
+    }
+    if (!PROFILE_ORDER.includes(rule.minimumProfile)) invalid(kind, 'cross-domain escalation minimumProfile is invalid');
+    const requiredGroups = uniqueStrings(rule.requiredGroups ?? [], kind, 'crossDomainEscalations.requiredGroups').sort();
+    if (requiredGroups.some((group) => !Object.hasOwn(catalog.groups, group))) invalid(kind, 'cross-domain escalation references unknown group');
+    const key = whenDomains.join('\0');
+    if (escalationKeys.has(key)) invalid(kind, 'contains duplicate cross-domain domain set');
+    escalationKeys.add(key);
+    return { whenDomains, minimumProfile: rule.minimumProfile, requiredGroups };
+  }).sort((left, right) => left.whenDomains.join('\0').localeCompare(right.whenDomains.join('\0')));
+
+  return freeze({ schemaVersion: 2, entries, crossDomainEscalations });
 }
 
 export function canonicalJson(value) {

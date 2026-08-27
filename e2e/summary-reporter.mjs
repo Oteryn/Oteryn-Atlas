@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { normalizeStableSpecPath, stableTestId } from '../tools/verification/stable-id.mjs';
 
 const CATEGORIES = new Set([
   'unit', 'contract', 'e2e', 'geometry', 'render', 'visual',
@@ -31,16 +32,7 @@ function optionalInteger(value) {
 }
 
 export function normalizeSpecPath(file) {
-  const normalized = String(file ?? '').replaceAll('\\', '/');
-  for (const marker of ['e2e/tests/', 'tests/']) {
-    const index = normalized.indexOf(marker);
-    if (index >= 0) return normalized.slice(index);
-  }
-  return normalized.replace(/^\.\//, '') || 'unknown';
-}
-
-export function stableTestId(project, specPath, scenario) {
-  return `${String(project ?? 'unknown').slice(0, 128)}::${String(specPath ?? 'unknown').slice(0, 512)}::${String(scenario ?? 'unknown').slice(0, 512)}`;
+  return normalizeStableSpecPath(file);
 }
 
 export function normalizeSummaryScenario(input) {

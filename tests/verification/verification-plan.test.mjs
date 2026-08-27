@@ -9,18 +9,18 @@ import { fileURLToPath } from 'node:url';
 import { buildVerificationPlan } from '../../tools/verification/build-verification-plan.mjs';
 
 const catalog = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   groups: {
-    'deterministic.core': { specs: ['tests/verification/*.test.mjs'], projects: [], resourceClass: 'cpu-light', evidence: 'machine-summary' },
-    'e2e.common-smoke': { specs: ['e2e/tests/desktop.spec.mjs', 'e2e/tests/mobile.spec.mjs'], projects: ['desktop-chromium', 'mobile-chromium'], resourceClass: 'browser-targeted', evidence: 'machine-summary' },
-    'e2e.creatures': { specs: ['e2e/tests/creatures-desktop.spec.mjs'], projects: ['desktop-chromium'], resourceClass: 'browser-targeted', evidence: 'machine-summary' },
-    'visual.creatures': { specs: ['e2e/tests/visual-desktop.spec.mjs'], projects: ['desktop-chromium'], resourceClass: 'browser-targeted', evidence: 'restricted-visual-review' },
-    'e2e.full': { specs: ['e2e/tests/*.spec.mjs'], projects: ['desktop-chromium', 'mobile-chromium'], resourceClass: 'browser-full', evidence: 'restricted-visual-review' },
+    'deterministic.core': { specs: ['tests/verification/*.test.mjs'], projects: [], resourceClass: 'cpu-light', evidence: 'machine-summary', capabilities: { browser: false, hosted: true, requiresPublication: false, dataCapability: 'qualification_fixture', visualReview: false, specialistReason: null } },
+    'e2e.common-smoke': { specs: ['e2e/tests/desktop.spec.mjs', 'e2e/tests/mobile.spec.mjs'], projects: ['desktop-chromium', 'mobile-chromium'], resourceClass: 'browser-targeted', evidence: 'machine-summary', capabilities: { browser: true, hosted: true, requiresPublication: true, dataCapability: 'qualification_fixture', visualReview: false, specialistReason: null } },
+    'e2e.creatures': { specs: ['e2e/tests/creatures-desktop.spec.mjs'], projects: ['desktop-chromium'], resourceClass: 'browser-targeted', evidence: 'machine-summary', capabilities: { browser: true, hosted: true, requiresPublication: true, dataCapability: 'qualification_fixture', visualReview: false, specialistReason: null } },
+    'visual.creatures': { specs: ['e2e/tests/visual-desktop.spec.mjs'], projects: ['desktop-chromium'], resourceClass: 'browser-targeted', evidence: 'restricted-visual-review', capabilities: { browser: true, hosted: false, requiresPublication: true, dataCapability: 'bounded_real_world', visualReview: true, specialistReason: 'private-visual' } },
+    'e2e.full': { specs: ['e2e/tests/*.spec.mjs'], projects: ['desktop-chromium', 'mobile-chromium'], resourceClass: 'browser-full', evidence: 'machine-summary', capabilities: { browser: true, hosted: true, requiresPublication: true, dataCapability: 'qualification_fixture', visualReview: false, specialistReason: null } },
   },
 };
 
 const trustedImpactManifest = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   entries: [
     { pathPrefix: 'docs/', domains: ['documentation'], minimumProfile: 'none', requiredGroups: [] },
     { pathPrefix: 'tools/dyn-atlas-semantic/', domains: ['generator'], minimumProfile: 'focused', requiredGroups: ['deterministic.core'] },
@@ -28,6 +28,7 @@ const trustedImpactManifest = {
     { pathPrefix: 'src/browser/', domains: ['browser-runtime'], minimumProfile: 'broad', requiredGroups: ['deterministic.core', 'e2e.common-smoke'] },
     { pathPrefix: 'tools/verification/', domains: ['verification-governance'], minimumProfile: 'full', requiredGroups: ['deterministic.core', 'e2e.full'] },
   ],
+  crossDomainEscalations: [],
 };
 
 function build(changedFiles, candidateImpactManifest = trustedImpactManifest) {
@@ -48,16 +49,72 @@ test('planner selects a deterministic targeted union across current and rename-s
     { path: 'src/browser/creature-interaction.mjs', previousPath: 'tools/dyn-atlas-semantic/legacy.mjs' },
   ]);
 
-  assert.equal(plan.profile, 'targeted');
+  assert.equal(plan.profile, 'broad');
   assert.deepEqual(plan.requiredGroupIds, [
     'deterministic.core', 'e2e.common-smoke', 'e2e.creatures', 'visual.creatures',
   ]);
-  assert.deepEqual(plan.impactDomains, ['creatures', 'generator']);
+  assert.deepEqual(plan.impactDomains, ['browser-runtime', 'creatures', 'generator']);
+  assert.deepEqual(plan.appliedCrossDomainEscalations, []);
   assert.equal(plan.shadowOnly, true);
   assert.match(plan.changedPathsDigest, /^sha256:[a-f0-9]{64}$/);
   assert.match(plan.impactPolicyDigest, /^sha256:[a-f0-9]{64}$/);
   assert.match(plan.verificationCatalogDigest, /^sha256:[a-f0-9]{64}$/);
   assert(Object.isFrozen(plan));
+});
+
+test('planner composes every overlapping rule and expands declared dependency closure', () => {
+  const compositionalCatalog = structuredClone(catalog);
+  compositionalCatalog.groups['e2e.runtime'] = {
+    specs: ['e2e/tests/state-desktop.spec.mjs'], projects: ['desktop-chromium'], resourceClass: 'browser-broad', evidence: 'machine-summary', capabilities: { browser: true, hosted: true, requiresPublication: true, dataCapability: 'qualification_fixture', visualReview: false, specialistReason: null },
+  };
+  compositionalCatalog.groups['e2e.geometry'] = {
+    specs: ['e2e/tests/geometry-desktop.spec.mjs'], projects: ['desktop-chromium'], resourceClass: 'render-geometry', evidence: 'machine-summary', capabilities: { browser: true, hosted: true, requiresPublication: true, dataCapability: 'qualification_fixture', visualReview: false, specialistReason: null },
+  };
+  compositionalCatalog.groups['e2e.creatures'].dependsOnGroups = ['e2e.geometry'];
+  const compositionalManifest = structuredClone(trustedImpactManifest);
+  compositionalManifest.entries[2].requiredGroups = ['deterministic.core', 'e2e.creatures'];
+  compositionalManifest.entries[3].requiredGroups = ['e2e.runtime'];
+
+  const plan = buildVerificationPlan({
+    repository: 'Oteryn/Oteryn-Atlas',
+    headSha: 'a'.repeat(40), integrationBaseSha: 'b'.repeat(40), mergeBaseSha: 'c'.repeat(40),
+    changedFiles: [{ path: 'src/browser/creature-interaction.mjs' }],
+    trustedImpactManifest: compositionalManifest,
+    candidateImpactManifest: compositionalManifest,
+    verificationCatalog: compositionalCatalog,
+  });
+
+  assert.deepEqual(plan.requiredGroupIds, ['deterministic.core', 'e2e.creatures', 'e2e.geometry', 'e2e.runtime']);
+  assert.equal(plan.profile, 'broad');
+});
+
+test('data capability is independent from verification profile and only real_fullworld routes to specialist execution', () => {
+  const capabilityCatalog = structuredClone(catalog);
+  for (const group of Object.values(capabilityCatalog.groups)) group.capabilities.dataCapability = 'qualification_fixture';
+  capabilityCatalog.groups['e2e.full'].capabilities.dataCapability = 'qualification_fixture';
+  capabilityCatalog.groups['e2e.real-world'] = {
+    specs: ['e2e/tests/overview-scale-desktop.spec.mjs'], projects: ['desktop-chromium'], resourceClass: 'browser-full', evidence: 'machine-summary',
+    capabilities: { browser: true, hosted: false, requiresPublication: true, dataCapability: 'real_fullworld', visualReview: false, specialistReason: 'lan-hardware' },
+  };
+  const capabilityManifest = structuredClone(trustedImpactManifest);
+  capabilityManifest.entries.push({ pathPrefix: 'tools/fullworld-generator/', domains: ['fullworld-generator'], minimumProfile: 'full', requiredGroups: ['deterministic.core', 'e2e.real-world'] });
+
+  const hostedFull = buildVerificationPlan({
+    repository: 'Oteryn/Oteryn-Atlas', headSha: 'a'.repeat(40), integrationBaseSha: 'b'.repeat(40), mergeBaseSha: 'c'.repeat(40),
+    changedFiles: [{ path: 'tools/verification/classify-pr-changes.mjs' }], trustedImpactManifest: capabilityManifest, candidateImpactManifest: capabilityManifest,
+    verificationCatalog: capabilityCatalog,
+  });
+  assert.equal(hostedFull.profile, 'full');
+  assert.equal(hostedFull.requiresRealFullWorld, false);
+  assert.deepEqual(hostedFull.requiredDataCapabilities, ['qualification_fixture']);
+
+  const specialist = buildVerificationPlan({
+    repository: 'Oteryn/Oteryn-Atlas', headSha: 'a'.repeat(40), integrationBaseSha: 'b'.repeat(40), mergeBaseSha: 'c'.repeat(40),
+    changedFiles: [{ path: 'tools/fullworld-generator/change.mjs' }], trustedImpactManifest: capabilityManifest, candidateImpactManifest: capabilityManifest,
+    verificationCatalog: capabilityCatalog,
+  });
+  assert.equal(specialist.requiresRealFullWorld, true);
+  assert.deepEqual(specialist.requiredDataCapabilities, ['qualification_fixture', 'real_fullworld']);
 });
 
 test('planner fails closed to full for unknown, empty, malformed and governance evidence', () => {
@@ -75,14 +132,15 @@ test('planner fails closed to full for unknown, empty, malformed and governance 
 
 test('candidate policy cannot narrow trusted-base requirements', () => {
   const narrowedCandidate = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     entries: [{
       pathPrefix: 'src/browser/creature-', domains: ['creatures'], minimumProfile: 'none', requiredGroups: [],
     }],
+    crossDomainEscalations: [],
   };
   const plan = build([{ path: 'src/browser/creature-interaction.mjs' }], narrowedCandidate);
 
-  assert.equal(plan.profile, 'targeted');
+  assert.equal(plan.profile, 'broad');
   assert.deepEqual(plan.requiredGroupIds, [
     'deterministic.core', 'e2e.common-smoke', 'e2e.creatures', 'visual.creatures',
   ]);
@@ -132,6 +190,27 @@ test('planner binds merge-base and diff identity to the exact candidate', () => 
   assert.match(plan.workerPolicyDigest, /^sha256:[a-f0-9]{64}$/);
 });
 
+test('full plan binds the exact protected stable-ID set and its recoverable digest', () => {
+  const protectedStableTestIds = [
+    'desktop-chromium::e2e/tests/desktop.spec.mjs::desktop fullworld',
+    'mobile-chromium::e2e/tests/mobile.spec.mjs::mobile fullworld',
+  ];
+  const plan = buildVerificationPlan({
+    repository: 'Oteryn/Oteryn-Atlas',
+    headSha: 'a'.repeat(40), integrationBaseSha: 'b'.repeat(40), mergeBaseSha: 'c'.repeat(40),
+    changedFiles: [{ path: 'tools/verification/classify-pr-changes.mjs' }],
+    trustedImpactManifest,
+    candidateImpactManifest: trustedImpactManifest,
+    verificationCatalog: catalog,
+    protectedStableTestIds,
+  });
+
+  assert.equal(plan.profile, 'full');
+  assert.deepEqual(plan.stableTestIds, protectedStableTestIds);
+  assert.match(plan.expectedStableTestIdsDigest, /^sha256:[a-f0-9]{64}$/);
+  assert.equal(plan.stableIdAlgorithm.id, 'atlas-stable-id-v2');
+});
+
 test('planner CLI emits a canonical shadow plan from explicit trusted and candidate inputs', () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-plan-'));
   const files = {
@@ -159,7 +238,7 @@ test('planner CLI emits a canonical shadow plan from explicit trusted and candid
 
   assert.equal(result.status, 0, result.stderr);
   const plan = JSON.parse(result.stdout);
-  assert.equal(plan.profile, 'targeted');
+  assert.equal(plan.profile, 'broad');
   assert.equal(plan.shadowOnly, true);
   fs.rmSync(directory, { recursive: true, force: true });
 });

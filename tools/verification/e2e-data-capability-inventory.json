@@ -1,0 +1,220 @@
+{
+    "schemaVersion":  1,
+    "allowedDataCapabilities":  [
+                                    "qualification_fixture",
+                                    "bounded_real_world",
+                                    "real_fullworld"
+                                ],
+    "specs":  [
+                  {
+                      "spec":  "e2e/tests/accessibility-desktop.spec.mjs",
+                      "dataCapability":  "qualification_fixture",
+                      "rationale":  "Accessible names, disabled state, keyboard reachability and control state depend on UI/runtime behavior, not real world bytes.",
+                      "splitRequired":  false
+                  },
+                  {
+                      "spec":  "e2e/tests/accessibility-mobile.spec.mjs",
+                      "dataCapability":  "qualification_fixture",
+                      "rationale":  "Touch reachability, drawers and focus restoration are viewport/UI oracles over representative deterministic data.",
+                      "splitRequired":  false
+                  },
+                  {
+                      "spec":  "e2e/tests/api-contract-desktop.spec.mjs",
+                      "dataCapability":  "bounded_real_world",
+                      "rationale":  "These assertions explicitly verify Oteryn-Game source authority, contract_id/capability metadata and real published records; a small immutable real export is sufficient.",
+                      "splitRequired":  false
+                  },
+                  {
+                      "spec":  "e2e/tests/audit-desktop.spec.mjs",
+                      "dataCapability":  "qualification_fixture",
+                      "rationale":  "Coordinate navigation, pan/zoom, controls and LOD transitions require deterministic topology through the production runtime only.",
+                      "splitRequired":  false
+                  },
+                  {
+                      "spec":  "e2e/tests/audit-mobile.spec.mjs",
+                      "dataCapability":  "qualification_fixture",
+                      "rationale":  "Mobile drawers and representation transitions are runtime/UI oracles independent of complete real content.",
+                      "splitRequired":  false
+                  },
+                  {
+                      "spec":  "e2e/tests/creature-gameplay-desktop.spec.mjs",
+                      "dataCapability":  "bounded_real_world",
+                      "rationale":  "Staging only: this mixed spec still combines exact Game-owned shop/loot/profile facts with functional inspector/state behavior; bounded real source compatibility is required until final Phase D splits those oracles.",
+                      "splitRequired":  true
+                  },
+                  {
+                      "spec":  "e2e/tests/creature-gameplay-mobile.spec.mjs",
+                      "dataCapability":  "bounded_real_world",
+                      "rationale":  "Staging only: this mixed spec still combines Game-owned gameplay-profile presentation with touch/state behavior; bounded real source compatibility is required until final Phase D splits those oracles.",
+                      "splitRequired":  true
+                  },
+                  {
+                      "spec":  "e2e/tests/creature-interaction-desktop.spec.mjs",
+                      "dataCapability":  "qualification_fixture",
+                      "rationale":  "Cards, overlap choice, hit-testing, stale geometry invalidation, copy-link and reload need representative NPC/monster placements; historical real placement coordinates are not part of the oracle.",
+                      "splitRequired":  false
+                  },
+                  {
+                      "spec":  "e2e/tests/creature-interaction-mobile.spec.mjs",
+                      "dataCapability":  "qualification_fixture",
+                      "rationale":  "Touch creature activation, card/inspector behavior and geometry require representative deterministic placements only.",
+                      "splitRequired":  false
+                  },
+                  {
+                      "spec":  "e2e/tests/creature-presentation-desktop.spec.mjs",
+                      "dataCapability":  "qualification_fixture",
+                      "rationale":  "Dense occupancy, factual-role row layout, LOD, selection and animation lifecycle are presentation/runtime oracles; fixture records can encode the required role shapes.",
+                      "splitRequired":  false
+                  },
+                  {
+                      "spec":  "e2e/tests/creature-presentation-mobile.spec.mjs",
+                      "dataCapability":  "qualification_fixture",
+                      "rationale":  "DPR/label layout and AUTO detail/minimap representation need representative fixture badges and placements, not real complete-world bytes.",
+                      "splitRequired":  false
+                  },
+                  {
+                      "spec":  "e2e/tests/creatures-desktop.spec.mjs",
+                      "dataCapability":  "qualification_fixture",
+                      "rationale":  "Filters, repaint, search deep links and bounded diagnostics are functional creature oracles; a fixture search record and creature placement are sufficient.",
+                      "splitRequired":  false
+                  },
+                  {
+                      "spec":  "e2e/tests/degraded-search-desktop.spec.mjs",
+                      "dataCapability":  "qualification_fixture",
+                      "rationale":  "Search outage, malformed schema and degraded-state behavior require controlled positive/negative fixture variants.",
+                      "splitRequired":  false
+                  },
+                  {
+                      "spec":  "e2e/tests/desktop.spec.mjs",
+                      "dataCapability":  "qualification_fixture",
+                      "rationale":  "Smoke qualification, authenticated range streaming, overview, zoom and semantic navigation need a valid production-format fixture; the historical Thais label is replaceable test data, not the oracle.",
+                      "splitRequired":  false
+                  },
+                  {
+                      "spec":  "e2e/tests/farm-explorer-desktop.spec.mjs",
+                      "dataCapability":  "qualification_fixture",
+                      "rationale":  "Farm UI fail-closed behavior, selected-monster flow, URL state and estimator semantics require a representative fixture monster, not canonical Cave Rat bytes.",
+                      "splitRequired":  false
+                  },
+                  {
+                      "spec":  "e2e/tests/farm-explorer-mobile.spec.mjs",
+                      "dataCapability":  "qualification_fixture",
+                      "rationale":  "Mobile Farm Explorer reachability and estimator interaction are functional UI contracts over representative fixture data.",
+                      "splitRequired":  false
+                  },
+                  {
+                      "spec":  "e2e/tests/fullworld-animation-census-desktop.spec.mjs",
+                      "dataCapability":  "real_fullworld",
+                      "rationale":  "This isolated oracle asserts the complete published animation programs product, its manifest digest and exact production-wide coverage census.",
+                      "splitRequired":  false
+                  },
+                  {
+                      "spec":  "e2e/tests/geometry-desktop.spec.mjs",
+                      "dataCapability":  "qualification_fixture",
+                      "rationale":  "Base/creature synchronization, floor isolation, pan and deep-link restoration require multi-floor deterministic topology through real renderer seams.",
+                      "splitRequired":  false
+                  },
+                  {
+                      "spec":  "e2e/tests/geometry-mobile.spec.mjs",
+                      "dataCapability":  "qualification_fixture",
+                      "rationale":  "Portrait/landscape resize geometry is a transform/synchronization oracle over representative topology.",
+                      "splitRequired":  false
+                  },
+                  {
+                      "spec":  "e2e/tests/layer-audit-desktop.spec.mjs",
+                      "dataCapability":  "qualification_fixture",
+                      "rationale":  "Layer availability and fail-closed state use representative layer products and negative variants, not complete real data.",
+                      "splitRequired":  false
+                  },
+                  {
+                      "spec":  "e2e/tests/mobile.spec.mjs",
+                      "dataCapability":  "qualification_fixture",
+                      "rationale":  "Mobile smoke, drawers and semantic navigation can use a deterministic search record; the historical Sam record is not part of the correctness claim.",
+                      "splitRequired":  false
+                  },
+                  {
+                      "spec":  "e2e/tests/performance-desktop.spec.mjs",
+                      "dataCapability":  "qualification_fixture",
+                      "rationale":  "The normalized workload measures bounded structural budgets; fixture density can be versioned to the workload without importing real-world identity.",
+                      "splitRequired":  false
+                  },
+                  {
+                      "spec":  "e2e/tests/race-desktop.spec.mjs",
+                      "dataCapability":  "qualification_fixture",
+                      "rationale":  "Abort/reorder/back/reload races need controlled delayed authenticated ranges and deterministic state, which a fixture can reproduce exactly.",
+                      "splitRequired":  false
+                  },
+                  {
+                      "spec":  "e2e/tests/render-probes-desktop.spec.mjs",
+                      "dataCapability":  "qualification_fixture",
+                      "rationale":  "WebGL non-blank detail and committed-frame replacement require representative verified pixel content, not complete real pixels.",
+                      "splitRequired":  false
+                  },
+                  {
+                      "spec":  "e2e/tests/resilience-desktop.spec.mjs",
+                      "dataCapability":  "qualification_fixture",
+                      "rationale":  "Corrupt ranges, missing optional inputs, malformed search and version mismatch are controlled loader/runtime failure oracles suited to fixture variants.",
+                      "splitRequired":  false
+                  },
+                  {
+                      "spec":  "e2e/tests/responsive-mobile.spec.mjs",
+                      "dataCapability":  "qualification_fixture",
+                      "rationale":  "Responsive controls, backdrop, resize and optional creature controls are viewport/shell oracles independent of real world content.",
+                      "splitRequired":  false
+                  },
+                  {
+                      "spec":  "e2e/tests/scale-desktop.spec.mjs",
+                      "dataCapability":  "qualification_fixture",
+                      "rationale":  "The bounded search-corpus DOM-growth oracle can use a deliberately sized deterministic fixture corpus; production corpus identity/size is not asserted.",
+                      "splitRequired":  false
+                  },
+                  {
+                      "spec":  "e2e/tests/soak-desktop.spec.mjs",
+                      "dataCapability":  "qualification_fixture",
+                      "rationale":  "Repeated interaction structural-state retention is a runtime lifetime oracle and should use a replayable fixture rather than incidental real data.",
+                      "splitRequired":  false
+                  },
+                  {
+                      "spec":  "e2e/tests/state-desktop.spec.mjs",
+                      "dataCapability":  "qualification_fixture",
+                      "rationale":  "URL/history/reload/invalid-coordinate behavior needs stable bounds and navigation state only.",
+                      "splitRequired":  false
+                  },
+                  {
+                      "spec":  "e2e/tests/stress-desktop.spec.mjs",
+                      "dataCapability":  "qualification_fixture",
+                      "rationale":  "Seeded interaction stress checks geometry/state invariants over replayable actions, not complete-world scale.",
+                      "splitRequired":  false
+                  },
+                  {
+                      "spec":  "e2e/tests/user-journey-desktop.spec.mjs",
+                      "dataCapability":  "qualification_fixture",
+                      "rationale":  "Cross-feature desktop journeys require representative search/map/creature/state data through the production runtime, not complete real bytes.",
+                      "splitRequired":  false
+                  },
+                  {
+                      "spec":  "e2e/tests/user-journey-mobile.spec.mjs",
+                      "dataCapability":  "qualification_fixture",
+                      "rationale":  "Touch-first cross-feature journeys require representative deterministic data only.",
+                      "splitRequired":  false
+                  },
+                  {
+                      "spec":  "e2e/tests/visual-desktop.spec.mjs",
+                      "dataCapability":  "qualification_fixture",
+                      "rationale":  "After the complete animation census split, the remaining oracles concern Atlas-owned chrome, transition isolation and functional playback pixels; rights-safe fixture pixels are sufficient.",
+                      "splitRequired":  false
+                  },
+                  {
+                      "spec":  "e2e/tests/visual-mobile.spec.mjs",
+                      "dataCapability":  "qualification_fixture",
+                      "rationale":  "Atlas-owned mobile chrome/drawer layout and functional toggles can be reviewed over rights-safe fixture data.",
+                      "splitRequired":  false
+                  },
+                  {
+                      "spec":  "e2e/tests/workflows-desktop.spec.mjs",
+                      "dataCapability":  "qualification_fixture",
+                      "rationale":  "Semantic-result navigation, reload and history dynamically select an adequate record and do not require real complete-world identity.",
+                      "splitRequired":  false
+                  }
+              ]
+}

@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "entries": [
     {
       "pathPrefix": "docs/",
@@ -14,6 +14,48 @@
       "requiredGroups": ["deterministic.core"]
     },
     {
+      "pathPrefix": "tools/animation-runtime/",
+      "domains": ["animation-product"],
+      "minimumProfile": "broad",
+      "requiredGroups": ["deterministic.core", "e2e.full", "fullworld.animation-census"]
+    },
+    {
+      "pathPrefix": "tools/fullworld-generation/",
+      "domains": ["fullworld-complete-product"],
+      "minimumProfile": "broad",
+      "requiredGroups": ["deterministic.core", "e2e.full"]
+    },
+    {
+      "pathPrefix": "tools/fullworld-publication/",
+      "domains": ["fullworld-complete-product"],
+      "minimumProfile": "broad",
+      "requiredGroups": ["deterministic.core", "e2e.full"]
+    },
+    {
+      "pathPrefix": "tools/fullworld-runtime/",
+      "domains": ["fullworld-complete-product"],
+      "minimumProfile": "broad",
+      "requiredGroups": ["deterministic.core", "e2e.full"]
+    },
+    {
+      "pathPrefix": "tools/fullworld-layers/",
+      "domains": ["fullworld-complete-product"],
+      "minimumProfile": "broad",
+      "requiredGroups": ["deterministic.core", "e2e.full"]
+    },
+    {
+      "pathPrefix": "tools/fullworld-minimap/",
+      "domains": ["fullworld-complete-product"],
+      "minimumProfile": "broad",
+      "requiredGroups": ["deterministic.core", "e2e.full"]
+    },
+    {
+      "pathPrefix": "tools/build-semantic-search-index.py",
+      "domains": ["source-contract"],
+      "minimumProfile": "targeted",
+      "requiredGroups": ["deterministic.core", "integration.source-contract"]
+    },
+    {
       "pathPrefix": "src/browser/creature-",
       "domains": ["creatures"],
       "minimumProfile": "targeted",
@@ -26,10 +68,80 @@
       "requiredGroups": ["deterministic.core", "e2e.common-smoke"]
     },
     {
+      "pathPrefix": "web/semantic-search/",
+      "domains": ["source-contract"],
+      "minimumProfile": "targeted",
+      "requiredGroups": ["deterministic.core", "integration.source-contract"]
+    },
+    {
+      "pathPrefix": "web/",
+      "domains": ["browser-ui"],
+      "minimumProfile": "broad",
+      "requiredGroups": ["deterministic.core", "e2e.full"]
+    },
+    {
+      "pathPrefix": "e2e/tests/fullworld-animation-census-desktop.spec.mjs",
+      "domains": ["animation-product", "verification-governance"],
+      "minimumProfile": "full",
+      "requiredGroups": ["deterministic.core", "e2e.full", "fullworld.animation-census"]
+    },
+    {
+      "pathPrefix": "e2e/tests/api-contract-desktop.spec.mjs",
+      "domains": ["source-contract", "verification-governance"],
+      "minimumProfile": "full",
+      "requiredGroups": ["deterministic.core", "e2e.full", "integration.source-contract"]
+    },
+    {
+      "pathPrefix": "e2e/",
+      "domains": ["verification-governance"],
+      "minimumProfile": "full",
+      "requiredGroups": ["deterministic.core", "e2e.full"]
+    },
+    {
+      "pathPrefix": "tests/verification/",
+      "domains": ["verification-governance"],
+      "minimumProfile": "full",
+      "requiredGroups": ["deterministic.core", "e2e.full"]
+    },
+    {
+      "pathPrefix": "tests/",
+      "domains": ["test-contract"],
+      "minimumProfile": "focused",
+      "requiredGroups": ["deterministic.core"]
+    },
+    {
       "pathPrefix": "tools/verification/",
       "domains": ["verification-governance"],
       "minimumProfile": "full",
       "requiredGroups": ["deterministic.core", "e2e.full"]
+    },
+    {
+      "pathPrefix": ".github/workflows/",
+      "domains": ["verification-governance"],
+      "minimumProfile": "full",
+      "requiredGroups": ["deterministic.core", "e2e.full"]
+    }
+  ],
+  "crossDomainEscalations": [
+    {
+      "whenDomains": ["browser-runtime", "generator"],
+      "minimumProfile": "full",
+      "requiredGroups": ["deterministic.core", "e2e.full"]
+    },
+    {
+      "whenDomains": ["browser-runtime", "browser-ui"],
+      "minimumProfile": "full",
+      "requiredGroups": ["deterministic.core", "e2e.full"]
+    },
+    {
+      "whenDomains": ["animation-product", "browser-runtime"],
+      "minimumProfile": "full",
+      "requiredGroups": ["deterministic.core", "e2e.full", "fullworld.animation-census"]
+    },
+    {
+      "whenDomains": ["source-contract", "browser-ui"],
+      "minimumProfile": "broad",
+      "requiredGroups": ["deterministic.core", "e2e.full", "integration.source-contract"]
     }
   ]
 }
