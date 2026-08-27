@@ -17,6 +17,7 @@ test('Phase E hosted benchmark runbook keeps pre-Phase-D evidence non-authoritat
   assert.match(doc, /final protected Phase D/i);
   assert.match(doc, /at least 3 clean repetitions/i);
   assert.match(doc, /retries\s*=\s*0/i);
+  assert.match(doc, /workflowRunAttempt\s*=\s*1/i);
   assert.match(doc, /Molehill.*specialist-only/i);
   assert.match(doc, /must not define ordinary.*defaults/i);
   assert.match(doc, /full.*does not imply.*real_fullworld/i);
@@ -39,7 +40,7 @@ test('Phase E hosted benchmark runbook keeps pre-Phase-D evidence non-authoritat
   }
 });
 
-test('Phase E hosted benchmark runbook covers the whole Actions DAG and decision metrics', () => {
+test('Phase E hosted benchmark runbook covers the whole Actions DAG, runner resources and decision metrics', () => {
   const doc = readRequired(docUrl, 'Phase E hosted benchmark runbook');
   for (const phrase of [
     'queue/provisioning',
@@ -56,6 +57,10 @@ test('Phase E hosted benchmark runbook covers the whole Actions DAG and decision
     'duplicate setup/work',
     'verdict wall-clock',
     'job-minutes',
+    'runner logical CPU count',
+    'runner total memory',
+    'peak CPU percent',
+    'peak memory bytes',
     'variance',
     'OOM/crash',
     'useful plans/hour',
