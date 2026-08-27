@@ -15,16 +15,21 @@ const list = [
   'Total: 3 tests in 2 files',
 ].join('\n');
 
-function execution(ids = [desktopA, mobileA]) {
+function execution() {
   return {
     schemaVersion: 1,
-    hosted: { groupIds: ['e2e.full'], stableTestIds: ids },
+    hosted: {
+      groupIds: ['e2e.full'],
+      stableTestIds: [desktopA, desktopB, mobileA],
+      protectedStableTestIds: [desktopA, mobileA],
+      candidateAdditionalStableTestIds: [desktopB],
+    },
     specialist: { groupIds: [], stableTestIds: [] },
   };
 }
 
-test('selection emits only exact protected hosted stable IDs in Playwright test-list syntax', () => {
-  const result = buildProtectedPlaywrightSelection(list, execution());
+test('protected placement emits only protected-base IDs from protected-base Playwright list', () => {
+  const result = buildProtectedPlaywrightSelection(list, execution(), { placement: 'protected' });
   assert.deepEqual(result.stableTestIds, [desktopA, mobileA].sort());
   assert.equal(result.testListText, [
     '[desktop-chromium] › desktop.spec.mjs:10:3 › suite › A',
@@ -34,19 +39,34 @@ test('selection emits only exact protected hosted stable IDs in Playwright test-
   assert(!result.testListText.includes('suite › B'));
 });
 
-test('selection fails closed when a planned hosted ID is missing from exact candidate census', () => {
-  assert.throws(() => buildProtectedPlaywrightSelection(list, execution([desktopA, 'desktop-chromium::e2e/tests/missing.spec.mjs::missing'])), /missing/i);
+test('candidate-additions placement emits only widen-only new IDs from candidate Playwright list', () => {
+  const result = buildProtectedPlaywrightSelection(list, execution(), { placement: 'candidate-additions' });
+  assert.deepEqual(result.stableTestIds, [desktopB]);
+  assert.equal(result.testListText, '[desktop-chromium] › desktop.spec.mjs:20:3 › suite › B\n');
+  assert(!result.testListText.includes('suite › A'));
 });
 
-test('selection rejects duplicate stable IDs in candidate Playwright list', () => {
+test('selection fails closed when a required source-placement ID is absent from its exact census', () => {
+  const withoutProtectedA = list.replace('  [desktop-chromium] › desktop.spec.mjs:10:3 › suite › A\n', '');
+  assert.throws(() => buildProtectedPlaywrightSelection(withoutProtectedA, execution(), { placement: 'protected' }), /missing/i);
+  const withoutAddition = list.replace('  [desktop-chromium] › desktop.spec.mjs:20:3 › suite › B\n', '');
+  assert.throws(() => buildProtectedPlaywrightSelection(withoutAddition, execution(), { placement: 'candidate-additions' }), /missing/i);
+});
+
+test('selection rejects duplicate stable IDs in either source Playwright list', () => {
   const duplicate = `${list}\n  [desktop-chromium] › desktop.spec.mjs:10:3 › suite › A\n`;
-  assert.throws(() => buildProtectedPlaywrightSelection(duplicate, execution()), /duplicate/i);
+  assert.throws(() => buildProtectedPlaywrightSelection(duplicate, execution(), { placement: 'protected' }), /duplicate/i);
 });
 
-test('selection never admits specialist IDs into hosted test list', () => {
-  const value = execution([desktopA]);
-  value.specialist = { groupIds: ['fullworld.animation-census'], stableTestIds: [desktopB] };
-  const result = buildProtectedPlaywrightSelection(list, value);
-  assert.deepEqual(result.stableTestIds, [desktopA]);
-  assert(!result.testListText.includes('suite › B'));
+test('selection never admits specialist IDs into either hosted test list', () => {
+  const value = execution();
+  value.specialist = { groupIds: ['fullworld.animation-census'], stableTestIds: [desktopA] };
+  const protectedResult = buildProtectedPlaywrightSelection(list, value, { placement: 'protected' });
+  const additionsResult = buildProtectedPlaywrightSelection(list, value, { placement: 'candidate-additions' });
+  assert.deepEqual(protectedResult.stableTestIds, [desktopA, mobileA].sort());
+  assert.deepEqual(additionsResult.stableTestIds, [desktopB]);
+});
+
+test('unknown selection placement fails closed', () => {
+  assert.throws(() => buildProtectedPlaywrightSelection(list, execution(), { placement: 'candidate-all' }), /placement/i);
 });
