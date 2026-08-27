@@ -20,7 +20,7 @@ const catalog = {
 };
 
 const trustedImpactManifest = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   entries: [
     { pathPrefix: 'docs/', domains: ['documentation'], minimumProfile: 'none', requiredGroups: [] },
     { pathPrefix: 'tools/dyn-atlas-semantic/', domains: ['generator'], minimumProfile: 'focused', requiredGroups: ['deterministic.core'] },
@@ -28,6 +28,7 @@ const trustedImpactManifest = {
     { pathPrefix: 'src/browser/', domains: ['browser-runtime'], minimumProfile: 'broad', requiredGroups: ['deterministic.core', 'e2e.common-smoke'] },
     { pathPrefix: 'tools/verification/', domains: ['verification-governance'], minimumProfile: 'full', requiredGroups: ['deterministic.core', 'e2e.full'] },
   ],
+  crossDomainEscalations: [],
 };
 
 function build(changedFiles, candidateImpactManifest = trustedImpactManifest) {
@@ -53,6 +54,7 @@ test('planner selects a deterministic targeted union across current and rename-s
     'deterministic.core', 'e2e.common-smoke', 'e2e.creatures', 'visual.creatures',
   ]);
   assert.deepEqual(plan.impactDomains, ['browser-runtime', 'creatures', 'generator']);
+  assert.deepEqual(plan.appliedCrossDomainEscalations, []);
   assert.equal(plan.shadowOnly, true);
   assert.match(plan.changedPathsDigest, /^sha256:[a-f0-9]{64}$/);
   assert.match(plan.impactPolicyDigest, /^sha256:[a-f0-9]{64}$/);
@@ -130,10 +132,11 @@ test('planner fails closed to full for unknown, empty, malformed and governance 
 
 test('candidate policy cannot narrow trusted-base requirements', () => {
   const narrowedCandidate = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     entries: [{
       pathPrefix: 'src/browser/creature-', domains: ['creatures'], minimumProfile: 'none', requiredGroups: [],
     }],
+    crossDomainEscalations: [],
   };
   const plan = build([{ path: 'src/browser/creature-interaction.mjs' }], narrowedCandidate);
 
