@@ -1,4 +1,4 @@
-import assert from 'node:assert/strict';
+﻿import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -16,7 +16,7 @@ import {
 } from '../../src/browser/fullworld.mjs';
 import { loadFullWorldPixelCatalog, loadVerifiedPixelPack, requiredPixelPacks } from '../../src/browser/fullworld-pixels.mjs';
 import { loadRuntimePixelBuckets, loadVerifiedPixelBucket, requiredRuntimePixelBuckets } from '../../src/browser/fullworld-pixel-buckets.mjs';
-import { resolveFullWorldTrust } from '../../src/browser/fullworld-trust.mjs';
+import { resolveQualificationManifestTrust } from '../../src/browser/fullworld-trust.mjs';
 import { loadMinimapFloor, loadMinimapWorld, loadVerifiedMinimapTile, selectMinimapChunks } from '../../src/layers/minimap.mjs';
 import { loadOverviewChunk, loadOverviewFloor, loadOverviewWorld } from '../../src/layers/overview.mjs';
 import { buildQualificationWorld } from '../../tools/verification/qualification-world.mjs';
@@ -54,7 +54,7 @@ test('qualification world traverses production manifests, floors, authenticated 
   const root = path.join(temporary, 'fixture');
   try {
     const manifest = await buildQualificationWorld(root);
-    const trust = resolveFullWorldTrust(manifest);
+    const trust = resolveQualificationManifestTrust(manifest);
     const fetcher = filesystemFetcher(root);
     const publicationBase = new URL('https://qualification.invalid/fullworld/publication/');
 

@@ -10,23 +10,38 @@ export const PRODUCTION_FULLWORLD_TRUST = Object.freeze({
   sourceFingerprint: 'sha256:52613c4b755bee1ca32608b1b860413c3a9184870ca61114fad5a7670e80aee9',
 });
 
+const QUALIFICATION_TRUST_MARKER = 'oteryn-atlas-qualification-trust-v1';
 const QUALIFICATION_FIXTURE_ID = 'atlas-qualification-world-v2';
 const CONTENT_ID = /^sha256:[0-9a-f]{64}$/;
-const QUALIFICATION_ROOT_FIELDS = Object.freeze([
+const QUALIFICATION_ID_FIELDS = Object.freeze([
   'publicationRoot', 'semanticRoot', 'pixelRoot', 'overviewRoot', 'minimapRoot',
   'runtimeIndexRoot', 'pixelBucketRoot', 'sourceFingerprint', 'productDigest',
 ]);
+const QUALIFICATION_DESCRIPTOR_KEYS = Object.freeze([
+  'marker', 'fixtureId', 'dataCapability', ...QUALIFICATION_ID_FIELDS,
+]);
 
-export function resolveFullWorldTrust(candidate = undefined) {
-  if (candidate == null) return PRODUCTION_FULLWORLD_TRUST;
-  if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)
-    || candidate.fixtureId !== QUALIFICATION_FIXTURE_ID
-    || candidate.dataCapability !== 'qualification_fixture') {
-    throw new TypeError('qualification trust requires the exact qualification fixture identity');
+function invalidQualificationTrust(detail) {
+  throw new TypeError(`qualification trust invalid: ${detail}`);
+}
+function validateQualificationIdentity(candidate, { exactDescriptor = false } = {}) {
+  if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) {
+    invalidQualificationTrust('descriptor must be an object');
   }
-  for (const field of QUALIFICATION_ROOT_FIELDS) {
-    if (!CONTENT_ID.test(candidate[field])) throw new TypeError(`qualification trust ${field} must be content-addressed`);
+  if (candidate.fixtureId !== QUALIFICATION_FIXTURE_ID) invalidQualificationTrust('fixture identity mismatch');
+  if (candidate.dataCapability !== 'qualification_fixture') invalidQualificationTrust('data capability mismatch');
+  if (exactDescriptor) {
+    const actualKeys = Object.keys(candidate).sort();
+    const expectedKeys = [...QUALIFICATION_DESCRIPTOR_KEYS].sort();
+    if (JSON.stringify(actualKeys) !== JSON.stringify(expectedKeys)) invalidQualificationTrust('descriptor fields mismatch');
   }
+  for (const field of QUALIFICATION_ID_FIELDS) {
+    if (!CONTENT_ID.test(candidate[field])) invalidQualificationTrust(`${field} must be a sha256 content id`);
+  }
+  return candidate;
+}
+
+function qualificationRuntimeTrust(candidate) {
   return Object.freeze({
     gameSha: 'fixture',
     publicationRoot: candidate.publicationRoot,
@@ -37,11 +52,24 @@ export function resolveFullWorldTrust(candidate = undefined) {
     runtimeIndexRoot: candidate.runtimeIndexRoot,
     pixelBucketRoot: candidate.pixelBucketRoot,
     sourceFingerprint: candidate.sourceFingerprint,
+    qualificationFixtureId: candidate.fixtureId,
     qualificationProductDigest: candidate.productDigest,
   });
 }
 
-export const FULLWORLD_TRUST = resolveFullWorldTrust(globalThis.__OTERYN_ATLAS_QUALIFICATION_TRUST__);
+export function resolveQualificationManifestTrust(candidate) {
+  return qualificationRuntimeTrust(validateQualificationIdentity(candidate));
+}
+
+export function resolveFullWorldTrust(scope = globalThis) {
+  const candidate = scope?.__OTERYN_ATLAS_QUALIFICATION_TRUST__;
+  if (candidate == null) return PRODUCTION_FULLWORLD_TRUST;
+  if (candidate.marker !== QUALIFICATION_TRUST_MARKER) invalidQualificationTrust('marker mismatch');
+  validateQualificationIdentity(candidate, { exactDescriptor: true });
+  return qualificationRuntimeTrust(candidate);
+}
+
+export const FULLWORLD_TRUST = resolveFullWorldTrust();
 
 export const FULLWORLD_PATHS = Object.freeze({
   animation: '/fullworld/animation/',
