@@ -1,0 +1,62 @@
+name: oteryn-atlas-protected-hosted-e2e
+
+services:
+  atlas-web:
+    image: ghcr.io/nginx/nginx-unprivileged:1.31.3-alpine3.24-slim@sha256:22f839c5fb4007dc24d203a170a9e03fc185d660bfefc34ac6823a7aef085cbc
+    read_only: true
+    environment:
+      ATLAS_CODE_REVISION: ${ATLAS_CODE_REVISION:?ATLAS_CODE_REVISION is required}
+      ATLAS_PUBLICATION_ORIGIN: ${ATLAS_PUBLICATION_ORIGIN:-http://127.0.0.1:9}
+      ATLAS_PUBLICATION_SCHEME: ${ATLAS_PUBLICATION_SCHEME:-http}
+      ATLAS_PUBLICATION_UPSTREAM: ${ATLAS_PUBLICATION_UPSTREAM:-127.0.0.1:9}
+      ATLAS_PUBLICATION_HOST_HEADER: ${ATLAS_PUBLICATION_HOST_HEADER:-127.0.0.1:9}
+      ATLAS_PUBLICATION_HOST: ${ATLAS_PUBLICATION_HOST:-127.0.0.1}
+      NGINX_ENVSUBST_FILTER: ^ATLAS_
+      NGINX_ENVSUBST_OUTPUT_DIR: /tmp
+    volumes:
+      - ${ATLAS_EXECUTION_CONTEXT:?ATLAS_EXECUTION_CONTEXT is required}/web:/usr/share/nginx/html/web:ro
+      - ${ATLAS_EXECUTION_CONTEXT:?ATLAS_EXECUTION_CONTEXT is required}/src:/usr/share/nginx/html/src:ro
+      - ./nginx/default.conf.template:/etc/nginx/templates/default.conf.template:ro
+      - ./nginx/include-generated.conf:/etc/nginx/conf.d/default.conf:ro
+    tmpfs:
+      - /tmp
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/web/fullworld.html || exit 1"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  e2e:
+    build:
+      context: ${ATLAS_EXECUTION_CONTEXT:?ATLAS_EXECUTION_CONTEXT is required}
+      dockerfile: e2e/Dockerfile
+    init: true
+    shm_size: 1gb
+    depends_on:
+      atlas-web:
+        condition: service_healthy
+    environment:
+      ATLAS_BASE_URL: http://atlas-web:8080
+      ATLAS_PUBLICATION_ORIGIN: ${ATLAS_PUBLICATION_ORIGIN:-}
+      ATLAS_EXPECTED_REVISION: ${ATLAS_CODE_REVISION:?ATLAS_CODE_REVISION is required}
+      ATLAS_VERIFICATION_PLAN_SHA256: ${ATLAS_VERIFICATION_PLAN_SHA256:?ATLAS_VERIFICATION_PLAN_SHA256 is required}
+      ATLAS_E2E_WORKERS: ${ATLAS_E2E_WORKERS:-1}
+      ATLAS_QUALIFICATION_TRUST_JSON: ${ATLAS_QUALIFICATION_TRUST_JSON:?ATLAS_QUALIFICATION_TRUST_JSON is required}
+      ATLAS_ARTIFACTS_DIR: /artifacts
+    volumes:
+      - ${ATLAS_E2E_ARTIFACTS_HOST:?ATLAS_E2E_ARTIFACTS_HOST is required}:/artifacts
+      - ${ATLAS_PROTECTED_TEST_LIST:?ATLAS_PROTECTED_TEST_LIST is required}:/run/atlas-protected-test-list.txt:ro
+    command:
+      - bash
+      - -lc
+      - >-
+        exec ./node_modules/.bin/playwright test
+        --config=playwright.config.mjs
+        --test-list=/run/atlas-protected-test-list.txt
+        --shard=${ATLAS_E2E_SHARD:?ATLAS_E2E_SHARD is required}
+        --workers=${ATLAS_E2E_WORKERS:-1}
+        --retries=0
+
+networks:
+  default:
+    internal: true

@@ -18,12 +18,19 @@ test('protected controller treats candidate as data and cross-checks GitHub chan
   assert.match(workflow, /pulls\/\$ATLAS_PR_NUMBER\/files/);
   assert.match(workflow, /git diff --name-status -z --find-renames/);
   assert.match(workflow, /GitHub changed-file evidence does not match protected merge-base diff/);
-  assert.match(workflow, /protected-controller-bootstrap\.mjs/);
+  assert.match(workflow, /git show "\$ATLAS_PROTECTED_BASE_SHA:tools\/verification\/impact-manifest\.json"/);
+  assert.match(workflow, /git show "\$ATLAS_CANDIDATE_HEAD_SHA:tools\/verification\/verification-catalog\.json"/);
+  assert.match(workflow, /protected-hosted-plan\.mjs/);
 });
 
-test('protected controller binds exact protected-base census and rejects stale head before publication', () => {
+test('protected controller binds protected and candidate censuses and rejects stale head before publication', () => {
   assert.match(workflow, /playwright test --config=e2e\/playwright\.config\.mjs --list/);
+  assert.match(workflow, /candidate-playwright-test-list\.txt/);
   assert.match(workflow, /parse-playwright-test-list\.mjs/);
+  assert.match(workflow, /--network none/);
+  assert.match(workflow, /--read-only/);
+  assert.match(workflow, /--cap-drop ALL/);
+  assert.match(workflow, /no-new-privileges/);
   assert.match(workflow, /assert-current-pr-head\.mjs/);
   assert.match(workflow, /protected-verification-plan/);
 });
