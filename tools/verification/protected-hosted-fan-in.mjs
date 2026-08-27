@@ -26,7 +26,11 @@ function sameIdentity(summary, plan, field, label) {
   if (actual !== planned) throw new TypeError(`fan-in ${label} mismatch`);
 }
 
-export function validateProtectedHostedFanIn(plan, summaries, { currentHeadSha } = {}) {
+export function validateProtectedHostedFanIn(plan, summaries, {
+  currentHeadSha,
+  expectedStableTestIds = plan?.stableTestIds,
+  expectedStableTestIdsDigest = plan?.expectedStableTestIdsDigest,
+} = {}) {
   if (!plan || typeof plan !== 'object' || Array.isArray(plan) || plan.schemaVersion !== 2) {
     throw new TypeError('fan-in requires protected hosted plan schemaVersion 2');
   }
@@ -37,8 +41,9 @@ export function validateProtectedHostedFanIn(plan, summaries, { currentHeadSha }
   const candidateHeadSha = exactSha(plan.candidateHeadSha, 'plan candidate head');
   if (exactSha(currentHeadSha, 'current PR head') !== candidateHeadSha) throw new TypeError('fan-in current PR head is stale');
   const planDigest = exactDigest(plan.planDigest, 'plan digest');
-  const expectedDigest = exactDigest(plan.expectedStableTestIdsDigest, 'plan expected stable-ID digest');
-  const expected = stableIds(plan.stableTestIds, 'planned stable IDs').sort();
+  const planExpectedDigest = exactDigest(plan.expectedStableTestIdsDigest, 'plan expected stable-ID digest');
+  const expectedDigest = exactDigest(expectedStableTestIdsDigest, 'fan-in expected stable-ID digest');
+  const expected = stableIds(expectedStableTestIds, 'fan-in expected stable IDs').sort();
   exactDigest(plan.productIdentitiesDigest, 'plan product identities digest');
   exactDigest(plan.workerPolicyDigest, 'plan worker policy digest');
   exactDigest(plan.executionPolicyDigest, 'plan execution policy digest');
@@ -61,7 +66,10 @@ export function validateProtectedHostedFanIn(plan, summaries, { currentHeadSha }
     if (exactSha(summary.candidateHeadSha, 'summary candidate head') !== candidateHeadSha) throw new TypeError('fan-in candidate head mismatch');
     if (exactSha(summary.controllerSourceSha, 'summary controller source SHA') !== controllerSourceSha) throw new TypeError('fan-in controller identity mismatch');
     if (exactDigest(summary.planDigest, 'summary plan digest') !== planDigest) throw new TypeError('fan-in plan digest mismatch');
-    if (exactDigest(summary.expectedStableTestIdsDigest, 'summary expected stable-ID digest') !== expectedDigest) {
+    if (exactDigest(summary.planExpectedStableTestIdsDigest, 'summary full-plan expected stable-ID digest') !== planExpectedDigest) {
+      throw new TypeError('fan-in full-plan expected stable-ID digest mismatch');
+    }
+    if (exactDigest(summary.expectedStableTestIdsDigest, 'summary placement expected stable-ID digest') !== expectedDigest) {
       throw new TypeError('fan-in expected stable-ID digest mismatch');
     }
     sameIdentity(summary, plan, 'productIdentitiesDigest', 'product identities digest');
@@ -100,6 +108,7 @@ export function validateProtectedHostedFanIn(plan, summaries, { currentHeadSha }
     status: 'success',
     candidateHeadSha,
     planDigest,
+    expectedStableTestIdsDigest: expectedDigest,
     executedStableTestIds: Object.freeze([...executed].sort()),
   });
 }
