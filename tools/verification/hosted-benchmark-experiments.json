@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "measurementOnly": true,
+  "finalPolicySelected": false,
+  "doNotCartesianProductAxes": true,
+  "executionShapeCandidates": [
+    {
+      "id": "packed-w1",
+      "workers": 1,
+      "shards": 1,
+      "profiles": ["targeted", "broad", "full"],
+      "gate": "BASELINE"
+    },
+    {
+      "id": "packed-w2",
+      "workers": 2,
+      "shards": 1,
+      "profiles": ["targeted", "broad", "full"],
+      "gate": "RUNNER_RESOURCES_MEASURED"
+    },
+    {
+      "id": "packed-w4",
+      "workers": 4,
+      "shards": 1,
+      "profiles": ["broad", "full"],
+      "gate": "W2_STABLE_WITH_RESOURCE_HEADROOM"
+    },
+    {
+      "id": "shards2-w1",
+      "workers": 1,
+      "shards": 2,
+      "profiles": ["broad", "full"],
+      "gate": "BROAD_OR_FULL_SETUP_AMORTIZATION_PLAUSIBLE"
+    },
+    {
+      "id": "shards4-w1",
+      "workers": 1,
+      "shards": 4,
+      "profiles": ["broad", "full"],
+      "gate": "SHARDS2_MATERIAL_WALL_CLOCK_WIN"
+    }
+  ],
+  "comparisonAxes": {
+    "cache": ["cold", "restored"],
+    "imageStrategy": ["current", "thin-immutable"],
+    "productStrategy": ["per-shard", "build-once-content-addressed"],
+    "dagStart": ["eager", "gated"]
+  },
+  "rules": [
+    "Run packed-w1 first for every representative workload.",
+    "Do not run workers=2 or workers=4 until actual hosted runner resource telemetry justifies the candidate.",
+    "Do not run hosted shards for focused/targeted work solely to increase parallelism.",
+    "Do not maximize workers and shards simultaneously; isolate the two parallelism axes before combined experiments are proposed.",
+    "Compare axes deliberately rather than materializing a Cartesian matrix.",
+    "No candidate in this file selects production policy; final calibration is a later protected post-Phase-D decision."
+  ]
+}
