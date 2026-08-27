@@ -10,14 +10,18 @@ function readRequired(url, label) {
   return fs.readFileSync(url, 'utf8').replace(/\r\n/g, '\n');
 }
 
-test('GitHub-hosted qualification compose serves the ready fixture without LAN or specialist dependencies', () => {
+test('GitHub-hosted qualification compose serves every fixture namespace without LAN or specialist dependencies', () => {
   const override = readRequired(overrideUrl, 'GitHub-hosted Compose override');
   assert.match(override, /atlas-publication:/);
   assert.match(override, /ghcr\.io\/nginx\/nginx-unprivileged:1\.31\.3-alpine3\.24-slim@sha256:22f839c5fb4007dc24d203a170a9e03fc185d660bfefc34ac6823a7aef085cbc/);
   assert.match(override, /\$\{ATLAS_QUALIFICATION_PUBLICATION_HOST:\?[^}]+\}:\/srv\/atlas\/fullworld:ro/);
+  assert.match(override, /\$\{ATLAS_QUALIFICATION_PUBLICATION_HOST:\?[^}]+\}\/data\/creatures:\/srv\/atlas\/data\/creatures:ro/);
+  assert.match(override, /atlas-web:[\s\S]*\$\{ATLAS_QUALIFICATION_PUBLICATION_HOST:\?[^}]+\}\/web\/semantic-search:\/usr\/share\/nginx\/html\/web\/semantic-search:ro/);
+  assert.match(override, /atlas-web:[\s\S]*\$\{ATLAS_QUALIFICATION_PUBLICATION_HOST:\?[^}]+\}\/web\/creature-gameplay:\/usr\/share\/nginx\/html\/web\/creature-gameplay:ro/);
   assert.match(override, /qualification-publication\.conf:\/etc\/nginx\/conf\.d\/default\.conf:ro/);
   assert.match(override, /__atlas\/readiness/);
   assert.match(override, /publication\/publication\.json/);
+  assert.match(override, /data\/creatures\/index\.json/);
   assert.match(override, /atlas-web:[\s\S]*depends_on:[\s\S]*atlas-publication:[\s\S]*condition: service_healthy/);
   assert.match(override, /ATLAS_PUBLICATION_UPSTREAM: atlas-publication:8081/);
   assert.match(override, /ATLAS_PUBLICATION_HOST_HEADER: atlas-publication/);
@@ -25,12 +29,13 @@ test('GitHub-hosted qualification compose serves the ready fixture without LAN o
   assert.doesNotMatch(override, /192\.168\.|synology|molehill/i);
 });
 
-test('qualification publication nginx exposes readiness and immutable fixture bytes as static content', () => {
+test('qualification publication nginx exposes readiness, FullWorld and creature fixture bytes only', () => {
   const nginx = readRequired(publicationNginxUrl, 'qualification publication nginx config');
   assert.match(nginx, /listen 8081;/);
   assert.match(nginx, /root \/srv\/atlas;/);
   assert.match(nginx, /location = \/__atlas\/readiness[\s\S]*alias \/srv\/atlas\/fullworld\/atlas-publication-readiness\.json;/);
   assert.match(nginx, /location \^~ \/fullworld\/[\s\S]*try_files \$uri =404;/);
+  assert.match(nginx, /location \^~ \/data\/creatures\/[\s\S]*try_files \$uri =404;/);
   assert.match(nginx, /Cache-Control "no-store"/);
   assert.doesNotMatch(nginx, /proxy_pass|192\.168\.|synology|molehill/i);
 });

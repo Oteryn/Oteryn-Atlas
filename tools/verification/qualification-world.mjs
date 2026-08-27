@@ -412,6 +412,7 @@ export async function buildQualificationWorld(destination) {
   const animation = await buildQualificationAnimation(root, semanticWorld.rootContentId, pixel.manifest.rootContentId, pixel.pixelContentId, pixel.pixels);
   const creatures = await buildQualificationCreatures(root, semanticWorld.rootContentId, animation);
   await buildQualificationSearch(root, semanticWorld.rootContentId, creatures.search);
+  writeJson(root, 'web/creature-gameplay/qualification-unavailable.json', { fixtureId: FIXTURE_ID, dataCapability: 'qualification_fixture', profileStatus: 'intentionally-unavailable' });
 
   const files = productEntries(root);
   const result = Object.freeze({
