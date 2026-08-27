@@ -8,6 +8,7 @@ import {
   validateImpactManifest,
   validateVerificationCatalog,
 } from './verification-plan-schema.mjs';
+import { stableIdAlgorithm } from './stable-id.mjs';
 
 const FALLBACK_GROUPS = Object.freeze(['deterministic.core', 'e2e.full']);
 const SHADOW_WORKER_POLICY = Object.freeze({ id: 'unmeasured-shadow-v1', version: 1 });
@@ -68,11 +69,7 @@ function allEvidencePaths(changedFiles) {
 }
 
 function matchesForPath(path, manifest) {
-  const longest = manifest.entries.reduce((length, entry) => (
-    path.startsWith(entry.pathPrefix) ? Math.max(length, entry.pathPrefix.length) : length
-  ), -1);
-  if (longest < 0) return [];
-  return manifest.entries.filter((entry) => path.startsWith(entry.pathPrefix) && entry.pathPrefix.length === longest);
+  return manifest.entries.filter((entry) => path.startsWith(entry.pathPrefix));
 }
 
 function classify(paths, manifest) {
@@ -130,6 +127,17 @@ function suppliedStableTestIds(value) {
   return ids;
 }
 
+function exactStableTestIds(groups, protectedStableTestIds) {
+  const supplied = suppliedStableTestIds(protectedStableTestIds);
+  if (!supplied) return groups.flatMap((group) => group.stableTestIds).sort();
+  if (groups.some((group) => group.id === 'e2e.full')) return supplied;
+  const required = new Set();
+  for (const group of groups) {
+    for (const id of group.stableTestIds) required.add(id);
+  }
+  return [...required].sort();
+}
+
 function mergeCatalogs(trusted, candidate) {
   const groups = {};
   for (const id of unionStrings(Object.keys(trusted.groups), Object.keys(candidate.groups))) {
@@ -154,13 +162,34 @@ function mergeCatalogs(trusted, candidate) {
         ? 'restricted-visual-review' : 'machine-summary',
       sequential: left.sequential || right.sequential,
       fullSafetyNet: left.fullSafetyNet || right.fullSafetyNet,
+      dependsOnGroups: unionStrings(left.dependsOnGroups, right.dependsOnGroups),
+      capabilities: {
+        browser: left.capabilities.browser || right.capabilities.browser,
+        hosted: left.capabilities.hosted && right.capabilities.hosted,
+        requiresPublication: left.capabilities.requiresPublication || right.capabilities.requiresPublication,
+        dataCapability: left.capabilities.dataCapability === 'real_fullworld' || right.capabilities.dataCapability === 'real_fullworld'
+          ? 'real_fullworld'
+          : left.capabilities.dataCapability === 'bounded_real_world' || right.capabilities.dataCapability === 'bounded_real_world'
+            ? 'bounded_real_world' : 'qualification_fixture',
+        visualReview: left.capabilities.visualReview || right.capabilities.visualReview,
+        specialistReason: left.capabilities.specialistReason ?? right.capabilities.specialistReason,
+      },
     };
   }
-  return freeze({ schemaVersion: 1, groups });
+  return freeze({ schemaVersion: 2, groups });
 }
 
 function selectedGroups(groupIds, catalog) {
-  return groupIds.map((id) => ({ id, ...catalog.groups[id] }));
+  const resolved = new Set();
+  const visit = (id) => {
+    if (resolved.has(id)) return;
+    const group = catalog.groups[id];
+    if (!group) throw new TypeError(`verification group ${id} is not catalogued`);
+    resolved.add(id);
+    for (const dependency of group.dependsOnGroups) visit(dependency);
+  };
+  for (const id of groupIds) visit(id);
+  return [...resolved].sort().map((id) => ({ id, ...catalog.groups[id] }));
 }
 
 export function buildVerificationPlan(input) {
@@ -177,10 +206,11 @@ export function buildVerificationPlan(input) {
   const candidate = classify(changedPaths, candidateImpactManifest);
   const result = unionClassification(trusted, candidate, bootstrapChanged(changedPaths));
   const groups = selectedGroups(result.groups, verificationCatalog);
+  result.groups = groups.map((group) => group.id);
   const visualGroupIds = groups.filter((group) => group.evidence === 'restricted-visual-review').map((group) => group.id);
   const resourceClasses = [...new Set(groups.map((group) => group.resourceClass))].sort();
-  const stableTestIds = suppliedStableTestIds(input.stableTestIds)
-    ?? groups.flatMap((group) => group.stableTestIds).sort();
+  const requiredDataCapabilities = [...new Set(groups.map((group) => group.capabilities.dataCapability))].sort();
+  const stableTestIds = exactStableTestIds(groups, input.protectedStableTestIds ?? input.stableTestIds);
   const headSha = sha(input.headSha, 'headSha');
   const integrationBaseSha = sha(input.integrationBaseSha, 'integrationBaseSha');
   const mergeBaseSha = sha(input.mergeBaseSha, 'mergeBaseSha');
@@ -200,8 +230,12 @@ export function buildVerificationPlan(input) {
     requiredGroupIds: result.groups,
     groups,
     stableTestIds,
+    expectedStableTestIdsDigest: digest(stableTestIds),
+    stableIdAlgorithm,
     requiredVisualGroupIds: visualGroupIds,
     resourceClasses,
+    requiredDataCapabilities,
+    requiresRealFullWorld: requiredDataCapabilities.includes('real_fullworld'),
     workerPolicyId: SHADOW_WORKER_POLICY.id,
     workerPolicyDigest: digest(SHADOW_WORKER_POLICY),
     retryPolicy: { retries: 0 },

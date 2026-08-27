@@ -1,11 +1,12 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "groups": {
     "deterministic.core": {
       "specs": ["tests/verification/*.test.mjs"],
       "projects": [],
       "resourceClass": "cpu-light",
       "evidence": "machine-summary",
+      "capabilities": { "browser": false, "hosted": true, "requiresPublication": false, "dataCapability": "qualification_fixture", "visualReview": false, "specialistReason": null },
       "fullSafetyNet": true
     },
     "e2e.common-smoke": {
@@ -13,6 +14,7 @@
       "projects": ["desktop-chromium", "mobile-chromium"],
       "resourceClass": "browser-targeted",
       "evidence": "machine-summary",
+      "capabilities": { "browser": true, "hosted": true, "requiresPublication": true, "dataCapability": "qualification_fixture", "visualReview": false, "specialistReason": null },
       "fullSafetyNet": true
     },
     "e2e.creatures": {
@@ -20,21 +22,72 @@
       "projects": ["desktop-chromium", "mobile-chromium"],
       "resourceClass": "browser-targeted",
       "evidence": "machine-summary",
+      "capabilities": { "browser": true, "hosted": true, "requiresPublication": true, "dataCapability": "qualification_fixture", "visualReview": false, "specialistReason": null },
       "fullSafetyNet": true
     },
     "e2e.full": {
-      "specs": ["e2e/tests/*.spec.mjs"],
+      "specs": [
+        "e2e/tests/accessibility-desktop.spec.mjs",
+        "e2e/tests/accessibility-mobile.spec.mjs",
+        "e2e/tests/audit-desktop.spec.mjs",
+        "e2e/tests/audit-mobile.spec.mjs",
+        "e2e/tests/creature-interaction-desktop.spec.mjs",
+        "e2e/tests/creature-interaction-mobile.spec.mjs",
+        "e2e/tests/creature-presentation-desktop.spec.mjs",
+        "e2e/tests/creature-presentation-mobile.spec.mjs",
+        "e2e/tests/creatures-desktop.spec.mjs",
+        "e2e/tests/degraded-search-desktop.spec.mjs",
+        "e2e/tests/desktop.spec.mjs",
+        "e2e/tests/farm-explorer-desktop.spec.mjs",
+        "e2e/tests/farm-explorer-mobile.spec.mjs",
+        "e2e/tests/geometry-desktop.spec.mjs",
+        "e2e/tests/geometry-mobile.spec.mjs",
+        "e2e/tests/layer-audit-desktop.spec.mjs",
+        "e2e/tests/mobile.spec.mjs",
+        "e2e/tests/performance-desktop.spec.mjs",
+        "e2e/tests/race-desktop.spec.mjs",
+        "e2e/tests/render-probes-desktop.spec.mjs",
+        "e2e/tests/resilience-desktop.spec.mjs",
+        "e2e/tests/responsive-mobile.spec.mjs",
+        "e2e/tests/scale-desktop.spec.mjs",
+        "e2e/tests/soak-desktop.spec.mjs",
+        "e2e/tests/state-desktop.spec.mjs",
+        "e2e/tests/stress-desktop.spec.mjs",
+        "e2e/tests/user-journey-desktop.spec.mjs",
+        "e2e/tests/user-journey-mobile.spec.mjs",
+        "e2e/tests/visual-desktop.spec.mjs",
+        "e2e/tests/visual-mobile.spec.mjs",
+        "e2e/tests/workflows-desktop.spec.mjs"
+      ],
       "projects": ["desktop-chromium", "mobile-chromium"],
       "resourceClass": "browser-full",
-      "evidence": "restricted-visual-review",
+      "evidence": "machine-summary",
+      "capabilities": { "browser": true, "hosted": true, "requiresPublication": true, "dataCapability": "qualification_fixture", "visualReview": false, "specialistReason": null },
       "fullSafetyNet": true
+    },
+    "fullworld.animation-census": {
+      "specs": ["e2e/tests/fullworld-animation-census-desktop.spec.mjs"],
+      "projects": ["desktop-chromium"],
+      "resourceClass": "browser-full",
+      "evidence": "machine-summary",
+      "capabilities": { "browser": true, "hosted": false, "requiresPublication": true, "dataCapability": "real_fullworld", "visualReview": false, "specialistReason": "real-fullworld-product" },
+      "fullSafetyNet": false
+    },
+    "integration.source-contract": {
+      "specs": ["e2e/tests/api-contract-desktop.spec.mjs"],
+      "projects": ["desktop-chromium"],
+      "resourceClass": "browser-targeted",
+      "evidence": "machine-summary",
+      "capabilities": { "browser": true, "hosted": true, "requiresPublication": true, "dataCapability": "bounded_real_world", "visualReview": false, "specialistReason": null },
+      "fullSafetyNet": false
     },
     "visual.creatures": {
       "specs": ["e2e/tests/visual-desktop.spec.mjs", "e2e/tests/visual-mobile.spec.mjs"],
       "projects": ["desktop-chromium", "mobile-chromium"],
       "resourceClass": "browser-targeted",
       "evidence": "restricted-visual-review",
-      "fullSafetyNet": true
+      "capabilities": { "browser": true, "hosted": false, "requiresPublication": true, "dataCapability": "bounded_real_world", "visualReview": true, "specialistReason": "private-visual" },
+      "fullSafetyNet": false
     }
   }
 }
