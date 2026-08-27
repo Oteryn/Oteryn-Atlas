@@ -176,7 +176,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          grep -q 'static-creatures-v1' web/fullworld-search.mjs
+          node --test \
+            tests/verification/qualification-semantic-browser-wiring.test.mjs \
+            tests/verification/qualification-semantic-source-trust.test.mjs
           grep -q 'semantic-search/creatures.json' web/fullworld-search.mjs
           grep -q 'static-creatures-v1' web/semantic-search/creatures.json
           grep -q 'semantic-search-source-v1' web/semantic-search/index.json
