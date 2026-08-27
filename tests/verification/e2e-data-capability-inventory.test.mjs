@@ -1,4 +1,4 @@
-import test from 'node:test';
+﻿import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -59,15 +59,23 @@ test('ordinary full-safety census contains exactly qualification-fixture browser
     'protected ordinary full-safety census must not absorb bounded_real_world or real_fullworld specs');
 });
 
-test('bounded source contract and complete FullWorld census are isolated', () => {
+test('bounded source contracts and complete FullWorld census are isolated during policy staging', () => {
   const inventory = readJson(INVENTORY_PATH);
   const bounded = inventory.specs.filter((entry) => entry.dataCapability === 'bounded_real_world');
   const full = inventory.specs.filter((entry) => entry.dataCapability === 'real_fullworld');
 
-  assert.deepEqual(bounded.map((entry) => entry.spec), ['e2e/tests/api-contract-desktop.spec.mjs']);
+  assert.deepEqual(bounded.map((entry) => entry.spec), [
+    'e2e/tests/api-contract-desktop.spec.mjs',
+    'e2e/tests/creature-gameplay-desktop.spec.mjs',
+    'e2e/tests/creature-gameplay-mobile.spec.mjs',
+  ]);
   assert.match(bounded[0].rationale, /source authority|contract_id/i);
+  assert.match(bounded[1].rationale, /mixed spec|Game-owned/i);
+  assert.match(bounded[2].rationale, /mixed mobile|Game-owned/i);
   assert.deepEqual(full.map((entry) => entry.spec), ['e2e/tests/fullworld-animation-census-desktop.spec.mjs']);
   assert.match(full[0].rationale, /complete published animation|production-wide coverage/i);
-  assert.equal(inventory.specs.some((entry) => entry.splitRequired), false,
-    'no mixed data-capability spec may remain after the complete-product split');
+  assert.deepEqual(inventory.specs.filter((entry) => entry.splitRequired).map((entry) => entry.spec), [
+    'e2e/tests/creature-gameplay-desktop.spec.mjs',
+    'e2e/tests/creature-gameplay-mobile.spec.mjs',
+  ], 'policy staging must keep the newly merged mixed gameplay specs explicit until final Phase D splits them');
 });
