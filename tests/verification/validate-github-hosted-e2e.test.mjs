@@ -21,6 +21,7 @@ function publicationReadiness(overrides = {}) {
     repository: 'Oteryn/Oteryn-Atlas',
     candidateSha: headSha,
     planDigest,
+    publicationOrigin,
     publicationRoot,
     treeDigest,
     fileCount: 321,
@@ -72,6 +73,7 @@ test('accepts exact-head all-pass zero-retry hosted evidence only with validated
     stableTestIdsDigest: expectedStableTestIdsDigest,
     browserContainer,
     planDigest,
+    publicationOrigin,
     publicationRoot,
     publicationTreeDigest: treeDigest,
     publicationFileCount: 321,
@@ -102,6 +104,7 @@ test('rejects missing, stale or mismatched immutable publication readiness', () 
   assert.throws(() => validate(summary(), { publicationReadiness: publicationReadiness({ browserImage: 'latest' }) }), /publication readiness browser/);
   assert.throws(() => validate(summary(), { publicationReadiness: publicationReadiness({ complete: false }) }), /publication readiness/);
   assert.throws(() => validate(summary({ metadata: { ...summary().metadata, publicationOrigin: null } })), /publication origin/);
+  assert.throws(() => validate(summary({ metadata: { ...summary().metadata, publicationOrigin: 'https://publication.invalid/other' } })), /publication origin/);
 });
 
 test('rejects failures, retries, skipped scenarios and duplicate stable ids', () => {
