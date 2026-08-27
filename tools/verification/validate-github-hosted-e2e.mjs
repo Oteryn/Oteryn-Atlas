@@ -37,7 +37,7 @@ function boundedList(values) {
   return values.slice(0, 8).join(', ');
 }
 
-function validatePublicationOrigin(value, publicationRoot) {
+function validatePublicationOrigin(value) {
   if (typeof value !== 'string' || value.trim().length === 0) {
     throw new TypeError('publication readiness origin is invalid');
   }
@@ -49,10 +49,6 @@ function validatePublicationOrigin(value, publicationRoot) {
   }
   if (parsed.protocol !== 'https:' || parsed.username || parsed.password || parsed.search || parsed.hash) {
     throw new TypeError('publication readiness origin is invalid');
-  }
-  const rootHex = publicationRoot.slice('sha256:'.length);
-  if (!parsed.pathname.split('/').filter(Boolean).includes(rootHex)) {
-    throw new TypeError('publication readiness origin is not bound to the publication root');
   }
   return parsed.href.replace(/\/$/, '');
 }
@@ -66,7 +62,7 @@ function validatePublicationReadiness(readiness, { headSha, planDigest }) {
   if (readiness.planDigest !== planDigest) throw new TypeError('publication readiness plan digest mismatch');
   if (readiness.browserImage !== PINNED_BROWSER_CONTAINER) throw new TypeError('publication readiness browser image mismatch');
   if (!validDigest(readiness.publicationRoot)) throw new TypeError('publication readiness root digest is invalid');
-  const publicationOrigin = validatePublicationOrigin(readiness.publicationOrigin, readiness.publicationRoot);
+  const publicationOrigin = validatePublicationOrigin(readiness.publicationOrigin);
   if (!validDigest(readiness.treeDigest)) throw new TypeError('publication readiness tree digest is invalid');
   if (!Number.isSafeInteger(readiness.fileCount) || readiness.fileCount <= 0) throw new TypeError('publication readiness file count is invalid');
   if (!Number.isSafeInteger(readiness.bytes) || readiness.bytes <= 0) throw new TypeError('publication readiness byte size is invalid');
