@@ -302,13 +302,14 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $payload = gh api "repos/$env:GITHUB_REPOSITORY/pulls/$env:ATLAS_PR_NUMBER"
           if ($LASTEXITCODE -ne 0) { throw 'GitHub PR lookup failed.' }
+          $currentPrPayload = Join-Path $env:RUNNER_TEMP "atlas-transition-current-pr-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT.json"
           [IO.File]::WriteAllText(
-            (Join-Path $PWD 'artifacts-current-pr.json'),
+            $currentPrPayload,
             ($payload -join "`n"),
             [Text.UTF8Encoding]::new($false)
           )
           node ..\trusted-base\tools\verification\assert-current-pr-head.mjs `
-            --payload artifacts-current-pr.json `
+            --payload $currentPrPayload `
             --repository $env:GITHUB_REPOSITORY `
             --pr-number $env:ATLAS_PR_NUMBER `
             --expected-head-sha $env:ATLAS_CODE_REVISION
