@@ -29,7 +29,6 @@
       "specs": [
         "e2e/tests/accessibility-desktop.spec.mjs",
         "e2e/tests/accessibility-mobile.spec.mjs",
-        "e2e/tests/api-contract-desktop.spec.mjs",
         "e2e/tests/audit-desktop.spec.mjs",
         "e2e/tests/audit-mobile.spec.mjs",
         "e2e/tests/creature-interaction-desktop.spec.mjs",
@@ -74,13 +73,21 @@
       "capabilities": { "browser": true, "hosted": false, "requiresPublication": true, "dataCapability": "real_fullworld", "visualReview": false, "specialistReason": "real-fullworld-product" },
       "fullSafetyNet": false
     },
+    "integration.source-contract": {
+      "specs": ["e2e/tests/api-contract-desktop.spec.mjs"],
+      "projects": ["desktop-chromium"],
+      "resourceClass": "browser-targeted",
+      "evidence": "machine-summary",
+      "capabilities": { "browser": true, "hosted": true, "requiresPublication": true, "dataCapability": "bounded_real_world", "visualReview": false, "specialistReason": null },
+      "fullSafetyNet": false
+    },
     "visual.creatures": {
       "specs": ["e2e/tests/visual-desktop.spec.mjs", "e2e/tests/visual-mobile.spec.mjs"],
       "projects": ["desktop-chromium", "mobile-chromium"],
       "resourceClass": "browser-targeted",
       "evidence": "restricted-visual-review",
       "capabilities": { "browser": true, "hosted": false, "requiresPublication": true, "dataCapability": "bounded_real_world", "visualReview": true, "specialistReason": "private-visual" },
-      "fullSafetyNet": true
+      "fullSafetyNet": false
     }
   }
 }
