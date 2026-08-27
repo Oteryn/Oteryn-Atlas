@@ -12,6 +12,7 @@ const productDigest = `sha256:${'3'.repeat(64)}`;
 const workerDigest = `sha256:${'4'.repeat(64)}`;
 const executionDigest = `sha256:${'5'.repeat(64)}`;
 const hostedId = 'desktop-chromium::e2e/tests/desktop.spec.mjs::hosted';
+const candidateAdditionalId = 'desktop-chromium::e2e/tests/desktop.spec.mjs::candidate addition';
 const specialistId = 'desktop-chromium::e2e/tests/fullworld-animation-census-desktop.spec.mjs::specialist';
 
 function digest(value) {
@@ -70,6 +71,7 @@ function plan(overrides = {}) {
     requiredGroupIds: ['e2e.full'],
     groups: [hostedGroup()],
     stableTestIds: [hostedId],
+    candidateStableIdAdditions: [],
     requiredDataCapabilities: ['qualification_fixture'],
     requiresRealFullWorld: false,
     ...overrides,
@@ -87,9 +89,30 @@ test('hosted execution contract copies exact protected selection and binds the h
   assert.equal(result.selectiveExecution, false);
   assert.deepEqual(result.hosted.groupIds, ['e2e.full']);
   assert.deepEqual(result.hosted.stableTestIds, [hostedId]);
+  assert.deepEqual(result.hosted.protectedStableTestIds, [hostedId]);
+  assert.deepEqual(result.hosted.candidateAdditionalStableTestIds, []);
   assert.deepEqual(result.specialist.groupIds, []);
   assert.deepEqual(result.specialist.stableTestIds, []);
   assert.deepEqual(result.review.groupIds, []);
+});
+
+test('candidate test bodies can widen only through new stable IDs; protected IDs stay protected-body work', () => {
+  const result = buildProtectedHostedExecutionContract(plan({
+    stableTestIds: [hostedId, candidateAdditionalId],
+    candidateStableIdAdditions: [candidateAdditionalId],
+  }), { currentHeadSha: head });
+  assert.deepEqual(result.hosted.stableTestIds, [candidateAdditionalId, hostedId].sort());
+  assert.deepEqual(result.hosted.protectedStableTestIds, [hostedId]);
+  assert.deepEqual(result.hosted.candidateAdditionalStableTestIds, [candidateAdditionalId]);
+});
+
+test('candidate-addition identity must be unique and belong to the exact planned census', () => {
+  const orphan = 'desktop-chromium::e2e/tests/desktop.spec.mjs::not planned';
+  assert.throws(() => buildProtectedHostedExecutionContract(plan({ candidateStableIdAdditions: [orphan] }), { currentHeadSha: head }), /candidate.*addition|planned/i);
+  assert.throws(() => buildProtectedHostedExecutionContract(plan({
+    stableTestIds: [hostedId, candidateAdditionalId],
+    candidateStableIdAdditions: [candidateAdditionalId, candidateAdditionalId],
+  }), { currentHeadSha: head }), /candidate.*addition|duplicate/i);
 });
 
 test('executor rejects a stale PR head before execution', () => {
