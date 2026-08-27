@@ -107,7 +107,7 @@ test('protected shard validator rejects missing duplicate mismatched and unsuppo
       { ...sources[1], summary: summaryFor(fixtureId) },
       sources[2],
     ], shardIndex: 0, shardCount: 2,
-  }), /unexpected|bounded_real_world/i);
+  }), /duplicate|unexpected|bounded_real_world/i);
   assert.throws(() => buildProtectedHostedShardSummary({
     plan, execution, sourceSummaries: [...sources, {
       placement: 'protected', dataCapability: 'real_fullworld', summary: summaryFor(fixtureId),
