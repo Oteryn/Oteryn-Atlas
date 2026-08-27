@@ -1,0 +1,89 @@
+{
+  "schemaVersion": 1,
+  "plan": {
+    "candidateHeadSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "planDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "stableTestIds": [
+      "desktop-chromium::e2e/tests/a.spec.mjs::alpha",
+      "desktop-chromium::e2e/tests/b.spec.mjs::beta"
+    ]
+  },
+  "cases": [
+    {
+      "id": "cancelled-summary",
+      "expectedError": "fan-in summary status is not success: cancelled",
+      "summaries": [
+        {
+          "status": "cancelled",
+          "candidateHeadSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "planDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "executedStableTestIds": ["desktop-chromium::e2e/tests/a.spec.mjs::alpha"]
+        }
+      ]
+    },
+    {
+      "id": "stale-old-head-success",
+      "expectedError": "fan-in candidate head mismatch",
+      "summaries": [
+        {
+          "status": "success",
+          "candidateHeadSha": "cccccccccccccccccccccccccccccccccccccccc",
+          "planDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "executedStableTestIds": [
+            "desktop-chromium::e2e/tests/a.spec.mjs::alpha",
+            "desktop-chromium::e2e/tests/b.spec.mjs::beta"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "duplicate-across-shards",
+      "expectedError": "fan-in duplicate stable ID",
+      "summaries": [
+        {
+          "status": "success",
+          "candidateHeadSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "planDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "executedStableTestIds": ["desktop-chromium::e2e/tests/a.spec.mjs::alpha"]
+        },
+        {
+          "status": "success",
+          "candidateHeadSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "planDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "executedStableTestIds": [
+            "desktop-chromium::e2e/tests/a.spec.mjs::alpha",
+            "desktop-chromium::e2e/tests/b.spec.mjs::beta"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-planned-id",
+      "expectedError": "fan-in missing stable IDs",
+      "summaries": [
+        {
+          "status": "success",
+          "candidateHeadSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "planDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "executedStableTestIds": ["desktop-chromium::e2e/tests/a.spec.mjs::alpha"]
+        }
+      ]
+    },
+    {
+      "id": "unexpected-id",
+      "expectedError": "fan-in unexpected stable IDs",
+      "summaries": [
+        {
+          "status": "success",
+          "candidateHeadSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "planDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "executedStableTestIds": [
+            "desktop-chromium::e2e/tests/a.spec.mjs::alpha",
+            "desktop-chromium::e2e/tests/b.spec.mjs::beta",
+            "mobile-chromium::e2e/tests/c.spec.mjs::gamma"
+          ]
+        }
+      ]
+    }
+  ]
+}

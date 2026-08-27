@@ -1,0 +1,128 @@
+{
+  "schemaVersion": 1,
+  "selectiveExecutionEnabled": false,
+  "additionalStableTestIds": [
+    "desktop-chromium::e2e/tests/fullworld-animation-census-desktop.spec.mjs::published creature animation product passes the full authoritative coverage census"
+  ],
+  "cases": [
+    {
+      "id": "historical-pr-88-runtime-pan-regression",
+      "provenance": {
+        "kind": "historical-pr-runtime-surface",
+        "pullRequest": 88,
+        "headSha": "03bb3e6cb082dd29dad7261a61e0030e4c846f9d",
+        "note": "Exact production runtime path from merged PR #88; test-only changed paths are intentionally excluded in this case so selector coverage of the regression surface is measured without governance bootstrap."
+      },
+      "changedFiles": [
+        { "path": "web/fullworld-creatures.mjs" }
+      ],
+      "truth": {
+        "source": "explicit",
+        "stableTestIds": [
+          "desktop-chromium::e2e/tests/creatures-desktop.spec.mjs::desktop creature overlay repaints in the same turn as continuous pan"
+        ]
+      },
+      "expectation": {
+        "profile": "broad",
+        "requiresRealFullWorld": false,
+        "requiredGroupIdsContain": ["e2e.full", "integration.creature-gameplay"]
+      }
+    },
+    {
+      "id": "historical-pr-88-complete-diff-governance",
+      "provenance": {
+        "kind": "historical-pr-complete-diff",
+        "pullRequest": 88,
+        "headSha": "03bb3e6cb082dd29dad7261a61e0030e4c846f9d"
+      },
+      "changedFiles": [
+        { "path": "e2e/tests/audit-desktop.spec.mjs" },
+        { "path": "e2e/tests/creatures-desktop.spec.mjs" },
+        { "path": "e2e/tests/layer-audit-desktop.spec.mjs" },
+        { "path": "web/fullworld-creatures.mjs" }
+      ],
+      "truth": { "source": "full-safe" },
+      "expectation": {
+        "profile": "full",
+        "requiresRealFullWorld": false,
+        "requiredGroupIdsContain": ["deterministic.core", "e2e.full"]
+      }
+    },
+    {
+      "id": "rename-source-destination-union",
+      "provenance": { "kind": "synthetic-rename-regression" },
+      "changedFiles": [
+        { "path": "docs/testing/creature-pan-note.md", "previousPath": "src/browser/creature-pan.mjs" }
+      ],
+      "truth": {
+        "source": "explicit",
+        "stableTestIds": [
+          "desktop-chromium::e2e/tests/creature-interaction-desktop.spec.mjs::desktop pan invalidates stale creature geometry before the next activation"
+        ]
+      },
+      "expectation": {
+        "profile": "broad",
+        "requiresRealFullWorld": false,
+        "requiredGroupIdsContain": ["e2e.creatures"]
+      }
+    },
+    {
+      "id": "multi-domain-cross-escalation",
+      "provenance": { "kind": "synthetic-cross-domain" },
+      "changedFiles": [
+        { "path": "src/browser/runtime-state.mjs" },
+        { "path": "tools/dyn-atlas-semantic/index.mjs" }
+      ],
+      "truth": { "source": "full-safe" },
+      "expectation": {
+        "profile": "full",
+        "requiresRealFullWorld": false,
+        "requiredGroupIdsContain": ["e2e.full"]
+      }
+    },
+    {
+      "id": "unknown-runtime-fails-closed",
+      "provenance": { "kind": "synthetic-unknown-runtime" },
+      "changedFiles": [
+        { "path": "src/new-runtime/uncatalogued.mjs" }
+      ],
+      "truth": { "source": "full-safe" },
+      "expectation": {
+        "profile": "full",
+        "requiresRealFullWorld": false,
+        "requiredGroupIdsContain": ["deterministic.core", "e2e.full"]
+      }
+    },
+    {
+      "id": "verification-governance-fails-closed",
+      "provenance": { "kind": "synthetic-verification-governance" },
+      "changedFiles": [
+        { "path": "tools/verification/shadow-selector-policy.mjs" }
+      ],
+      "truth": { "source": "full-safe" },
+      "expectation": {
+        "profile": "full",
+        "requiresRealFullWorld": false,
+        "requiredGroupIdsContain": ["deterministic.core", "e2e.full"]
+      }
+    },
+    {
+      "id": "animation-real-fullworld-specialist",
+      "provenance": { "kind": "synthetic-specialist-capability" },
+      "changedFiles": [
+        { "path": "tools/animation-runtime/animation-census.mjs" }
+      ],
+      "truth": {
+        "source": "explicit",
+        "stableTestIds": [
+          "desktop-chromium::e2e/tests/fullworld-animation-census-desktop.spec.mjs::published creature animation product passes the full authoritative coverage census"
+        ]
+      },
+      "expectation": {
+        "profile": "broad",
+        "requiresRealFullWorld": true,
+        "requiredGroupIdsContain": ["fullworld.animation-census"]
+      }
+    }
+  ]
+}
