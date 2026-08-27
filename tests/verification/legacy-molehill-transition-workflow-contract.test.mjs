@@ -49,3 +49,12 @@ test('PowerShell transition planner uses the exported stable-ID parser instead o
   assert.doesNotMatch(workflow, /node\s+\.\.\\trusted-base\\tools\\verification\\parse-playwright-test-list\.mjs\s+`/);
   assert.match(workflow, /parsePlaywrightStableTestIds/);
 });
+
+test('legacy transition qualification retains bounded publication-forwarder diagnostics', () => {
+  const workflow = fs.readFileSync(workflowPath, 'utf8');
+
+  assert.match(workflow, /@\{ Source = \(Join-Path \$runRoot 'publication-forwarder\.log'\); Name = 'publication-forwarder\.log' \},/);
+  assert.match(workflow, /@\{ Source = \(Join-Path \$runRoot 'publication-forwarder\.err\.log'\); Name = 'publication-forwarder\.err\.log' \},/);
+  assert.match(workflow, /candidate\/artifacts\/github-evidence\/publication-forwarder\.log/);
+  assert.match(workflow, /candidate\/artifacts\/github-evidence\/publication-forwarder\.err\.log/);
+});

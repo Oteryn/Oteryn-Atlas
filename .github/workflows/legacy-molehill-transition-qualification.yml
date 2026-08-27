@@ -228,6 +228,8 @@ jobs:
             @{ Source = (Join-Path $runRoot 'summary.json'); Name = 'summary.json' },
             @{ Source = (Join-Path $runRoot 'resource-admission.json'); Name = 'resource-admission.json' },
             @{ Source = (Join-Path $runRoot 'slot-lease.json'); Name = 'slot-lease.json' },
+            @{ Source = (Join-Path $runRoot 'publication-forwarder.log'); Name = 'publication-forwarder.log' },
+            @{ Source = (Join-Path $runRoot 'publication-forwarder.err.log'); Name = 'publication-forwarder.err.log' },
             @{ Source = (Join-Path $evidenceRoot 'pr-verification-plan.json'); Name = 'pr-verification-plan.json' },
             @{ Source = (Join-Path $evidenceRoot 'run-metadata.json'); Name = 'run-metadata.json' }
           )
@@ -245,6 +247,8 @@ jobs:
             candidate/artifacts/github-evidence/summary.json
             candidate/artifacts/github-evidence/resource-admission.json
             candidate/artifacts/github-evidence/slot-lease.json
+            candidate/artifacts/github-evidence/publication-forwarder.log
+            candidate/artifacts/github-evidence/publication-forwarder.err.log
             candidate/artifacts/github-evidence/pr-verification-plan.json
             candidate/artifacts/github-evidence/run-metadata.json
           if-no-files-found: warn
