@@ -3,6 +3,7 @@ import { expect } from '@playwright/test';
 export const DESKTOP_ENTRY = '/web/fullworld.html?x=32369&y=32241&floor=-7&zoom=2&mode=map';
 export const MOBILE_ENTRY = '/web/fullworld.html?x=32369&y=32241&floor=-7&zoom=0.25&mode=auto';
 
+const qualificationTrustInstalledPages = new WeakSet();
 const OPTIONAL_HTTP_ALLOWLIST = [
   {
     matches: ({ pathname, status }) => status === 404 && pathname === '/favicon.ico',
@@ -41,6 +42,21 @@ function qualificationTrustFromEnvironment() {
   return value;
 }
 
+async function installQualificationTrust(page) {
+  if (qualificationTrustInstalledPages.has(page)) return;
+  const qualificationTrust = qualificationTrustFromEnvironment();
+  if (!qualificationTrust) return;
+  await page.addInitScript((descriptor) => {
+    Object.defineProperty(globalThis, '__OTERYN_ATLAS_QUALIFICATION_TRUST__', {
+      value: Object.freeze({ ...descriptor }),
+      writable: false,
+      configurable: false,
+      enumerable: false,
+    });
+  }, qualificationTrust);
+  qualificationTrustInstalledPages.add(page);
+}
+
 export function captureRuntimeFailures(page) {
   const state = {
     failures: [],
@@ -76,17 +92,7 @@ export function captureRuntimeFailures(page) {
 }
 
 export async function gotoAtlas(page, entry) {
-  const qualificationTrust = qualificationTrustFromEnvironment();
-  if (qualificationTrust) {
-    await page.addInitScript((descriptor) => {
-      Object.defineProperty(globalThis, '__OTERYN_ATLAS_QUALIFICATION_TRUST__', {
-        value: Object.freeze({ ...descriptor }),
-        writable: false,
-        configurable: false,
-        enumerable: false,
-      });
-    }, qualificationTrust);
-  }
+  await installQualificationTrust(page);
   const response = await page.goto(entry, { waitUntil: 'domcontentloaded' });
   expect(response, 'Atlas navigation did not produce an HTTP response').not.toBeNull();
   expect(response.ok(), `Atlas entry returned HTTP ${response.status()}`).toBeTruthy();
