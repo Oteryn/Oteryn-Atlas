@@ -26,33 +26,61 @@ const catalog = {
   },
 };
 
-test('impact manifest accepts versioned known-domain entries with allowlisted groups', () => {
-  const manifest = validateImpactManifest({
-    schemaVersion: 1,
-    entries: [{
-      pathPrefix: 'src/browser/feature/',
-      domains: ['feature-ui'],
-      minimumProfile: 'targeted',
-      requiredGroups: ['deterministic.core', 'e2e.common-smoke'],
-    }],
-  }, catalog);
+const v2Manifest = {
+  schemaVersion: 2,
+  entries: [{
+    pathPrefix: 'src/browser/feature/',
+    domains: ['feature-ui'],
+    minimumProfile: 'targeted',
+    requiredGroups: ['deterministic.core'],
+  }],
+  crossDomainEscalations: [{
+    whenDomains: ['feature-ui', 'generator'],
+    minimumProfile: 'broad',
+    requiredGroups: ['e2e.common-smoke'],
+  }],
+};
 
-  assert.equal(manifest.schemaVersion, 1);
-  assert.deepEqual(manifest.entries[0].requiredGroups, ['deterministic.core', 'e2e.common-smoke']);
+test('impact manifest accepts explicit cross-domain escalation rules with allowlisted groups', () => {
+  const manifest = validateImpactManifest(v2Manifest, catalog);
+
+  assert.equal(manifest.schemaVersion, 2);
+  assert.deepEqual(manifest.entries[0].requiredGroups, ['deterministic.core']);
+  assert.deepEqual(manifest.crossDomainEscalations, [{
+    whenDomains: ['feature-ui', 'generator'],
+    minimumProfile: 'broad',
+    requiredGroups: ['e2e.common-smoke'],
+  }]);
   assert(Object.isFrozen(manifest));
 });
 
-test('impact manifest rejects unknown group, malformed prefix and duplicate entry', () => {
-  for (const entries of [
-    [{ pathPrefix: 'src/../browser/', domains: ['runtime'], minimumProfile: 'broad', requiredGroups: ['deterministic.core'] }],
-    [{ pathPrefix: 'src/browser/', domains: ['runtime'], minimumProfile: 'broad', requiredGroups: ['not-catalogued'] }],
-    [
+test('impact manifest rejects malformed path rules and cross-domain escalations', () => {
+  const invalidCandidates = [
+    { ...v2Manifest, entries: [{ pathPrefix: 'src/../browser/', domains: ['runtime'], minimumProfile: 'broad', requiredGroups: ['deterministic.core'] }] },
+    { ...v2Manifest, entries: [{ pathPrefix: 'src/browser/', domains: ['runtime'], minimumProfile: 'broad', requiredGroups: ['not-catalogued'] }] },
+    { ...v2Manifest, entries: [
       { pathPrefix: 'src/browser/', domains: ['runtime'], minimumProfile: 'broad', requiredGroups: ['deterministic.core'] },
       { pathPrefix: 'src/browser/', domains: ['runtime'], minimumProfile: 'broad', requiredGroups: ['deterministic.core'] },
-    ],
-  ]) {
-    assert.throws(() => validateImpactManifest({ schemaVersion: 1, entries }, catalog), /impact manifest/i);
+    ] },
+    { ...v2Manifest, crossDomainEscalations: [{ whenDomains: ['feature-ui'], minimumProfile: 'broad', requiredGroups: ['e2e.common-smoke'] }] },
+    { ...v2Manifest, crossDomainEscalations: [{ whenDomains: ['feature-ui', 'feature-ui'], minimumProfile: 'broad', requiredGroups: ['e2e.common-smoke'] }] },
+    { ...v2Manifest, crossDomainEscalations: [{ whenDomains: ['feature-ui', 'generator'], minimumProfile: 'impossible', requiredGroups: ['e2e.common-smoke'] }] },
+    { ...v2Manifest, crossDomainEscalations: [{ whenDomains: ['feature-ui', 'generator'], minimumProfile: 'broad', requiredGroups: ['not-catalogued'] }] },
+    { ...v2Manifest, crossDomainEscalations: [
+      { whenDomains: ['feature-ui', 'generator'], minimumProfile: 'broad', requiredGroups: ['e2e.common-smoke'] },
+      { whenDomains: ['generator', 'feature-ui'], minimumProfile: 'broad', requiredGroups: ['e2e.common-smoke'] },
+    ] },
+  ];
+  for (const candidate of invalidCandidates) {
+    assert.throws(() => validateImpactManifest(candidate, catalog), /impact manifest/i);
   }
+});
+
+test('impact manifest rejects arbitrary legacy schema v1 rather than silently bypassing v2 escalation policy', () => {
+  assert.throws(() => validateImpactManifest({
+    schemaVersion: 1,
+    entries: [{ pathPrefix: 'src/browser/', domains: ['runtime'], minimumProfile: 'none', requiredGroups: [] }],
+  }, catalog), /legacy|schemaVersion|impact manifest/i);
 });
 
 test('verification catalog rejects arbitrary commands and unsafe resource metadata', () => {
