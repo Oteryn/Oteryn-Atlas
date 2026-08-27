@@ -1,0 +1,79 @@
+{
+  "schemaVersion": 1,
+  "measurementOnly": true,
+  "selectionApplied": false,
+  "matchMode": "CASE_INSENSITIVE_REGEXP",
+  "phases": [
+    {
+      "id": "checkout-fetch",
+      "metricId": "checkoutFetchMs",
+      "requirement": "REQUIRED",
+      "stepNamePatterns": ["check out exact", "checkout", "git fetch"]
+    },
+    {
+      "id": "dependency-restore-install",
+      "metricId": "dependencyRestoreInstallMs",
+      "requirement": "REQUIRED",
+      "stepNamePatterns": ["dependency.*(restore|install)", "npm ci", "install dependencies", "restore dependencies"]
+    },
+    {
+      "id": "qualification-build-verify-readiness",
+      "metricId": "qualificationBuildVerifyReadinessMs",
+      "requirement": "REQUIRED",
+      "stepNamePatterns": ["qualification.*(build|prepare|verify|readiness)", "prepare hosted qualification", "publication.*readiness"]
+    },
+    {
+      "id": "browser-image",
+      "metricId": "browserImageMs",
+      "requirement": "REQUIRED",
+      "stepNamePatterns": ["(playwright|browser).*(image|pull|build|extract)", "docker.*(pull|build)", "build.*playwright"]
+    },
+    {
+      "id": "preview-startup",
+      "metricId": "previewStartupMs",
+      "requirement": "REQUIRED",
+      "stepNamePatterns": ["(preview|service).*(start|startup|ready)", "start.*preview", "compose.*up"]
+    },
+    {
+      "id": "playwright-execution",
+      "metricId": "playwrightExecutionMs",
+      "requirement": "REQUIRED",
+      "stepNamePatterns": ["playwright.*(execute|execution|test|run)", "run.*playwright", "browser.*tests"]
+    },
+    {
+      "id": "shard-fanout-fanin",
+      "metricId": "shardFanoutFaninMs",
+      "requirement": "OPTIONAL_EXPLICIT_NA",
+      "stepNamePatterns": ["shard.*(fan.?out|fan.?in|summary|merge)", "fan.?in.*evidence", "merge.*shard"]
+    },
+    {
+      "id": "cache-restore",
+      "metricId": "cacheRestoreMs",
+      "requirement": "OPTIONAL_EXPLICIT_NA",
+      "stepNamePatterns": ["cache.*restore", "restore.*cache"]
+    },
+    {
+      "id": "cache-save",
+      "metricId": "cacheSaveMs",
+      "requirement": "OPTIONAL_EXPLICIT_NA",
+      "stepNamePatterns": ["cache.*save", "save.*cache"]
+    },
+    {
+      "id": "artifact-upload",
+      "metricId": "artifactUploadMs",
+      "requirement": "OPTIONAL_EXPLICIT_NA",
+      "stepNamePatterns": ["(publish|upload).*artifact", "artifact.*upload"]
+    },
+    {
+      "id": "artifact-download",
+      "metricId": "artifactDownloadMs",
+      "requirement": "OPTIONAL_EXPLICIT_NA",
+      "stepNamePatterns": ["download.*artifact", "artifact.*download"]
+    }
+  ],
+  "notes": [
+    "Required phases must match at least one completed GitHub Actions step; missing required timing fails collection.",
+    "Optional phases are explicit NOT_APPLICABLE when the selected DAG truly does not contain that phase; they are never silently recorded as zero.",
+    "Step-name matching is versioned measurement metadata and does not influence verification selection or gate authority."
+  ]
+}
