@@ -31,3 +31,18 @@ test('live Chromium enters Gameplay and proves real Sam trade plus Rat loot', ()
   assert.match(livePreview, /100%/);
   assert.match(livePreview, /inspector.*gameplay/i);
 });
+
+test('live Semantic assertions explicitly select Semantic because Gameplay is default', () => {
+  const desktopStart = livePreview.indexOf('async function runDesktop');
+  const mobileStart = livePreview.indexOf('async function runMobile');
+  assert.ok(desktopStart >= 0 && mobileStart > desktopStart);
+
+  for (const body of [livePreview.slice(desktopStart, mobileStart), livePreview.slice(mobileStart)]) {
+    const search = body.indexOf('await searchAndSelect(');
+    const assertion = body.indexOf('assertCreatureInspector(', search);
+    assert.ok(search >= 0 && assertion > search);
+    const between = body.slice(search, assertion);
+    assert.match(between, /#inspector-tab-semantic/);
+    assert.match(between, /aria-selected/);
+  }
+});
