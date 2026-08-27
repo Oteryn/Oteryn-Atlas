@@ -16,7 +16,7 @@ const BOUNDED_REAL_TRUST_MARKER = 'oteryn-atlas-bounded-real-trust-v1';
 const BOUNDED_REAL_FIXTURE_ID = 'atlas-bounded-real-world-v1';
 const BOUNDED_REAL_SOURCE_CONTRACT = 'oteryn-atlas-bounded-real-runtime-v1';
 const BOUNDED_REAL_CREATURE_CAPABILITY = 'bounded-real-creatures-v1';
-const BOUNDED_REAL_GAME_SHA = 'bounded-fixture';
+const BOUNDED_REAL_GAME_SHA = 'fixture';
 const CONTENT_ID = /^sha256:[0-9a-f]{64}$/;
 const TRUST_ID_FIELDS = Object.freeze([
   'publicationRoot', 'semanticRoot', 'pixelRoot', 'overviewRoot', 'minimapRoot',
