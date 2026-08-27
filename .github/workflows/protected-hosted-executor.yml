@@ -258,11 +258,12 @@ jobs:
           git -C protected-control worktree add --detach "$candidate_dir" "$CANDIDATE_HEAD_SHA"
           printf '%s\n' "$candidate_dir" > artifacts/controller/candidate-dir.txt
 
-      - name: Enumerate protected bodies and candidate additions under protected census rules
+      - name: Enumerate exact hosted source lists by data capability
         shell: bash
         run: |
           set -euo pipefail
           candidate_dir="$(cat artifacts/controller/candidate-dir.txt)"
+          execution=artifacts/controller/protected-hosted-execution.json
           npm ci --prefix protected-control/e2e --ignore-scripts --no-audit --no-fund
 
           (
@@ -287,36 +288,97 @@ jobs:
             bash -lc 'cd /candidate && CI=1 /candidate/e2e/node_modules/.bin/playwright test --config=/candidate/e2e/playwright.config.mjs --list' \
             > artifacts/controller/candidate-playwright-source-list.txt
 
-          node protected-control/tools/verification/protected-playwright-selection.mjs \
-            --list artifacts/controller/protected-playwright-source-list.txt \
-            --execution artifacts/controller/protected-hosted-execution.json \
-            --placement protected \
-            > artifacts/controller/protected-playwright-test-list.txt
-          node protected-control/tools/verification/protected-playwright-selection.mjs \
-            --list artifacts/controller/candidate-playwright-source-list.txt \
-            --execution artifacts/controller/protected-hosted-execution.json \
-            --placement candidate-additions \
-            > artifacts/controller/candidate-additions-test-list.txt
+          if jq -e '.hosted.partitions[]? | select(.dataCapability == "real_fullworld")' "$execution" >/dev/null; then
+            echo 'ordinary hosted executor must not execute real_fullworld' >&2
+            exit 1
+          fi
+          jq -e '[.hosted.partitions[]?.dataCapability] | all(. == "qualification_fixture" or . == "bounded_real_world")' "$execution" >/dev/null \
+            || { echo 'unsupported hosted data capability' >&2; exit 1; }
 
-      - name: Build deterministic qualification product and verify plan identity
+          mkdir -p artifacts/controller/test-lists
+          mapfile -t capabilities < <(jq -r '.hosted.partitions[] | select((.stableTestIds | length) > 0) | .dataCapability' "$execution" | sort -u)
+          test "${#capabilities[@]}" -gt 0
+          for dataCapability in "${capabilities[@]}"; do
+            mkdir -p "artifacts/controller/test-lists/$dataCapability"
+            node protected-control/tools/verification/protected-playwright-selection.mjs \
+              --list artifacts/controller/protected-playwright-source-list.txt \
+              --execution "$execution" \
+              --placement protected \
+              --data-capability "$dataCapability" \
+              > "artifacts/controller/test-lists/$dataCapability/protected.txt"
+            node protected-control/tools/verification/protected-playwright-selection.mjs \
+              --list artifacts/controller/candidate-playwright-source-list.txt \
+              --execution "$execution" \
+              --placement candidate-additions \
+              --data-capability "$dataCapability" \
+              > "artifacts/controller/test-lists/$dataCapability/candidate-additions.txt"
+          done
+
+      - name: Build exact protected products required by hosted partitions
         shell: bash
         run: |
           set -euo pipefail
-          qualification="$RUNNER_TEMP/atlas-qualification-$GITHUB_RUN_ID-${{ matrix.shard }}"
-          rm -rf "$qualification"
-          node --input-type=module - "$qualification" artifacts/controller/protected-verification-plan.json <<'NODE'
+          node --input-type=module - artifacts/controller/protected-verification-plan.json artifacts/controller/protected-hosted-execution.json artifacts/controller/hosted-products.json <<'NODE'
           import fs from 'node:fs';
+          import path from 'node:path';
           import { buildQualificationWorld, verifyQualificationWorld } from './protected-control/tools/verification/qualification-world.mjs';
-          const [destination, planPath] = process.argv.slice(2);
-          await buildQualificationWorld(destination);
-          const manifest = await verifyQualificationWorld(destination);
+
+          const [planPath, executionPath, outputPath] = process.argv.slice(2);
           const plan = JSON.parse(fs.readFileSync(planPath, 'utf8'));
-          const expected = plan.productIdentities?.qualification_fixture;
-          if (!expected || expected.id !== manifest.fixtureId || expected.digest !== manifest.productDigest) {
-            throw new Error('Qualification fixture identity does not match protected plan.');
+          const execution = JSON.parse(fs.readFileSync(executionPath, 'utf8'));
+          const capabilities = [...new Set((execution.hosted?.partitions ?? [])
+            .filter((partition) => (partition.stableTestIds?.length ?? 0) > 0)
+            .map((partition) => partition.dataCapability))].sort();
+          if (capabilities.includes('real_fullworld')) throw new Error('ordinary hosted executor must not execute real_fullworld');
+          if (capabilities.some((value) => !['qualification_fixture', 'bounded_real_world'].includes(value))) {
+            throw new Error('unsupported hosted data capability');
           }
+
+          const products = {};
+          if (capabilities.includes('qualification_fixture')) {
+            const destination = path.join(process.env.RUNNER_TEMP, `atlas-qualification-${process.env.GITHUB_RUN_ID}-${process.env.ATLAS_E2E_SHARD.replace('/', '-')}`);
+            fs.rmSync(destination, { recursive: true, force: true });
+            await buildQualificationWorld(destination);
+            const manifest = await verifyQualificationWorld(destination);
+            const expected = plan.productIdentities?.qualification_fixture;
+            if (!expected || expected.id !== manifest.fixtureId || expected.digest !== manifest.productDigest) {
+              throw new Error('Qualification fixture identity does not match protected plan.');
+            }
+            products.qualification_fixture = {
+              root: destination,
+              trustPath: path.join(destination, 'fixture-manifest.json'),
+            };
+          }
+
+          if (capabilities.includes('bounded_real_world')) {
+            const builderPath = './protected-control/tools/verification/bounded-real-world.mjs';
+            const registryPath = './protected-control/tools/verification/protected-hosted-product-identities.json';
+            if (!fs.existsSync(builderPath)) throw new Error('protected bounded_real_world builder prerequisite is missing');
+            if (!fs.existsSync(registryPath)) throw new Error('protected-hosted-product-identities.json prerequisite is missing');
+            const registry = JSON.parse(fs.readFileSync(registryPath, 'utf8'));
+            const expected = plan.productIdentities?.bounded_real_world;
+            const pinned = registry.bounded_real_world;
+            if (!expected || !pinned || expected.id !== pinned.id || expected.digest !== pinned.digest) {
+              throw new Error('bounded_real_world protected plan identity does not match protected registry');
+            }
+            const { buildBoundedRealWorld, verifyBoundedRealWorld, boundedRealTrustDescriptor } = await import(builderPath);
+            const destination = path.join(process.env.RUNNER_TEMP, `atlas-bounded-real-${process.env.GITHUB_RUN_ID}-${process.env.ATLAS_E2E_SHARD.replace('/', '-')}`);
+            fs.rmSync(destination, { recursive: true, force: true });
+            const built = await buildBoundedRealWorld(destination, { sourceRoot: './protected-control' });
+            const verified = await verifyBoundedRealWorld(destination);
+            if (built.fixtureId !== expected.id || verified.fixtureId !== expected.id
+              || built.productDigest !== expected.digest || verified.productDigest !== expected.digest) {
+              throw new Error('bounded_real_world product identity does not match protected plan');
+            }
+            const trustDir = path.join('artifacts', 'controller', 'product-trust');
+            fs.mkdirSync(trustDir, { recursive: true });
+            const trustPath = path.join(trustDir, 'bounded_real_world.json');
+            fs.writeFileSync(trustPath, `${JSON.stringify(boundedRealTrustDescriptor(verified))}\n`);
+            products.bounded_real_world = { root: destination, trustPath: path.resolve(trustPath) };
+          }
+
+          fs.writeFileSync(outputPath, `${JSON.stringify(products, null, 2)}\n`);
           NODE
-          printf '%s\n' "$qualification" > artifacts/controller/qualification-dir.txt
 
       - name: Build separate protected-body and candidate-addition execution contexts
         shell: bash
@@ -356,85 +418,126 @@ jobs:
           printf '%s\n' "$protected_context" > artifacts/controller/protected-execution-context.txt
           printf '%s\n' "$candidate_context" > artifacts/controller/candidate-additions-execution-context.txt
 
-      - name: Run exact protected hosted shard on internal Docker network
+      - name: Run each hosted data-capability partition against only its exact product
         shell: bash
         run: |
           set -euo pipefail
           protected_context="$(cat artifacts/controller/protected-execution-context.txt)"
           candidate_context="$(cat artifacts/controller/candidate-additions-execution-context.txt)"
-          qualification="$(cat artifacts/controller/qualification-dir.txt)"
+          execution=artifacts/controller/protected-hosted-execution.json
+          products=artifacts/controller/hosted-products.json
           shard_root="$PWD/artifacts/hosted-shard-${{ matrix.shard }}"
-          protected_artifacts="$shard_root/protected"
-          candidate_artifacts="$shard_root/candidate-additions"
-          mkdir -p "$protected_artifacts" "$candidate_artifacts"
+          source_manifest="$shard_root/source-manifest.json"
+          mkdir -p "$shard_root/sources"
+          printf '[]\n' > "$source_manifest"
 
-          export ATLAS_QUALIFICATION_PUBLICATION_HOST="$qualification"
-          export ATLAS_QUALIFICATION_TRUST_JSON="$(jq -c . "$qualification/fixture-manifest.json")"
           export ATLAS_CODE_REVISION="$CANDIDATE_HEAD_SHA"
           export ATLAS_VERIFICATION_PLAN_SHA256="$(jq -r .planDigest artifacts/controller/protected-verification-plan.json)"
-          export ATLAS_EXECUTION_CONTEXT="$candidate_context"
-          export ATLAS_PROTECTED_TEST_LIST="$PWD/artifacts/controller/protected-playwright-test-list.txt"
-          export ATLAS_E2E_ARTIFACTS_HOST="$protected_artifacts"
+          export ATLAS_E2E_SHARD='1/1'
 
-          cleanup() {
+          compose_down() {
             docker compose \
               -f protected-control/e2e/compose.protected-hosted-executor.yml \
               -f protected-control/e2e/compose.github-hosted.yml \
               down -v --remove-orphans >/dev/null 2>&1 || true
           }
-          trap cleanup EXIT
+          trap compose_down EXIT
 
-          docker compose \
-            -f protected-control/e2e/compose.protected-hosted-executor.yml \
-            -f protected-control/e2e/compose.github-hosted.yml \
-            up -d --wait atlas-publication atlas-web
+          append_source() {
+            local placement="$1" dataCapability="$2" summaryPath="$3" tmp
+            tmp="$(mktemp)"
+            jq --arg placement "$placement" --arg dataCapability "$dataCapability" --arg summaryPath "$summaryPath" \
+              '. + [{placement: $placement, dataCapability: $dataCapability, summaryPath: $summaryPath}]' \
+              "$source_manifest" > "$tmp"
+            mv "$tmp" "$source_manifest"
+          }
 
-          export ATLAS_EXECUTION_CONTEXT="$protected_context"
-          export ATLAS_PROTECTED_TEST_LIST="$PWD/artifacts/controller/protected-playwright-test-list.txt"
-          export ATLAS_E2E_ARTIFACTS_HOST="$protected_artifacts"
-          export ATLAS_E2E_SHARD="${{ matrix.shard }}/1"
-          docker compose \
-            -f protected-control/e2e/compose.protected-hosted-executor.yml \
-            -f protected-control/e2e/compose.github-hosted.yml \
-            build e2e
-          docker compose \
-            -f protected-control/e2e/compose.protected-hosted-executor.yml \
-            -f protected-control/e2e/compose.github-hosted.yml \
-            run --rm e2e
+          mapfile -t capabilities < <(jq -r '.hosted.partitions[] | select((.stableTestIds | length) > 0) | .dataCapability' "$execution" | sort -u)
+          for dataCapability in "${capabilities[@]}"; do
+            case "$dataCapability" in
+              qualification_fixture|bounded_real_world) ;;
+              real_fullworld)
+                echo 'ordinary hosted executor must not execute real_fullworld' >&2
+                exit 1
+                ;;
+              *)
+                echo "unsupported hosted data capability: $dataCapability" >&2
+                exit 1
+                ;;
+            esac
 
-          addition_count="$(jq '.hosted.candidateAdditionalStableTestIds | length' artifacts/controller/protected-hosted-execution.json)"
-          if [[ "${{ matrix.index }}" == "0" ]] && (( addition_count > 0 )); then
-            export ATLAS_EXECUTION_CONTEXT="$candidate_context"
-            export ATLAS_PROTECTED_TEST_LIST="$PWD/artifacts/controller/candidate-additions-test-list.txt"
-            export ATLAS_E2E_ARTIFACTS_HOST="$candidate_artifacts"
-            export ATLAS_E2E_SHARD='1/1'
+            product_root="$(jq -r --arg capability "$dataCapability" '.[$capability].root // empty' "$products")"
+            trust_path="$(jq -r --arg capability "$dataCapability" '.[$capability].trustPath // empty' "$products")"
+            test -d "$product_root"
+            test -s "$trust_path"
+            protected_list="$PWD/artifacts/controller/test-lists/$dataCapability/protected.txt"
+            candidate_list="$PWD/artifacts/controller/test-lists/$dataCapability/candidate-additions.txt"
+            test -f "$protected_list"
+            test -f "$candidate_list"
+            if [[ ! -s "$protected_list" && ! -s "$candidate_list" ]]; then
+              echo "hosted partition has no selected source tests: $dataCapability" >&2
+              exit 1
+            fi
+
+            export COMPOSE_PROJECT_NAME="atlas-protected-${GITHUB_RUN_ID}-${{ matrix.shard }}-${dataCapability//_/-}"
+            export ATLAS_QUALIFICATION_PUBLICATION_HOST="$product_root"
+            export ATLAS_QUALIFICATION_TRUST_JSON="$(jq -c . "$trust_path")"
+            export ATLAS_EXECUTION_CONTEXT="$protected_context"
+            export ATLAS_PROTECTED_TEST_LIST="$protected_list"
+            export ATLAS_E2E_ARTIFACTS_HOST="$shard_root/sources/protected/$dataCapability"
+            mkdir -p "$ATLAS_E2E_ARTIFACTS_HOST"
+
+            compose_down
             docker compose \
               -f protected-control/e2e/compose.protected-hosted-executor.yml \
               -f protected-control/e2e/compose.github-hosted.yml \
-              build e2e
-            docker compose \
-              -f protected-control/e2e/compose.protected-hosted-executor.yml \
-              -f protected-control/e2e/compose.github-hosted.yml \
-              run --rm e2e
-          fi
+              up -d --wait atlas-publication atlas-web
+
+            if [[ -s "$protected_list" ]]; then
+              export ATLAS_EXECUTION_CONTEXT="$protected_context"
+              export ATLAS_PROTECTED_TEST_LIST="$protected_list"
+              export ATLAS_E2E_ARTIFACTS_HOST="$shard_root/sources/protected/$dataCapability"
+              mkdir -p "$ATLAS_E2E_ARTIFACTS_HOST"
+              docker compose \
+                -f protected-control/e2e/compose.protected-hosted-executor.yml \
+                -f protected-control/e2e/compose.github-hosted.yml \
+                build e2e
+              docker compose \
+                -f protected-control/e2e/compose.protected-hosted-executor.yml \
+                -f protected-control/e2e/compose.github-hosted.yml \
+                run --rm e2e
+              append_source protected "$dataCapability" "$ATLAS_E2E_ARTIFACTS_HOST/summary.json"
+            fi
+
+            if [[ -s "$candidate_list" ]]; then
+              export ATLAS_EXECUTION_CONTEXT="$candidate_context"
+              export ATLAS_PROTECTED_TEST_LIST="$candidate_list"
+              export ATLAS_E2E_ARTIFACTS_HOST="$shard_root/sources/candidate-additions/$dataCapability"
+              mkdir -p "$ATLAS_E2E_ARTIFACTS_HOST"
+              docker compose \
+                -f protected-control/e2e/compose.protected-hosted-executor.yml \
+                -f protected-control/e2e/compose.github-hosted.yml \
+                build e2e
+              docker compose \
+                -f protected-control/e2e/compose.protected-hosted-executor.yml \
+                -f protected-control/e2e/compose.github-hosted.yml \
+                run --rm e2e
+              append_source candidate-additions "$dataCapability" "$ATLAS_E2E_ARTIFACTS_HOST/summary.json"
+            fi
+            compose_down
+          done
 
       - name: Convert shard result into protected machine evidence
         if: always()
         shell: bash
         run: |
           set -euo pipefail
-          args=(
-            --plan artifacts/controller/protected-verification-plan.json
-            --execution artifacts/controller/protected-hosted-execution.json
-            --summary artifacts/hosted-shard-${{ matrix.shard }}/protected/summary.json
-            --shard-index ${{ matrix.index }}
-            --shard-count 1
-          )
-          addition_count="$(jq '.hosted.candidateAdditionalStableTestIds | length' artifacts/controller/protected-hosted-execution.json)"
-          if [[ "${{ matrix.index }}" == "0" ]] && (( addition_count > 0 )); then
-            args+=(--additional-summary artifacts/hosted-shard-${{ matrix.shard }}/candidate-additions/summary.json)
-          fi
-          node protected-control/tools/verification/protected-hosted-shard-summary.mjs "${args[@]}" \
+          node protected-control/tools/verification/protected-hosted-shard-summary.mjs \
+            --plan artifacts/controller/protected-verification-plan.json \
+            --execution artifacts/controller/protected-hosted-execution.json \
+            --source-manifest artifacts/hosted-shard-${{ matrix.shard }}/source-manifest.json \
+            --shard-index ${{ matrix.index }} \
+            --shard-count 1 \
             > artifacts/hosted-shard-${{ matrix.shard }}/protected-shard-summary.json
 
       - name: Publish protected shard evidence
