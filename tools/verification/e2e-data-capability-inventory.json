@@ -1,0 +1,202 @@
+{
+  "schemaVersion": 1,
+  "allowedDataCapabilities": [
+    "qualification_fixture",
+    "bounded_real_world",
+    "real_fullworld"
+  ],
+  "specs": [
+    {
+      "spec": "e2e/tests/accessibility-desktop.spec.mjs",
+      "dataCapability": "qualification_fixture",
+      "rationale": "Desktop accessibility oracles exercise control names, state and keyboard reachability; representative deterministic world data through the real runtime is sufficient.",
+      "splitRequired": false
+    },
+    {
+      "spec": "e2e/tests/accessibility-mobile.spec.mjs",
+      "dataCapability": "qualification_fixture",
+      "rationale": "Mobile accessibility oracles exercise touch reachability, drawers and focus restoration; complete real-world bytes do not affect those assertions.",
+      "splitRequired": false
+    },
+    {
+      "spec": "e2e/tests/api-contract-desktop.spec.mjs",
+      "dataCapability": "qualification_fixture",
+      "rationale": "Semantic API and browser rendering contracts require representative immutable published records, not a complete real-world census.",
+      "splitRequired": false
+    },
+    {
+      "spec": "e2e/tests/audit-desktop.spec.mjs",
+      "dataCapability": "qualification_fixture",
+      "rationale": "Desktop audit controls, coordinate navigation, zoom, pan and LOD transitions can be proven with a deterministic multi-floor qualification region.",
+      "splitRequired": false
+    },
+    {
+      "spec": "e2e/tests/audit-mobile.spec.mjs",
+      "dataCapability": "qualification_fixture",
+      "rationale": "Mobile drawer and representation-transition audits depend on runtime behavior and viewport state, not complete FullWorld content.",
+      "splitRequired": false
+    },
+    {
+      "spec": "e2e/tests/creature-interaction-desktop.spec.mjs",
+      "dataCapability": "qualification_fixture",
+      "rationale": "Creature cards, hit testing, stale-geometry invalidation and deep links need representative NPC and monster placements through production seams only.",
+      "splitRequired": false
+    },
+    {
+      "spec": "e2e/tests/creature-interaction-mobile.spec.mjs",
+      "dataCapability": "qualification_fixture",
+      "rationale": "Mobile creature activation and inspector behavior need representative NPC and monster placements, not complete-world identity or scale.",
+      "splitRequired": false
+    },
+    {
+      "spec": "e2e/tests/creature-presentation-desktop.spec.mjs",
+      "dataCapability": "qualification_fixture",
+      "rationale": "Desktop creature layout, roles, overlap, LOD and animation lifetime oracles need deterministic representative placements and presentation data only.",
+      "splitRequired": false
+    },
+    {
+      "spec": "e2e/tests/creature-presentation-mobile.spec.mjs",
+      "dataCapability": "qualification_fixture",
+      "rationale": "Mobile creature badges and representation transitions are layout and DPR oracles that a deterministic representative fixture can prove.",
+      "splitRequired": false
+    },
+    {
+      "spec": "e2e/tests/creatures-desktop.spec.mjs",
+      "dataCapability": "qualification_fixture",
+      "rationale": "Creature filtering, search, overlay repaint and controls require representative immutable creature records, not a complete real-world corpus.",
+      "splitRequired": false
+    },
+    {
+      "spec": "e2e/tests/degraded-search-desktop.spec.mjs",
+      "dataCapability": "qualification_fixture",
+      "rationale": "Search outage, malformed schema and degraded-state oracles rely on controlled positive and negative publication variants, which belong in the qualification fixture.",
+      "splitRequired": false
+    },
+    {
+      "spec": "e2e/tests/desktop.spec.mjs",
+      "dataCapability": "qualification_fixture",
+      "rationale": "Desktop smoke proves manifest qualification, authenticated range streaming and semantic navigation through real loader seams without claiming complete-world census correctness.",
+      "splitRequired": false
+    },
+    {
+      "spec": "e2e/tests/farm-explorer-desktop.spec.mjs",
+      "dataCapability": "qualification_fixture",
+      "rationale": "Farm Explorer fail-closed facts and custom estimator behavior need representative feature data and missing-data variants, not complete FullWorld bytes.",
+      "splitRequired": false
+    },
+    {
+      "spec": "e2e/tests/farm-explorer-mobile.spec.mjs",
+      "dataCapability": "qualification_fixture",
+      "rationale": "Mobile Farm Explorer reachability and truthfulness are feature-shell oracles that representative deterministic feature data can prove.",
+      "splitRequired": false
+    },
+    {
+      "spec": "e2e/tests/geometry-desktop.spec.mjs",
+      "dataCapability": "qualification_fixture",
+      "rationale": "Desktop base and creature geometry synchronization, floor isolation and deep-link restoration require representative multi-floor topology, not complete-world coverage.",
+      "splitRequired": false
+    },
+    {
+      "spec": "e2e/tests/geometry-mobile.spec.mjs",
+      "dataCapability": "qualification_fixture",
+      "rationale": "Mobile resize geometry preservation is a transform and synchronization oracle that a bounded deterministic multi-floor fixture can prove.",
+      "splitRequired": false
+    },
+    {
+      "spec": "e2e/tests/layer-audit-desktop.spec.mjs",
+      "dataCapability": "qualification_fixture",
+      "rationale": "Layer availability and fail-closed state assertions need representative layer inputs and negative variants rather than complete FullWorld content.",
+      "splitRequired": false
+    },
+    {
+      "spec": "e2e/tests/mobile.spec.mjs",
+      "dataCapability": "qualification_fixture",
+      "rationale": "Mobile smoke proves drawers, world loading and semantic navigation through production seams without an oracle over complete-world identity or scale.",
+      "splitRequired": false
+    },
+    {
+      "spec": "e2e/tests/performance-desktop.spec.mjs",
+      "dataCapability": "qualification_fixture",
+      "rationale": "The current normalized workload asserts structural budgets and records timing evidence; complete-world data volume is not the measured correctness oracle.",
+      "splitRequired": false
+    },
+    {
+      "spec": "e2e/tests/race-desktop.spec.mjs",
+      "dataCapability": "qualification_fixture",
+      "rationale": "Race and cancellation scenarios require controlled delayed range responses and representative geometry, which a deterministic fixture can reproduce exactly.",
+      "splitRequired": false
+    },
+    {
+      "spec": "e2e/tests/render-probes-desktop.spec.mjs",
+      "dataCapability": "qualification_fixture",
+      "rationale": "WebGL non-blank and committed-frame replacement probes test renderer behavior over representative detail pixels, not complete-world publication completeness.",
+      "splitRequired": false
+    },
+    {
+      "spec": "e2e/tests/resilience-desktop.spec.mjs",
+      "dataCapability": "qualification_fixture",
+      "rationale": "Corrupt ranges, malformed products, missing optional data and version mismatches are deterministic loader/runtime failure oracles suited to fixture variants.",
+      "splitRequired": false
+    },
+    {
+      "spec": "e2e/tests/responsive-mobile.spec.mjs",
+      "dataCapability": "qualification_fixture",
+      "rationale": "Responsive controls, backdrop behavior, resizing and optional creature controls are viewport and shell oracles independent of complete-world bytes.",
+      "splitRequired": false
+    },
+    {
+      "spec": "e2e/tests/scale-desktop.spec.mjs",
+      "dataCapability": "qualification_fixture",
+      "rationale": "The current repeated-search scale oracle checks bounded DOM growth across a deterministic corpus; it does not claim complete FullWorld corpus scale.",
+      "splitRequired": false
+    },
+    {
+      "spec": "e2e/tests/soak-desktop.spec.mjs",
+      "dataCapability": "qualification_fixture",
+      "rationale": "The bounded interaction soak checks retained structural state across repeated actions; complete-world data volume is not part of its oracle.",
+      "splitRequired": false
+    },
+    {
+      "spec": "e2e/tests/state-desktop.spec.mjs",
+      "dataCapability": "qualification_fixture",
+      "rationale": "Coordinate state, reload, history and invalid-input behavior need stable representative bounds and navigation state, not a complete real publication.",
+      "splitRequired": false
+    },
+    {
+      "spec": "e2e/tests/stress-desktop.spec.mjs",
+      "dataCapability": "qualification_fixture",
+      "rationale": "The seeded interaction stress oracle checks renderer and creature geometry invariants over replayable actions, not complete-world scale or census.",
+      "splitRequired": false
+    },
+    {
+      "spec": "e2e/tests/user-journey-desktop.spec.mjs",
+      "dataCapability": "qualification_fixture",
+      "rationale": "Desktop user journeys require representative cross-feature search, map, creature and state data while making no complete-world correctness claim.",
+      "splitRequired": false
+    },
+    {
+      "spec": "e2e/tests/user-journey-mobile.spec.mjs",
+      "dataCapability": "qualification_fixture",
+      "rationale": "Mobile user journeys require representative touch-first cross-feature data and production runtime seams, not complete-world identity or scale.",
+      "splitRequired": false
+    },
+    {
+      "spec": "e2e/tests/visual-desktop.spec.mjs",
+      "dataCapability": "real_fullworld",
+      "rationale": "This mixed spec contains the published creature-animation full authoritative coverage census, whose oracle requires complete product coverage; split that census from the fixture-sufficient visual and playback scenarios.",
+      "splitRequired": true
+    },
+    {
+      "spec": "e2e/tests/visual-mobile.spec.mjs",
+      "dataCapability": "qualification_fixture",
+      "rationale": "Mobile visual acceptance covers Atlas-owned chrome, drawers and user-visible layout; representative rights-safe fixture content is sufficient.",
+      "splitRequired": false
+    },
+    {
+      "spec": "e2e/tests/workflows-desktop.spec.mjs",
+      "dataCapability": "qualification_fixture",
+      "rationale": "Published semantic-result navigation, reload and history restoration need representative immutable semantic records, not complete-world coverage.",
+      "splitRequired": false
+    }
+  ]
+}
