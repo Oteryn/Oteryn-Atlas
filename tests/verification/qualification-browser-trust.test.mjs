@@ -2,23 +2,54 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
 
-const trust = fs.readFileSync(new URL('../../src/browser/fullworld-trust.mjs', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
-const runtime = fs.readFileSync(new URL('../../e2e/tests/runtime.mjs', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
+import { PRODUCTION_FULLWORLD_TRUST, resolveFullWorldTrust } from '../../src/browser/fullworld-trust.mjs';
 
-test('production FullWorld trust defaults remain exact and qualification override is explicit', () => {
-  assert.match(trust, /PRODUCTION_FULLWORLD_TRUST/);
-  assert.match(trust, /__OTERYN_ATLAS_QUALIFICATION_TRUST__/);
-  assert.match(trust, /atlas-qualification-world-v2/);
-  assert.match(trust, /oteryn-atlas-qualification-trust-v1/);
+const trustSource = fs.readFileSync(new URL('../../src/browser/fullworld-trust.mjs', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
+const runtime = fs.readFileSync(new URL('../../e2e/tests/runtime.mjs', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
+const root = (char) => `sha256:${char.repeat(64)}`;
+const descriptor = Object.freeze({
+  marker: 'oteryn-atlas-qualification-trust-v1',
+  fixtureId: 'atlas-qualification-world-v2',
+  publicationRoot: root('1'),
+  semanticRoot: root('2'),
+  pixelRoot: root('3'),
+  overviewRoot: root('4'),
+  runtimeIndexRoot: root('5'),
+  pixelBucketRoot: root('6'),
+  sourceFingerprint: root('7'),
+});
+
+test('production FullWorld trust remains the exact default without an override', () => {
+  assert.equal(resolveFullWorldTrust({}), PRODUCTION_FULLWORLD_TRUST);
+  assert.equal(Object.isFrozen(PRODUCTION_FULLWORLD_TRUST), true);
+  assert.match(PRODUCTION_FULLWORLD_TRUST.gameSha, /^[0-9a-f]{40}$/);
+  assert.match(PRODUCTION_FULLWORLD_TRUST.minimapRoot, /^sha256:[0-9a-f]{64}$/);
+});
+
+test('qualification override is explicit, immutable and does not borrow production identity', () => {
+  const resolved = resolveFullWorldTrust({ __OTERYN_ATLAS_QUALIFICATION_TRUST__: descriptor });
+  assert.equal(resolved.gameSha, 'fixture');
+  assert.equal(resolved.minimapRoot, null);
+  assert.equal(resolved.qualificationFixtureId, 'atlas-qualification-world-v2');
   for (const field of ['publicationRoot', 'semanticRoot', 'pixelRoot', 'overviewRoot', 'runtimeIndexRoot', 'pixelBucketRoot', 'sourceFingerprint']) {
-    assert.match(trust, new RegExp(`\\b${field}\\b`));
+    assert.equal(resolved[field], descriptor[field]);
   }
+  assert.equal(Object.isFrozen(resolved), true);
 });
 
 test('qualification override fails closed instead of silently falling back to production', () => {
-  assert.match(trust, /qualification trust.*invalid|invalid.*qualification trust/i);
-  assert.match(trust, /sha256:\[0-9a-f\]\{64\}/);
-  assert.match(trust, /Object\.freeze/);
+  const malformed = [
+    {},
+    { ...descriptor, marker: 'wrong' },
+    { ...descriptor, fixtureId: 'other-fixture' },
+    { ...descriptor, semanticRoot: 'not-a-root' },
+    Object.fromEntries(Object.entries(descriptor).filter(([key]) => key !== 'pixelRoot')),
+    { ...descriptor, extra: true },
+  ];
+  for (const candidate of malformed) {
+    assert.throws(() => resolveFullWorldTrust({ __OTERYN_ATLAS_QUALIFICATION_TRUST__: candidate }), /qualification trust invalid/i);
+  }
+  assert.match(trustSource, /sha256:\[0-9a-f\]\{64\}/);
 });
 
 test('Playwright injects qualification trust before navigation only when explicitly configured', () => {
