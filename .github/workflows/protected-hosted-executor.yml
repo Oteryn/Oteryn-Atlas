@@ -176,12 +176,19 @@ jobs:
           git -C protected-control worktree add --detach "$candidate_dir" "$CANDIDATE_HEAD_SHA"
           printf '%s\n' "$candidate_dir" > artifacts/controller/candidate-dir.txt
 
-      - name: Re-enumerate candidate under protected no-network census sandbox
+      - name: Enumerate protected bodies and candidate additions under protected census rules
         shell: bash
         run: |
           set -euo pipefail
           candidate_dir="$(cat artifacts/controller/candidate-dir.txt)"
           npm ci --prefix protected-control/e2e --ignore-scripts --no-audit --no-fund
+
+          (
+            cd protected-control
+            ATLAS_ARTIFACTS_DIR="$GITHUB_WORKSPACE/artifacts/controller/protected-playwright-list" \
+              npm exec --prefix e2e -- playwright test --config=e2e/playwright.config.mjs --list
+          ) > artifacts/controller/protected-playwright-source-list.txt
+
           timeout --signal=KILL 120s docker run --rm \
             --network none \
             --read-only \
@@ -196,11 +203,18 @@ jobs:
             --mount "type=bind,src=$PWD/protected-control/e2e/node_modules,dst=/candidate/e2e/node_modules,readonly" \
             mcr.microsoft.com/playwright:v1.62.0-noble@sha256:baed2032d533817f3dbe6425de795788430ba345e819a1201337009ba17c9d07 \
             bash -lc 'cd /candidate && CI=1 /candidate/e2e/node_modules/.bin/playwright test --config=/candidate/e2e/playwright.config.mjs --list' \
-            > artifacts/controller/candidate-playwright-test-list.txt
+            > artifacts/controller/candidate-playwright-source-list.txt
+
           node protected-control/tools/verification/protected-playwright-selection.mjs \
-            --list artifacts/controller/candidate-playwright-test-list.txt \
+            --list artifacts/controller/protected-playwright-source-list.txt \
             --execution artifacts/controller/protected-hosted-execution.json \
-            > artifacts/controller/protected-hosted-test-list.txt
+            --placement protected \
+            > artifacts/controller/protected-playwright-test-list.txt
+          node protected-control/tools/verification/protected-playwright-selection.mjs \
+            --list artifacts/controller/candidate-playwright-source-list.txt \
+            --execution artifacts/controller/protected-hosted-execution.json \
+            --placement candidate-additions \
+            > artifacts/controller/candidate-additions-test-list.txt
 
       - name: Build deterministic qualification product and verify plan identity
         shell: bash
@@ -222,43 +236,64 @@ jobs:
           NODE
           printf '%s\n' "$qualification" > artifacts/controller/qualification-dir.txt
 
-      - name: Build sanitized candidate execution context with protected control files
+      - name: Build separate protected-body and candidate-addition execution contexts
         shell: bash
         run: |
           set -euo pipefail
           candidate_dir="$(cat artifacts/controller/candidate-dir.txt)"
-          context="$RUNNER_TEMP/atlas-execution-context-$GITHUB_RUN_ID-${{ matrix.shard }}"
-          rm -rf "$context"
-          mkdir -p "$context"
-          rsync -a --delete --exclude='.git' "$candidate_dir/" "$context/"
-          for path in e2e e2e/tests web src; do
-            test -d "$context/$path"
-            test ! -L "$context/$path"
+          protected_context="$RUNNER_TEMP/protected-execution-context-$GITHUB_RUN_ID-${{ matrix.shard }}"
+          candidate_context="$RUNNER_TEMP/candidate-additions-execution-context-$GITHUB_RUN_ID-${{ matrix.shard }}"
+          rm -rf "$protected_context" "$candidate_context"
+          mkdir -p "$protected_context" "$candidate_context"
+
+          rsync -a --delete --exclude='.git' "$candidate_dir/" "$protected_context/"
+          for path in web src; do
+            test -d "$protected_context/$path"
+            test ! -L "$protected_context/$path"
           done
-          rm -rf "$context/e2e/node_modules"
-          rm -f "$context/.dockerignore" "$context/e2e/Dockerfile.dockerignore"
-          cp protected-control/e2e/Dockerfile "$context/e2e/Dockerfile"
-          cp protected-control/e2e/package.json protected-control/e2e/package-lock.json "$context/e2e/"
-          cp protected-control/e2e/playwright.config.mjs protected-control/e2e/summary-reporter.mjs "$context/e2e/"
-          mkdir -p "$context/tools/verification"
-          cp protected-control/tools/verification/stable-id.mjs "$context/tools/verification/stable-id.mjs"
-          printf '%s\n' "$context" > artifacts/controller/execution-context.txt
+          rm -rf "$protected_context/e2e"
+          cp -a protected-control/e2e "$protected_context/e2e"
+          rm -rf "$protected_context/e2e/node_modules"
+          rm -f "$protected_context/.dockerignore" "$protected_context/e2e/Dockerfile.dockerignore"
+          mkdir -p "$protected_context/tools/verification"
+          cp protected-control/tools/verification/stable-id.mjs "$protected_context/tools/verification/stable-id.mjs"
+
+          rsync -a --delete --exclude='.git' "$candidate_dir/" "$candidate_context/"
+          for path in e2e e2e/tests web src; do
+            test -d "$candidate_context/$path"
+            test ! -L "$candidate_context/$path"
+          done
+          rm -rf "$candidate_context/e2e/node_modules"
+          rm -f "$candidate_context/.dockerignore" "$candidate_context/e2e/Dockerfile.dockerignore"
+          cp protected-control/e2e/Dockerfile "$candidate_context/e2e/Dockerfile"
+          cp protected-control/e2e/package.json protected-control/e2e/package-lock.json "$candidate_context/e2e/"
+          cp protected-control/e2e/playwright.config.mjs protected-control/e2e/summary-reporter.mjs "$candidate_context/e2e/"
+          mkdir -p "$candidate_context/tools/verification"
+          cp protected-control/tools/verification/stable-id.mjs "$candidate_context/tools/verification/stable-id.mjs"
+
+          printf '%s\n' "$protected_context" > artifacts/controller/protected-execution-context.txt
+          printf '%s\n' "$candidate_context" > artifacts/controller/candidate-additions-execution-context.txt
 
       - name: Run exact protected hosted shard on internal Docker network
         shell: bash
         run: |
           set -euo pipefail
-          context="$(cat artifacts/controller/execution-context.txt)"
+          protected_context="$(cat artifacts/controller/protected-execution-context.txt)"
+          candidate_context="$(cat artifacts/controller/candidate-additions-execution-context.txt)"
           qualification="$(cat artifacts/controller/qualification-dir.txt)"
-          artifacts="$PWD/artifacts/hosted-shard-${{ matrix.shard }}"
-          mkdir -p "$artifacts"
-          export ATLAS_EXECUTION_CONTEXT="$context"
+          shard_root="$PWD/artifacts/hosted-shard-${{ matrix.shard }}"
+          protected_artifacts="$shard_root/protected"
+          candidate_artifacts="$shard_root/candidate-additions"
+          mkdir -p "$protected_artifacts" "$candidate_artifacts"
+
           export ATLAS_QUALIFICATION_PUBLICATION_HOST="$qualification"
           export ATLAS_QUALIFICATION_TRUST_JSON="$(jq -c . "$qualification/fixture-manifest.json")"
           export ATLAS_CODE_REVISION="$CANDIDATE_HEAD_SHA"
           export ATLAS_VERIFICATION_PLAN_SHA256="$(jq -r .planDigest artifacts/controller/protected-verification-plan.json)"
-          export ATLAS_PROTECTED_TEST_LIST="$PWD/artifacts/controller/protected-hosted-test-list.txt"
-          export ATLAS_E2E_ARTIFACTS_HOST="$artifacts"
+          export ATLAS_EXECUTION_CONTEXT="$candidate_context"
+          export ATLAS_PROTECTED_TEST_LIST="$PWD/artifacts/controller/protected-playwright-test-list.txt"
+          export ATLAS_E2E_ARTIFACTS_HOST="$protected_artifacts"
+
           cleanup() {
             docker compose \
               -f protected-control/e2e/compose.protected-hosted-executor.yml \
@@ -266,26 +301,58 @@ jobs:
               down -v --remove-orphans >/dev/null 2>&1 || true
           }
           trap cleanup EXIT
+
           docker compose \
             -f protected-control/e2e/compose.protected-hosted-executor.yml \
             -f protected-control/e2e/compose.github-hosted.yml \
             up -d --wait atlas-publication atlas-web
+
+          export ATLAS_EXECUTION_CONTEXT="$protected_context"
+          export ATLAS_PROTECTED_TEST_LIST="$PWD/artifacts/controller/protected-playwright-test-list.txt"
+          export ATLAS_E2E_ARTIFACTS_HOST="$protected_artifacts"
+          export ATLAS_E2E_SHARD="${{ matrix.shard }}/2"
+          docker compose \
+            -f protected-control/e2e/compose.protected-hosted-executor.yml \
+            -f protected-control/e2e/compose.github-hosted.yml \
+            build e2e
           docker compose \
             -f protected-control/e2e/compose.protected-hosted-executor.yml \
             -f protected-control/e2e/compose.github-hosted.yml \
             run --rm e2e
+
+          addition_count="$(jq '.hosted.candidateAdditionalStableTestIds | length' artifacts/controller/protected-hosted-execution.json)"
+          if [[ "${{ matrix.index }}" == "0" ]] && (( addition_count > 0 )); then
+            export ATLAS_EXECUTION_CONTEXT="$candidate_context"
+            export ATLAS_PROTECTED_TEST_LIST="$PWD/artifacts/controller/candidate-additions-test-list.txt"
+            export ATLAS_E2E_ARTIFACTS_HOST="$candidate_artifacts"
+            export ATLAS_E2E_SHARD='1/1'
+            docker compose \
+              -f protected-control/e2e/compose.protected-hosted-executor.yml \
+              -f protected-control/e2e/compose.github-hosted.yml \
+              build e2e
+            docker compose \
+              -f protected-control/e2e/compose.protected-hosted-executor.yml \
+              -f protected-control/e2e/compose.github-hosted.yml \
+              run --rm e2e
+          fi
 
       - name: Convert shard result into protected machine evidence
         if: always()
         shell: bash
         run: |
           set -euo pipefail
-          node protected-control/tools/verification/protected-hosted-shard-summary.mjs \
-            --plan artifacts/controller/protected-verification-plan.json \
-            --execution artifacts/controller/protected-hosted-execution.json \
-            --summary artifacts/hosted-shard-${{ matrix.shard }}/summary.json \
-            --shard-index ${{ matrix.index }} \
-            --shard-count 2 \
+          args=(
+            --plan artifacts/controller/protected-verification-plan.json
+            --execution artifacts/controller/protected-hosted-execution.json
+            --summary artifacts/hosted-shard-${{ matrix.shard }}/protected/summary.json
+            --shard-index ${{ matrix.index }}
+            --shard-count 2
+          )
+          addition_count="$(jq '.hosted.candidateAdditionalStableTestIds | length' artifacts/controller/protected-hosted-execution.json)"
+          if [[ "${{ matrix.index }}" == "0" ]] && (( addition_count > 0 )); then
+            args+=(--additional-summary artifacts/hosted-shard-${{ matrix.shard }}/candidate-additions/summary.json)
+          fi
+          node protected-control/tools/verification/protected-hosted-shard-summary.mjs "${args[@]}" \
             > artifacts/hosted-shard-${{ matrix.shard }}/protected-shard-summary.json
 
       - name: Publish protected shard evidence
