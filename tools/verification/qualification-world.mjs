@@ -10,6 +10,7 @@ import {
 } from '../../src/browser/fullworld.mjs';
 import { PIXEL_HASH_DOMAIN, PIXEL_PROFILE, PIXEL_ROOT_DOMAIN } from '../../src/browser/fullworld-pixels.mjs';
 import { RUNTIME_PIXEL_BUCKET_DOMAIN, RUNTIME_PIXEL_BUCKET_PROFILE } from '../../src/browser/fullworld-pixel-buckets.mjs';
+import { minimapDomains, minimapProfiles } from '../../src/layers/minimap.mjs';
 import { computeOverviewRoot, overviewDomains, overviewProfiles } from '../../src/layers/overview.mjs';
 
 const FIXTURE_ID = 'atlas-qualification-world-v2';
@@ -18,7 +19,9 @@ const FLOORS = Object.freeze([-8, -7, -6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 
 const ACTIVE_FLOOR = -7;
 const CHUNK_PATH = 'chunks/f-7-r1008-c1004.jsonl';
 const BOUNDS = Object.freeze({ x_min: 32256, x_max_exclusive: 32288, y_min: 32128, y_max_exclusive: 32160 });
+const MINIMAP_BOUNDS = Object.freeze({ x_min: 32256, x_max_exclusive: 32512, y_min: 32000, y_max_exclusive: 32256 });
 const PIXEL_BYTES = 32 * 32 * 4;
+const MINIMAP_PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64');
 
 function sha(bytes) { return `sha256:${crypto.createHash('sha256').update(bytes).digest('hex')}`; }
 function canonicalDigest(value) { return sha(canonicalJsonBytes(value)); }
@@ -147,6 +150,47 @@ async function buildOverview(root, publicationRoot, semanticWorld, semanticFloor
   return world;
 }
 
+async function buildMinimap(root, publicationRoot, pixelRoot, sourceContentId) {
+  const tileContentId = await sha256ContentId(MINIMAP_PNG);
+  const tileRelative = 'tiles/f-7-r126-c125.png';
+  const floors = [];
+  for (const floor of FLOORS) {
+    const active = floor === ACTIVE_FLOOR;
+    const chunks = active ? [{
+      logicalAddress: { floor, region_x: 126, region_y: 125 },
+      path: tileRelative,
+      bytes: MINIMAP_PNG.byteLength,
+      contentId: tileContentId,
+      sourceContentId,
+    }] : [];
+    const floorCore = {
+      profile: minimapProfiles.floor,
+      floor,
+      regionSpan: 256,
+      pixelPerWorldTile: 1,
+      bounds: MINIMAP_BOUNDS,
+      chunks,
+      counts: { chunks: chunks.length, tiles: chunks.length },
+    };
+    const floorManifest = { ...floorCore, rootContentId: await domainRoot(minimapDomains.floor, floorCore) };
+    writeJson(root, `minimap/floors/f${floor}.json`, floorManifest);
+    floors.push({ floor, path: `floors/f${floor}.json`, rootContentId: floorManifest.rootContentId });
+  }
+  writeBytes(root, `minimap/${tileRelative}`, MINIMAP_PNG);
+  const worldCore = {
+    profile: minimapProfiles.world,
+    regionSpan: 256,
+    pixelPerWorldTile: 1,
+    source: { authority: 'Oteryn/Oteryn-Game', publicationRoot, pixelRoot },
+    semantics: { terrainClassification: 'NOT_CLAIMED', walkability: 'NOT_CLAIMED' },
+    floors,
+    counts: { floors: FLOORS.length, chunks: 1, tiles: 1 },
+  };
+  const world = { ...worldCore, rootContentId: await domainRoot(minimapDomains.world, worldCore) };
+  writeJson(root, 'minimap/world.json', world);
+  return world;
+}
+
 export async function buildQualificationWorld(destination) {
   const root = path.resolve(destination);
   if (fs.existsSync(root)) throw new TypeError('qualification world destination already exists');
@@ -188,6 +232,7 @@ export async function buildQualificationWorld(destination) {
 
   const pixelBuckets = await buildRuntimePixelBuckets(root, publication.rootContentId, pixel.manifest.rootContentId, pixel.pixelContentId, pixel.pixels);
   const overview = await buildOverview(root, publication.rootContentId, semanticWorld, semanticFloors, chunkContentId);
+  const minimap = await buildMinimap(root, publication.rootContentId, pixel.manifest.rootContentId, chunkContentId);
 
   const files = productEntries(root);
   const result = Object.freeze({
@@ -201,6 +246,7 @@ export async function buildQualificationWorld(destination) {
     runtimeIndexRoot: runtimeWorld.rootContentId,
     pixelBucketRoot: pixelBuckets.rootContentId,
     overviewRoot: overview.rootContentId,
+    minimapRoot: minimap.rootContentId,
     sourceFingerprint: SOURCE_FINGERPRINT,
     productDigest: canonicalDigest(files),
     files,
@@ -214,7 +260,7 @@ export async function verifyQualificationWorld(root) {
   const files = productEntries(root);
   if (canonicalDigest(files) !== canonicalDigest(manifest.files) || canonicalDigest(files) !== manifest.productDigest) throw new TypeError('qualification world digest mismatch');
   if (manifest.fixtureId !== FIXTURE_ID || manifest.dataCapability !== 'qualification_fixture' || manifest.semanticFloorCount !== 16 || manifest.runtimeFloorCount !== 16) throw new TypeError('qualification world identity mismatch');
-  for (const field of ['publicationRoot', 'semanticRoot', 'pixelRoot', 'runtimeIndexRoot', 'pixelBucketRoot', 'overviewRoot', 'sourceFingerprint']) {
+  for (const field of ['publicationRoot', 'semanticRoot', 'pixelRoot', 'runtimeIndexRoot', 'pixelBucketRoot', 'overviewRoot', 'minimapRoot', 'sourceFingerprint']) {
     if (!/^sha256:[0-9a-f]{64}$/.test(manifest[field])) throw new TypeError(`qualification world ${field} invalid`);
   }
   return Object.freeze(manifest);
