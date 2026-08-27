@@ -50,6 +50,19 @@ test('hosted executor consumes a published protected plan under read-only GitHub
   assert.doesNotMatch(executor, /pull_request_target:|atlas-local-e2e|192\.168\.|molehill|synology|secrets:/i);
 });
 
+test('protected-base test implementations and candidate additions execute from separate contexts', () => {
+  assert.match(executor, /protected-playwright-test-list\.txt/);
+  assert.match(executor, /candidate-additions-test-list\.txt/);
+  assert.match(executor, /--placement protected/);
+  assert.match(executor, /--placement candidate-additions/);
+  assert.match(executor, /protected-execution-context/);
+  assert.match(executor, /candidate-additions-execution-context/);
+  assert.match(executor, /rm -rf "\$protected_context\/e2e"/);
+  assert.match(executor, /cp -a protected-control\/e2e "\$protected_context\/e2e"/);
+  assert.match(executor, /candidateAdditionalStableTestIds/);
+  assert.match(executor, /--additional-summary/);
+});
+
 test('candidate browser execution and hosted publication share one internal default network with no host IPC', () => {
   assert.match(compose, /networks:\n\s+default:\n\s+internal:\s*true/);
   assert.doesNotMatch(compose, /atlas-e2e-internal/);
