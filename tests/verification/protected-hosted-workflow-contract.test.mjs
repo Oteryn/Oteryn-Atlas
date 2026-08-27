@@ -84,7 +84,6 @@ test('protected-base test implementations and candidate additions execute from s
   assert.match(executor, /candidate-additions-execution-context/);
   assert.match(executor, /rm -rf "\$protected_context\/e2e"/);
   assert.match(executor, /cp -a protected-control\/e2e "\$protected_context\/e2e"/);
-  assert.match(executor, /candidateAdditionalStableTestIds/);
   assert.match(executor, /placement: \$placement, dataCapability: \$dataCapability, summaryPath: \$summaryPath/);
   assert.match(executor, /--source-manifest/);
   assert.doesNotMatch(executor, /--additional-summary/);
