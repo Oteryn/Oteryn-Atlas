@@ -118,7 +118,7 @@ jobs:
           mapfile -t names < <(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$CONTROLLER_RUN_ID/artifacts?per_page=100" \
             --jq '.artifacts[] | select(.expired == false and (.name | startswith("protected-verification-plan-"))) | .name')
           test "${#names[@]}" -eq 1
-          gh run download "$CONTROLLER_RUN_ID" --name "${names[0]}" --dir artifacts/controller
+          gh run download "$CONTROLLER_RUN_ID" --repo "$GITHUB_REPOSITORY" --name "${names[0]}" --dir artifacts/controller
           test -s artifacts/controller/protected-verification-plan.json
 
       - name: Resolve protected controller and candidate identities
@@ -230,7 +230,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p artifacts/controller
-          gh run download "$GITHUB_RUN_ID" --name "$BUNDLE_NAME" --dir artifacts/controller
+          gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --name "$BUNDLE_NAME" --dir artifacts/controller
           test -s artifacts/controller/protected-verification-plan.json
           test -s artifacts/controller/protected-hosted-execution.json
 
@@ -465,8 +465,8 @@ jobs:
           set -euo pipefail
           test "${{ needs.hosted-shards.result }}" = success
           mkdir -p artifacts/controller artifacts/shards
-          gh run download "$GITHUB_RUN_ID" --name "$BUNDLE_NAME" --dir artifacts/controller
-          gh run download "$GITHUB_RUN_ID" --pattern 'protected-hosted-shard-*' --dir artifacts/shards
+          gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --name "$BUNDLE_NAME" --dir artifacts/controller
+          gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --pattern 'protected-hosted-shard-*' --dir artifacts/shards
           test "$(find artifacts/shards -name protected-shard-summary.json -type f | wc -l)" -eq 1
 
       - name: Check out exact protected controller source
