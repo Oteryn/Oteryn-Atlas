@@ -66,6 +66,9 @@ export function profileRank(profile) {
 }
 
 export function validateVerificationCatalog(candidate) {
+  if (isPlainObject(candidate) && candidate.schemaVersion === 1) {
+    return normalizeTrustedVerificationCatalog(candidate);
+  }
   const kind = 'verification catalog';
   if (!isPlainObject(candidate) || candidate.schemaVersion !== 2 || !isPlainObject(candidate.groups)) {
     invalid(kind, 'requires schemaVersion 2 and groups object');
