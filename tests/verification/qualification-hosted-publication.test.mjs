@@ -108,3 +108,13 @@ test('hosted qualification server refuses tampered bytes before browser consumpt
     fs.rmSync(root, { recursive: true, force: true });
   }
 });
+
+test('hosted qualification server fails closed if ready publication mutates after startup', async () => {
+  await withReadyServer(async ({ publicationDir, server }) => {
+    const relative = 'publication/semantic/chunks/f-7-r1008-c1004.jsonl';
+    fs.appendFileSync(path.join(publicationDir, relative), 'forged-after-readiness');
+    const response = await fetch(`${server.origin}/fullworld/${relative}`);
+    assert.equal(response.status, 503);
+    assert.equal(await response.text(), '');
+  });
+});
