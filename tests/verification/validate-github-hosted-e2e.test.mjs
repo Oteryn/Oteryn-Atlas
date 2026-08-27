@@ -80,7 +80,11 @@ test('accepts exact-head all-pass zero-retry hosted evidence only with validated
 });
 
 test('rejects stale head, wrong worker count, direct-preview mode and wrong browser identity', () => {
-  assert.throws(() => validate(summary(), { headSha: 'e'.repeat(40) }), /expectedRevision/);
+  const staleHead = 'e'.repeat(40);
+  assert.throws(() => validate(summary(), {
+    headSha: staleHead,
+    publicationReadiness: publicationReadiness({ candidateSha: staleHead }),
+  }), /expectedRevision/);
   assert.throws(() => validate(summary(), { workers: 2 }), /worker count/);
   assert.throws(() => validate(summary({ metadata: { ...summary().metadata, targetMode: 'direct-preview', publicationOrigin: null } })), /checkout-overlay/);
   assert.throws(() => validate(summary({ metadata: { ...summary().metadata, browserContainer: 'latest' } })), /browser container/);
@@ -88,7 +92,11 @@ test('rejects stale head, wrong worker count, direct-preview mode and wrong brow
 
 test('rejects missing, stale or mismatched immutable publication readiness', () => {
   assert.throws(() => validate(summary(), { publicationReadiness: null }), /publication readiness/);
-  assert.throws(() => validate(summary(), { planDigest: `sha256:${'f'.repeat(64)}` }), /verification plan/);
+  const otherPlanDigest = `sha256:${'f'.repeat(64)}`;
+  assert.throws(() => validate(summary(), {
+    planDigest: otherPlanDigest,
+    publicationReadiness: publicationReadiness({ planDigest: otherPlanDigest }),
+  }), /verification plan/);
   assert.throws(() => validate(summary(), { publicationReadiness: publicationReadiness({ candidateSha: 'e'.repeat(40) }) }), /publication readiness candidate/);
   assert.throws(() => validate(summary(), { publicationReadiness: publicationReadiness({ planDigest: `sha256:${'f'.repeat(64)}` }) }), /publication readiness plan/);
   assert.throws(() => validate(summary(), { publicationReadiness: publicationReadiness({ browserImage: 'latest' }) }), /publication readiness browser/);
