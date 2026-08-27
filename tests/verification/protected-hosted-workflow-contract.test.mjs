@@ -50,8 +50,9 @@ test('hosted executor consumes a published protected plan under read-only GitHub
   assert.doesNotMatch(executor, /pull_request_target:|atlas-local-e2e|192\.168\.|molehill|synology|secrets:/i);
 });
 
-test('candidate browser execution has no host IPC or egress path', () => {
-  assert.match(compose, /internal:\s*true/);
+test('candidate browser execution and hosted publication share one internal default network with no host IPC', () => {
+  assert.match(compose, /networks:\n\s+default:\n\s+internal:\s*true/);
+  assert.doesNotMatch(compose, /atlas-e2e-internal/);
   assert.match(compose, /--test-list=\/run\/atlas-protected-test-list\.txt/);
   assert.match(compose, /--retries=0/);
   assert.doesNotMatch(compose, /ipc:\s*host|network_mode:\s*host/);
