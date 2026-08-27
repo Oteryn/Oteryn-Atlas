@@ -14,7 +14,7 @@ const SANDBOX_POLICY_ID = 'atlas-candidate-census-sandbox-v1';
 const PROTECTED_HOSTED_WORKER_POLICY = Object.freeze({
   id: 'atlas-protected-hosted-workers-v1',
   version: 1,
-  hostedShards: 2,
+  hostedShards: 1,
   workersPerShard: 1,
 });
 const SHA = /^[a-f0-9]{40}$/;
