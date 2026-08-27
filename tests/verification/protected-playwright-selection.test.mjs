@@ -61,10 +61,8 @@ test('selection rejects duplicate stable IDs in either source Playwright list', 
 test('selection never admits specialist IDs into either hosted test list', () => {
   const value = execution();
   value.specialist = { groupIds: ['fullworld.animation-census'], stableTestIds: [desktopA] };
-  const protectedResult = buildProtectedPlaywrightSelection(list, value, { placement: 'protected' });
-  const additionsResult = buildProtectedPlaywrightSelection(list, value, { placement: 'candidate-additions' });
-  assert.deepEqual(protectedResult.stableTestIds, [desktopA, mobileA].sort());
-  assert.deepEqual(additionsResult.stableTestIds, [desktopB]);
+  assert.throws(() => buildProtectedPlaywrightSelection(list, value, { placement: 'protected' }), /placement overlap/i);
+  assert.throws(() => buildProtectedPlaywrightSelection(list, value, { placement: 'candidate-additions' }), /placement overlap/i);
 });
 
 test('unknown selection placement fails closed', () => {
