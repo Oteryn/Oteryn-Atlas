@@ -56,7 +56,7 @@ test('desktop coordinate replace-state, reload and browser history remain cohere
   const second = new URL(page.url());
   second.searchParams.set('x', '32390');
   second.searchParams.set('y', '32260');
-  await page.goto(second.href, { waitUntil: 'domcontentloaded' });
+  await gotoAtlas(page, second.href);
   await waitForAtlas(page);
   expect(new URL(page.url()).searchParams.get('x')).toBe('32390');
 
