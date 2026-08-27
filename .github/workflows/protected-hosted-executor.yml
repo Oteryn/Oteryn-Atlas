@@ -130,8 +130,6 @@ jobs:
         include:
           - shard: 1
             index: 0
-          - shard: 2
-            index: 1
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
@@ -141,7 +139,7 @@ jobs:
       PR_NUMBER: ${{ needs.preflight.outputs.pr_number }}
       BUNDLE_NAME: ${{ needs.preflight.outputs.bundle_name }}
       ATLAS_E2E_WORKERS: '1'
-      ATLAS_E2E_SHARD: ${{ matrix.shard }}/2
+      ATLAS_E2E_SHARD: ${{ matrix.shard }}/1
     steps:
       - name: Download protected execution contract
         shell: bash
@@ -310,7 +308,7 @@ jobs:
           export ATLAS_EXECUTION_CONTEXT="$protected_context"
           export ATLAS_PROTECTED_TEST_LIST="$PWD/artifacts/controller/protected-playwright-test-list.txt"
           export ATLAS_E2E_ARTIFACTS_HOST="$protected_artifacts"
-          export ATLAS_E2E_SHARD="${{ matrix.shard }}/2"
+          export ATLAS_E2E_SHARD="${{ matrix.shard }}/1"
           docker compose \
             -f protected-control/e2e/compose.protected-hosted-executor.yml \
             -f protected-control/e2e/compose.github-hosted.yml \
@@ -346,7 +344,7 @@ jobs:
             --execution artifacts/controller/protected-hosted-execution.json
             --summary artifacts/hosted-shard-${{ matrix.shard }}/protected/summary.json
             --shard-index ${{ matrix.index }}
-            --shard-count 2
+            --shard-count 1
           )
           addition_count="$(jq '.hosted.candidateAdditionalStableTestIds | length' artifacts/controller/protected-hosted-execution.json)"
           if [[ "${{ matrix.index }}" == "0" ]] && (( addition_count > 0 )); then
@@ -384,7 +382,7 @@ jobs:
           mkdir -p artifacts/controller artifacts/shards
           gh run download "$GITHUB_RUN_ID" --name "$BUNDLE_NAME" --dir artifacts/controller
           gh run download "$GITHUB_RUN_ID" --pattern 'protected-hosted-shard-*' --dir artifacts/shards
-          test "$(find artifacts/shards -name protected-shard-summary.json -type f | wc -l)" -eq 2
+          test "$(find artifacts/shards -name protected-shard-summary.json -type f | wc -l)" -eq 1
 
       - name: Check out exact protected controller source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
