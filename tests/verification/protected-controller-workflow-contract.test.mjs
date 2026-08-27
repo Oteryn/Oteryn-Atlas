@@ -20,6 +20,8 @@ test('protected controller treats candidate as data and cross-checks GitHub chan
   assert.match(workflow, /GitHub changed-file evidence does not match protected merge-base diff/);
   assert.match(workflow, /git show "\$ATLAS_PROTECTED_BASE_SHA:tools\/verification\/impact-manifest\.json"/);
   assert.match(workflow, /git show "\$ATLAS_CANDIDATE_HEAD_SHA:tools\/verification\/verification-catalog\.json"/);
+  assert.match(workflow, /git show "\$ATLAS_PROTECTED_BASE_SHA:tools\/verification\/protected-hosted-product-identities\.json"/);
+  assert.doesNotMatch(workflow, /git show "\$ATLAS_CANDIDATE_HEAD_SHA:tools\/verification\/protected-hosted-product-identities\.json"/);
   assert.match(workflow, /protected-hosted-plan\.mjs/);
 });
 
@@ -33,4 +35,5 @@ test('protected controller binds protected and candidate censuses and rejects st
   assert.match(workflow, /no-new-privileges/);
   assert.match(workflow, /assert-current-pr-head\.mjs/);
   assert.match(workflow, /protected-verification-plan/);
+  assert.match(workflow, /product-identities\.json/);
 });
