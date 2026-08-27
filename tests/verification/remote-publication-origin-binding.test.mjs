@@ -70,13 +70,29 @@ test('remote readiness binds the immutable serving origin to both readiness and 
   }
 });
 
-test('remote readiness rejects missing, non-HTTPS, non-content-addressed, or identity-mismatched origins', () => {
+test('origin identity does not assume a provider-specific digest-in-path layout', () => {
+  const f = fixture();
+  try {
+    const providerOrigin = 'https://immutable-publication.example.invalid/releases/fullworld-v2';
+    const manifest = structuredClone(f.manifest);
+    manifest.publication.origin = providerOrigin;
+    rewrite(f.manifestPath, manifest);
+    rewrite(f.publicationIdentityPath, { rootContentId: ROOT, origin: providerOrigin });
+    const result = validateRemoteReadinessMetadata(options(f));
+    assert.equal(result.publicationOrigin, providerOrigin);
+  } finally {
+    fs.rmSync(f.temp, { recursive: true, force: true });
+  }
+});
+
+test('remote readiness rejects missing, non-HTTPS, credentialed, or identity-mismatched origins', () => {
   const f = fixture();
   try {
     for (const mutate of [
       (m) => { delete m.publication.origin; },
       (m) => { m.publication.origin = `http://publication.example.invalid/atlas/${ROOT.slice(7)}`; },
-      (m) => { m.publication.origin = 'https://publication.example.invalid/atlas/latest'; },
+      (m) => { m.publication.origin = `https://user:secret@publication.example.invalid/atlas/${ROOT.slice(7)}`; },
+      (m) => { m.publication.origin = `https://publication.example.invalid/atlas/${ROOT.slice(7)}?mutable=1`; },
     ]) {
       const candidate = structuredClone(f.manifest);
       mutate(candidate);
