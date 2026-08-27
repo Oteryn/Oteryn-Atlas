@@ -103,7 +103,7 @@ test('hosted benchmark schema fails closed on missing metrics and invalid observ
   assert.throws(() => validateHostedBenchmarkEvidence(wrongUnit), /unit/i);
 });
 
-test('hosted benchmark schema rejects identity drift, retries and policy mutation', async () => {
+test('hosted benchmark schema rejects identity drift, workflow reruns, retries and policy mutation', async () => {
   const { validateHostedBenchmarkEvidence } = await loadValidator();
 
   const badSha = makeEvidence();
@@ -113,6 +113,10 @@ test('hosted benchmark schema rejects identity drift, retries and policy mutatio
   const badDigest = makeEvidence();
   badDigest.identity.planDigest = 'sha256:1234';
   assert.throws(() => validateHostedBenchmarkEvidence(badDigest), /planDigest/i);
+
+  const rerun = makeEvidence();
+  rerun.identity.workflowRunAttempt = 2;
+  assert.throws(() => validateHostedBenchmarkEvidence(rerun), /workflowRunAttempt.*1/i);
 
   const retry = makeEvidence();
   retry.retryPolicy.retries = 1;
@@ -125,6 +129,47 @@ test('hosted benchmark schema rejects identity drift, retries and policy mutatio
   const mutated = makeEvidence();
   mutated.measurementOnly = false;
   assert.throws(() => validateHostedBenchmarkEvidence(mutated), /measurementOnly/i);
+});
+
+test('successful hosted benchmark evidence requires measured and plausible runner resource telemetry', async () => {
+  const { validateHostedBenchmarkEvidence } = await loadValidator();
+
+  const missingPeakCpu = makeEvidence();
+  missingPeakCpu.metrics.peakCpuPercent = {
+    status: 'NOT_APPLICABLE',
+    value: null,
+    unit: 'percent',
+    source: 'synthetic:telemetry-unavailable',
+  };
+  assert.throws(() => validateHostedBenchmarkEvidence(missingPeakCpu), /peakCpuPercent.*MEASURED/i);
+
+  const invalidCpuCount = makeEvidence();
+  invalidCpuCount.metrics.runnerLogicalCpuCount.value = 0;
+  assert.throws(() => validateHostedBenchmarkEvidence(invalidCpuCount), /runnerLogicalCpuCount.*positive integer/i);
+
+  const invalidPeakCpu = makeEvidence();
+  invalidPeakCpu.metrics.peakCpuPercent.value = 101;
+  assert.throws(() => validateHostedBenchmarkEvidence(invalidPeakCpu), /peakCpuPercent.*0.*100/i);
+
+  const invalidPeakMemory = makeEvidence();
+  invalidPeakMemory.metrics.runnerMemoryTotalBytes.value = 1024;
+  invalidPeakMemory.metrics.peakMemoryBytes.value = 2048;
+  assert.throws(() => validateHostedBenchmarkEvidence(invalidPeakMemory), /peakMemoryBytes.*runnerMemoryTotalBytes/i);
+});
+
+test('failed hosted benchmark evidence can preserve unreached resource telemetry explicitly', async () => {
+  const { validateHostedBenchmarkEvidence } = await loadValidator();
+  const evidence = makeEvidence();
+  evidence.outcome = { conclusion: 'failure', failureClass: 'INFRASTRUCTURE' };
+  for (const metricId of contract.requiredSuccessMeasuredMetricIds) {
+    evidence.metrics[metricId] = {
+      status: 'NOT_APPLICABLE',
+      value: null,
+      unit: contract.metricUnits[metricId],
+      source: 'synthetic:run-failed-before-resource-sampling',
+    };
+  }
+  assert.equal(validateHostedBenchmarkEvidence(evidence), evidence);
 });
 
 test('hosted benchmark schema cannot claim authoritative post-Phase-D evidence without protected merged Phase D identity', async () => {
