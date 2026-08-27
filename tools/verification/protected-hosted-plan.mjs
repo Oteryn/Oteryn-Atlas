@@ -11,6 +11,12 @@ import {
 
 const CONTROLLER = Object.freeze({ id: 'atlas-protected-hosted-controller-v2', version: 2 });
 const SANDBOX_POLICY_ID = 'atlas-candidate-census-sandbox-v1';
+const PROTECTED_HOSTED_WORKER_POLICY = Object.freeze({
+  id: 'atlas-protected-hosted-workers-v1',
+  version: 1,
+  hostedShards: 2,
+  workersPerShard: 1,
+});
 const SHA = /^[a-f0-9]{40}$/;
 const SHA256 = /^sha256:[a-f0-9]{64}$/;
 const DATA_CAPABILITIES = new Set(['qualification_fixture', 'bounded_real_world', 'real_fullworld']);
@@ -157,11 +163,12 @@ export function buildProtectedHostedPlan(input) {
   const candidateVerificationCatalogDigest = digest(candidateCatalog);
   const stableIdAlgorithmDigest = digest(stableIdAlgorithm);
   const productIdentitiesDigest = digest(productIdentities);
+  const workerPolicyDigest = digest(PROTECTED_HOSTED_WORKER_POLICY);
   const executionPolicy = {
     controllerId: CONTROLLER.id,
     retries: 0,
     selectiveExecution: false,
-    workerPolicyDigest: basePlan.workerPolicyDigest,
+    workerPolicyDigest,
     requiredGroupIds: basePlan.requiredGroupIds,
     requiredDataCapabilities: basePlan.requiredDataCapabilities,
     requiresRealFullWorld: basePlan.requiresRealFullWorld,
@@ -204,8 +211,9 @@ export function buildProtectedHostedPlan(input) {
     requiresRealFullWorld: basePlan.requiresRealFullWorld,
     productIdentities,
     productIdentitiesDigest,
-    workerPolicyId: basePlan.workerPolicyId,
-    workerPolicyDigest: basePlan.workerPolicyDigest,
+    workerPolicy: PROTECTED_HOSTED_WORKER_POLICY,
+    workerPolicyId: PROTECTED_HOSTED_WORKER_POLICY.id,
+    workerPolicyDigest,
     retryPolicy: { retries: 0 },
     requiredEvidence: basePlan.requiredEvidence,
     requiresNativeHardware: basePlan.requiresNativeHardware,
@@ -224,3 +232,5 @@ export const protectedCandidateCensusSandboxPolicy = Object.freeze({
   secrets: false,
   lan: false,
 });
+
+export const protectedHostedWorkerPolicy = PROTECTED_HOSTED_WORKER_POLICY;
