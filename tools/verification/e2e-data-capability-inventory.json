@@ -20,8 +20,8 @@
     },
     {
       "spec": "e2e/tests/api-contract-desktop.spec.mjs",
-      "dataCapability": "qualification_fixture",
-      "rationale": "Semantic API and browser rendering contracts require representative immutable published records, not a complete real-world census.",
+      "dataCapability": "bounded_real_world",
+      "rationale": "The current semantic API diagnostics and published-record search assertions exercise real published record compatibility, but no complete-world census or scale property.",
       "splitRequired": false
     },
     {
@@ -38,8 +38,8 @@
     },
     {
       "spec": "e2e/tests/creature-interaction-desktop.spec.mjs",
-      "dataCapability": "qualification_fixture",
-      "rationale": "Creature cards, hit testing, stale-geometry invalidation and deep links need representative NPC and monster placements through production seams only.",
+      "dataCapability": "bounded_real_world",
+      "rationale": "Most interaction cases are fixture-sufficient, but the current fixed monster overlap/card assertion depends on a bounded real published placement; complete-world coverage is unnecessary.",
       "splitRequired": false
     },
     {
@@ -50,20 +50,20 @@
     },
     {
       "spec": "e2e/tests/creature-presentation-desktop.spec.mjs",
-      "dataCapability": "qualification_fixture",
-      "rationale": "Desktop creature layout, roles, overlap, LOD and animation lifetime oracles need deterministic representative placements and presentation data only.",
+      "dataCapability": "bounded_real_world",
+      "rationale": "Current presentation oracles assert factual mixed-scene roles, dense names, LOD and lifecycle behavior against bounded real placements, without a whole-product claim.",
       "splitRequired": false
     },
     {
       "spec": "e2e/tests/creature-presentation-mobile.spec.mjs",
-      "dataCapability": "qualification_fixture",
-      "rationale": "Mobile creature badges and representation transitions are layout and DPR oracles that a deterministic representative fixture can prove.",
+      "dataCapability": "bounded_real_world",
+      "rationale": "Current mobile presentation assertions use factual bounded real badges and detail/minimap labels; their oracle does not require complete FullWorld bytes.",
       "splitRequired": false
     },
     {
       "spec": "e2e/tests/creatures-desktop.spec.mjs",
-      "dataCapability": "qualification_fixture",
-      "rationale": "Creature filtering, search, overlay repaint and controls require representative immutable creature records, not a complete real-world corpus.",
+      "dataCapability": "bounded_real_world",
+      "rationale": "Controls and repaint are fixture-sufficient, while the current Sam search/deep-link case asserts bounded real publication integration; no complete corpus is required.",
       "splitRequired": false
     },
     {
@@ -74,20 +74,20 @@
     },
     {
       "spec": "e2e/tests/desktop.spec.mjs",
-      "dataCapability": "qualification_fixture",
-      "rationale": "Desktop smoke proves manifest qualification, authenticated range streaming and semantic navigation through real loader seams without claiming complete-world census correctness.",
+      "dataCapability": "bounded_real_world",
+      "rationale": "The current desktop smoke asserts Thais navigation and a representative verified range against real published data, but not complete-world census correctness.",
       "splitRequired": false
     },
     {
       "spec": "e2e/tests/farm-explorer-desktop.spec.mjs",
-      "dataCapability": "qualification_fixture",
-      "rationale": "Farm Explorer fail-closed facts and custom estimator behavior need representative feature data and missing-data variants, not complete FullWorld bytes.",
+      "dataCapability": "bounded_real_world",
+      "rationale": "The current Farm Explorer desktop flow is tied to the bounded real Cave Rat identity and URL facts; complete FullWorld content is not part of the oracle.",
       "splitRequired": false
     },
     {
       "spec": "e2e/tests/farm-explorer-mobile.spec.mjs",
-      "dataCapability": "qualification_fixture",
-      "rationale": "Mobile Farm Explorer reachability and truthfulness are feature-shell oracles that representative deterministic feature data can prove.",
+      "dataCapability": "bounded_real_world",
+      "rationale": "The current mobile Farm Explorer flow is tied to the bounded real Cave Rat facts, while making no complete-world identity, census or scale claim.",
       "splitRequired": false
     },
     {
@@ -110,14 +110,14 @@
     },
     {
       "spec": "e2e/tests/mobile.spec.mjs",
-      "dataCapability": "qualification_fixture",
-      "rationale": "Mobile smoke proves drawers, world loading and semantic navigation through production seams without an oracle over complete-world identity or scale.",
+      "dataCapability": "bounded_real_world",
+      "rationale": "The current mobile smoke asserts Sam semantic navigation against bounded real published data; complete-world identity or scale is not asserted.",
       "splitRequired": false
     },
     {
       "spec": "e2e/tests/performance-desktop.spec.mjs",
-      "dataCapability": "qualification_fixture",
-      "rationale": "The current normalized workload asserts structural budgets and records timing evidence; complete-world data volume is not the measured correctness oracle.",
+      "dataCapability": "bounded_real_world",
+      "rationale": "The current normalized high-density workload records structural budgets over bounded real data; it does not measure complete FullWorld volume or scale.",
       "splitRequired": false
     },
     {
@@ -146,14 +146,14 @@
     },
     {
       "spec": "e2e/tests/scale-desktop.spec.mjs",
-      "dataCapability": "qualification_fixture",
-      "rationale": "The current repeated-search scale oracle checks bounded DOM growth across a deterministic corpus; it does not claim complete FullWorld corpus scale.",
+      "dataCapability": "bounded_real_world",
+      "rationale": "The current scale oracle searches a bounded published corpus of more than fifty records with a sampled cap, rather than asserting production FullWorld scale.",
       "splitRequired": false
     },
     {
       "spec": "e2e/tests/soak-desktop.spec.mjs",
-      "dataCapability": "qualification_fixture",
-      "rationale": "The bounded interaction soak checks retained structural state across repeated actions; complete-world data volume is not part of its oracle.",
+      "dataCapability": "bounded_real_world",
+      "rationale": "The current soak uses a bounded repeated structural-growth workload over real representative data; complete FullWorld volume is not part of its oracle.",
       "splitRequired": false
     },
     {
@@ -183,19 +183,19 @@
     {
       "spec": "e2e/tests/visual-desktop.spec.mjs",
       "dataCapability": "real_fullworld",
-      "rationale": "This mixed spec contains the published creature-animation full authoritative coverage census, whose oracle requires complete product coverage; split that census from the fixture-sufficient visual and playback scenarios.",
+      "rationale": "This mixed spec contains the published creature-animation full authoritative coverage census, whose oracle requires complete product coverage; split that census from the fixture and bounded-real-world visual scenarios.",
       "splitRequired": true
     },
     {
       "spec": "e2e/tests/visual-mobile.spec.mjs",
-      "dataCapability": "qualification_fixture",
-      "rationale": "Mobile visual acceptance covers Atlas-owned chrome, drawers and user-visible layout; representative rights-safe fixture content is sufficient.",
+      "dataCapability": "bounded_real_world",
+      "rationale": "The current mobile chrome/drawer visual case uses a bounded real Thais result while its local pixel-toggle case is fixture-sufficient; no complete-world oracle exists.",
       "splitRequired": false
     },
     {
       "spec": "e2e/tests/workflows-desktop.spec.mjs",
       "dataCapability": "qualification_fixture",
-      "rationale": "Published semantic-result navigation, reload and history restoration need representative immutable semantic records, not complete-world coverage.",
+      "rationale": "Published semantic-result navigation, reload and history restoration dynamically selects an adequate record and does not depend on complete real-world coverage.",
       "splitRequired": false
     }
   ]
