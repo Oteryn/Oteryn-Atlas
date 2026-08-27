@@ -372,6 +372,11 @@ async function runDesktop(browser) {
   await waitSemanticReady(page);
   await waitReady(page, { selectedId: targets.npc.record_id });
   assertDeepLink(page, targets.npc, 'monster,npc');
+  const semanticTab = page.locator('#inspector-tab-semantic');
+  await semanticTab.waitFor({ state: 'visible', timeout: 30_000 });
+  await semanticTab.click();
+  await page.waitForFunction(() => document.querySelector('#inspector-tab-semantic')?.getAttribute('aria-selected') === 'true', null, { timeout: 30_000 });
+  assert.equal(await semanticTab.getAttribute('aria-selected'), 'true');
   const inspector = await page.locator('#creature-inspector').innerText();
   assertCreatureInspector(inspector, targets.npc, 'NPC');
 
@@ -430,6 +435,11 @@ async function runMobile(browser) {
   await page.locator('#mobile-inspector-toggle').click();
   const inspector = page.locator('#creature-inspector');
   await inspector.waitFor({ state: 'visible', timeout: 30_000 });
+  const semanticTab = page.locator('#inspector-tab-semantic');
+  await semanticTab.waitFor({ state: 'visible', timeout: 30_000 });
+  await semanticTab.click();
+  await page.waitForFunction(() => document.querySelector('#inspector-tab-semantic')?.getAttribute('aria-selected') === 'true', null, { timeout: 30_000 });
+  assert.equal(await semanticTab.getAttribute('aria-selected'), 'true');
   const text = await inspector.innerText();
   assertCreatureInspector(text, targets.monster, 'Monster / Spawn');
   await page.screenshot({ path: `${evidenceDir}/mobile-monster-only.png`, fullPage: true });
