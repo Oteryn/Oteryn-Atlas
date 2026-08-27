@@ -4,6 +4,8 @@ on:
   workflow_run:
     workflows: ["Protected Verification Controller"]
     types: [completed]
+  pull_request:
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: read
@@ -11,17 +13,21 @@ permissions:
   pull-requests: read
 
 concurrency:
-  group: atlas-protected-hosted-pr-${{ github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.head_branch }}
+  group: atlas-protected-hosted-pr-${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.head_branch }}
   cancel-in-progress: true
 
 jobs:
   preflight:
     if: >-
-      github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.event == 'pull_request_target'
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'pull_request_target') ||
+      (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main')
     runs-on: ubuntu-24.04
-    timeout-minutes: 8
+    timeout-minutes: 12
     outputs:
+      bootstrap_active: ${{ steps.controller.outputs.bootstrap_active }}
+      controller_run_id: ${{ steps.controller.outputs.controller_run_id }}
       bundle_name: ${{ steps.contract.outputs.bundle_name }}
       candidate_head_sha: ${{ steps.contract.outputs.candidate_head_sha }}
       controller_source_sha: ${{ steps.contract.outputs.controller_source_sha }}
@@ -30,10 +36,82 @@ jobs:
       specialist_count: ${{ steps.contract.outputs.specialist_count }}
     env:
       GH_TOKEN: ${{ github.token }}
-      CONTROLLER_RUN_ID: ${{ github.event.workflow_run.id }}
     steps:
-      - name: Download the unique protected-verification-plan artifact
+      - name: Resolve authoritative protected controller run
+        id: controller
         shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          WORKFLOW_RUN_ID: ${{ github.event.workflow_run.id }}
+          PROTECTED_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          BOOTSTRAP_PR_NUMBER: ${{ github.event.pull_request.number }}
+          BOOTSTRAP_CANDIDATE_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+
+          if [[ "$EVENT_NAME" == "workflow_run" ]]; then
+            [[ "$WORKFLOW_RUN_ID" =~ ^[0-9]+$ ]]
+            printf 'bootstrap_active=true\n' >> "$GITHUB_OUTPUT"
+            printf 'controller_run_id=%s\n' "$WORKFLOW_RUN_ID" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          test "$EVENT_NAME" = "pull_request"
+          [[ "$PROTECTED_BASE_SHA" =~ ^[a-f0-9]{40}$ ]]
+          [[ "$BOOTSTRAP_CANDIDATE_HEAD_SHA" =~ ^[a-f0-9]{40}$ ]]
+          [[ "$BOOTSTRAP_PR_NUMBER" =~ ^[0-9]+$ ]]
+
+          set +e
+          base_probe="$(gh api "repos/$GITHUB_REPOSITORY/contents/.github/workflows/protected-hosted-executor.yml?ref=$PROTECTED_BASE_SHA" 2>&1)"
+          base_probe_rc=$?
+          set -e
+          if (( base_probe_rc == 0 )); then
+            printf 'bootstrap_active=false\n' >> "$GITHUB_OUTPUT"
+            printf 'controller_run_id=\n' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if ! grep -Eq 'HTTP 404|Not Found' <<<"$base_probe"; then
+            printf '%s\n' "$base_probe" >&2
+            echo 'Protected-base executor probe failed with a non-404 response.' >&2
+            exit 1
+          fi
+
+          controller_run_id=''
+          runs_json="$RUNNER_TEMP/protected-controller-runs.json"
+          for attempt in {1..30}; do
+            gh api "repos/$GITHUB_REPOSITORY/actions/workflows/protected-verification-controller.yml/runs?event=pull_request_target&per_page=100" > "$runs_json"
+            controller_run_id="$(node --input-type=module - "$runs_json" "$BOOTSTRAP_PR_NUMBER" "$BOOTSTRAP_CANDIDATE_HEAD_SHA" "$PROTECTED_BASE_SHA" <<'NODE'
+          import fs from 'node:fs';
+          const [runsPath, prValue, candidateHeadSha, protectedBaseSha] = process.argv.slice(2);
+          const prNumber = Number(prValue);
+          const payload = JSON.parse(fs.readFileSync(runsPath, 'utf8'));
+          const matches = (payload.workflow_runs ?? [])
+            .filter((run) => run.event === 'pull_request_target'
+              && run.status === 'completed'
+              && run.conclusion === 'success'
+              && run.head_sha === candidateHeadSha
+              && (run.pull_requests ?? []).some((pr) => Number(pr.number) === prNumber
+                && pr.base?.sha === protectedBaseSha))
+            .sort((a, b) => Number(b.id) - Number(a.id));
+          if (matches.length > 0) process.stdout.write(String(matches[0].id));
+          NODE
+            )"
+            if [[ -n "$controller_run_id" ]]; then
+              break
+            fi
+            if (( attempt < 30 )); then
+              sleep 10
+            fi
+          done
+          [[ "$controller_run_id" =~ ^[0-9]+$ ]]
+          printf 'bootstrap_active=true\n' >> "$GITHUB_OUTPUT"
+          printf 'controller_run_id=%s\n' "$controller_run_id" >> "$GITHUB_OUTPUT"
+
+      - name: Download the unique protected-verification-plan artifact
+        if: steps.controller.outputs.bootstrap_active == 'true'
+        shell: bash
+        env:
+          CONTROLLER_RUN_ID: ${{ steps.controller.outputs.controller_run_id }}
         run: |
           set -euo pipefail
           mkdir -p artifacts/controller
@@ -44,6 +122,7 @@ jobs:
           test -s artifacts/controller/protected-verification-plan.json
 
       - name: Resolve protected controller and candidate identities
+        if: steps.controller.outputs.bootstrap_active == 'true'
         id: identity
         shell: bash
         run: |
@@ -64,6 +143,7 @@ jobs:
           NODE
 
       - name: Check out exact protected controller source
+        if: steps.controller.outputs.bootstrap_active == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ steps.identity.outputs.controller_source_sha }}
@@ -72,6 +152,7 @@ jobs:
           path: protected-control
 
       - name: Reject superseded head before expensive execution
+        if: steps.controller.outputs.bootstrap_active == 'true'
         shell: bash
         env:
           PR_NUMBER: ${{ steps.identity.outputs.pr_number }}
@@ -86,6 +167,7 @@ jobs:
             --expected-head-sha "$CANDIDATE_HEAD_SHA"
 
       - name: Derive immutable hosted execution contract from protected plan
+        if: steps.controller.outputs.bootstrap_active == 'true'
         id: contract
         shell: bash
         env:
@@ -110,6 +192,7 @@ jobs:
           NODE
 
       - name: Publish protected execution contract
+        if: steps.controller.outputs.bootstrap_active == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ${{ steps.contract.outputs.bundle_name }}
@@ -122,7 +205,7 @@ jobs:
           retention-days: 14
 
   hosted-shards:
-    if: needs.preflight.outputs.hosted_count != '0'
+    if: needs.preflight.outputs.bootstrap_active == 'true' && needs.preflight.outputs.hosted_count != '0'
     needs: [preflight]
     strategy:
       fail-fast: false
@@ -136,6 +219,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       CANDIDATE_HEAD_SHA: ${{ needs.preflight.outputs.candidate_head_sha }}
       CONTROLLER_SOURCE_SHA: ${{ needs.preflight.outputs.controller_source_sha }}
+      CONTROLLER_RUN_ID: ${{ needs.preflight.outputs.controller_run_id }}
       PR_NUMBER: ${{ needs.preflight.outputs.pr_number }}
       BUNDLE_NAME: ${{ needs.preflight.outputs.bundle_name }}
       ATLAS_E2E_WORKERS: '1'
@@ -357,13 +441,13 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: protected-hosted-shard-${{ github.event.workflow_run.id }}-${{ matrix.shard }}
+          name: protected-hosted-shard-${{ needs.preflight.outputs.controller_run_id }}-${{ matrix.shard }}
           path: artifacts/hosted-shard-${{ matrix.shard }}/protected-shard-summary.json
           if-no-files-found: error
           retention-days: 14
 
   fan-in:
-    if: always() && needs.preflight.result == 'success' && needs.preflight.outputs.hosted_count != '0'
+    if: always() && needs.preflight.result == 'success' && needs.preflight.outputs.bootstrap_active == 'true' && needs.preflight.outputs.hosted_count != '0'
     needs: [preflight, hosted-shards]
     runs-on: ubuntu-24.04
     timeout-minutes: 8
@@ -371,6 +455,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       CANDIDATE_HEAD_SHA: ${{ needs.preflight.outputs.candidate_head_sha }}
       CONTROLLER_SOURCE_SHA: ${{ needs.preflight.outputs.controller_source_sha }}
+      CONTROLLER_RUN_ID: ${{ needs.preflight.outputs.controller_run_id }}
       PR_NUMBER: ${{ needs.preflight.outputs.pr_number }}
       BUNDLE_NAME: ${{ needs.preflight.outputs.bundle_name }}
     steps:
@@ -439,7 +524,7 @@ jobs:
       - name: Publish protected hosted fan-in evidence
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: protected-hosted-fan-in-${{ github.event.workflow_run.id }}-${{ needs.preflight.outputs.candidate_head_sha }}
+          name: protected-hosted-fan-in-${{ needs.preflight.outputs.controller_run_id }}-${{ needs.preflight.outputs.candidate_head_sha }}
           path: artifacts/controller/protected-hosted-fan-in.json
           if-no-files-found: error
           retention-days: 14
