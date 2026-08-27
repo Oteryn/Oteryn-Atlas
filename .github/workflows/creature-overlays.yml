@@ -66,8 +66,10 @@ jobs:
           node --check src/browser/creature-presentation-lod.mjs
           node --check src/browser/creature-presentation-runtime.mjs
           node --check src/browser/creature-render-diagnostics.mjs
+          node --check src/browser/creature-publication-source.mjs
           node --check web/fullworld-creatures.mjs
           node --test tests/npc-markers.mjs tests/npc-badge-primitives.mjs tests/creature-presentation-layout.mjs tests/creature-presentation-lod.mjs tests/creature-presentation-runtime.mjs tests/creature-presentation-controller.mjs
+          node --test tests/verification/qualification-creature-browser-wiring.test.mjs tests/verification/qualification-creature-source-trust.test.mjs
 
       - name: Run deterministic creature-index fixture
         shell: bash
@@ -155,10 +157,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          grep -q "EXPECTED_SEMANTIC_DIGEST = 'sha256:7dc951874c95424279737eaaf51cf2d50940162ef4799daea39a187a581ef0e8'" web/fullworld-creatures.mjs
-          grep -q "EXPECTED_CAPABILITY = 'animated-creatures-v1'" web/fullworld-creatures.mjs
+          grep -Fq 'ancillarySourceExpectations(FULLWORLD_TRUST)' web/fullworld-creatures.mjs
+          grep -Fq 'validateCreaturePublicationSource(index.source, state.animationRuntime.manifest.source, ancillarySources.creatures)' web/fullworld-creatures.mjs
           grep -q 'getAnimationRuntime' web/fullworld-creatures.mjs
-          grep -q "EXPECTED_NPC_ROLE_SCHEMA = 1" web/fullworld-creatures.mjs
           grep -q "NPC_BADGE_STYLE = 'functional-icons-v2'" src/browser/npc-badge-primitives.mjs
           grep -q 'createCreaturePresentationController' web/fullworld-creatures.mjs
           grep -q "id=\"npc-role-filter\"" web/fullworld-creatures.mjs
