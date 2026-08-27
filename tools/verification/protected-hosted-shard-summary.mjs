@@ -73,47 +73,77 @@ function validateExecution(execution, plan) {
     throw new TypeError('protected shard execution must bind zero retries and disabled selective execution');
   }
   const hosted = stableIds(execution.hosted?.stableTestIds, 'hosted stable IDs', { allowEmpty: true });
+  const protectedHosted = stableIds(execution.hosted?.protectedStableTestIds, 'protected hosted stable IDs', { allowEmpty: true });
+  const candidateAdditions = stableIds(execution.hosted?.candidateAdditionalStableTestIds, 'candidate-addition hosted stable IDs', { allowEmpty: true });
   const specialist = stableIds(execution.specialist?.stableTestIds, 'specialist stable IDs', { allowEmpty: true });
   const specialistSet = new Set(specialist);
   if (hosted.some((id) => specialistSet.has(id))) throw new TypeError('hosted and specialist stable-ID placement overlaps');
-  return { hosted, specialist, hostedExpectedStableTestIdsDigest };
+  const partition = [...new Set([...protectedHosted, ...candidateAdditions])].sort();
+  if (partition.length !== hosted.length || partition.some((id, index) => id !== hosted[index])) {
+    throw new TypeError('protected shard hosted source placement must exactly partition hosted stable IDs');
+  }
+  if (protectedHosted.some((id) => candidateAdditions.includes(id))) {
+    throw new TypeError('protected shard hosted source placement overlaps');
+  }
+  return { hosted, protectedHosted, candidateAdditions, specialist, hostedExpectedStableTestIdsDigest };
 }
 
-export function buildProtectedHostedShardSummary({ plan, execution, summary, shardIndex, shardCount }) {
-  const protectedPlan = validatePlan(plan);
-  const { hosted, hostedExpectedStableTestIdsDigest } = validateExecution(execution, protectedPlan);
-  if (!Number.isSafeInteger(shardCount) || shardCount !== protectedPlan.workerPolicy.hostedShards
-    || !Number.isSafeInteger(shardIndex) || shardIndex < 0 || shardIndex >= shardCount) {
-    throw new TypeError('protected shard count/index does not match worker policy');
+function normalizeSummaries(summary, summaries) {
+  if (summary != null && summaries != null) throw new TypeError('protected shard evidence accepts summary or summaries, not both');
+  const values = summaries ?? (summary == null ? null : [summary]);
+  if (!Array.isArray(values) || values.length === 0 || values.length > 2) {
+    throw new TypeError('protected shard evidence requires one or two source summaries');
   }
-  if (!summary || typeof summary !== 'object' || Array.isArray(summary)) throw new TypeError('protected shard summary must be an object');
-  if (summary.status !== 'passed') throw new TypeError('protected shard summary status must be passed');
-  if (summary.cancelled === true) throw new TypeError('cancelled protected shard evidence is forbidden');
-  const metadata = summary.metadata;
-  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) throw new TypeError('protected shard metadata is required');
-  same(metadata.targetMode, 'checkout-overlay', 'target mode');
-  same(exactSha(metadata.expectedRevision, 'summary expected revision'), protectedPlan.candidateHeadSha, 'revision');
-  same(exactDigest(metadata.verificationPlanSha256, 'summary verification plan digest'), protectedPlan.planDigest, 'plan digest');
-  same(metadata.browserContainer, BROWSER_CONTAINER, 'browser container');
-  same(metadata.workers, protectedPlan.workerPolicy.workersPerShard, 'worker count');
-  if (!Array.isArray(summary.scenarios)) throw new TypeError('protected shard scenarios must be an array');
+  return values;
+}
 
-  const hostedSet = new Set(hosted);
-  const executed = [];
-  const seen = new Set();
+function validateRawSummary(summary, protectedPlan, allowedStableIds, sourceLabel, seen, executed) {
+  if (!summary || typeof summary !== 'object' || Array.isArray(summary)) throw new TypeError(`protected shard ${sourceLabel} summary must be an object`);
+  if (summary.status !== 'passed') throw new TypeError(`protected shard ${sourceLabel} summary status must be passed`);
+  if (summary.cancelled === true) throw new TypeError(`cancelled protected shard ${sourceLabel} evidence is forbidden`);
+  const metadata = summary.metadata;
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) throw new TypeError(`protected shard ${sourceLabel} metadata is required`);
+  same(metadata.targetMode, 'checkout-overlay', `${sourceLabel} target mode`);
+  same(exactSha(metadata.expectedRevision, `${sourceLabel} summary expected revision`), protectedPlan.candidateHeadSha, `${sourceLabel} revision`);
+  same(exactDigest(metadata.verificationPlanSha256, `${sourceLabel} summary verification plan digest`), protectedPlan.planDigest, `${sourceLabel} plan digest`);
+  same(metadata.browserContainer, BROWSER_CONTAINER, `${sourceLabel} browser container`);
+  same(metadata.workers, protectedPlan.workerPolicy.workersPerShard, `${sourceLabel} worker count`);
+  if (!Array.isArray(summary.scenarios)) throw new TypeError(`protected shard ${sourceLabel} scenarios must be an array`);
+
+  const allowed = new Set(allowedStableIds);
   for (const scenario of summary.scenarios) {
     if (!scenario || typeof scenario !== 'object' || typeof scenario.stableTestId !== 'string' || !scenario.stableTestId.includes('::')) {
-      throw new TypeError('protected shard scenario has malformed stable ID');
+      throw new TypeError(`protected shard ${sourceLabel} scenario has malformed stable ID`);
     }
     const id = scenario.stableTestId;
-    if (seen.has(id)) throw new TypeError(`protected shard contains duplicate stable ID: ${id}`);
+    if (seen.has(id)) throw new TypeError(`protected shard contains duplicate stable ID across source summaries: ${id}`);
     seen.add(id);
-    if (!hostedSet.has(id)) throw new TypeError(`protected shard contains unexpected non-hosted stable ID: ${id}`);
+    if (!allowed.has(id)) throw new TypeError(`protected shard ${sourceLabel} contains unexpected stable ID: ${id}`);
     if (scenario.status === 'skipped' || scenario.skipReason != null) throw new TypeError(`protected shard skipped stable ID is forbidden: ${id}`);
     if (scenario.status !== 'passed') throw new TypeError(`protected shard scenario status is not passed: ${id}`);
     if (scenario.retry !== 0) throw new TypeError(`protected shard retry is forbidden: ${id}`);
     executed.push(id);
   }
+}
+
+export function buildProtectedHostedShardSummary({ plan, execution, summary, summaries, shardIndex, shardCount }) {
+  const protectedPlan = validatePlan(plan);
+  const { hosted, protectedHosted, candidateAdditions, hostedExpectedStableTestIdsDigest } = validateExecution(execution, protectedPlan);
+  if (!Number.isSafeInteger(shardCount) || shardCount !== protectedPlan.workerPolicy.hostedShards
+    || !Number.isSafeInteger(shardIndex) || shardIndex < 0 || shardIndex >= shardCount) {
+    throw new TypeError('protected shard count/index does not match worker policy');
+  }
+
+  const rawSummaries = normalizeSummaries(summary, summaries);
+  const executed = [];
+  const seen = new Set();
+  validateRawSummary(rawSummaries[0], protectedPlan, protectedHosted, 'protected-body', seen, executed);
+  if (rawSummaries.length === 2) {
+    if (candidateAdditions.length === 0) throw new TypeError('candidate-addition summary is forbidden when no candidate additions are planned');
+    validateRawSummary(rawSummaries[1], protectedPlan, candidateAdditions, 'candidate-additions', seen, executed);
+  }
+  const hostedSet = new Set(hosted);
+  if (executed.some((id) => !hostedSet.has(id))) throw new TypeError('protected shard source evidence escaped hosted placement');
 
   return Object.freeze({
     schemaVersion: 1,
@@ -137,12 +167,15 @@ export function buildProtectedHostedShardSummary({ plan, execution, summary, sha
 
 function parseArgs(argv) {
   const required = ['--plan', '--execution', '--summary', '--shard-index', '--shard-count'];
-  if (argv.length !== required.length * 2) throw new TypeError(`usage: protected-hosted-shard-summary.mjs ${required.join(' <value> ')}`);
+  const allowed = [...required, '--additional-summary'];
+  if (argv.length !== required.length * 2 && argv.length !== (required.length + 1) * 2) {
+    throw new TypeError('usage: protected-hosted-shard-summary.mjs --plan <plan> --execution <execution> --summary <summary> [--additional-summary <summary>] --shard-index <index> --shard-count <count>');
+  }
   const result = {};
   for (let index = 0; index < argv.length; index += 2) {
     const flag = argv[index];
     const value = argv[index + 1];
-    if (!required.includes(flag) || value == null || Object.hasOwn(result, flag)) throw new TypeError('protected shard summary CLI requires unique arguments');
+    if (!allowed.includes(flag) || value == null || Object.hasOwn(result, flag)) throw new TypeError('protected shard summary CLI requires unique arguments');
     result[flag] = value;
   }
   if (required.some((flag) => !Object.hasOwn(result, flag))) throw new TypeError('protected shard summary CLI is incomplete');
@@ -157,10 +190,12 @@ function readJson(pathname, label) {
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   try {
     const args = parseArgs(process.argv.slice(2));
+    const rawSummaries = [readJson(args['--summary'], 'protected-body summary')];
+    if (args['--additional-summary']) rawSummaries.push(readJson(args['--additional-summary'], 'candidate-additions summary'));
     const result = buildProtectedHostedShardSummary({
       plan: readJson(args['--plan'], 'plan'),
       execution: readJson(args['--execution'], 'execution'),
-      summary: readJson(args['--summary'], 'summary'),
+      summaries: rawSummaries,
       shardIndex: Number(args['--shard-index']),
       shardCount: Number(args['--shard-count']),
     });
