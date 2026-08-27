@@ -18,7 +18,7 @@ test('qualification world is deterministic, complete for the 16-floor runtime co
   assert.equal(first.semanticFloorCount, 16);
   assert.equal(first.runtimeFloorCount, 16);
   assert.equal(first.dataCapability, 'qualification_fixture');
-  for (const field of ['publicationRoot', 'semanticRoot', 'runtimeIndexRoot', 'pixelRoot', 'pixelBucketRoot', 'overviewRoot', 'productDigest']) {
+  for (const field of ['publicationRoot', 'semanticRoot', 'runtimeIndexRoot', 'pixelRoot', 'pixelBucketRoot', 'overviewRoot', 'minimapRoot', 'productDigest']) {
     assert.match(first[field], /^sha256:[a-f0-9]{64}$/, `${field} must be content-addressed`);
   }
   assert.deepEqual(await verifyQualificationWorld(left), first);

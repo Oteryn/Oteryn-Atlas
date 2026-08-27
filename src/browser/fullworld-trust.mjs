@@ -1,4 +1,4 @@
-export const FULLWORLD_TRUST = Object.freeze({
+export const PRODUCTION_FULLWORLD_TRUST = Object.freeze({
   gameSha: 'f79fd3b5c239fa13810338f1380539c4eac67d7d',
   publicationRoot: 'sha256:9d0d2f3bb16a5a90f9b51a21366e4ed42963f5cb12366c404a20d9502ec4857f',
   semanticRoot: 'sha256:27d7a83a7d9f498ea614b440ab4216cae5e6d11ea0527482410e40948cade5a9',
@@ -9,6 +9,39 @@ export const FULLWORLD_TRUST = Object.freeze({
   pixelBucketRoot: 'sha256:99cf23b01a0d652ff670a994a2b80cbef8d17036f514522d47f1aa98352d3116',
   sourceFingerprint: 'sha256:52613c4b755bee1ca32608b1b860413c3a9184870ca61114fad5a7670e80aee9',
 });
+
+const QUALIFICATION_FIXTURE_ID = 'atlas-qualification-world-v2';
+const CONTENT_ID = /^sha256:[0-9a-f]{64}$/;
+const QUALIFICATION_ROOT_FIELDS = Object.freeze([
+  'publicationRoot', 'semanticRoot', 'pixelRoot', 'overviewRoot', 'minimapRoot',
+  'runtimeIndexRoot', 'pixelBucketRoot', 'sourceFingerprint', 'productDigest',
+]);
+
+export function resolveFullWorldTrust(candidate = undefined) {
+  if (candidate == null) return PRODUCTION_FULLWORLD_TRUST;
+  if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)
+    || candidate.fixtureId !== QUALIFICATION_FIXTURE_ID
+    || candidate.dataCapability !== 'qualification_fixture') {
+    throw new TypeError('qualification trust requires the exact qualification fixture identity');
+  }
+  for (const field of QUALIFICATION_ROOT_FIELDS) {
+    if (!CONTENT_ID.test(candidate[field])) throw new TypeError(`qualification trust ${field} must be content-addressed`);
+  }
+  return Object.freeze({
+    gameSha: 'fixture',
+    publicationRoot: candidate.publicationRoot,
+    semanticRoot: candidate.semanticRoot,
+    pixelRoot: candidate.pixelRoot,
+    overviewRoot: candidate.overviewRoot,
+    minimapRoot: candidate.minimapRoot,
+    runtimeIndexRoot: candidate.runtimeIndexRoot,
+    pixelBucketRoot: candidate.pixelBucketRoot,
+    sourceFingerprint: candidate.sourceFingerprint,
+    qualificationProductDigest: candidate.productDigest,
+  });
+}
+
+export const FULLWORLD_TRUST = resolveFullWorldTrust(globalThis.__OTERYN_ATLAS_QUALIFICATION_TRUST__);
 
 export const FULLWORLD_PATHS = Object.freeze({
   animation: '/fullworld/animation/',
