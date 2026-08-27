@@ -11,6 +11,7 @@ const PLAN = `sha256:${'2'.repeat(64)}`;
 const ROOT = `sha256:${'3'.repeat(64)}`;
 const TREE = `sha256:${'4'.repeat(64)}`;
 const IMAGE = `mcr.microsoft.com/playwright@sha256:${'5'.repeat(64)}`;
+const ORIGIN = `https://publication.example.invalid/atlas/${ROOT.slice(7)}`;
 
 function fixture() {
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-remote-publication-readiness-'));
@@ -24,6 +25,7 @@ function fixture() {
     planDigest: PLAN,
     producer: { runId: '12345', runAttempt: 2 },
     publication: {
+      origin: ORIGIN,
       rootContentId: ROOT,
       inventoryAlgorithm: 'atlas-publication-tree-v1',
       treeDigest: TREE,
@@ -35,7 +37,7 @@ function fixture() {
     createdAt: '2026-08-27T05:00:00.000Z',
   };
   fs.writeFileSync(manifestPath, `${JSON.stringify(manifest)}\n`);
-  fs.writeFileSync(publicationIdentityPath, `${JSON.stringify({ rootContentId: ROOT })}\n`);
+  fs.writeFileSync(publicationIdentityPath, `${JSON.stringify({ rootContentId: ROOT, origin: ORIGIN })}\n`);
   return { temp, manifestPath, publicationIdentityPath, manifest };
 }
 
@@ -65,6 +67,7 @@ test('remote consumer accepts only exact producer readiness metadata and publica
     assert.equal(result.complete, true);
     assert.equal(result.candidateSha, SHA);
     assert.equal(result.planDigest, PLAN);
+    assert.equal(result.publicationOrigin, ORIGIN);
     assert.equal(result.publicationRoot, ROOT);
     assert.equal(result.treeDigest, TREE);
     assert.equal(result.fileCount, 321);
@@ -106,7 +109,7 @@ test('remote consumer rejects incomplete, stale, or mismatched readiness metadat
 test('remote consumer rejects publication identity bytes that disagree with readiness', () => {
   const f = fixture();
   try {
-    rewrite(f.publicationIdentityPath, { rootContentId: `sha256:${'9'.repeat(64)}` });
+    rewrite(f.publicationIdentityPath, { rootContentId: `sha256:${'9'.repeat(64)}`, origin: ORIGIN });
     assert.throws(() => validateRemoteReadinessMetadata(options(f)), /publication identity/);
   } finally {
     fs.rmSync(f.temp, { recursive: true, force: true });
