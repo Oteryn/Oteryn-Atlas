@@ -18,7 +18,7 @@
 - Compare exact stable IDs; counts are telemetry only.
 - Under-selection is a correctness blocker; over-selection is optimization debt.
 - Unknown/malformed/governance change evidence must fail closed through the existing planner.
-- `force-full` and `SELECTOR_ESCAPE` may only widen to the complete full-safe stable-ID set.
+- `force-full` and `SELECTOR_ESCAPE` may only widen: effective fallback is the hosted full-safety stable-ID set union any already-required specialist stable IDs.
 - `profile=full` must remain independent from `real_fullworld`.
 - Stale/cancelled evidence must be represented by negative fixtures compatible with protected fan-in.
 
@@ -31,14 +31,14 @@
 - Create: `tools/verification/shadow-backtest.mjs`
 
 **Interfaces:**
-- Produces: `evaluateStableIdSelection({ selectedStableTestIds, requiredTruthStableTestIds, fullSafeStableTestIds })`
+- Produces: `evaluateStableIdSelection({ selectedStableTestIds, requiredTruthStableTestIds, fullSafeStableTestIds, allowedAdditionalStableTestIds })`
 - Produces: `assertExactFullSafeCoverage({ expectedStableTestIds, observedStableTestIds })`
 - Produces: `evaluateMatrixCardinality({ axes, maxCombinations })`
 
-- [ ] **Step 1: Write failing tests** proving exact false-negative IDs, exact over-selected IDs, rejection when truth/selection contains IDs outside the full-safe universe, exact full-safe set equality, duplicate rejection, and a parameterized matrix guard that rejects Cartesian expansion above a caller-supplied limit.
-- [ ] **Step 2: Run RED** with `node --test tests/verification/shadow-backtest.test.mjs`; expected failure is missing `tools/verification/shadow-backtest.mjs`.
-- [ ] **Step 3: Implement minimal pure evaluator** using sorted unique stable-ID sets. `status` is `BLOCKED_UNDER_SELECTION` when any required-truth ID is missed, otherwise `SAFE`; over-selection is returned as telemetry and never hides an under-selection.
-- [ ] **Step 4: Run GREEN** with the same test command and `node --check tools/verification/shadow-backtest.mjs`.
+- [x] **Step 1: Write failing tests** proving exact false-negative IDs, exact over-selected IDs, rejection when truth/selection contains IDs outside the full-safe plus explicit-specialist universe, exact full-safe set equality, duplicate rejection, and a parameterized matrix guard that rejects Cartesian expansion above a caller-supplied limit.
+- [x] **Step 2: Run RED** with `node --test tests/verification/shadow-backtest.test.mjs`; expected failure is missing `tools/verification/shadow-backtest.mjs`.
+- [x] **Step 3: Implement minimal pure evaluator** using sorted unique stable-ID sets. `status` is `BLOCKED_UNDER_SELECTION` when any required-truth ID is missed, otherwise `SAFE`; over-selection is returned as telemetry and never hides an under-selection.
+- [x] **Step 4: Run GREEN** with the same test command and `node --check tools/verification/shadow-backtest.mjs`.
 
 ### Task 2: Durable widening-only SELECTOR_ESCAPE feedback
 
@@ -49,13 +49,13 @@
 
 **Interfaces:**
 - Produces: `validateSelectorEscapeState(state)`
-- Produces: `recordSelectorMiss({ state, evidence, fullSafeStableTestIds })`
-- Produces: `resolveSelectorFallback({ state, forceFull, selectiveStableTestIds, fullSafeStableTestIds })`
+- Produces: `recordSelectorMiss({ state, evidence, fullSafeStableTestIds, allowedAdditionalStableTestIds })`
+- Produces: `resolveSelectorFallback({ state, forceFull, selectiveStableTestIds, fullSafeStableTestIds, allowedAdditionalStableTestIds })`
 
-- [ ] **Step 1: Write failing tests** proving default state is inactive and selective execution is explicitly disabled, a proven miss creates an append-only auditable event and activates escape, active escape resolves to the exact full-safe ID set, `forceFull=true` resolves to the exact full-safe ID set, and malformed/attempted narrowing input fails closed.
-- [ ] **Step 2: Run RED** with `node --test tests/verification/selector-escape.test.mjs`.
-- [ ] **Step 3: Implement minimal module** with schema validation and deterministic evidence digest. No reset/deactivation API is provided by Lane D; protected/coordinator cutover owns any future clear operation.
-- [ ] **Step 4: Run GREEN** and `node --check tools/verification/selector-escape.mjs`.
+- [x] **Step 1: Write failing tests** proving default state is inactive and selective execution is explicitly disabled, a proven hosted or specialist miss creates an append-only auditable event and activates escape, active escape and `forceFull=true` widen to hosted full-safe plus any already-required specialist obligations, and malformed/attempted narrowing input fails closed.
+- [x] **Step 2: Run RED** with `node --test tests/verification/selector-escape.test.mjs`.
+- [x] **Step 3: Implement minimal module** with schema validation and deterministic evidence digest. No reset/deactivation API is provided by Lane D; protected/coordinator cutover owns any future clear operation.
+- [x] **Step 4: Run GREEN** and `node --check tools/verification/selector-escape.mjs`.
 
 ### Task 3: Versioned historical/live corpus and deterministic runner
 
@@ -67,14 +67,14 @@
 
 **Interfaces:**
 - Consumes: current trusted/candidate impact manifest and catalog, `buildVerificationPlan()`, full-safety stable-ID census, Task 1 evaluator.
-- Corpus case schema: `{ id, provenance, changedFiles, requiredTruthStableTestIds, expectation }` with immutable GitHub provenance where historical.
+- Corpus case schema: `{ id, provenance, changedFiles, truth, expectation }` with immutable GitHub provenance where historical.
 - Runner output: versioned JSON report containing case ID, plan identity, selected IDs/digest, full-safe IDs/digest, false negatives, over-selection, profile/data capabilities, and verdict.
 
-- [ ] **Step 1: Add RED corpus tests** requiring representative governance, unknown-path, rename, multi-domain and historical-regression cases; bind the NPC/monster continuous-pan regression to merged PR #88 / head `03bb3e6cb082dd29dad7261a61e0030e4c846f9d` and its permanent stable ID.
-- [ ] **Step 2: Add fan-in negative tests** that feed the existing `validateProtectedFanIn()` cancelled, stale-head, duplicate, missing and unexpected stable-ID summaries and require rejection.
-- [ ] **Step 3: Run RED** for the new corpus/runner tests.
-- [ ] **Step 4: Implement corpus and runner** without network access at execution time. Historical provenance is data only; the runner evaluates current policy against recorded changed-file evidence and exact truth IDs.
-- [ ] **Step 5: Run GREEN** for all four Lane D test files, then `node --test tests/verification/*.test.mjs` on the actual branch/CI.
+- [x] **Step 1: Add RED corpus tests** requiring representative governance, unknown-path, rename, multi-domain and historical-regression cases; bind the NPC/monster continuous-pan regression to merged PR #88 / head `03bb3e6cb082dd29dad7261a61e0030e4c846f9d` and its permanent stable ID.
+- [x] **Step 2: Add fan-in negative tests** that feed the existing `validateProtectedFanIn()` cancelled, stale-head, duplicate, missing and unexpected stable-ID summaries and require rejection.
+- [x] **Step 3: Run RED** for the new corpus/runner tests.
+- [x] **Step 4: Implement corpus and runner** without network access at execution time. Historical provenance is data only; the runner evaluates current policy against recorded changed-file evidence and exact truth IDs.
+- [ ] **Step 5: Run GREEN** for all Lane D unit/fixture tests, then `node --test tests/verification/*.test.mjs` on the actual branch/CI. Narrow Lane D result is currently `19/19 PASS`; full repository verification remains an exact-head publication gate.
 
 ### Task 4: Document handoff and exact rerun boundary
 
@@ -84,14 +84,14 @@
 **Interfaces:**
 - Records admission protected main, Lane D base/head, #200/#195/#213 heads observed at implementation, corpus provenance, commands/results, disabled cutover state, and exact post-Phase-E reruns required.
 
-- [ ] **Step 1: Document** that this branch is preparation only and cannot approve #200 or #179 cutover.
-- [ ] **Step 2: Record** that Phase E final worker/shard policy is still unavailable and therefore matrix guard remains parameterized rather than selecting a threshold.
+- [x] **Step 1: Document** that this branch is preparation only and cannot approve #200 or #179 cutover.
+- [x] **Step 2: Record** that Phase E final worker/shard policy is still unavailable and therefore matrix guard remains parameterized rather than selecting a threshold.
 - [ ] **Step 3: Run** `git diff --check` equivalent through repository diff inspection, targeted Node tests, full `tests/verification/*.test.mjs`, and exact-head CI where available.
 - [ ] **Step 4: Open a dedicated draft PR** with base/head/test evidence and the mandatory post-Phase-E rerun list.
 
 ## Self-Review
 
-- Spec coverage: historical corpus, exact set classification, permanent regression format, full-safe comparison, force-full, SELECTOR_ESCAPE, matrix guard, stale/cancelled fan-in negatives and disabled cutover are each assigned above.
+- Spec coverage: historical corpus, exact set classification, permanent regression format, hosted full-safe comparison, specialist-ID preservation, force-full, SELECTOR_ESCAPE, matrix guard, stale/cancelled fan-in negatives and disabled cutover are each assigned above.
 - Conflict avoidance: no planned mutation of `build-verification-plan.mjs`, `protected-controller-bootstrap.mjs`, `protected-fan-in-bootstrap.mjs`, workflows, branch protection or Phase E worker policy.
 - No execution-shape constants are invented before Phase E.
 - The historical regression case uses verified repository PR #88 rather than fabricated history.
