@@ -46,13 +46,18 @@ function execution() {
     executionPolicyDigest: executionDigest,
     retries: 0,
     selectiveExecution: false,
-    hosted: { groupIds: ['e2e.full'], stableTestIds: [idA, idB] },
+    hosted: {
+      groupIds: ['e2e.full'],
+      stableTestIds: [idA, idB],
+      protectedStableTestIds: [idA],
+      candidateAdditionalStableTestIds: [idB],
+    },
     specialist: { groupIds: [], stableTestIds: [] },
     review: { groupIds: [], stableTestIds: [] },
   };
 }
 
-function summary(overrides = {}) {
+function summaryFor(id, overrides = {}) {
   return {
     status: 'passed',
     metadata: {
@@ -63,10 +68,12 @@ function summary(overrides = {}) {
       workers: 1,
     },
     projects: [{ name: 'desktop-chromium' }],
-    scenarios: [{ stableTestId: idA, status: 'passed', retry: 0, skipReason: null }],
+    scenarios: [{ stableTestId: id, status: 'passed', retry: 0, skipReason: null }],
     ...overrides,
   };
 }
+
+const summary = (overrides = {}) => summaryFor(idA, overrides);
 
 test('protected shard summary binds exact plan/controller/product/worker and hosted-placement identities', () => {
   const result = buildProtectedHostedShardSummary({ plan: plan(), execution: execution(), summary: summary(), shardIndex: 0, shardCount: 2 });
@@ -86,6 +93,23 @@ test('protected shard summary binds exact plan/controller/product/worker and hos
   assert.equal(result.retries, 0);
   assert.deepEqual(result.skippedStableTestIds, []);
   assert.deepEqual(result.executedStableTestIds, [idA]);
+});
+
+test('protected shard evidence unions protected-body and candidate-addition Playwright runs', () => {
+  const result = buildProtectedHostedShardSummary({
+    plan: plan(),
+    execution: execution(),
+    summaries: [summaryFor(idA), summaryFor(idB)],
+    shardIndex: 0,
+    shardCount: 2,
+  });
+  assert.deepEqual(result.executedStableTestIds, [idA, idB]);
+});
+
+test('duplicate stable IDs across protected and candidate-addition summaries fail closed', () => {
+  assert.throws(() => buildProtectedHostedShardSummary({
+    plan: plan(), execution: execution(), summaries: [summaryFor(idA), summaryFor(idA)], shardIndex: 0, shardCount: 2,
+  }), /duplicate/i);
 });
 
 test('failed cancelled skipped retried or duplicate scenario evidence fails closed', () => {
@@ -118,6 +142,6 @@ test('wrong hosted placement digest and unexpected or specialist stable IDs fail
   assert.throws(() => buildProtectedHostedShardSummary({ plan: plan(), execution: execution(), summary: summary({ scenarios: [{ stableTestId: unexpected, status: 'passed', retry: 0, skipReason: null }] }), shardIndex: 0, shardCount: 2 }), /unexpected|hosted/i);
   const value = execution();
   value.specialist = { groupIds: ['fullworld.animation-census'], stableTestIds: [idB] };
-  value.hosted = { groupIds: ['e2e.full'], stableTestIds: [idA] };
-  assert.throws(() => buildProtectedHostedShardSummary({ plan: plan(), execution: value, summary: summary({ scenarios: [{ stableTestId: idB, status: 'passed', retry: 0, skipReason: null }] }), shardIndex: 0, shardCount: 2 }), /unexpected|hosted/i);
+  value.hosted = { groupIds: ['e2e.full'], stableTestIds: [idA], protectedStableTestIds: [idA], candidateAdditionalStableTestIds: [] };
+  assert.throws(() => buildProtectedHostedShardSummary({ plan: plan(), execution: value, summary: summaryFor(idB), shardIndex: 0, shardCount: 2 }), /unexpected|hosted/i);
 });
