@@ -102,6 +102,17 @@ function contentType(target) {
   return 'application/octet-stream';
 }
 
+function parseStrictRange(header, size) {
+  if (header === undefined) return null;
+  if (typeof header !== 'string') return false;
+  const match = /^bytes=([0-9]+)-([0-9]+)$/.exec(header);
+  if (!match) return false;
+  const start = Number(match[1]);
+  const end = Number(match[2]);
+  if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start < 0 || end < start || end >= size) return false;
+  return { start, end };
+}
+
 export async function startReadyQualificationPublicationServer({ publicationDir, readiness, ...identity }) {
   const root = path.resolve(publicationDir);
   const validatedReadiness = validateReadyPublication({ publicationDir: root, manifest: readiness, ...identity });
@@ -130,13 +141,35 @@ export async function startReadyQualificationPublicationServer({ publicationDir,
       response.end();
       return;
     }
-    const headers = {
+    const range = parseStrictRange(request.headers.range, file.size);
+    if (range === false) {
+      response.writeHead(416, {
+        'Accept-Ranges': 'bytes',
+        'Content-Range': `bytes */${file.size}`,
+        'Cache-Control': 'no-store',
+      });
+      response.end();
+      return;
+    }
+    if (range) {
+      const length = range.end - range.start + 1;
+      response.writeHead(206, {
+        'Content-Type': contentType(file.target),
+        'Content-Length': String(length),
+        'Content-Range': `bytes ${range.start}-${range.end}/${file.size}`,
+        'Cache-Control': 'no-store',
+        'Accept-Ranges': 'bytes',
+      });
+      if (request.method === 'HEAD') response.end();
+      else fs.createReadStream(file.target, { start: range.start, end: range.end }).pipe(response);
+      return;
+    }
+    response.writeHead(200, {
       'Content-Type': contentType(file.target),
       'Content-Length': String(file.size),
       'Cache-Control': 'no-store',
-      'Accept-Ranges': 'none',
-    };
-    response.writeHead(200, headers);
+      'Accept-Ranges': 'bytes',
+    });
     if (request.method === 'HEAD') response.end();
     else fs.createReadStream(file.target).pipe(response);
   });
