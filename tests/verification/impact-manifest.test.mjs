@@ -7,19 +7,21 @@ import {
 } from '../../tools/verification/verification-plan-schema.mjs';
 
 const catalog = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   groups: {
     'deterministic.core': {
       specs: ['tests/verification/*.test.mjs'],
       projects: [],
       resourceClass: 'cpu-light',
       evidence: 'machine-summary',
+      capabilities: { browser: false, hosted: true, requiresPublication: false, dataCapability: 'qualification_fixture', visualReview: false, specialistReason: null },
     },
     'e2e.common-smoke': {
       specs: ['e2e/tests/desktop.spec.mjs', 'e2e/tests/mobile.spec.mjs'],
       projects: ['desktop-chromium', 'mobile-chromium'],
       resourceClass: 'browser-targeted',
       evidence: 'machine-summary',
+      capabilities: { browser: true, hosted: true, requiresPublication: true, dataCapability: 'qualification_fixture', visualReview: false, specialistReason: null },
     },
   },
 };
@@ -61,7 +63,7 @@ test('verification catalog rejects arbitrary commands and unsafe resource metada
         specs: ['e2e/tests/desktop.spec.mjs; rm -rf /'],
         projects: ['desktop-chromium'],
         resourceClass: 'browser-targeted',
-        evidence: 'machine-summary',
+        evidence: 'machine-summary', capabilities: { browser: true, hosted: true, requiresPublication: true, visualReview: false, specialistReason: null },
       },
     },
   }), /verification catalog/i);
@@ -77,4 +79,21 @@ test('verification catalog rejects arbitrary commands and unsafe resource metada
       },
     },
   }), /verification catalog/i);
+});
+
+test('verification catalog requires semantic execution capability rather than name-derived browser inference', () => {
+  assert.throws(() => validateVerificationCatalog({
+    schemaVersion: 2,
+    groups: {
+      misleading: {
+        specs: ['e2e/tests/desktop.spec.mjs'], projects: ['desktop-chromium'], resourceClass: 'cpu-light', evidence: 'machine-summary',
+      },
+    },
+  }), /capabilit|schemaVersion/i);
+});
+
+test('verification catalog rejects a real_fullworld group that could run on GitHub-hosted infrastructure', () => {
+  const invalid = structuredClone(catalog);
+  invalid.groups['e2e.common-smoke'].capabilities.dataCapability = 'real_fullworld';
+  assert.throws(() => validateVerificationCatalog(invalid), /real_fullworld.*specialist/i);
 });

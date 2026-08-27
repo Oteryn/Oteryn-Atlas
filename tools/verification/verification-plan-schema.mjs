@@ -4,6 +4,8 @@ const RESOURCE_CLASSES = new Set([
   'render-geometry', 'native-gpu', 'performance', 'soak', 'artifact-build',
 ]);
 const EVIDENCE_CLASSES = new Set(['machine-summary', 'restricted-visual-review']);
+const SPECIALIST_REASONS = new Set(['private-visual', 'native-windows-gpu', 'lan-hardware', 'real-fullworld-product']);
+const DATA_CAPABILITIES = new Set(['qualification_fixture', 'bounded_real_world', 'real_fullworld']);
 const GROUP_ID = /^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$/;
 const SAFE_PATH = /^(?:tests|e2e)\/[A-Za-z0-9_./*-]+$/;
 
@@ -47,8 +49,8 @@ export function profileRank(profile) {
 
 export function validateVerificationCatalog(candidate) {
   const kind = 'verification catalog';
-  if (!isPlainObject(candidate) || candidate.schemaVersion !== 1 || !isPlainObject(candidate.groups)) {
-    invalid(kind, 'requires schemaVersion 1 and groups object');
+  if (!isPlainObject(candidate) || candidate.schemaVersion !== 2 || !isPlainObject(candidate.groups)) {
+    invalid(kind, 'requires schemaVersion 2 and groups object');
   }
   const groups = {};
   for (const [id, value] of Object.entries(candidate.groups).sort(([left], [right]) => left.localeCompare(right))) {
@@ -58,7 +60,24 @@ export function validateVerificationCatalog(candidate) {
     const projects = uniqueStrings(value.projects ?? [], kind, `${id}.projects`);
     if (!RESOURCE_CLASSES.has(value.resourceClass)) invalid(kind, `${id}.resourceClass is not allowlisted`);
     if (!EVIDENCE_CLASSES.has(value.evidence)) invalid(kind, `${id}.evidence is not allowlisted`);
+    if (!isPlainObject(value.capabilities)
+      || typeof value.capabilities.browser !== 'boolean'
+      || typeof value.capabilities.hosted !== 'boolean'
+      || typeof value.capabilities.requiresPublication !== 'boolean'
+      || !DATA_CAPABILITIES.has(value.capabilities.dataCapability)
+      || typeof value.capabilities.visualReview !== 'boolean'
+      || !(value.capabilities.specialistReason === null || SPECIALIST_REASONS.has(value.capabilities.specialistReason))) {
+      invalid(kind, `${id}.capabilities is not explicit semantic metadata`);
+    }
+    if (value.capabilities.browser !== (projects.length > 0)) invalid(kind, `${id}.capabilities.browser conflicts with projects`);
+    if (value.capabilities.specialistReason !== null && value.capabilities.hosted) invalid(kind, `${id}.capabilities cannot be hosted and specialist-only`);
+    if (value.capabilities.dataCapability === 'real_fullworld'
+      && (value.capabilities.hosted || value.capabilities.specialistReason === null)) {
+      invalid(kind, `${id}.real_fullworld must be specialist-only`);
+    }
     const stableTestIds = uniqueStrings(value.stableTestIds ?? [], kind, `${id}.stableTestIds`);
+    const dependsOnGroups = uniqueStrings(value.dependsOnGroups ?? [], kind, `${id}.dependsOnGroups`);
+    if (dependsOnGroups.includes(id)) invalid(kind, `${id}.dependsOnGroups cannot include itself`);
     groups[id] = {
       specs,
       projects,
@@ -67,10 +86,17 @@ export function validateVerificationCatalog(candidate) {
       evidence: value.evidence,
       sequential: Boolean(value.sequential),
       fullSafetyNet: Boolean(value.fullSafetyNet),
+      dependsOnGroups,
+      capabilities: { ...value.capabilities },
     };
   }
   if (Object.keys(groups).length === 0) invalid(kind, 'requires at least one group');
-  return freeze({ schemaVersion: 1, groups });
+  for (const [id, group] of Object.entries(groups)) {
+    if (group.dependsOnGroups.some((dependency) => !Object.hasOwn(groups, dependency))) {
+      invalid(kind, `${id}.dependsOnGroups references unknown group`);
+    }
+  }
+  return freeze({ schemaVersion: 2, groups });
 }
 
 function safePrefix(value) {
