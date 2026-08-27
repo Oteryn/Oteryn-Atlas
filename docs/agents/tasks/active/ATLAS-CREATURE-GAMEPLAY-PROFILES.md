@@ -4,10 +4,12 @@
 issue: 165
 repository: Oteryn/Oteryn-Atlas
 base_branch: main
-base_sha: baa45ac3010eed54aac936662a0cb8aa892181f9
-branch: feat/creature-gameplay-profiles-165
-pr: 170
+base_sha: 12bd459f51c6d8721cdb85c25f926128efb0748f
+branch: fix/creature-gameplay-live-acceptance-165
+pr: 214
 status: verifying
+authoritative_implementation_pr: 170
+authoritative_implementation_merge: 12bd459f51c6d8721cdb85c25f926128efb0748f
 programme: ATLAS-CREATURE-GAMEPLAY-PROFILES
 game_issue: Oteryn/Oteryn-Game#136
 game_pr: Oteryn/Oteryn-Game#138
@@ -23,47 +25,40 @@ Consume the exact merged Game gameplay-profile projection through a bounded lazy
 
 ## Integration state
 
-- Current protected `main@baa45ac3010eed54aac936662a0cb8aa892181f9` includes #180 plan-bound verification, #192 META execution routing, #197 capability truthfulness, #179 GitHub-hosted E2E architecture authority, #203 readiness/concurrency, #205 Pro P0 E2E audit requirements, and #207 data-capability amendment authority for lifecycle #179.
-- #207 adds only `docs/agents/prompts/ATLAS-E2E-VERIFICATION-OPTIMIZATION-IMPLEMENTATION-DATA-CAPABILITY-AMENDMENT.md`; it has no #165 runtime/data/workflow byte delta. It governs #179's future profile/data-capability cutover, but Issue #165 still explicitly requires the serialized Molehill `e2e/run.ps1` full gate and current protected main has not replaced that executable delivery gate for this PR.
-- PR #162 / Issue #145 remains a separate draft for walking-in-place animation and is not imported into this task.
-- Issue #113 remains the canonical quick-card/interaction seam. Farm Explorer remains a consumer and never becomes gameplay-fact authority.
-- Upstream movement has been reconciled only by normal non-force merge-up; unaffected implementation and deterministic findings are preserved.
+- Implementation PR #170 passed its exact-head 77/77 zero-retry Molehill gate, 17/17 manual visual review, `atlas-local-e2e`, `atlas-gate` and `provenance-gate`, then squash-merged as protected `main@12bd459f51c6d8721cdb85c25f926128efb0748f`.
+- The first merged-main Synology Live Acceptance run `33064019881` staged, built and cut over that exact revision successfully, but its desktop Chromium step failed before the required Gameplay proof and rollback restored `baa45ac3010eed54aac936662a0cb8aa892181f9`.
+- Root cause is acceptance-script state, not Game/Atlas publication data: Gameplay is intentionally the default inspector tab, while the live script immediately applied Semantic-only `Record`/provenance assertions after search without explicitly selecting Semantic.
+- Issue #165 is reopened. Repair PR #214 is acceptance-only: deterministic RED guard first, then explicit desktop/mobile Semantic tab selection before Semantic assertions. Gameplay Sam/Rat proof remains unchanged.
+- PR #162 / Issue #145 remains separate and is not imported. Issue #113 remains the canonical quick-card/interaction seam.
 
 ## Execution routing / lanes
 
-Strategy: `parallel_first`. No implementation writer remains; final hosted verification and specialist browser qualification are evidence lanes. Final integration/merge is serial.
+Strategy: `parallel_first`. The repair has one tiny writer lane and independent verification lanes; final integration is serial.
 
-- `hosted-gates`: exact pushed qualification head; deterministic/CI/provenance/security evidence; no host lease.
-- `molehill-browser`: specialist-only exact-head full browser/visual evidence while protected main still lacks an executable repository-owned replacement for this PR gate; one bounded Molehill heavy-E2E lease.
-- `live-closeout`: exact merged-main Synology deployment/live evidence after protected squash merge.
-- integration order: exact-head hosted gates -> exact-head specialist full gate -> digest-bound 17-frame review/status -> Ready/fenced squash merge -> merged-main live closeout.
-- old-head evidence cannot satisfy a newer task head. No copied/stale `atlas-local-e2e` status is allowed.
+- `repair`: `tests/synology-live-workflow.mjs`, `e2e/tests/live-creature-preview.cjs`, this checkpoint; branch/PR #214 only.
+- `hosted-gates`: exact-head deterministic/CI/provenance/security evidence; no host lease.
+- `molehill-browser`: exact-head full browser/visual evidence if the repository classifier requires it; one bounded Molehill heavy-E2E lease through the repository-approved route.
+- `live-closeout`: exact merged-main Synology deployment/live evidence after protected squash merge of #214.
+- integration order: RED -> GREEN -> exact-head hosted + required Molehill gate -> protected merge -> merged-main live closeout.
 
 ## Acceptance
 
 - [x] Exact merged Game SHA/digest are pinned and committed publication bytes rebuild exactly.
-- [x] Consumer rejects malformed/mixed/corrupt/unbounded products and lazily fetches one entity shard with bounded LRU cache.
-- [x] `inspector=gameplay|semantic|live` is durable; Gameplay is default; unavailable Live state falls back truthfully.
-- [x] NPC Sells/Buys/Services/Travel and monster Loot/Stats/Resistances/Spawns distinguish COMPLETE from non-complete absence.
-- [x] Quick card remains immediate and gains only bounded proven profile summaries.
-- [x] Existing Semantic facts remain available.
-- [ ] Exact current-head hosted gates, 77/77 zero-retry full browser gate, 17/17 visual review, `atlas-local-e2e`, `atlas-gate`/`provenance-gate`, protected merge and merged-main Synology Gameplay acceptance all pass.
+- [x] Consumer/runtime/UI, Gameplay default, truthful completeness and Semantic preservation are implemented by #170.
+- [x] PR #170 exact-head 77/77 zero-retry browser gate, 17/17 visual review, `atlas-local-e2e`, `atlas-gate` and `provenance-gate` passed before merge.
+- [x] Merged-main failure `33064019881` was preserved with rollback evidence and received a deterministic regression before repair.
+- [ ] PR #214 exact-head required verification passes and protected squash merge lands.
+- [ ] A new merged-main Synology Live Acceptance succeeds without rollback and proves exact revision/container/header, committed Gameplay manifest, real Sam trade and real Rat loot.
 
 ## Verification checkpoint
 
 - Exact Game publication: 1049 NPC / 1800 monster profiles / 508 shards / `sha256:7ac7c08949aa498cb843ca26e3417e537b3409d89e4f265861f3f94855b96d28`.
-- Deterministic Node matrix after browser-found regression guards: **397/397 PASS**, 0 fail, 0 skip on the most recently qualified implementation-equivalent head.
-- Required Playwright census remains 77 stable IDs (71 merged-main scenarios + six Gameplay journeys), workers=1, retries=0; required formal visual census remains 17.
-- Extraction provenance verifier has passed 144 mapped rows against exact legacy `e417c5e7c22986bf4acef0495eb47f7b72c97cce`.
-- Synology candidate/live Gameplay manifest contract and live Chromium Sam/Rat contract are implemented; merged-main execution remains pending until merge.
-- Permanent browser regressions cover Rat loot/max-count distinction, inspector tab visibility, visual filter cleanup, map-reachable H.L. large-shop fixture, desktop/mobile inspector baselines, and bounded authenticated pixel fetches.
-- The former AUTO mode-aware LOD hang was reproduced, given a deterministic RED regression, and fixed by bounded pixel-bucket/bundle fetch deadlines; later exact-head hardware evidence showed that scenario PASS.
-- Exact `90f9661e...` hardware evidence is diagnostic FAIL only: five clustered HTTP 502 failures were traced to `ConnectionRefusedError [WinError 10061]` from the external LAN publication origin, not an Atlas runtime regression.
-- Exact `683069ba...` qualification became old-head diagnostic evidence when protected main advanced to #203.
-- Exact `032f7c1e...` hosted qualification was green except the intentionally missing physical evidence, but its specialist packet was never consumed because Molehill did not respond; #205 advanced protected main before a run started.
-- Exact `604e150a...` hosted qualification was green except intentionally missing physical evidence; its specialist packet was never consumed because Molehill was unavailable, and #207 advanced protected main before a run started.
-- #203/#205/#207 freshness requires browser evidence to bind the exact current qualification head; no old-head artifact may satisfy current fan-in.
+- PR #170 final browser evidence: 77/77 PASS, workers=1, retries=0; 17/17 full-frame screenshots manually reviewed and digest-bound.
+- Failed merged-main run: `33064019881`; evidence artifact `9644140444`; failure at `e2e/tests/live-creature-preview.cjs::assertCreatureInspector` because Gameplay was active while the assertion expected Semantic-only rows; rollback PASS.
+- Repair RED commit: `ff01d0e250ca22f1748ec4e163854da85d0f7c52`.
+- Minimal GREEN implementation commit: `25279270c5ad7c14d0b353330369a5adca9a626b` explicitly selects `#inspector-tab-semantic` on desktop/mobile before Semantic assertions and does not alter Gameplay proof.
+- Deterministic exact-head CI on `25279270...`: 398/398 PASS, 0 fail, 0 skip, including the new live Semantic-selection regression.
 
 ## Excluded
 
-No Game mutation, no Platform/legacy/wiki fallback, no item identity invention, no fabricated live Game state, no task-branch deployment.
+No Game mutation, no runtime-data/schema change, no Platform/legacy/wiki fallback, no item identity invention, no fabricated live Game state, no retry/tolerance weakening and no task-branch deployment.
