@@ -162,7 +162,11 @@
           <span class="pill" id="inspector-pill">ROOTS</span>
           <button id="mobile-inspector-close" class="mobile-drawer-close" type="button" aria-label="Close inspector">×</button>
         </div>
-        <div class="tabs"><button class="tab active" type="button">Semantic</button><button class="tab" type="button" disabled>Live state</button></div>
+        <div class="tabs creature-inspector-tabs" role="tablist" aria-label="Creature inspector view">
+          <button class="tab" id="inspector-tab-gameplay" data-inspector-tab="gameplay" role="tab" aria-selected="false" type="button">Gameplay</button>
+          <button class="tab active" id="inspector-tab-semantic" data-inspector-tab="semantic" role="tab" aria-selected="true" type="button">Semantic</button>
+          <button class="tab" id="inspector-tab-live" data-inspector-tab="live" role="tab" aria-selected="false" type="button" disabled>Live state</button>
+        </div>
         <div class="inspector-content" id="inspector-content"><p class="empty">Verifying full-world publication…</p></div>
       </aside>
     </div>
