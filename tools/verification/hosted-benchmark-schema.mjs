@@ -75,6 +75,9 @@ function validateIdentity(identity, authority, phaseDState) {
   requireDigest(identity.browserHarnessDigest, 'browserHarnessDigest');
   requirePositiveInteger(identity.workflowRunId, 'workflowRunId');
   requirePositiveInteger(identity.workflowRunAttempt, 'workflowRunAttempt');
+  if (!contract.allowedWorkflowRunAttempts.includes(identity.workflowRunAttempt)) {
+    invalid(`workflowRunAttempt must be ${contract.allowedWorkflowRunAttempts.join(' or ')} so benchmark retries remain zero`);
+  }
   if (!contract.allowedProfiles.includes(identity.profile)) invalid('profile is not allowlisted');
   if (!contract.allowedDataCapabilities.includes(identity.dataCapability)) invalid('dataCapability is not allowlisted');
 
@@ -145,6 +148,38 @@ function validateMetrics(metrics) {
   }
 }
 
+function validateResourceMetrics(metrics, outcome) {
+  if (outcome.conclusion === 'success') {
+    for (const metricId of contract.requiredSuccessMeasuredMetricIds) {
+      if (metrics[metricId].status !== 'MEASURED') {
+        invalid(`${metricId} must be MEASURED for successful hosted benchmark evidence`);
+      }
+    }
+  }
+
+  if (metrics.runnerLogicalCpuCount.status === 'MEASURED') {
+    requirePositiveInteger(metrics.runnerLogicalCpuCount.value, 'runnerLogicalCpuCount');
+  }
+  if (metrics.runnerMemoryTotalBytes.status === 'MEASURED') {
+    requirePositiveInteger(metrics.runnerMemoryTotalBytes.value, 'runnerMemoryTotalBytes');
+  }
+  if (metrics.peakCpuPercent.status === 'MEASURED' && metrics.peakCpuPercent.value > 100) {
+    invalid('peakCpuPercent must remain between 0 and 100 percent of total hosted-runner CPU capacity');
+  }
+  if (metrics.peakMemoryBytes.status === 'MEASURED') {
+    if (!Number.isInteger(metrics.peakMemoryBytes.value) || metrics.peakMemoryBytes.value < 0) {
+      invalid('peakMemoryBytes must be a non-negative integer byte count');
+    }
+  }
+  if (
+    metrics.runnerMemoryTotalBytes.status === 'MEASURED'
+    && metrics.peakMemoryBytes.status === 'MEASURED'
+    && metrics.peakMemoryBytes.value > metrics.runnerMemoryTotalBytes.value
+  ) {
+    invalid('peakMemoryBytes cannot exceed runnerMemoryTotalBytes');
+  }
+}
+
 function validateSource(source) {
   exactKeys(source, ['collector', 'runCreatedAt', 'runCompletedAt', 'jobs'], 'source');
   if (source.collector !== 'hosted-benchmark-collector-v1') invalid('source.collector is not supported');
@@ -180,6 +215,7 @@ export function validateHostedBenchmarkEvidence(evidence) {
   validateExperiment(evidence.experiment, evidence.identity.profile);
   validateOutcome(evidence.outcome);
   validateMetrics(evidence.metrics);
+  validateResourceMetrics(evidence.metrics, evidence.outcome);
   validateSource(evidence.source);
   return evidence;
 }
