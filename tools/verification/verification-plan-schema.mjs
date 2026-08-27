@@ -9,6 +9,24 @@ const DATA_CAPABILITIES = new Set(['qualification_fixture', 'bounded_real_world'
 const GROUP_ID = /^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$/;
 const SAFE_PATH = /^(?:tests|e2e)\/[A-Za-z0-9_./*-]+$/;
 
+const LEGACY_BOOTSTRAP_CATALOG_V1 = {
+  schemaVersion: 1,
+  groups: {
+    'deterministic.core': {
+      specs: ['tests/verification/*.test.mjs'],
+      projects: [],
+      resourceClass: 'cpu-light',
+      evidence: 'machine-summary',
+    },
+    'e2e.full': {
+      specs: ['e2e/tests/*.spec.mjs'],
+      projects: ['desktop-chromium', 'mobile-chromium'],
+      resourceClass: 'browser-full',
+      evidence: 'restricted-visual-review',
+    },
+  },
+};
+
 function invalid(kind, detail) {
   throw new TypeError(`${kind} invalid: ${detail}`);
 }
@@ -97,6 +115,50 @@ export function validateVerificationCatalog(candidate) {
     }
   }
   return freeze({ schemaVersion: 2, groups });
+}
+
+export function normalizeTrustedVerificationCatalog(candidate) {
+  if (isPlainObject(candidate) && candidate.schemaVersion === 2) {
+    return validateVerificationCatalog(candidate);
+  }
+  if (canonicalJson(candidate) !== canonicalJson(LEGACY_BOOTSTRAP_CATALOG_V1)) {
+    invalid('trusted verification catalog', 'legacy schemaVersion 1 is allowed only for the exact protected bootstrap lower bound');
+  }
+  return validateVerificationCatalog({
+    schemaVersion: 2,
+    groups: {
+      'deterministic.core': {
+        specs: ['tests/verification/*.test.mjs'],
+        projects: [],
+        resourceClass: 'cpu-light',
+        evidence: 'machine-summary',
+        capabilities: {
+          browser: false,
+          hosted: true,
+          requiresPublication: false,
+          dataCapability: 'qualification_fixture',
+          visualReview: false,
+          specialistReason: null,
+        },
+        fullSafetyNet: true,
+      },
+      'e2e.full': {
+        specs: ['e2e/tests/*.spec.mjs'],
+        projects: ['desktop-chromium', 'mobile-chromium'],
+        resourceClass: 'browser-full',
+        evidence: 'restricted-visual-review',
+        capabilities: {
+          browser: true,
+          hosted: false,
+          requiresPublication: true,
+          dataCapability: 'real_fullworld',
+          visualReview: true,
+          specialistReason: 'real-fullworld-product',
+        },
+        fullSafetyNet: true,
+      },
+    },
+  });
 }
 
 function safePrefix(value) {
