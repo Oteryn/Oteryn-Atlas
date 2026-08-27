@@ -155,13 +155,39 @@ function suppliedStableTestIds(value) {
   return ids;
 }
 
+function stableTestCoordinates(id) {
+  const first = id.indexOf('::');
+  const second = first < 0 ? -1 : id.indexOf('::', first + 2);
+  if (first <= 0 || second <= first + 2 || second >= id.length - 2) {
+    throw new TypeError('stableTestIds must use project::spec::title identity');
+  }
+  return {
+    project: id.slice(0, first),
+    spec: id.slice(first + 2, second),
+  };
+}
+
+function matchesSpecPattern(pattern, spec) {
+  const expression = pattern
+    .split('*')
+    .map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+    .join('[^/]*');
+  return new RegExp(`^${expression}$`).test(spec);
+}
+
+function stableIdMatchesGroup(id, group) {
+  if (!group.capabilities.browser) return false;
+  const { project, spec } = stableTestCoordinates(id);
+  return group.projects.includes(project) && group.specs.some((pattern) => matchesSpecPattern(pattern, spec));
+}
+
 function exactStableTestIds(groups, protectedStableTestIds) {
+  const required = new Set(groups.flatMap((group) => group.stableTestIds));
   const supplied = suppliedStableTestIds(protectedStableTestIds);
-  if (!supplied) return groups.flatMap((group) => group.stableTestIds).sort();
-  if (groups.some((group) => group.id === 'e2e.full')) return supplied;
-  const required = new Set();
-  for (const group of groups) {
-    for (const id of group.stableTestIds) required.add(id);
+  if (!supplied) return [...required].sort();
+  const browserGroups = groups.filter((group) => group.capabilities.browser);
+  for (const id of supplied) {
+    if (browserGroups.some((group) => stableIdMatchesGroup(id, group))) required.add(id);
   }
   return [...required].sort();
 }
