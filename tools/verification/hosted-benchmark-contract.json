@@ -10,6 +10,7 @@
   "retryPolicy": {
     "retries": 0
   },
+  "allowedWorkflowRunAttempts": [1],
   "requiredIdentityFields": [
     "repository",
     "candidateSha",
@@ -54,9 +55,19 @@
     "duplicateSetupMs",
     "verdictWallClockMs",
     "jobMinutes",
+    "runnerLogicalCpuCount",
+    "runnerMemoryTotalBytes",
+    "peakCpuPercent",
+    "peakMemoryBytes",
     "varianceMs",
     "oomCrashCount",
     "usefulPlansPerHour"
+  ],
+  "requiredSuccessMeasuredMetricIds": [
+    "runnerLogicalCpuCount",
+    "runnerMemoryTotalBytes",
+    "peakCpuPercent",
+    "peakMemoryBytes"
   ],
   "metricUnits": {
     "queueProvisioningMs": "ms",
@@ -75,6 +86,10 @@
     "duplicateSetupMs": "ms",
     "verdictWallClockMs": "ms",
     "jobMinutes": "job-minutes",
+    "runnerLogicalCpuCount": "count",
+    "runnerMemoryTotalBytes": "bytes",
+    "peakCpuPercent": "percent",
+    "peakMemoryBytes": "bytes",
     "varianceMs": "ms",
     "oomCrashCount": "count",
     "usefulPlansPerHour": "plans/hour"
@@ -91,6 +106,8 @@
   "zeroDefaultPolicy": "FORBIDDEN",
   "notes": [
     "A numeric zero is valid only when directly measured and sourced; absence must never be coerced to zero.",
+    "Only workflowRunAttempt=1 is benchmark-eligible; reruns are excluded so retries remain zero.",
+    "Successful worker/shard evidence must contain measured runner CPU and memory telemetry before higher parallelism is considered.",
     "All evidence created before final protected Phase D is merged must use NON_AUTHORITATIVE_PRE_PHASE_D.",
     "This contract records measurements only and cannot select or mutate worker/shard policy."
   ]
