@@ -112,6 +112,39 @@ function unionClassification(left, right, bootstrap) {
   return { profile, groups: [...groups].sort(), domains: [...domains].sort() };
 }
 
+function expandImpactDependencies(classification, rules) {
+  const groups = new Set(classification.groups);
+  const domains = new Set(classification.domains);
+  let profile = classification.profile;
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const rule of rules) {
+      if (!rule.whenAllDomains.every((domain) => domains.has(domain))) continue;
+      if (profileRank(rule.minimumProfile) > profileRank(profile)) {
+        profile = rule.minimumProfile;
+        changed = true;
+      }
+      for (const group of rule.requiredGroups) {
+        if (!groups.has(group)) {
+          groups.add(group);
+          changed = true;
+        }
+      }
+      for (const domain of rule.addDomains) {
+        if (!domains.has(domain)) {
+          domains.add(domain);
+          changed = true;
+        }
+      }
+    }
+  }
+  if (profile === 'full') {
+    for (const group of FALLBACK_GROUPS) groups.add(group);
+  }
+  return { profile, groups: [...groups].sort(), domains: [...domains].sort() };
+}
+
 function unionStrings(...values) {
   return [...new Set(values.flat())].sort();
 }
@@ -188,7 +221,11 @@ export function buildVerificationPlan(input) {
   const changedPaths = allEvidencePaths(input.changedFiles);
   const trusted = classify(changedPaths, trustedImpactManifest);
   const candidate = classify(changedPaths, candidateImpactManifest);
-  const result = unionClassification(trusted, candidate, bootstrapChanged(changedPaths));
+  const union = unionClassification(trusted, candidate, bootstrapChanged(changedPaths));
+  const result = expandImpactDependencies(
+    union,
+    [...trustedImpactManifest.dependencyRules, ...candidateImpactManifest.dependencyRules],
+  );
   const requiredGroupIds = dependencyClosure(result.groups, verificationCatalog);
   const groups = selectedGroups(requiredGroupIds, verificationCatalog);
   const visualGroupIds = groups.filter((group) => group.evidence === 'restricted-visual-review').map((group) => group.id);
