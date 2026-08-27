@@ -28,12 +28,20 @@ const catalog = {
 
 const v2Manifest = {
   schemaVersion: 2,
-  entries: [{
-    pathPrefix: 'src/browser/feature/',
-    domains: ['feature-ui'],
-    minimumProfile: 'targeted',
-    requiredGroups: ['deterministic.core'],
-  }],
+  entries: [
+    {
+      pathPrefix: 'src/browser/feature/',
+      domains: ['feature-ui'],
+      minimumProfile: 'targeted',
+      requiredGroups: ['deterministic.core'],
+    },
+    {
+      pathPrefix: 'tools/dyn-atlas-semantic/',
+      domains: ['generator'],
+      minimumProfile: 'focused',
+      requiredGroups: ['deterministic.core'],
+    },
+  ],
   crossDomainEscalations: [{
     whenDomains: ['feature-ui', 'generator'],
     minimumProfile: 'broad',
