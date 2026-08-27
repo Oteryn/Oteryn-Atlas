@@ -126,6 +126,26 @@ test('force-full and selector escape widen hosted full-safe without dropping sel
   assert.deepEqual(escaped.stableTestIds, [A, B, specialist].sort());
 });
 
+test('active selector escape restores required specialist obligations even when the selector missed them', () => {
+  const specialist = 'desktop-chromium::e2e/tests/fullworld-animation-census-desktop.spec.mjs::complete census';
+  const state = inactiveState({ selectiveExecutionEnabled: true, escapeActive: true });
+  const escaped = resolveSelectorFallback({
+    state,
+    selectiveStableTestIds: [A],
+    fullSafeStableTestIds: [A, B],
+    allowedAdditionalStableTestIds: [specialist],
+    requiredAdditionalStableTestIds: [specialist],
+  });
+  assert.equal(escaped.reason, 'selector-escape-active');
+  assert.deepEqual(escaped.stableTestIds, [A, B, specialist].sort());
+  assert.throws(() => resolveSelectorFallback({
+    state,
+    selectiveStableTestIds: [A],
+    fullSafeStableTestIds: [A, B],
+    requiredAdditionalStableTestIds: [specialist],
+  }), /required additional stable ID is outside explicit additional set/);
+});
+
 test('selector miss feedback records specialist false negatives from the explicit additional universe', () => {
   const specialist = 'desktop-chromium::e2e/tests/fullworld-animation-census-desktop.spec.mjs::complete census';
   const state = recordSelectorMiss({

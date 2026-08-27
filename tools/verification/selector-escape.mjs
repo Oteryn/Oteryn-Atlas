@@ -101,15 +101,22 @@ export function resolveSelectorFallback({
   selectiveStableTestIds,
   fullSafeStableTestIds,
   allowedAdditionalStableTestIds = [],
+  requiredAdditionalStableTestIds = [],
 } = {}) {
   const current = validateSelectorEscapeState(state);
   const fullSafe = stableIds(fullSafeStableTestIds, 'fullSafeStableTestIds', { allowEmpty: false });
   const additional = stableIds(allowedAdditionalStableTestIds, 'allowedAdditionalStableTestIds');
+  const requiredAdditional = stableIds(requiredAdditionalStableTestIds, 'requiredAdditionalStableTestIds');
   const selected = stableIds(selectiveStableTestIds, 'selectiveStableTestIds');
+  const additionalSet = new Set(additional);
+  const requiredOutside = requiredAdditional.filter((id) => !additionalSet.has(id));
+  if (requiredOutside.length) {
+    throw new TypeError(`required additional stable ID is outside explicit additional set: ${requiredOutside.join(', ')}`);
+  }
   const universe = new Set([...fullSafe, ...additional]);
   const outside = selected.filter((id) => !universe.has(id));
   if (outside.length) throw new TypeError(`selective stable ID is outside full-safe universe and explicit additional set: ${outside.join(', ')}`);
-  const widenedFullSafe = [...new Set([...fullSafe, ...selected])].sort();
+  const widenedFullSafe = [...new Set([...fullSafe, ...requiredAdditional, ...selected])].sort();
 
   let mode = 'SELECTIVE_SHADOW';
   let reason = 'shadow-selection';
