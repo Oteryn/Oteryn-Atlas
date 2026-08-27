@@ -995,3 +995,28 @@ Separate FACT / INFERENCE / UNKNOWN and include:
 - any real external blocker precisely classified.
 
 Do not claim completion from a design, one fast benchmark, partial hosted migration, green subset or selective planner alone. Completion requires the merged end-state, complete safety-net proof, and measured evidence that ordinary Atlas development no longer pays for unrelated full E2E or wasteful GitHub/PC/Synology execution.
+
+# Current continuation checkpoint — 2026-08-27
+
+This section is additive current execution guidance. It does not weaken any earlier requirement or either amendment.
+
+For continuation after the current implementation wave, first read:
+- `docs/agents/tasks/active/ATLAS-E2E-VERIFICATION-OPTIMIZATION-FINAL-HANDOFF.md`
+- `docs/agents/prompts/ATLAS-E2E-VERIFICATION-OPTIMIZATION-FINAL-CLOSEOUT-COORDINATOR.md`
+
+The remaining work MAY be parallelized only through these isolated lanes:
+- `ATLAS-E2E-OPT-LANE-A-PROTECTED-HOSTED-CONTROL-PLANE`
+- `ATLAS-E2E-OPT-LANE-B-HOSTED-QUALIFICATION-BROWSER`
+- `ATLAS-E2E-OPT-LANE-C-PHASE-E-HOSTED-BENCHMARK-HARNESS`
+- `ATLAS-E2E-OPT-LANE-D-PHASE-F-SHADOW-BACKTEST`
+
+One coordinator owns all merge/retarget/cutover decisions. Lane agents must use isolated branches/worktrees and may not merge protected shared branches, publish transitional local statuses, mutate branch protection or enable selective execution.
+
+The sequential invariant remains:
+`#208 protected bootstrap -> #209 protected policy v2 -> final protected hosted Phase D -> measured Phase E -> disabled shadow/full-safety Phase F -> selective cutover -> final administrative/full-safety closeout -> #179 close`.
+
+At checkpoint creation #208 had an exact 77/77 zero-retry local physical PASS on head `9564aa6724da19ba32781c1a3ebefc53996bb851`, but that evidence still required actual visual review, exact review binding, status publication and same-SHA CI rerun before merge. Resolve all SHAs fresh before acting.
+
+A dedicated preservation branch `handoff/issue-179-ancillary-hosted-q` contains then-unintegrated neutral ancillary qualification products and hosted fixture namespace wiring transplanted onto then-current #213. Treat it as a review/cherry-pick source, not authority; compare against current #213 before reuse.
+
+Do not create another broad handoff. The next coordinator is expected to execute through terminal closeout, using parallel lanes only to shorten independent preparation/implementation work.
