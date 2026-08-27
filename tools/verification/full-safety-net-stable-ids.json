@@ -1,4 +1,4 @@
-+{
+{
   "schemaVersion": 1,
   "stableIdAlgorithm": {
     "id": "atlas-stable-id-v2",
@@ -35,6 +35,7 @@
     "desktop-chromium::e2e/tests/degraded-search-desktop.spec.mjs::unsupported semantic API schema is rejected without stale browser search state",
     "desktop-chromium::e2e/tests/desktop.spec.mjs::desktop FullWorld qualifies, streams verified ranges and navigates semantic search",
     "desktop-chromium::e2e/tests/farm-explorer-desktop.spec.mjs::desktop Farm Explorer fails closed for upstream facts and keeps custom kill estimator usable",
+    "desktop-chromium::e2e/tests/fullworld-animation-census-desktop.spec.mjs::published creature animation product passes the full authoritative coverage census",
     "desktop-chromium::e2e/tests/geometry-desktop.spec.mjs::NPC overlay never commits independently from the base renderer during continuous pan",
     "desktop-chromium::e2e/tests/geometry-desktop.spec.mjs::creature geometry remains floor-isolated and restores through moved deep-link reload",
     "desktop-chromium::e2e/tests/layer-audit-desktop.spec.mjs::layer controls expose correct availability and fail-closed states",
@@ -62,7 +63,6 @@
     "desktop-chromium::e2e/tests/visual-desktop.spec.mjs::creature overlay never paints previous-floor records during a view event",
     "desktop-chromium::e2e/tests/visual-desktop.spec.mjs::desktop Atlas-owned chrome and user journey retain reviewed visual contracts",
     "desktop-chromium::e2e/tests/visual-desktop.spec.mjs::playback changes only verified animated presentation regions and restores static pixels",
-    "desktop-chromium::e2e/tests/visual-desktop.spec.mjs::published creature animation product passes the full authoritative coverage census",
     "desktop-chromium::e2e/tests/workflows-desktop.spec.mjs::published semantic result navigates, survives reload, and restores through history",
     "mobile-chromium::e2e/tests/accessibility-mobile.spec.mjs::mobile core controls are touch-reachable in portrait and landscape",
     "mobile-chromium::e2e/tests/accessibility-mobile.spec.mjs::mobile drawers expose truthful hidden state and restore keyboard focus",
