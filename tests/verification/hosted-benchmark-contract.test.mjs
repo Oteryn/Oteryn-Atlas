@@ -81,7 +81,7 @@ test('hosted Phase E benchmark contract binds exact identity and complete measur
   assert.equal(contract.zeroDefaultPolicy, 'FORBIDDEN');
 });
 
-test('hosted benchmark experiments prepare a packed baseline and guarded worker/shard candidates only', () => {
+test('hosted benchmark experiments cover workers 1/2/4/6/8 and isolated multi-job candidates without selecting policy', () => {
   const experiments = readJson(experimentsUrl, 'hosted benchmark experiments');
   assert.equal(experiments.schemaVersion, 1);
   assert.equal(experiments.measurementOnly, true);
@@ -96,15 +96,23 @@ test('hosted benchmark experiments prepare a packed baseline and guarded worker/
     profiles: ['targeted', 'broad', 'full'],
     gate: 'BASELINE',
   });
-  assert.equal(candidates.some((candidate) => candidate.workers === 6 || candidate.workers === 8), false);
+
+  const packed = candidates.filter((candidate) => candidate.shards === 1);
+  assert.deepEqual(packed.map((candidate) => candidate.workers), [1, 2, 4, 6, 8]);
   assert.equal(candidates.some((candidate) => candidate.workers > 1 && candidate.shards > 1), false);
 
   const twoWorkers = candidates.find((candidate) => candidate.id === 'packed-w2');
   const fourWorkers = candidates.find((candidate) => candidate.id === 'packed-w4');
+  const sixWorkers = candidates.find((candidate) => candidate.id === 'packed-w6');
+  const eightWorkers = candidates.find((candidate) => candidate.id === 'packed-w8');
   const twoShards = candidates.find((candidate) => candidate.id === 'shards2-w1');
   const fourShards = candidates.find((candidate) => candidate.id === 'shards4-w1');
   assert.equal(twoWorkers?.gate, 'RUNNER_RESOURCES_MEASURED');
   assert.equal(fourWorkers?.gate, 'W2_STABLE_WITH_RESOURCE_HEADROOM');
+  assert.equal(sixWorkers?.gate, 'W4_STABLE_WITH_RESOURCE_HEADROOM');
+  assert.equal(eightWorkers?.gate, 'W6_STABLE_WITH_RESOURCE_HEADROOM');
+  assert.deepEqual(sixWorkers?.profiles, ['broad', 'full']);
+  assert.deepEqual(eightWorkers?.profiles, ['broad', 'full']);
   assert.deepEqual(twoShards?.profiles, ['broad', 'full']);
   assert.deepEqual(fourShards?.profiles, ['broad', 'full']);
   assert.equal(twoShards?.gate, 'BROAD_OR_FULL_SETUP_AMORTIZATION_PLAUSIBLE');
