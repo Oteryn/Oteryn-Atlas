@@ -63,5 +63,6 @@ test('Playwright never predefines qualification trust after protected web bootst
   assert.doesNotMatch(runtime, /qualificationTrustInstalledPages/);
   assert.doesNotMatch(runtime, /installQualificationTrust/);
   assert.doesNotMatch(runtime, /Object\.defineProperty\(globalThis,\s*['"]__OTERYN_ATLAS_QUALIFICATION_TRUST__/);
-  assert.doesNotMatch(runtime, /ATLAS_QUALIFICATION_TRUST_JSON/);
+  assert.match(runtime, /resolveQualificationEntry\(entry,\s*\{\s*qualificationTrustJson:\s*process\.env\.ATLAS_QUALIFICATION_TRUST_JSON,/);
+  assert.doesNotMatch(runtime, /__OTERYN_ATLAS_QUALIFICATION_TRUST__/);
 });
