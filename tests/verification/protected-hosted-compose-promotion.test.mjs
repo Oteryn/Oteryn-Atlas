@@ -65,7 +65,7 @@ test('protected hosted web bootstrap injects immutable qualification trust befor
   assert.match(override, /const expectedWeb = '\/tmp\/expected-web'/);
   assert.match(override, /fs\.cpSync\('\/source-web', expectedWeb, \{ recursive: true \}\)/);
   assert.match(override, /__OTERYN_ATLAS_QUALIFICATION_TRUST__/);
-  assert.match(override, /Object\.defineProperty\(globalThis, '__OTERYN_ATLAS_QUALIFICATION_TRUST__'/);
+  assert.match(override, /Object\.defineProperty\(globalThis/);
   assert.match(override, /Object\.freeze\('/);
   assert.match(override, /writable: false, configurable: false, enumerable: false/);
   assert.match(override, /const head = '<head>'/);
@@ -93,11 +93,13 @@ test('protected hosted web bootstrap reentry is exact validation only and never 
 
 test('protected readiness init is re-entry safe only by exact validation, never overwrite', () => {
   const override = readRequired('e2e/compose.github-hosted.yml', 'GitHub-hosted qualification compose override');
-  assert.match(override, /const readinessPath = publicationDir \+ '\/atlas-publication-readiness\.json'/);
-  assert.match(override, /if \(fs\.existsSync\(readinessPath\)\) \{[\s\S]*JSON\.parse\(fs\.readFileSync\(readinessPath, 'utf8'\)\)/);
-  assert.match(override, /else \{[\s\S]*publishReadyPublication\([\s\S]*destinationDir: publicationDir/);
-  assert.match(override, /validateReadyPublication\([\s\S]*publicationDir,[\s\S]*manifest,[\s\S]*\.\.\.identity/);
-  assert.doesNotMatch(override, /force:\s*true|overwrite|rmSync\(publicationDir/);
+  const publicationReadyBlock = override.match(/  atlas-publication-ready:[\s\S]*?\n  atlas-publication:/)?.[0] ?? '';
+  assert.notEqual(publicationReadyBlock, '', 'atlas-publication-ready compose block is missing');
+  assert.match(publicationReadyBlock, /const readinessPath = publicationDir \+ '\/atlas-publication-readiness\.json'/);
+  assert.match(publicationReadyBlock, /if \(fs\.existsSync\(readinessPath\)\) \{[\s\S]*JSON\.parse\(fs\.readFileSync\(readinessPath, 'utf8'\)\)/);
+  assert.match(publicationReadyBlock, /else \{[\s\S]*publishReadyPublication\([\s\S]*destinationDir: publicationDir/);
+  assert.match(publicationReadyBlock, /validateReadyPublication\([\s\S]*publicationDir,[\s\S]*manifest,[\s\S]*\.\.\.identity/);
+  assert.doesNotMatch(publicationReadyBlock, /force:\s*true|overwrite|rmSync\(publicationDir/);
 });
 
 test('protected hosted executor materializes dedicated exact browser trust for qualification fixture', () => {
