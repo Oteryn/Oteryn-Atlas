@@ -60,3 +60,12 @@ test('protected readiness init is re-entry safe only by exact validation, never 
   assert.match(override, /validateReadyPublication\([\s\S]*publicationDir,[\s\S]*manifest,[\s\S]*\.\.\.identity/);
   assert.doesNotMatch(override, /force:\s*true|overwrite|rmSync\(publicationDir/);
 });
+
+test('protected hosted executor materializes dedicated exact browser trust for qualification fixture', () => {
+  const workflow = readRequired('.github/workflows/protected-hosted-executor.yml', 'protected hosted executor workflow');
+  assert.match(workflow, /qualificationTrustDescriptor/);
+  assert.match(workflow, /product-trust/);
+  assert.match(workflow, /qualification_fixture\.json/);
+  assert.match(workflow, /JSON\.stringify\(qualificationTrustDescriptor\(manifest\)\)/);
+  assert.doesNotMatch(workflow, /trustPath:\s*path\.join\(destination,\s*'fixture-manifest\.json'\)/);
+});

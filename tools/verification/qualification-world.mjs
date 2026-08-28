@@ -23,6 +23,7 @@ import {
 } from './qualification-fixture-definition.mjs';
 
 const FIXTURE_ID = QUALIFICATION_FIXTURE_ID;
+const QUALIFICATION_TRUST_MARKER = 'oteryn-atlas-qualification-trust-v1';
 const SOURCE_FINGERPRINT = 'sha256:5af8a7b6d6cb61bf6a430842141a658d3ba183f6e2ec5e3d9a7ea39ccf866d72';
 const FLOORS = Object.freeze([-8, -7, -6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7]);
 const ACTIVE_FLOOR = QUALIFICATION_ACTIVE_FLOOR;
@@ -433,6 +434,24 @@ export async function buildQualificationWorld(destination) {
   });
   writeJson(root, 'fixture-manifest.json', result);
   return result;
+}
+
+export function qualificationTrustDescriptor(manifest) {
+  resolveQualificationManifestTrust(manifest);
+  return Object.freeze({
+    marker: QUALIFICATION_TRUST_MARKER,
+    fixtureId: manifest.fixtureId,
+    dataCapability: manifest.dataCapability,
+    publicationRoot: manifest.publicationRoot,
+    semanticRoot: manifest.semanticRoot,
+    pixelRoot: manifest.pixelRoot,
+    runtimeIndexRoot: manifest.runtimeIndexRoot,
+    pixelBucketRoot: manifest.pixelBucketRoot,
+    overviewRoot: manifest.overviewRoot,
+    minimapRoot: manifest.minimapRoot,
+    sourceFingerprint: manifest.sourceFingerprint,
+    productDigest: manifest.productDigest,
+  });
 }
 
 function qualificationFilesystemFetcher(root) {
