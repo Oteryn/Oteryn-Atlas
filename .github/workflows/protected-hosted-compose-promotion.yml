@@ -95,7 +95,7 @@ jobs:
           trust_path="$RUNNER_TEMP/atlas-compose-trust.json"
           test_list="$RUNNER_TEMP/atlas-protected-test-list.txt"
           rm -rf "$source_root" "$artifacts_root"
-          mkdir -p "$source_root" "$artifacts_root"
+          mkdir -p "$artifacts_root"
           : > "$test_list"
 
           SOURCE_ROOT="$source_root" TRUST_PATH="$trust_path" node --input-type=module <<'NODE'
