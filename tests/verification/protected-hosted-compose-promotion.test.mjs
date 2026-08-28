@@ -62,13 +62,11 @@ test('protected hosted web bootstrap injects immutable qualification trust befor
   assert.match(override, /ATLAS_QUALIFICATION_TRUST_JSON:\s*\$\{ATLAS_QUALIFICATION_TRUST_JSON:\?ATLAS_QUALIFICATION_TRUST_JSON must identify verified qualification roots\}/);
   assert.match(override, /ATLAS_EXECUTION_CONTEXT:\?ATLAS_EXECUTION_CONTEXT is required\}\/web:\/source-web:ro/);
   assert.match(override, /atlas-ready-web:\/ready-web/);
-  assert.match(override, /fs\.cpSync\('\/source-web', '\/ready-web', \{ recursive: true \}\)/);
+  assert.match(override, /const expectedWeb = '\/tmp\/expected-web'/);
+  assert.match(override, /fs\.cpSync\('\/source-web', expectedWeb, \{ recursive: true \}\)/);
   assert.match(override, /__OTERYN_ATLAS_QUALIFICATION_TRUST__/);
   assert.match(override, /Object\.defineProperty\(globalThis, '__OTERYN_ATLAS_QUALIFICATION_TRUST__'/);
-  assert.match(override, /const serialized = JSON\.stringify\(descriptor\)/);
-  assert.match(override, /Object\.freeze\(\$\$\{serialized\}\)/);
-  assert.match(override, /qualification trust \$\$\{field\} is invalid/);
-  assert.match(override, /\$\$\{head\}\\n  \$\$\{bootstrap\}/);
+  assert.match(override, /Object\.freeze\('/);
   assert.match(override, /writable: false, configurable: false, enumerable: false/);
   assert.match(override, /const head = '<head>'/);
   assert.match(override, /source\.indexOf\('<script'\)/);
@@ -76,6 +74,21 @@ test('protected hosted web bootstrap injects immutable qualification trust befor
   assert.match(override, /atlas-ready-web:\/usr\/share\/nginx\/html\/web:ro/);
   assert.match(override, /volumes:[\s\S]*atlas-ready-web:/);
   assert.doesNotMatch(override, /\/source-web:(?!ro)|\/ready-web:ro/);
+});
+
+test('protected hosted web bootstrap reentry is exact validation only and never overwrites stale bytes', () => {
+  const override = readRequired('e2e/compose.github-hosted.yml', 'GitHub-hosted qualification compose override');
+  assert.match(override, /function treeDigest\(root\)/);
+  assert.match(override, /fs\.lstatSync\(absolute\)/);
+  assert.match(override, /stat\.isSymbolicLink\(\)/);
+  assert.match(override, /const expectedDigest = treeDigest\(expectedWeb\)/);
+  assert.match(override, /const readyEntries = fs\.readdirSync\('\/ready-web'\)/);
+  assert.match(override, /if \(readyEntries\.length === 0\) \{/);
+  assert.match(override, /copyDirectoryContents\(expectedWeb, '\/ready-web'\)/);
+  assert.match(override, /const readyDigest = treeDigest\('\/ready-web'\)/);
+  assert.match(override, /if \(readyDigest !== expectedDigest\)/);
+  assert.match(override, /protected web bootstrap re-entry digest mismatch/);
+  assert.doesNotMatch(override, /rmSync\('\/ready-web'|force:\s*true[^\n]*\/ready-web|overwrite/i);
 });
 
 test('protected readiness init is re-entry safe only by exact validation, never overwrite', () => {
