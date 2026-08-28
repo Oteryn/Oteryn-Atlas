@@ -2,7 +2,10 @@ import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import test from 'node:test';
 
-import { buildProtectedHostedExecutionContract } from '../../tools/verification/protected-hosted-execution.mjs';
+import {
+  buildProtectedHostedExecutionContract,
+  resolveProtectedPromotionQualification,
+} from '../../tools/verification/protected-hosted-execution.mjs';
 
 const head = 'b'.repeat(40);
 const controllerSha = 'a'.repeat(40);
@@ -226,4 +229,22 @@ test('every planned stable ID must resolve to exactly one machine execution plac
     requiredDataCapabilities: ['qualification_fixture', 'real_fullworld'],
     requiresRealFullWorld: true,
   }), { currentHeadSha: head }), /ambiguous|placement/i);
+});
+
+test('protected promotion qualification registry binds exact hosted proof for bounded-real row framing', () => {
+  const spec = resolveProtectedPromotionQualification('fix/issue-179-bounded-real-row-framing');
+  assert.deepEqual(spec, {
+    id: 'bounded-real-row-framing-v1',
+    headRef: 'fix/issue-179-bounded-real-row-framing',
+    changedFiles: [
+      'tests/verification/bounded-real-world.test.mjs',
+      'tests/verification/protected-hosted-product-identities.test.mjs',
+      'tools/verification/bounded-real-world.mjs',
+      'tools/verification/protected-hosted-product-identities.json',
+    ],
+    expectedProductDigest: 'sha256:a19f0371eb5afcdf8c40156d732d5602e970400ec9369607f901e2f0a58c92b6',
+  });
+  assert.equal(Object.isFrozen(spec), true);
+  assert.equal(Object.isFrozen(spec.changedFiles), true);
+  assert.throws(() => resolveProtectedPromotionQualification('fix/issue-179-unknown'), /unsupported.*promotion/i);
 });
