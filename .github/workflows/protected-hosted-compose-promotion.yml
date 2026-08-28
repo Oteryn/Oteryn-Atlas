@@ -94,6 +94,7 @@ jobs:
           artifacts_root="$RUNNER_TEMP/atlas-compose-artifacts"
           trust_path="$RUNNER_TEMP/atlas-compose-trust.json"
           test_list="$RUNNER_TEMP/atlas-protected-test-list.txt"
+          proof_test="$RUNNER_TEMP/atlas-protected-compose-bootstrap-desktop.spec.mjs"
           rm -rf "$source_root" "$artifacts_root"
           mkdir -p "$artifacts_root"
           : > "$test_list"
@@ -106,6 +107,25 @@ jobs:
           const manifest = await verifyQualificationWorld(process.env.SOURCE_ROOT);
           fs.writeFileSync(process.env.TRUST_PATH, `${JSON.stringify(qualificationTrustDescriptor(manifest))}\n`);
           NODE
+
+          cat > "$proof_test" <<'TEST'
+          import { expect, test } from '@playwright/test';
+          import { assertNoRuntimeFailures, captureRuntimeFailures, gotoAtlas, waitForAtlas } from './runtime.mjs';
+
+          const QUALIFICATION_ENTRY = '/web/fullworld.html?x=32280&y=32155&floor=-7&zoom=2&mode=map';
+
+          test('protected qualification trust bootstrap reaches verified Atlas inside fixture bounds', async ({ page }) => {
+            const runtime = captureRuntimeFailures(page);
+            await gotoAtlas(page, QUALIFICATION_ENTRY);
+            await waitForAtlas(page);
+            const trust = await page.evaluate(() => globalThis.__OTERYN_ATLAS_QUALIFICATION_TRUST__);
+            expect(trust?.marker).toBe('oteryn-atlas-qualification-trust-v1');
+            expect(trust?.fixtureId).toBe('atlas-qualification-world-v2');
+            expect(trust?.dataCapability).toBe('qualification_fixture');
+            await expect(page.getByRole('textbox', { name: 'Global semantic Atlas search' }).first()).toBeVisible();
+            assertNoRuntimeFailures(runtime);
+          });
+          TEST
 
           export ATLAS_VERIFICATION_PLAN_SHA256="sha256:$(printf '1%.0s' {1..64})"
           export ATLAS_E2E_SHARD='1/1'
@@ -148,12 +168,13 @@ jobs:
             exit 1
           fi
 
-          compose run --no-deps --rm e2e \
+          compose run --no-deps --rm \
+            --volume "$proof_test:/workspace/e2e/tests/protected-compose-bootstrap-desktop.spec.mjs:ro" \
+            e2e \
             ./node_modules/.bin/playwright test \
             --config=playwright.config.mjs \
-            tests/accessibility-desktop.spec.mjs \
+            tests/protected-compose-bootstrap-desktop.spec.mjs \
             --project=desktop-chromium \
-            --grep='desktop critical controls expose truthful accessible names and disabled states' \
             --workers=1 \
             --retries=0
 
