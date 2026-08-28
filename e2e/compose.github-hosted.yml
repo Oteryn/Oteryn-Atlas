@@ -31,7 +31,6 @@ services:
         import { publishReadyPublication, validateReadyPublication } from '/protected-control/tools/verification/publication-readiness.mjs';
 
         const harnessFiles = [
-          '.github/workflows/protected-hosted-executor.yml',
           'e2e/compose.protected-hosted-executor.yml',
           'e2e/compose.github-hosted.yml',
           'e2e/Dockerfile',
