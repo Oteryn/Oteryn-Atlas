@@ -53,31 +53,34 @@ test('bounded-real product is deterministic and binds exact real ancillary bytes
   fs.rmSync(path.dirname(secondRoot), { recursive: true, force: true });
 });
 
-test('bounded-real runtime group ranges decode through the production semantic decoder', async () => {
-  const root = tempDir('atlas-bounded-range-decode');
+test('bounded-real authenticated semantic groups decode exact tile cardinality', async () => {
+  const root = tempDir('atlas-bounded-row-framing');
   await buildBoundedRealWorld(root, { sourceRoot: ROOT });
   const runtimeWorld = JSON.parse(fs.readFileSync(path.join(root, 'runtime-index/world.json'), 'utf8'));
-  let decodedGroups = 0;
-  for (const floorEntry of runtimeWorld.floors) {
-    const runtimeFloor = JSON.parse(fs.readFileSync(path.join(root, 'runtime-index', floorEntry.path), 'utf8'));
-    for (const chunk of runtimeFloor.chunks) {
-      const source = fs.readFileSync(path.join(root, 'publication/semantic', chunk.path));
-      for (const group of chunk.groups) {
-        const bytes = source.subarray(group.offset, group.offset + group.bytes);
-        const tiles = decodeSemanticGroup(bytes, {
-          chunk,
-          floor: runtimeFloor.floor,
-          group,
-          regionSpan: runtimeWorld.regionSpan,
-          visualBounds: runtimeWorld.visualBounds,
-        });
-        assert.equal(tiles.length, group.tiles);
-        decodedGroups += 1;
+  let decodedTiles = 0;
+  try {
+    for (const floorEntry of runtimeWorld.floors) {
+      const runtimeFloor = JSON.parse(fs.readFileSync(path.join(root, 'runtime-index', floorEntry.path), 'utf8'));
+      for (const chunk of runtimeFloor.chunks) {
+        const source = fs.readFileSync(path.join(root, 'publication/semantic', chunk.path));
+        for (const group of chunk.groups) {
+          const bytes = source.subarray(group.offset, group.offset + group.bytes);
+          const tiles = decodeSemanticGroup(bytes, {
+            floor: runtimeFloor.floor,
+            regionSpan: runtimeWorld.regionSpan,
+            visualBounds: runtimeWorld.visualBounds,
+            chunk,
+            group,
+          });
+          assert.equal(tiles.length, group.tiles);
+          decodedTiles += tiles.length;
+        }
       }
     }
+    assert.equal(decodedTiles, runtimeWorld.counts.tiles);
+  } finally {
+    fs.rmSync(path.dirname(root), { recursive: true, force: true });
   }
-  assert.equal(decodedGroups, runtimeWorld.counts.groups);
-  fs.rmSync(path.dirname(root), { recursive: true, force: true });
 });
 
 test('bounded-real runtime creature census is only the four exact compatibility fixtures', async () => {
