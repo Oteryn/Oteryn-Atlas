@@ -325,9 +325,11 @@ jobs:
         run: |
           set -euo pipefail
           node --input-type=module - artifacts/controller/protected-verification-plan.json artifacts/controller/protected-hosted-execution.json artifacts/controller/hosted-products.json <<'NODE'
+          import crypto from 'node:crypto';
           import fs from 'node:fs';
           import path from 'node:path';
           import { buildQualificationWorld, verifyQualificationWorld } from './protected-control/tools/verification/qualification-world.mjs';
+          import { publishReadyPublication } from './protected-control/tools/verification/publication-readiness.mjs';
 
           const [planPath, executionPath, outputPath] = process.argv.slice(2);
           const plan = JSON.parse(fs.readFileSync(planPath, 'utf8'));
@@ -339,6 +341,59 @@ jobs:
           if (capabilities.some((value) => !['qualification_fixture', 'bounded_real_world'].includes(value))) {
             throw new Error('unsupported hosted data capability');
           }
+          if (plan.repository !== process.env.GITHUB_REPOSITORY
+            || plan.candidateHeadSha !== process.env.CANDIDATE_HEAD_SHA
+            || plan.controller?.sourceSha !== process.env.CONTROLLER_SOURCE_SHA
+            || plan.planDigest !== execution.planDigest) {
+            throw new Error('Hosted product publication identity does not match the protected execution authority.');
+          }
+
+          const harnessFiles = [
+            'protected-control/tools/verification/publication-readiness.mjs',
+            'protected-control/tools/verification/qualification-world.mjs',
+            'protected-control/e2e/compose.protected-hosted-executor.yml',
+            'protected-control/e2e/compose.github-hosted.yml',
+          ];
+          if (capabilities.includes('bounded_real_world')) {
+            harnessFiles.push(
+              'protected-control/tools/verification/bounded-real-world.mjs',
+              'protected-control/tools/verification/protected-hosted-product-identities.json',
+            );
+          }
+          const harnessEntries = harnessFiles.sort().map((file) => ({
+            path: file.replace(/^protected-control\//, ''),
+            digest: crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex'),
+          }));
+          const harnessDigest = `sha256:${crypto.createHash('sha256').update(JSON.stringify(harnessEntries)).digest('hex')}`;
+          const publicationIdentity = Object.freeze({
+            repository: plan.repository,
+            candidateSha: plan.candidateHeadSha,
+            planDigest: plan.planDigest,
+            producerRunId: `${process.env.GITHUB_RUN_ID}-${process.env.GITHUB_RUN_ATTEMPT}`,
+            harnessDigest,
+          });
+          const readyProduct = (capability, sourceRoot, trustPath) => {
+            const publicationRoot = path.join(
+              process.env.RUNNER_TEMP,
+              `atlas-ready-${capability}-${process.env.GITHUB_RUN_ID}-${process.env.GITHUB_RUN_ATTEMPT}-${process.env.ATLAS_E2E_SHARD.replace('/', '-')}`,
+            );
+            const readiness = publishReadyPublication({
+              sourceDir: sourceRoot,
+              destinationDir: publicationRoot,
+              ...publicationIdentity,
+            });
+            const readinessPath = path.join(publicationRoot, 'atlas-publication-readiness.json');
+            if (JSON.parse(fs.readFileSync(readinessPath, 'utf8')).productDigest !== readiness.productDigest) {
+              throw new Error(`Ready ${capability} publication manifest does not match validated readiness.`);
+            }
+            return Object.freeze({
+              sourceRoot: path.resolve(sourceRoot),
+              publicationRoot: path.resolve(publicationRoot),
+              trustPath: path.resolve(trustPath),
+              readinessPath: path.resolve(readinessPath),
+              harnessDigest,
+            });
+          };
 
           const products = {};
           if (capabilities.includes('qualification_fixture')) {
@@ -350,10 +405,11 @@ jobs:
             if (!expected || expected.id !== manifest.fixtureId || expected.digest !== manifest.productDigest) {
               throw new Error('Qualification fixture identity does not match protected plan.');
             }
-            products.qualification_fixture = {
-              root: destination,
-              trustPath: path.join(destination, 'fixture-manifest.json'),
-            };
+            products.qualification_fixture = readyProduct(
+              'qualification_fixture',
+              destination,
+              path.join(destination, 'fixture-manifest.json'),
+            );
           }
 
           if (capabilities.includes('bounded_real_world')) {
@@ -380,7 +436,7 @@ jobs:
             fs.mkdirSync(trustDir, { recursive: true });
             const trustPath = path.join(trustDir, 'bounded_real_world.json');
             fs.writeFileSync(trustPath, `${JSON.stringify(boundedRealTrustDescriptor(verified))}\n`);
-            products.bounded_real_world = { root: destination, trustPath: path.resolve(trustPath) };
+            products.bounded_real_world = readyProduct('bounded_real_world', destination, trustPath);
           }
 
           fs.writeFileSync(outputPath, `${JSON.stringify(products, null, 2)}\n`);
@@ -472,10 +528,34 @@ jobs:
                 ;;
             esac
 
-            product_root="$(jq -r --arg capability "$dataCapability" '.[$capability].root // empty' "$products")"
+            source_root="$(jq -r --arg capability "$dataCapability" '.[$capability].sourceRoot // empty' "$products")"
+            publication_root="$(jq -r --arg capability "$dataCapability" '.[$capability].publicationRoot // empty' "$products")"
             trust_path="$(jq -r --arg capability "$dataCapability" '.[$capability].trustPath // empty' "$products")"
-            test -d "$product_root"
+            readiness_path="$(jq -r --arg capability "$dataCapability" '.[$capability].readinessPath // empty' "$products")"
+            harness_digest="$(jq -r --arg capability "$dataCapability" '.[$capability].harnessDigest // empty' "$products")"
+            test -d "$source_root"
+            test -d "$publication_root"
+            test "$source_root" != "$publication_root"
             test -s "$trust_path"
+            test -s "$readiness_path"
+            [[ "$harness_digest" =~ ^sha256:[a-f0-9]{64}$ ]]
+
+            node --input-type=module - "$publication_root" "$readiness_path" "$harness_digest" <<'NODE'
+            import fs from 'node:fs';
+            import { validateReadyPublication } from './protected-control/tools/verification/publication-readiness.mjs';
+            const [publicationRoot, readinessPath, harnessDigest] = process.argv.slice(2);
+            const manifest = JSON.parse(fs.readFileSync(readinessPath, 'utf8'));
+            validateReadyPublication({
+              publicationDir: publicationRoot,
+              manifest,
+              repository: process.env.GITHUB_REPOSITORY,
+              candidateSha: process.env.CANDIDATE_HEAD_SHA,
+              planDigest: process.env.ATLAS_VERIFICATION_PLAN_SHA256,
+              producerRunId: `${process.env.GITHUB_RUN_ID}-${process.env.GITHUB_RUN_ATTEMPT}`,
+              harnessDigest,
+            });
+            NODE
+
             protected_list="$PWD/artifacts/controller/test-lists/$dataCapability/protected.txt"
             candidate_list="$PWD/artifacts/controller/test-lists/$dataCapability/candidate-additions.txt"
             test -f "$protected_list"
@@ -486,7 +566,7 @@ jobs:
             fi
 
             export COMPOSE_PROJECT_NAME="atlas-protected-${GITHUB_RUN_ID}-${{ matrix.shard }}-${dataCapability//_/-}"
-            export ATLAS_QUALIFICATION_PUBLICATION_HOST="$product_root"
+            export ATLAS_QUALIFICATION_PUBLICATION_HOST="$publication_root"
             export ATLAS_QUALIFICATION_TRUST_JSON="$(jq -c . "$trust_path")"
             export ATLAS_EXECUTION_CONTEXT="$protected_context"
             export ATLAS_PROTECTED_TEST_LIST="$protected_list"
