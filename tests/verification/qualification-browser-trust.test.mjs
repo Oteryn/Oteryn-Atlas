@@ -57,7 +57,8 @@ test('qualification override fails closed instead of silently falling back to pr
   assert.match(trustSource, /sha256:\[0-9a-f\]\{64\}/);
 });
 
-test('Playwright never predefines qualification  const originalTrustJson = process.env.ATLAS_QUALIFICATION_TRUST_JSON;
+test('Playwright resolves qualification navigation before the only Atlas navigation', async () => {
+  const originalTrustJson = process.env.ATLAS_QUALIFICATION_TRUST_JSON;
   const semanticIndex = {
     source: {
       fixture_id: descriptor.fixtureId,
@@ -95,11 +96,5 @@ test('Playwright never predefines qualification  const originalTrustJson = proce
   assert.doesNotMatch(runtime, /qualificationTrustInstalledPages/);
   assert.doesNotMatch(runtime, /installQualificationTrust/);
   assert.doesNotMatch(runtime, /Object\s*\.\s*defineProperty\s*\(\s*globalThis\s*,\s*['"]__OTERYN_ATLAS_QUALIFICATION_TRUST__/);
-  assert.doesNotMatch(runtime, /__OTERYN_ATLAS_QUALIFICATION_TRUST__/);
-ation must occur after qualification entry resolution');
-  assert.doesNotMatch(runtime, /page\.addInitScript/);
-  assert.doesNotMatch(runtime, /qualificationTrustInstalledPages/);
-  assert.doesNotMatch(runtime, /installQualificationTrust/);
-  assert.doesNotMatch(runtime, /Object\.defineProperty\(globalThis,\s*['"]__OTERYN_ATLAS_QUALIFICATION_TRUST__/);
   assert.doesNotMatch(runtime, /__OTERYN_ATLAS_QUALIFICATION_TRUST__/);
 });
