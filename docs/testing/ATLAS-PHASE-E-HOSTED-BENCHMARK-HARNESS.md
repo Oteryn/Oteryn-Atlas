@@ -76,15 +76,15 @@ Required phase names are mapped through `hosted-benchmark-phase-map.json`. On a 
 
 `duplicateSetupMs` is descriptive duplicated setup time: for checkout/fetch, dependency restore/install, qualification preparation, browser-image preparation, and preview startup, the collector counts repeated mapped occurrences after the first occurrence. It is not itself a policy threshold.
 
-`runnerLogicalCpuCount`, `runnerMemoryTotalBytes`, `peakCpuPercent`, and `peakMemoryBytes` are required `MEASURED` observations for a successful benchmark. `peakCpuPercent` is normalized to 0–100% of total hosted-runner CPU capacity, and `peakMemoryBytes` cannot exceed measured runner total memory. These observations are the guardrail for deciding whether a later `workers=2` or `workers=4` experiment is even eligible to run; they are not themselves a production threshold.
+`runnerLogicalCpuCount`, `runnerMemoryTotalBytes`, `peakCpuPercent`, and `peakMemoryBytes` are required `MEASURED` observations for a successful benchmark. `peakCpuPercent` is normalized to 0–100% of total hosted-runner CPU capacity, and `peakMemoryBytes` cannot exceed measured runner total memory. These observations are the guardrail for deciding whether a later `workers=2`, `workers=4`, `workers=6`, or `workers=8` packed experiment is eligible to run; they are not themselves a production threshold.
 
 `varianceMs` is an aggregate dispersion field. For comparison summaries use a documented millisecond spread over repeated clean verdict wall-clock observations, consistently across candidates; single-run records keep it explicit `NOT_APPLICABLE`. `usefulPlansPerHour` is likewise aggregate: count only exact-identity, non-superseded plans that reach a valid verdict during the measured observation window.
 
 ## Experiment sequence — prepare, do not conclude
 
-Start every representative workload with `packed-w1`: one hosted job, `workers=1`, `shards=1`. This is the fixed-cost and critical-path baseline.
+Start every representative workload with `packed-w1`: one hosted job, `workers=1`, `shards=1`. This is the fixed-cost and critical-path baseline. The packed measurement ladder is `workers=1/2/4/6/8`, with each tier measured as a separate single-job experiment.
 
-`workers=2` is conditional on measured hosted-runner CPU/memory headroom and a clean packed baseline. `workers=4` is conditional on `workers=2` remaining stable and showing real resource headroom; there is no 6/8 worker ladder.
+`workers=2` is conditional on measured hosted-runner CPU/memory headroom and a clean packed baseline. `workers=4` is conditional on `workers=2` remaining stable and showing real resource headroom. `workers=6` is conditional on `workers=4` remaining stable with resource headroom, and `workers=8` is conditional on `workers=6` remaining stable with resource headroom. A higher tier that is ineligible or unstable remains recorded as such and must not be substituted into policy selection.
 
 2 shards are candidates only for `broad` and `full` when setup amortization is plausibly favorable. 4 shards are candidates only for `broad` and `full` after 2-shard evidence shows a material wall-clock benefit that can justify duplicated setup and extra job-minutes. Sharding is not a default for focused/targeted work.
 
