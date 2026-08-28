@@ -58,18 +58,39 @@ test('qualification override fails closed instead of silently falling back to pr
 
 test('Playwright never predefines qualification trust after protected web bootstrap promotion', () => {
   const navigation = runtime.indexOf('page.goto');
-  const gotoAtlasStart = runtime.indexOf('export async function gotoAtlas');
-  const nextExport = runtime.indexOf('\nexport ', gotoAtlasStart + 1);
+  const gotoAtlas = /export\s+async\s+function\s+gotoAtlas\s*\([^)]*\)\s*\{/.exec(runtime);
   assert(navigation >= 0, 'Atlas navigation is missing');
-  assert(gotoAtlasStart >= 0 && nextExport > gotoAtlasStart, 'gotoAtlas source bounds are missing');
-  const gotoAtlasSource = runtime.slice(gotoAtlasStart, nextExport);
-  const resolver = /resolveQualificationEntry\s*\(\s*entry\s*,\s*\{[\s\S]*?\bqualificationTrustJson\s*:\s*process\.env\.ATLAS_QUALIFICATION_TRUST_JSON\b[\s\S]*?\}\s*\)/.exec(gotoAtlasSource);
-  assert(resolver, 'qualification trust input must be bound while resolving the entry');
-  const resolverBinding = gotoAtlasSource.indexOf('qualificationTrustJson', resolver.index);
-  const navigationCalls = [...gotoAtlasSource.matchAll(/\bpage\s*\.\s*goto\s*\(\s*([A-Za-z_$][\w$]*)\b/g)];
+  assert(gotoAtlas, 'gotoAtlas export is missing');
+  const gotoAtlasStart = gotoAtlas.index;
+  const nextExportOffset = runtime.slice(gotoAtlasStart + gotoAtlas[0].length).search(/\n\s*export\s+(?:async\s+)?function\b/);
+  assert(nextExportOffset >= 0, 'next exported function after gotoAtlas is missing');
+  const gotoAtlasSource = runtime.slice(gotoAtlasStart, gotoAtlasStart + gotoAtlas[0].length + nextExportOffset);
+  const resolver = /\bresolveQualificationEntry\s*\(\s*entry\s*,\s*\{/.exec(gotoAtlasSource);
+  assert(resolver, 'qualification entry resolution is missing');
+  const closingCallParen = (source, callStart) => {
+    const openingParen = source.indexOf('(', callStart);
+    let depth = 0;
+    let quote = null;
+    for (let index = openingParen; index < source.length; index += 1) {
+      const char = source[index];
+      if (quote) {
+        if (char.charCodeAt(0) === 92) index += 1;
+        else if (char === quote) quote = null;
+      } else if (char === "'" || char === '"' || char.charCodeAt(0) === 96) quote = char;
+      else if (char === '(') depth += 1;
+      else if (char === ')' && --depth === 0) return index + 1;
+    }
+    return -1;
+  };
+  const resolverEnd = closingCallParen(gotoAtlasSource, resolver.index);
+  assert(resolverEnd > resolver.index, 'qualification entry resolution must have a complete call');
+  const resolverSource = gotoAtlasSource.slice(resolver.index, resolverEnd);
+  assert.match(resolverSource, /\bqualificationTrustJson\s*:\s*process\.env\.ATLAS_QUALIFICATION_TRUST_JSON\b/);
+  const navigationCalls = [...gotoAtlasSource.matchAll(/\bpage\s*\.\s*goto\s*\(/g)];
   assert.equal(navigationCalls.length, 1, 'gotoAtlas must make exactly one navigation');
-  assert.equal(navigationCalls[0][1], 'resolvedEntry', 'Atlas navigation must use the resolved qualification entry');
-  assert(navigationCalls[0].index > resolverBinding, 'Atlas navigation must occur after qualification entry resolution');
+  const navigationSource = gotoAtlasSource.slice(navigationCalls[0].index);
+  assert.match(navigationSource, /^page\s*\.\s*goto\s*\(\s*resolvedEntry\s*(?=,|\))/);
+  assert(navigationCalls[0].index > resolverEnd, 'Atlas navigation must occur after qualification entry resolution');
   assert.doesNotMatch(runtime, /page\.addInitScript/);
   assert.doesNotMatch(runtime, /qualificationTrustInstalledPages/);
   assert.doesNotMatch(runtime, /installQualificationTrust/);
