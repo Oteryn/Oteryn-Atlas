@@ -12,10 +12,17 @@ function readRequired(url, label) {
 
 test('GitHub-hosted qualification compose serves every fixture namespace without LAN or specialist dependencies', () => {
   const override = readRequired(overrideUrl, 'GitHub-hosted Compose override');
+  assert.match(override, /atlas-publication-ready:/);
+  assert.match(override, /network_mode: none/);
+  assert.match(override, /\$\{ATLAS_QUALIFICATION_PUBLICATION_HOST:\?[^}]+\}:\/source:ro/);
+  assert.match(override, /atlas-ready-publication:\/ready/);
+  assert.match(override, /\.\.:\/protected-control:ro/);
+  assert.match(override, /publishReadyPublication/);
+  assert.match(override, /validateReadyPublication/);
   assert.match(override, /atlas-publication:/);
   assert.match(override, /ghcr\.io\/nginx\/nginx-unprivileged:1\.31\.3-alpine3\.24-slim@sha256:22f839c5fb4007dc24d203a170a9e03fc185d660bfefc34ac6823a7aef085cbc/);
-  assert.match(override, /\$\{ATLAS_QUALIFICATION_PUBLICATION_HOST:\?[^}]+\}:\/srv\/atlas\/fullworld:ro/);
-  assert.match(override, /\$\{ATLAS_QUALIFICATION_PUBLICATION_HOST:\?[^}]+\}\/data\/creatures:\/srv\/atlas\/data\/creatures:ro/);
+  assert.match(override, /atlas-publication:[\s\S]*depends_on:[\s\S]*atlas-publication-ready:[\s\S]*condition: service_completed_successfully/);
+  assert.match(override, /atlas-publication:[\s\S]*atlas-ready-publication:\/srv\/atlas:ro/);
   assert.match(override, /atlas-web:[\s\S]*\$\{ATLAS_QUALIFICATION_PUBLICATION_HOST:\?[^}]+\}\/web\/semantic-search:\/usr\/share\/nginx\/html\/web\/semantic-search:ro/);
   assert.match(override, /atlas-web:[\s\S]*\$\{ATLAS_QUALIFICATION_PUBLICATION_HOST:\?[^}]+\}\/web\/creature-gameplay:\/usr\/share\/nginx\/html\/web\/creature-gameplay:ro/);
   assert.match(override, /qualification-publication\.conf:\/etc\/nginx\/conf\.d\/default\.conf:ro/);
