@@ -45,7 +45,7 @@ jobs:
           test "$(wc -l < "$rows" | tr -d '[:space:]')" = "$ATLAS_CHANGED_FILE_COUNT"
           printf '%s\n' \
             '.github/workflows/protected-execution-promotion-qualification.yml' \
-            'tests/verification/legacy-molehill-transition-workflow-contract.test.mjs' \
+            'tests/verification/protected-execution-promotion-workflow-contract.test.mjs' \
             'tests/verification/protected-hosted-execution.test.mjs' \
             'tools/verification/protected-hosted-execution.mjs' \
             > "$expected"
