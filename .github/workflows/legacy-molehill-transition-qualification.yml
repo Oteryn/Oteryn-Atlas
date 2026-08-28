@@ -30,7 +30,6 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       ATLAS_PR_NUMBER: ${{ github.event.pull_request.number }}
       ATLAS_HEAD_REF: ${{ github.event.pull_request.head.ref }}
-      ATLAS_HEAD_REF: ${{ github.event.pull_request.head.ref }}
       ATLAS_CODE_REVISION: ${{ github.event.pull_request.head.sha }}
       ATLAS_EXPECTED_REVISION: ${{ github.event.pull_request.head.sha }}
       ATLAS_BASE_SHA: ${{ github.event.pull_request.base.sha }}
@@ -279,6 +278,7 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       ATLAS_PR_NUMBER: ${{ github.event.pull_request.number }}
+      ATLAS_HEAD_REF: ${{ github.event.pull_request.head.ref }}
       ATLAS_CODE_REVISION: ${{ github.event.pull_request.head.sha }}
       ATLAS_BASE_SHA: ${{ github.event.pull_request.base.sha }}
       ATLAS_CHANGED_FILE_COUNT: ${{ github.event.pull_request.changed_files }}
