@@ -57,3 +57,15 @@ test('protected execution promotion preauthorizes the qualification trust-descri
   assert.match(workflow, /tests\/verification\/protected-hosted-compose-promotion\.test\.mjs/);
   assert.match(workflow, /tools\/verification\/qualification-world\.mjs/);
 });
+
+test('protected execution promotion preauthorizes the qualification product-binding repair on exact GitHub-hosted evidence', () => {
+  const workflow = fs.readFileSync(workflowPath, 'utf8');
+  const legacy = fs.readFileSync(legacyWorkflowPath, 'utf8');
+  const heavy = legacy.split('  legacy-qualification:')[1]?.split('  protected-census-bootstrap:')[0] ?? '';
+
+  assert.match(workflow, /fix\/issue-179-qualification-promotion-product-binding/);
+  assert.doesNotMatch(heavy, /fix\/issue-179-qualification-promotion-product-binding/);
+  assert.match(workflow, /tests\/verification\/protected-promotion-product-binding\.test\.mjs/);
+  assert.match(workflow, /qualification_fixture/);
+  assert.match(workflow, /Protected GitHub-hosted promotion registry binding proof/);
+});
