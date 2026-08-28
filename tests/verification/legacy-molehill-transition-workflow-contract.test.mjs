@@ -1,11 +1,31 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
+import { buildVerificationPlan } from '../../tools/verification/build-verification-plan.mjs';
+import { parsePlaywrightStableTestIds } from '../../tools/verification/parse-playwright-test-list.mjs';
+
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const workflowPath = path.join(ROOT, '.github/workflows/legacy-molehill-transition-qualification.yml');
+const catalogPath = path.join(ROOT, 'tools/verification/verification-catalog.json');
+const impactPath = path.join(ROOT, 'tools/verification/impact-manifest.json');
+
+function readJson(pathname) {
+  return JSON.parse(fs.readFileSync(pathname, 'utf8'));
+}
+
+function retainedLegacyRunnerStableTestIds() {
+  const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+  const listed = spawnSync(npm, [
+    'exec', '--prefix', 'e2e', '--',
+    'playwright', 'test', '--config=e2e/playwright.config.mjs', '--list',
+  ], { cwd: ROOT, encoding: 'utf8' });
+  assert.equal(listed.status, 0, listed.stderr);
+  return parsePlaywrightStableTestIds(listed.stdout);
+}
 
 test('legacy atlas-local-e2e transition qualifier is bounded, exact-head and repository-approved-runner only', () => {
   assert.equal(fs.existsSync(workflowPath), true, 'legacy transition workflow must exist');
@@ -31,6 +51,30 @@ test('legacy atlas-local-e2e transition qualifier is bounded, exact-head and rep
   assert.doesNotMatch(workflow, /continue-on-error:\s*true/);
   assert.doesNotMatch(workflow, /retries?\s*[:=]\s*[1-9]/i);
   assert.doesNotMatch(workflow, /synology/i);
+});
+
+test('legacy transition plan binds every stable ID executed by its retained full runner', () => {
+  const stableTestIds = retainedLegacyRunnerStableTestIds();
+  const catalog = readJson(catalogPath);
+  const impact = readJson(impactPath);
+  const plan = buildVerificationPlan({
+    repository: 'Oteryn/Oteryn-Atlas',
+    headSha: 'a'.repeat(40),
+    integrationBaseSha: 'b'.repeat(40),
+    mergeBaseSha: 'c'.repeat(40),
+    changedFiles: [{ path: '.github/workflows/legacy-molehill-transition-qualification.yml' }],
+    trustedImpactManifest: impact,
+    candidateImpactManifest: impact,
+    trustedVerificationCatalog: catalog,
+    candidateVerificationCatalog: catalog,
+    stableTestIds,
+  });
+
+  assert.deepEqual(plan.stableTestIds, stableTestIds,
+    'the status validator requires an exact plan-to-summary census, not a lower bound');
+  assert.deepEqual(plan.requiredDataCapabilities,
+    ['bounded_real_world', 'qualification_fixture', 'real_fullworld']);
+  assert.equal(plan.requiresRealFullWorld, true);
 });
 
 test('PowerShell PR-head fences write JSON as UTF-8 without BOM before Node parses it', () => {
