@@ -11,6 +11,7 @@ services:
       ATLAS_PUBLICATION_UPSTREAM: ${ATLAS_PUBLICATION_UPSTREAM:-127.0.0.1:9}
       ATLAS_PUBLICATION_HOST_HEADER: ${ATLAS_PUBLICATION_HOST_HEADER:-127.0.0.1:9}
       ATLAS_PUBLICATION_HOST: ${ATLAS_PUBLICATION_HOST:-127.0.0.1}
+      ATLAS_QUALIFICATION_TRUST_JSON: ${ATLAS_QUALIFICATION_TRUST_JSON:?ATLAS_QUALIFICATION_TRUST_JSON is required}
       NGINX_ENVSUBST_FILTER: ^ATLAS_
       NGINX_ENVSUBST_OUTPUT_DIR: /tmp
     volumes:
@@ -21,7 +22,7 @@ services:
     tmpfs:
       - /tmp
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/web/fullworld.html || exit 1"]
+      test: ["CMD-SHELL", "test -n \"$$ATLAS_QUALIFICATION_TRUST_JSON\" && wget -q -O /dev/null http://127.0.0.1:8080/web/fullworld.html || exit 1"]
       interval: 2s
       timeout: 2s
       retries: 30
