@@ -26,7 +26,7 @@ const plan = {
   productIdentitiesDigest: productDigest,
   workerPolicyDigest: workerDigest,
   executionPolicyDigest: executionDigest,
-  workerPolicy: { id: 'atlas-protected-hosted-workers-v1', version: 1, hostedShards: 2, workersPerShard: 1 },
+  workerPolicy: { id: 'atlas-protected-hosted-workers-v1', version: 1, hostedShards: 1, workersPerShard: 1 },
   retryPolicy: { retries: 0 },
   selectiveExecution: false,
 };
@@ -89,28 +89,28 @@ const sources = [
 
 test('protected shard validator accepts the exact required source summary for every nonempty data-capability placement', () => {
   const result = buildProtectedHostedShardSummary({
-    plan, execution, sourceSummaries: sources, shardIndex: 0, shardCount: 2,
+    plan, execution, sourceSummaries: sources, shardIndex: 0, shardCount: 1,
   });
   assert.deepEqual(result.executedStableTestIds, [boundedAdditionId, boundedId, fixtureId].sort());
 });
 
 test('protected shard validator rejects missing duplicate mismatched and unsupported capability source summaries', () => {
   assert.throws(() => buildProtectedHostedShardSummary({
-    plan, execution, sourceSummaries: sources.slice(1), shardIndex: 0, shardCount: 2,
+    plan, execution, sourceSummaries: sources.slice(1), shardIndex: 0, shardCount: 1,
   }), /missing|qualification_fixture/i);
   assert.throws(() => buildProtectedHostedShardSummary({
-    plan, execution, sourceSummaries: [...sources, sources[1]], shardIndex: 0, shardCount: 2,
+    plan, execution, sourceSummaries: [...sources, sources[1]], shardIndex: 0, shardCount: 1,
   }), /duplicate|bounded_real_world/i);
   assert.throws(() => buildProtectedHostedShardSummary({
     plan, execution, sourceSummaries: [
       sources[0],
       { ...sources[1], summary: summaryFor(fixtureId) },
       sources[2],
-    ], shardIndex: 0, shardCount: 2,
+    ], shardIndex: 0, shardCount: 1,
   }), /duplicate|unexpected|bounded_real_world/i);
   assert.throws(() => buildProtectedHostedShardSummary({
     plan, execution, sourceSummaries: [...sources, {
       placement: 'protected', dataCapability: 'real_fullworld', summary: summaryFor(fixtureId),
-    }], shardIndex: 0, shardCount: 2,
+    }], shardIndex: 0, shardCount: 1,
   }), /real_fullworld|unsupported|capability/i);
 });

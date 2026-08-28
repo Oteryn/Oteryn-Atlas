@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 const SHA = /^[a-f0-9]{40}$/;
 const SHA256 = /^sha256:[a-f0-9]{64}$/;
 const BROWSER_CONTAINER = 'mcr.microsoft.com/playwright:v1.62.0-noble@sha256:baed2032d533817f3dbe6425de795788430ba345e819a1201337009ba17c9d07';
-const WORKER_POLICY = Object.freeze({ id: 'atlas-protected-hosted-workers-v1', version: 1, hostedShards: 2, workersPerShard: 1 });
+const WORKER_POLICY = Object.freeze({ id: 'atlas-protected-hosted-workers-v1', version: 1, hostedShards: 1, workersPerShard: 1 });
 const SOURCE_PLACEMENTS = new Set(['protected', 'candidate-additions']);
 const HOSTED_DATA_CAPABILITIES = new Set(['qualification_fixture', 'bounded_real_world']);
 

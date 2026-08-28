@@ -4,6 +4,7 @@ export const ANIMATION_RUNTIME_PROFILE = 'oteryn-atlas-animation-runtime-v1';
 export const ANIMATION_PRODUCT_ROOT = 'sha256:0d1c8fc777d1d220a9d7723507fddd72585f7358d35a40209bd7415f1fe057c1';
 export const OUTFIT_SPATIAL_ROOT = 'sha256:62fdd7d0ce02652582f03bf971455f4a2f9ec1e472eaebfec5af739cf11a921e';
 export const GAME_ANIMATION_SHA = '8f6a4fdea4487a61c4cdaf1889d421ecd2265a31';
+export const PRODUCTION_ANIMATION_SOURCE = Object.freeze({ gameSha: GAME_ANIMATION_SHA, appearanceProductRoot: ANIMATION_PRODUCT_ROOT, outfitSpatialProductRoot: OUTFIT_SPATIAL_ROOT });
 const MAX_MANIFEST_BYTES = 2 * 1024 * 1024;
 const MAX_PROGRAM_BYTES = 48 * 1024 * 1024;
 const MAX_BUCKET_BYTES = 8 * 1024 * 1024;
@@ -80,14 +81,17 @@ function objectSpriteFor(program, pattern, phase) {
   requireValue(Number.isSafeInteger(sprite) && sprite > 0, 'object animation sprite missing');
   return sprite;
 }
-export async function loadAnimationRuntime(baseUrl, fetcher = fetch) {
+export async function loadAnimationRuntime(baseUrl, fetcher = fetch, expectedSource = PRODUCTION_ANIMATION_SOURCE) {
+  requireValue(expectedSource && typeof expectedSource === 'object', 'animation source expectations invalid');
+  requireValue((expectedSource.gameSha === 'fixture' || /^[0-9a-f]{40}$/.test(expectedSource.gameSha ?? '')), 'animation source Game SHA expectation invalid');
+  requireValue(isSha(expectedSource.appearanceProductRoot) && isSha(expectedSource.outfitSpatialProductRoot), 'animation source root expectation invalid');
   const root = new URL(baseUrl);
   const manifestBytes = await readBytes(new URL('manifest.json', root), MAX_MANIFEST_BYTES, null, null, fetcher);
   const manifest = parseJson(manifestBytes, 'animation manifest');
   requireValue(manifest.profile === ANIMATION_RUNTIME_PROFILE && manifest.identityAuthority === false, 'unsupported animation runtime manifest');
-  requireValue(manifest.source?.game_sha === GAME_ANIMATION_SHA, 'animation Game SHA mismatch');
-  requireValue(manifest.source?.appearance_product_root === ANIMATION_PRODUCT_ROOT, 'animation product root mismatch');
-  requireValue(manifest.source?.outfit_spatial_product_root === OUTFIT_SPATIAL_ROOT, 'outfit spatial root mismatch');
+  requireValue(manifest.source?.game_sha === expectedSource.gameSha, 'animation Game SHA mismatch');
+  requireValue(manifest.source?.appearance_product_root === expectedSource.appearanceProductRoot, 'animation product root mismatch');
+  requireValue(manifest.source?.outfit_spatial_product_root === expectedSource.outfitSpatialProductRoot, 'outfit spatial root mismatch');
   requireValue(Array.isArray(manifest.buckets) && manifest.buckets.length <= MAX_BUCKETS, 'animation bucket census invalid');
   const programBytes = await readBytes(new URL(safePath(manifest.programs.path), root), MAX_PROGRAM_BYTES, manifest.programs.digest, manifest.programs.bytes, fetcher);
   const product = parseJson(programBytes, 'animation programs');
