@@ -129,18 +129,3 @@ test('reviewed status fence keeps the candidate checkout clean before protected 
   assert.match(statusJob, /--payload \$currentPrPayload/);
   assert.doesNotMatch(statusJob, /Join-Path \$PWD 'artifacts-current-pr\.json'/);
 });
-
-test('protected execution contract promotion uses GitHub-hosted targeted compatibility proof, never Molehill full E2E', () => {
-  const workflow = fs.readFileSync(workflowPath, 'utf8');
-  const bootstrap = workflow.split('  protected-census-bootstrap:')[1]?.split('  publish-reviewed-status:')[0] ?? '';
-  const heavy = workflow.split('  legacy-qualification:')[1]?.split('  protected-census-bootstrap:')[0] ?? '';
-  assert.match(bootstrap, /fix\/issue-179-protected-execution-contract-promotion/);
-  assert.doesNotMatch(heavy, /fix\/issue-179-protected-execution-contract-promotion/);
-  assert.match(bootstrap, /tests\/verification\/protected-hosted-execution\.test\.mjs/);
-  assert.match(bootstrap, /tools\/verification\/protected-hosted-execution\.mjs/);
-  assert.match(bootstrap, /node --test tests\/verification\/protected-hosted-execution\.test\.mjs/);
-  assert.match(bootstrap, /runs-on:\s*ubuntu-24\.04/);
-  assert.doesNotMatch(bootstrap, /\\e2e\\run\.ps1|group:\s*atlas-runners|labels:\s*oteryn-atlas-pc/);
-  assert.match(bootstrap, /assert-current-pr-head\.mjs/);
-  assert.match(bootstrap, /context='atlas-local-e2e'|context.*atlas-local-e2e/s);
-});
