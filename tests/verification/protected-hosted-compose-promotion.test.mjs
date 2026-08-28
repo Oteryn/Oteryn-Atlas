@@ -31,7 +31,7 @@ test('protected GitHub-hosted qualification publication is atomically readied, s
   assert.match(override, /publication-readiness\.mjs/);
   assert.match(override, /publishReadyPublication/);
   assert.match(override, /validateReadyPublication/);
-  assert.match(override, /destinationDir:\s*'\/ready\/fullworld'/);
+  assert.match(override, /publicationDir\s*=\s*'\/ready\/fullworld'/);
   assert.match(override, /producerRunId:\s*process\.env\.GITHUB_RUN_ID \+ '-' \+ shardOrdinal/);
   assert.match(override, /atlas-ready-publication:\/ready/);
   assert.match(override, /atlas-publication-ready:[\s\S]*condition: service_completed_successfully/);
@@ -50,4 +50,13 @@ test('protected GitHub-hosted qualification publication is atomically readied, s
   assert.match(nginx, /location \^~ \/fullworld\//);
   assert.match(nginx, /location \^~ \/data\/creatures\/[\s\S]*root \/srv\/atlas\/fullworld;/);
   assert.doesNotMatch(nginx, /proxy_pass|192\.168\.|synology|molehill/i);
+});
+
+test('protected readiness init is re-entry safe only by exact validation, never overwrite', () => {
+  const override = readRequired('e2e/compose.github-hosted.yml', 'GitHub-hosted qualification compose override');
+  assert.match(override, /const readinessPath = publicationDir \+ '\/atlas-publication-readiness\.json'/);
+  assert.match(override, /if \(fs\.existsSync\(readinessPath\)\) \{[\s\S]*JSON\.parse\(fs\.readFileSync\(readinessPath, 'utf8'\)\)/);
+  assert.match(override, /else \{[\s\S]*publishReadyPublication\([\s\S]*destinationDir: publicationDir/);
+  assert.match(override, /validateReadyPublication\([\s\S]*publicationDir,[\s\S]*manifest,[\s\S]*\.\.\.identity/);
+  assert.doesNotMatch(override, /force:\s*true|overwrite|rmSync\(publicationDir/);
 });

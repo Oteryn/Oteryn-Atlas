@@ -53,13 +53,20 @@ services:
           producerRunId: process.env.GITHUB_RUN_ID + '-' + shardOrdinal,
           harnessDigest: 'sha256:' + hash.digest('hex'),
         };
-        const manifest = publishReadyPublication({
-          sourceDir: '/source',
-          destinationDir: '/ready/fullworld',
-          ...identity,
-        });
+        const publicationDir = '/ready/fullworld';
+        const readinessPath = publicationDir + '/atlas-publication-readiness.json';
+        let manifest;
+        if (fs.existsSync(readinessPath)) {
+          manifest = JSON.parse(fs.readFileSync(readinessPath, 'utf8'));
+        } else {
+          manifest = publishReadyPublication({
+            sourceDir: '/source',
+            destinationDir: publicationDir,
+            ...identity,
+          });
+        }
         validateReadyPublication({
-          publicationDir: '/ready/fullworld',
+          publicationDir,
           manifest,
           ...identity,
         });
