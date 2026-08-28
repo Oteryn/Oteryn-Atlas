@@ -26,7 +26,7 @@ function plan() {
     productIdentitiesDigest: productDigest,
     workerPolicyDigest: workerDigest,
     executionPolicyDigest: executionDigest,
-    workerPolicy: { id: 'atlas-protected-hosted-workers-v1', version: 1, hostedShards: 2, workersPerShard: 1 },
+    workerPolicy: { id: 'atlas-protected-hosted-workers-v1', version: 1, hostedShards: 1, workersPerShard: 1 },
     retryPolicy: { retries: 0 },
     selectiveExecution: false,
   };
@@ -76,7 +76,7 @@ function summaryFor(id, overrides = {}) {
 const summary = (overrides = {}) => summaryFor(idA, overrides);
 
 test('protected shard summary binds exact plan/controller/product/worker and hosted-placement identities', () => {
-  const result = buildProtectedHostedShardSummary({ plan: plan(), execution: execution(), summary: summary(), shardIndex: 0, shardCount: 2 });
+  const result = buildProtectedHostedShardSummary({ plan: plan(), execution: execution(), summary: summary(), shardIndex: 0, shardCount: 1 });
   assert.equal(result.schemaVersion, 1);
   assert.equal(result.status, 'success');
   assert.equal(result.cancelled, false);
@@ -89,7 +89,7 @@ test('protected shard summary binds exact plan/controller/product/worker and hos
   assert.equal(result.workerPolicyDigest, workerDigest);
   assert.equal(result.executionPolicyDigest, executionDigest);
   assert.equal(result.shardIndex, 0);
-  assert.equal(result.shardCount, 2);
+  assert.equal(result.shardCount, 1);
   assert.equal(result.retries, 0);
   assert.deepEqual(result.skippedStableTestIds, []);
   assert.deepEqual(result.executedStableTestIds, [idA]);
@@ -101,23 +101,23 @@ test('protected shard evidence unions protected-body and candidate-addition Play
     execution: execution(),
     summaries: [summaryFor(idA), summaryFor(idB)],
     shardIndex: 0,
-    shardCount: 2,
+    shardCount: 1,
   });
   assert.deepEqual(result.executedStableTestIds, [idA, idB]);
 });
 
 test('duplicate stable IDs across protected and candidate-addition summaries fail closed', () => {
   assert.throws(() => buildProtectedHostedShardSummary({
-    plan: plan(), execution: execution(), summaries: [summaryFor(idA), summaryFor(idA)], shardIndex: 0, shardCount: 2,
+    plan: plan(), execution: execution(), summaries: [summaryFor(idA), summaryFor(idA)], shardIndex: 0, shardCount: 1,
   }), /duplicate/i);
 });
 
 test('failed cancelled skipped retried or duplicate scenario evidence fails closed', () => {
-  assert.throws(() => buildProtectedHostedShardSummary({ plan: plan(), execution: execution(), summary: summary({ status: 'failed' }), shardIndex: 0, shardCount: 2 }), /status|passed/i);
-  assert.throws(() => buildProtectedHostedShardSummary({ plan: plan(), execution: execution(), summary: summary({ cancelled: true }), shardIndex: 0, shardCount: 2 }), /cancel/i);
-  assert.throws(() => buildProtectedHostedShardSummary({ plan: plan(), execution: execution(), summary: summary({ scenarios: [{ stableTestId: idA, status: 'skipped', retry: 0, skipReason: 'skip' }] }), shardIndex: 0, shardCount: 2 }), /skip/i);
-  assert.throws(() => buildProtectedHostedShardSummary({ plan: plan(), execution: execution(), summary: summary({ scenarios: [{ stableTestId: idA, status: 'passed', retry: 1, skipReason: null }] }), shardIndex: 0, shardCount: 2 }), /retr/i);
-  assert.throws(() => buildProtectedHostedShardSummary({ plan: plan(), execution: execution(), summary: summary({ scenarios: [summary().scenarios[0], summary().scenarios[0]] }), shardIndex: 0, shardCount: 2 }), /duplicate/i);
+  assert.throws(() => buildProtectedHostedShardSummary({ plan: plan(), execution: execution(), summary: summary({ status: 'failed' }), shardIndex: 0, shardCount: 1 }), /status|passed/i);
+  assert.throws(() => buildProtectedHostedShardSummary({ plan: plan(), execution: execution(), summary: summary({ cancelled: true }), shardIndex: 0, shardCount: 1 }), /cancel/i);
+  assert.throws(() => buildProtectedHostedShardSummary({ plan: plan(), execution: execution(), summary: summary({ scenarios: [{ stableTestId: idA, status: 'skipped', retry: 0, skipReason: 'skip' }] }), shardIndex: 0, shardCount: 1 }), /skip/i);
+  assert.throws(() => buildProtectedHostedShardSummary({ plan: plan(), execution: execution(), summary: summary({ scenarios: [{ stableTestId: idA, status: 'passed', retry: 1, skipReason: null }] }), shardIndex: 0, shardCount: 1 }), /retr/i);
+  assert.throws(() => buildProtectedHostedShardSummary({ plan: plan(), execution: execution(), summary: summary({ scenarios: [summary().scenarios[0], summary().scenarios[0]] }), shardIndex: 0, shardCount: 1 }), /duplicate/i);
 });
 
 test('wrong revision plan digest browser container worker count or shard policy fails closed', () => {
@@ -128,20 +128,20 @@ test('wrong revision plan digest browser container worker count or shard policy 
     { metadata: { ...summary().metadata, workers: 2 } },
   ];
   for (const overrides of cases) {
-    assert.throws(() => buildProtectedHostedShardSummary({ plan: plan(), execution: execution(), summary: summary(overrides), shardIndex: 0, shardCount: 2 }), /revision|plan|browser|worker|mismatch/i);
+    assert.throws(() => buildProtectedHostedShardSummary({ plan: plan(), execution: execution(), summary: summary(overrides), shardIndex: 0, shardCount: 1 }), /revision|plan|browser|worker|mismatch/i);
   }
-  assert.throws(() => buildProtectedHostedShardSummary({ plan: plan(), execution: execution(), summary: summary(), shardIndex: 0, shardCount: 1 }), /shard|worker.*policy/i);
+  assert.throws(() => buildProtectedHostedShardSummary({ plan: plan(), execution: execution(), summary: summary(), shardIndex: 0, shardCount: 2 }), /shard|worker.*policy/i);
 });
 
 test('wrong hosted placement digest and unexpected or specialist stable IDs fail closed', () => {
   const badExecution = execution();
   badExecution.hostedExpectedStableTestIdsDigest = 'not-a-digest';
-  assert.throws(() => buildProtectedHostedShardSummary({ plan: plan(), execution: badExecution, summary: summary(), shardIndex: 0, shardCount: 2 }), /hosted.*digest/i);
+  assert.throws(() => buildProtectedHostedShardSummary({ plan: plan(), execution: badExecution, summary: summary(), shardIndex: 0, shardCount: 1 }), /hosted.*digest/i);
 
   const unexpected = 'desktop-chromium::e2e/tests/desktop.spec.mjs::C';
-  assert.throws(() => buildProtectedHostedShardSummary({ plan: plan(), execution: execution(), summary: summary({ scenarios: [{ stableTestId: unexpected, status: 'passed', retry: 0, skipReason: null }] }), shardIndex: 0, shardCount: 2 }), /unexpected|hosted/i);
+  assert.throws(() => buildProtectedHostedShardSummary({ plan: plan(), execution: execution(), summary: summary({ scenarios: [{ stableTestId: unexpected, status: 'passed', retry: 0, skipReason: null }] }), shardIndex: 0, shardCount: 1 }), /unexpected|hosted/i);
   const value = execution();
   value.specialist = { groupIds: ['fullworld.animation-census'], stableTestIds: [idB] };
   value.hosted = { groupIds: ['e2e.full'], stableTestIds: [idA], protectedStableTestIds: [idA], candidateAdditionalStableTestIds: [] };
-  assert.throws(() => buildProtectedHostedShardSummary({ plan: plan(), execution: value, summary: summaryFor(idB), shardIndex: 0, shardCount: 2 }), /unexpected|hosted/i);
+  assert.throws(() => buildProtectedHostedShardSummary({ plan: plan(), execution: value, summary: summaryFor(idB), shardIndex: 0, shardCount: 1 }), /unexpected|hosted/i);
 });
