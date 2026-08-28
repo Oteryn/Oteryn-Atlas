@@ -34,7 +34,7 @@ test('protected hosted compose promotion proves core trust bootstrap without cla
   assert.match(workflow, /runtime-badge[^\n]*VERIFIED FULL-WORLD/);
   assert.match(workflow, /diag-backend[^\n]*webgl2/);
   assert.match(workflow, /__OTERYN_ATLAS_SEMANTIC_SEARCH__\?\.status === 'FAIL'/);
-  assert.match(workflow, /untrusted creature search semantic digest/);
+  assert.match(workflow, /semantic\?\.error\)\.toBe\('semantic search source authority invalid'\)/);
   assert.match(workflow, /fixtureId\)\.toBe\('atlas-qualification-world-v2'\)/);
   assert.match(workflow, /dataCapability\)\.toBe\('qualification_fixture'\)/);
   assert.match(workflow, /--volume "\$proof_test:\/workspace\/e2e\/tests\/protected-compose-bootstrap-desktop\.spec\.mjs:ro"/);
