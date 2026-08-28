@@ -9,6 +9,7 @@ RUN npm ci --ignore-scripts --no-audit --no-fund \
 COPY e2e/playwright.config.mjs e2e/summary-reporter.mjs ./
 COPY e2e/tests ./tests
 COPY e2e/support ./support
+COPY tools/verification/qualification-fixture-definition.mjs /workspace/tools/verification/qualification-fixture-definition.mjs
 COPY tools/verification/stable-id.mjs /workspace/tools/verification/stable-id.mjs
 
 ENV CI=1
