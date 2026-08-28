@@ -12,6 +12,8 @@ test('protected hosted executor compose is present and remains fail-closed', () 
   const compose = readRequired('e2e/compose.protected-hosted-executor.yml', 'protected hosted executor compose');
   assert.match(compose, /ATLAS_EXECUTION_CONTEXT:\?ATLAS_EXECUTION_CONTEXT is required/);
   assert.match(compose, /ATLAS_PROTECTED_TEST_LIST:\?ATLAS_PROTECTED_TEST_LIST is required/);
+  assert.match(compose, /atlas-web:[\s\S]*ATLAS_QUALIFICATION_TRUST_JSON:\s*\$\{ATLAS_QUALIFICATION_TRUST_JSON:\?ATLAS_QUALIFICATION_TRUST_JSON is required\}/);
+  assert.match(compose, /healthcheck:[\s\S]*\$\$ATLAS_QUALIFICATION_TRUST_JSON[\s\S]*\/web\/fullworld\.html/);
   assert.match(compose, /--test-list=\/run\/atlas-protected-test-list\.txt/);
   assert.match(compose, /--workers=\$\{ATLAS_E2E_WORKERS:-1\}/);
   assert.match(compose, /--retries=0/);
@@ -47,9 +49,30 @@ test('protected GitHub-hosted qualification publication is atomically readied, s
   assert.match(nginx, /listen 8081;/);
   assert.match(nginx, /location = \/__atlas\/readiness/);
   assert.match(nginx, /alias \/srv\/atlas\/fullworld\/atlas-publication-readiness\.json/);
+  assert.match(nginx, /location = \/fullworld\/atlas-publication-readiness\.json[\s\S]*return 404/);
   assert.match(nginx, /location \^~ \/fullworld\//);
   assert.match(nginx, /location \^~ \/data\/creatures\/[\s\S]*root \/srv\/atlas\/fullworld;/);
   assert.doesNotMatch(nginx, /proxy_pass|192\.168\.|synology|molehill/i);
+});
+
+test('protected hosted web bootstrap injects immutable qualification trust before candidate modules', () => {
+  const override = readRequired('e2e/compose.github-hosted.yml', 'GitHub-hosted qualification compose override');
+  assert.match(override, /atlas-web-ready:/);
+  assert.match(override, /network_mode:\s*none/);
+  assert.match(override, /ATLAS_QUALIFICATION_TRUST_JSON:\s*\$\{ATLAS_QUALIFICATION_TRUST_JSON:\?ATLAS_QUALIFICATION_TRUST_JSON must identify verified qualification roots\}/);
+  assert.match(override, /ATLAS_EXECUTION_CONTEXT:\?ATLAS_EXECUTION_CONTEXT is required\}\/web:\/source-web:ro/);
+  assert.match(override, /atlas-ready-web:\/ready-web/);
+  assert.match(override, /fs\.cpSync\('\/source-web', '\/ready-web', \{ recursive: true \}\)/);
+  assert.match(override, /__OTERYN_ATLAS_QUALIFICATION_TRUST__/);
+  assert.match(override, /Object\.defineProperty\(globalThis, '__OTERYN_ATLAS_QUALIFICATION_TRUST__'/);
+  assert.match(override, /Object\.freeze\(descriptor\)/);
+  assert.match(override, /writable: false, configurable: false, enumerable: false/);
+  assert.match(override, /const head = '<head>'/);
+  assert.match(override, /source\.indexOf\('<script'\)/);
+  assert.match(override, /atlas-web-ready:[\s\S]*condition: service_completed_successfully/);
+  assert.match(override, /atlas-ready-web:\/usr\/share\/nginx\/html\/web:ro/);
+  assert.match(override, /volumes:[\s\S]*atlas-ready-web:/);
+  assert.doesNotMatch(override, /\/source-web:(?!ro)|\/ready-web:ro/);
 });
 
 test('protected readiness init is re-entry safe only by exact validation, never overwrite', () => {
