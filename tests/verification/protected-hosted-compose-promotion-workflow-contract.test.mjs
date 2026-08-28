@@ -31,6 +31,8 @@ test('protected hosted compose promotion is bounded GitHub-hosted browser bootst
   assert.match(workflow, /--retries=0/);
   assert.match(workflow, /__OTERYN_ATLAS_QUALIFICATION_TRUST__/);
   assert.match(workflow, /docker compose[\s\S]*config -q/);
+  assert.match(workflow, /compose run --no-deps --rm e2e/);
+  assert.doesNotMatch(workflow, /compose run --rm e2e/);
   assert.match(workflow, /assert-current-pr-head\.mjs/);
   assert.match(workflow, /statuses:\s*write/);
   assert.match(workflow, /context='atlas-local-e2e'|context.*atlas-local-e2e/s);
