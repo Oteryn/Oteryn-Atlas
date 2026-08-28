@@ -58,7 +58,14 @@ test('qualification override fails closed instead of silently falling back to pr
 
 test('Playwright never predefines qualification trust after protected web bootstrap promotion', () => {
   const navigation = runtime.indexOf('page.goto');
+  const trustResolution = runtime.indexOf('resolveQualificationEntry(entry, {');
+  const trustBinding = runtime.indexOf('qualificationTrustJson: process.env.ATLAS_QUALIFICATION_TRUST_JSON', trustResolution);
+  const resolvedNavigation = runtime.indexOf('page.goto(resolvedEntry,', trustResolution);
   assert(navigation >= 0, 'Atlas navigation is missing');
+  assert(trustResolution >= 0, 'qualification entry resolution is missing');
+  assert(trustBinding > trustResolution && trustBinding < resolvedNavigation, 'qualification trust input must be bound while resolving the entry before navigation');
+  assert(resolvedNavigation > trustResolution, 'Atlas navigation must use the resolved qualification entry');
+  assert.equal(runtime.indexOf('page.goto(entry,'), -1, 'Atlas navigation must not use raw entry');
   assert.doesNotMatch(runtime, /page\.addInitScript/);
   assert.doesNotMatch(runtime, /qualificationTrustInstalledPages/);
   assert.doesNotMatch(runtime, /installQualificationTrust/);
