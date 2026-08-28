@@ -104,9 +104,15 @@ test('Playwright resolves qualification navigation before the only Atlas navigat
   const page = {
     request: {
       get: async (url) => {
-        events.push('semantic-index');
         assert.equal(url, '/web/semantic-search/index.json');
-        return { ok: () => true, status: () => 200, json: async () => semanticIndex };
+        return {
+          ok: () => true,
+          status: () => 200,
+          json: async () => {
+            events.push('semantic-index-complete');
+            return semanticIndex;
+          },
+        };
       },
     },
     goto: async (...args) => {
@@ -120,7 +126,7 @@ test('Playwright resolves qualification navigation before the only Atlas navigat
   try {
     const gotoAtlas = await loadGotoAtlasForContract();
     await gotoAtlas(page, '/web/fullworld.html?x=1&y=2&floor=0&zoom=2&mode=map');
-    assert.deepEqual(events, ['semantic-index', 'goto']);
+    assert.deepEqual(events, ['semantic-index-complete', 'goto']);
     assert.deepEqual(navigations, [[
       '/web/fullworld.html?x=101&y=202&floor=-3&zoom=2&mode=map',
       { waitUntil: 'domcontentloaded' },
