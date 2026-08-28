@@ -125,7 +125,7 @@ test('Playwright resolves qualification navigation before the only Atlas navigat
   delete process.env.ATLAS_EXPECTED_REVISION;
   try {
     const gotoAtlas = await loadGotoAtlasForContract();
-    await gotoAtlas(page, '/web/fullworld.html?x=1&y=2&floor=0&zoom=2&mode=map');
+    await gotoAtlas(page, '/web/fullworld.html?x=32369&y=32241&floor=-7&zoom=2&mode=map');
     assert.deepEqual(events, ['semantic-index-complete', 'goto']);
     assert.deepEqual(navigations, [[
       '/web/fullworld.html?x=101&y=202&floor=-3&zoom=2&mode=map',
