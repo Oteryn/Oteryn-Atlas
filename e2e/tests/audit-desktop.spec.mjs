@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { DESKTOP_ENTRY, assertNoRuntimeFailures, captureRuntimeFailures, gotoAtlas, waitForAtlas } from './runtime.mjs';
+import { NAVIGATION_B } from '../support/qualification-fixture-scenarios.mjs';
 import { assertUserVisibleSurface, captureUserVisualEvidence, waitForCurrentDetailScene } from '../support/user-acceptance.mjs';
 
 async function waitRep(page, expected) {
@@ -118,15 +119,15 @@ test('audit coordinate Go, wheel zoom and drag pan', async ({ page }, testInfo) 
   await gotoAtlas(page, DESKTOP_ENTRY);
   await waitForAtlas(page);
 
-  await page.locator('#search-input').fill('32380 32250 -7');
+  await page.locator('#search-input').fill(`${NAVIGATION_B.center.x} ${NAVIGATION_B.center.y} ${NAVIGATION_B.center.floor}`);
   const coordinateResults = page.locator('#semantic-search-results-desktop');
   await expect(coordinateResults).toBeVisible();
   await page.locator('#search-form button[type="submit"]').click();
   await expect(coordinateResults).toBeHidden();
   await page.waitForTimeout(300);
   const afterGo = new URL(page.url());
-  expect(afterGo.searchParams.get('x'), 'coordinate Go should navigate X').toBe('32380');
-  expect(afterGo.searchParams.get('y'), 'coordinate Go should navigate Y').toBe('32250');
+  expect(afterGo.searchParams.get('x'), 'coordinate Go should navigate X').toBe(String(NAVIGATION_B.center.x));
+  expect(afterGo.searchParams.get('y'), 'coordinate Go should navigate Y').toBe(String(NAVIGATION_B.center.y));
 
   const canvas = page.locator('#atlas');
   const box = await canvas.boundingBox();

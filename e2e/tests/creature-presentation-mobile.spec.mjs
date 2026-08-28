@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { MIXED_SCENE, OVERFLOW_NPC, sceneEntry } from '../support/creature-presentation-fixtures.mjs';
+import { MIXED_SCENE, OVERFLOW_NPC, sceneEntry } from '../support/qualification-fixture-scenarios.mjs';
 import {
   assertCssRect,
   assertPresentationContract,
@@ -45,8 +45,8 @@ test('mobile DPR2 keeps truthful Eremo badges in CSS pixels beside the canonical
   const viewport = await viewportSize(page);
   expect(viewport.dpr).toBe(2);
   await expect(page.locator('#creature-quick-card')).toBeVisible();
-  await captureUserVisualEvidence(page, testInfo, 'creature-presentation.mobile-eremo-card', {
-    note: 'DPR2 mobile selected Eremo with factual overflow row and #113 card.',
+  await captureUserVisualEvidence(page, testInfo, 'creature-presentation.mobile-fixture-guide-card', {
+    note: 'DPR2 mobile selected fixture Guide with factual overflow row and #113 card.',
   });
   const render = assertPresentationContract(state);
   const badge = badgeLayoutFor(state, OVERFLOW_NPC.record_id);
@@ -55,7 +55,7 @@ test('mobile DPR2 keeps truthful Eremo badges in CSS pixels beside the canonical
     { kind: 'role', role: 'shop' },
     { kind: 'overflow', hiddenCount: 3 },
   ]);
-  badge.rects.forEach((rect, index) => assertCssRect(rect, viewport, `mobile Eremo badge ${index}`));
+  badge.rects.forEach((rect, index) => assertCssRect(rect, viewport, `mobile fixture Guide badge ${index}`));
   const presentation = render.presentationRects.find((entry) => entry.recordId === OVERFLOW_NPC.record_id);
   expect(presentation?.rect).toEqual(state.cardTargetRect);
   const label = labelLayoutFor(state, OVERFLOW_NPC.record_id);

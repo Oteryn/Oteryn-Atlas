@@ -2,10 +2,11 @@ import { expect, test } from '@playwright/test';
 import { assertNoRuntimeFailures, captureRuntimeFailures, gotoAtlas, waitForAtlas } from './runtime.mjs';
 import { canvasAlphaCount, comparePngOutsideRects } from '../support/visual-oracle.mjs';
 import { assertUserVisibleSurface, captureUserVisualEvidence } from '../support/user-acceptance.mjs';
-const ENTRY = '/web/fullworld.html?x=32361&y=32198&floor=-7&zoom=2&mode=map&creatures=npc,monster&animation=off';
-const VISUAL_ENTRY = '/web/fullworld.html?x=32369&y=32241&floor=-7&zoom=2&mode=map&animation=off';
-const CREATURE_ONLY_PLAYBACK_ENTRY = '/web/fullworld.html?x=32831&y=32596&floor=-12&zoom=2&mode=map&animation=off&creatures=monster';
-const NPC_ONLY_PLAYBACK_ENTRY = '/web/fullworld.html?x=32209&y=31924&floor=-12&zoom=2&mode=map&animation=off&creatures=npc';
+import { visualSourceScenarios } from '../support/visual-source-scenarios.mjs';
+
+function desktopSource() {
+  return visualSourceScenarios(process.env.ATLAS_QUALIFICATION_TRUST_JSON).desktop;
+}
 
 async function overlayOpaquePixels(page) {
   return page.locator('#creature-overlay').evaluate((canvas) => {
@@ -75,7 +76,8 @@ async function assertCreatureFamilyPlaybackChangesPixels(page, entry, kind) {
 
 test('desktop Atlas-owned chrome and user journey retain reviewed visual contracts', async ({ page }, testInfo) => {
   const runtime = captureRuntimeFailures(page);
-  await gotoAtlas(page, `${VISUAL_ENTRY}&creatures=npc,monster`);
+  const source = desktopSource();
+  await gotoAtlas(page, `${source.visualEntry}&creatures=npc,monster`);
   await waitForAtlas(page);
 
   const initialMetrics = await assertUserVisibleSurface(page, {
@@ -103,17 +105,17 @@ test('desktop Atlas-owned chrome and user journey retain reviewed visual contrac
   });
 
   const search = page.locator('#search-input');
-  await search.fill('Thais');
+  await search.fill(source.semantic.query);
   const results = page.locator('#semantic-search-results-desktop');
   await expect(results).toBeVisible();
-  const thais = results.getByRole('option').filter({ hasText: 'Thais' }).first();
-  await expect(thais).toBeVisible();
+  const selectedSemanticRecord = results.getByRole('option').filter({ hasText: source.semantic.label }).first();
+  await expect(selectedSemanticRecord).toBeVisible();
   await Promise.all([
     page.waitForURL((url) => Boolean(url.searchParams.get('semantic'))),
-    thais.click(),
+    selectedSemanticRecord.click(),
   ]);
   await waitForAtlas(page);
-  await expect(page.locator('#inspector-content')).toContainText('Thais');
+  await expect(page.locator('#inspector-content')).toContainText(source.semantic.label);
   const inspectorMetrics = await assertUserVisibleSurface(page, {
     label: 'desktop search and inspector',
     minimumMapAreaRatio: 0.28,
@@ -143,7 +145,7 @@ test('desktop Atlas-owned chrome and user journey retain reviewed visual contrac
 
 test('creature overlay never paints previous-floor records during a view event', async ({ page }) => {
   const runtime = captureRuntimeFailures(page);
-  await gotoAtlas(page, ENTRY);
+  await gotoAtlas(page, desktopSource().entry);
   await waitForAtlas(page);
   await page.waitForFunction(() => globalThis.__OTERYN_ATLAS_CREATURES__?.status === 'PASS'
     && globalThis.__OTERYN_ATLAS_CREATURES__?.render?.anchors?.length > 0, null, { timeout: 30_000 });
@@ -166,7 +168,7 @@ test('creature overlay never paints previous-floor records during a view event',
 });
 
 test('NPC playback changes real outfit pixels and restores the deterministic static phase', async ({ page }) => {
-  await assertCreatureFamilyPlaybackChangesPixels(page, NPC_ONLY_PLAYBACK_ENTRY, 'npc');
+  await assertCreatureFamilyPlaybackChangesPixels(page, desktopSource().npcOnlyPlaybackEntry, 'npc');
 });
 
 test('playback changes only verified animated presentation regions and restores static pixels', async ({ page }, testInfo) => {
@@ -189,7 +191,7 @@ test('playback changes only verified animated presentation regions and restores 
       return original.apply(this, args);
     };
   });
-  await gotoAtlas(page, CREATURE_ONLY_PLAYBACK_ENTRY);
+  await gotoAtlas(page, desktopSource().creatureOnlyPlaybackEntry);
   await waitForAtlas(page);
   await page.addStyleTag({ content: '#map-frame.visual-world-only #creature-overlay, #map-frame.visual-world-only #creature-presentation-overlay, #map-frame.visual-world-only #minimap-layer, #map-frame.visual-world-only #overview-overlay, #map-frame.visual-world-only #selection-box, #map-frame.visual-world-only #cursor-coordinate, #map-frame.visual-world-only #runtime-badge, #map-frame.visual-world-only #detail-badge { visibility: hidden !important; }' });
   await page.waitForFunction(() => globalThis.__OTERYN_ATLAS_CREATURES__?.status === 'PASS'

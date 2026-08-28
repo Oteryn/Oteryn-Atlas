@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { assertNoRuntimeFailures, captureRuntimeFailures, gotoAtlas, waitForAtlas } from './runtime.mjs';
+import { MIXED_SCENE, qualificationEntry, sceneEntry } from '../support/qualification-fixture-scenarios.mjs';
 
 async function creatureState(page) {
   await page.waitForFunction(() => ['PASS', 'FAIL'].includes(globalThis.__OTERYN_ATLAS_CREATURES__?.status), null, { timeout: 30_000 });
@@ -16,11 +17,9 @@ async function discoverKind(page, kind) {
 }
 
 function targetEntry(record) {
-  const params = new URLSearchParams({
-    x: String(record.position.x), y: String(record.position.y), floor: String(record.position.floor),
-    zoom: '2', mode: 'map', creatures: 'npc,monster', creature: record.record_id,
+  return qualificationEntry(record.position, {
+    zoom: 2, mode: 'map', creatures: 'npc,monster', creature: record.record_id,
   });
-  return `/web/fullworld.html?${params.toString()}`;
 }
 
 async function tapCommittedTarget(page, record) {
@@ -44,10 +43,10 @@ async function tapCommittedTarget(page, record) {
 for (const kind of ['npc', 'monster']) {
   test(`mobile ${kind} tap activates fresh creature geometry without base tile selection`, async ({ page }) => {
     const runtime = captureRuntimeFailures(page);
-    await gotoAtlas(page, '/web/fullworld.html?x=32369&y=32241&floor=-7&zoom=2&mode=map&creatures=npc,monster');
+    await gotoAtlas(page, sceneEntry(MIXED_SCENE));
     await waitForAtlas(page);
     const initial = await creatureState(page);
-    test.skip(initial.status === 'FAIL' && /HTTP 404/.test(initial.error ?? ''), 'Current target has no optional creature publication.');
+    expect(initial.status, initial.error ?? 'creature runtime').toBe('PASS');
     const record = await discoverKind(page, kind);
     expect(record).not.toBeNull();
 
@@ -66,10 +65,10 @@ for (const kind of ['npc', 'monster']) {
 
 test('mobile Details opens the existing inspector above the card and Escape dismisses topmost only', async ({ page }) => {
   const runtime = captureRuntimeFailures(page);
-  await gotoAtlas(page, '/web/fullworld.html?x=32369&y=32241&floor=-7&zoom=2&mode=map&creatures=npc,monster');
+  await gotoAtlas(page, sceneEntry(MIXED_SCENE));
   await waitForAtlas(page);
   const initial = await creatureState(page);
-  test.skip(initial.status === 'FAIL' && /HTTP 404/.test(initial.error ?? ''), 'Current target has no optional creature publication.');
+  expect(initial.status, initial.error ?? 'creature runtime').toBe('PASS');
   const record = await discoverKind(page, 'npc');
   await gotoAtlas(page, targetEntry(record));
   await waitForAtlas(page);

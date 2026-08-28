@@ -6,6 +6,7 @@ import {
   gotoAtlas,
   waitForAtlas,
 } from './runtime.mjs';
+import { FARM_MONSTER, qualificationEntry } from '../support/qualification-fixture-scenarios.mjs';
 
 async function waitForFarm(page) {
   await page.waitForFunction(() => ['PASS', 'FAIL'].includes(globalThis.__OTERYN_ATLAS_FARM__?.status), null, { timeout: 30_000 });
@@ -13,7 +14,7 @@ async function waitForFarm(page) {
 }
 test('mobile Farm Explorer remains reachable and truthful in the existing controls drawer', async ({ page }) => {
   const runtime = captureRuntimeFailures(page);
-  await gotoAtlas(page, MOBILE_ENTRY);
+  await gotoAtlas(page, qualificationEntry(FARM_MONSTER.position, { creatures: 'npc,monster' }));
   await waitForAtlas(page);
   const farm = await waitForFarm(page);
   expect(farm.status, farm.error ?? 'farm runtime').toBe('PASS');
@@ -23,10 +24,10 @@ test('mobile Farm Explorer remains reachable and truthful in the existing contro
   await page.locator('#mobile-controls-toggle').click();
   await expect(page.locator('#mobile-controls-panel')).toHaveClass(/mobile-open/);
   await expect(page.locator('#farm-explorer')).toBeVisible();
-  await page.locator('#farm-creature-search').fill('Cave Rat');
-  const caveRat = page.locator('#farm-creature-results .farm-creature-result').filter({ hasText: /^Cave Rat$/ }).first();
-  await expect(caveRat).toBeVisible();
-  await caveRat.click();
+  await page.locator('#farm-creature-search').fill(FARM_MONSTER.label);
+  const fixtureMonster = page.locator('#farm-creature-results .farm-creature-result').filter({ hasText: FARM_MONSTER.label }).first();
+  await expect(fixtureMonster).toBeVisible();
+  await fixtureMonster.click();
   await page.locator('#farm-target-kills').fill('90');
   await page.locator('#farm-kph').fill('45');
   await page.locator('#farm-time-base').selectOption('trip_wall');

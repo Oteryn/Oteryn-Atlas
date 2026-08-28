@@ -2,8 +2,9 @@ import { expect, test } from '@playwright/test';
 
 import { waitForRendererCommit } from '../support/diagnostics.mjs';
 import { assertNoRuntimeFailures, captureRuntimeFailures, gotoAtlas } from './runtime.mjs';
+import { qualificationEntry } from '../support/qualification-fixture-scenarios.mjs';
 
-const ENTRY = '/web/fullworld.html?x=32369&y=32241&floor=-7&zoom=2&mode=map&capture=1&sync-evidence=1&animation=off';
+const ENTRY = `${qualificationEntry(undefined, { animation: 'off' })}&capture=1&sync-evidence=1`;
 
 async function waitForNonBlankProbe(page, afterGeneration = 0) {
   await page.waitForFunction((after) => {

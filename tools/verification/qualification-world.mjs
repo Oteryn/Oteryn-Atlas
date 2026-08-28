@@ -18,8 +18,10 @@ import { RUNTIME_PIXEL_BUCKET_DOMAIN, RUNTIME_PIXEL_BUCKET_PROFILE } from '../..
 import { minimapDomains, minimapProfiles } from '../../src/layers/minimap.mjs';
 import { computeOverviewRoot, overviewDomains, overviewProfiles } from '../../src/layers/overview.mjs';
 import {
-  QUALIFICATION_ACTIVE_FLOOR, QUALIFICATION_CREATURES, QUALIFICATION_FIXTURE_ID,
-  QUALIFICATION_SEMANTIC_RECORD, QUALIFICATION_SOURCE_CONTRACT,
+  QUALIFICATION_ACTIVE_FLOOR, QUALIFICATION_ADJACENT_FLOOR_CENTER, QUALIFICATION_CREATURES, QUALIFICATION_FIXTURE_ID,
+  QUALIFICATION_NAVIGATION_B_CENTER,
+  QUALIFICATION_OUTFIT_PRESENTATION_ID, QUALIFICATION_SEMANTIC_RECORDS, QUALIFICATION_DEFAULT_NAVIGATION,
+  QUALIFICATION_SOURCE_CONTRACT,
 } from './qualification-fixture-definition.mjs';
 
 const FIXTURE_ID = QUALIFICATION_FIXTURE_ID;
@@ -27,8 +29,7 @@ const QUALIFICATION_TRUST_MARKER = 'oteryn-atlas-qualification-trust-v1';
 const SOURCE_FINGERPRINT = 'sha256:5af8a7b6d6cb61bf6a430842141a658d3ba183f6e2ec5e3d9a7ea39ccf866d72';
 const FLOORS = Object.freeze([-8, -7, -6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7]);
 const ACTIVE_FLOOR = QUALIFICATION_ACTIVE_FLOOR;
-const CHUNK_PATH = 'chunks/f-7-r1008-c1004.jsonl';
-const BOUNDS = Object.freeze({ x_min: 32256, x_max_exclusive: 32288, y_min: 32128, y_max_exclusive: 32160 });
+const BOUNDS = Object.freeze({ x_min: 32256, x_max_exclusive: 32320, y_min: 32128, y_max_exclusive: 32160 });
 const MINIMAP_BOUNDS = Object.freeze({ x_min: 32256, x_max_exclusive: 32512, y_min: 32000, y_max_exclusive: 32256 });
 const PIXEL_BYTES = 32 * 32 * 4;
 const MINIMAP_PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64');
@@ -45,11 +46,86 @@ function writeJson(root, relative, value) {
 function writeBytes(root, relative, value) {
   const target = path.join(root, relative); fs.mkdirSync(path.dirname(target), { recursive: true }); fs.writeFileSync(target, value);
 }
-function fixtureTile() {
+function uniquePositionPairs(records) {
+  const positions = new Map();
+  for (const { position } of records) positions.set(`${position.floor}:${position.x}:${position.y}`, [position.x, position.y]);
+  return Object.freeze([...positions.values()].sort(([leftX, leftY], [rightX, rightY]) => leftY - rightY || leftX - rightX));
+}
+
+const PRIMARY_SCENARIO_POSITIONS = uniquePositionPairs([
+  ...QUALIFICATION_SEMANTIC_RECORDS,
+  ...QUALIFICATION_CREATURES,
+]);
+const FIXTURE_SOURCE_LAYOUT = Object.freeze([
+  Object.freeze({
+    chunkId: 'qualification-anchor', floor: -7, regionX: 1008, regionY: 1004,
+    positions: PRIMARY_SCENARIO_POSITIONS,
+  }),
+  Object.freeze({
+    chunkId: 'qualification-navigation-east', floor: -7, regionX: 1009, regionY: 1004,
+    positions: Object.freeze([[QUALIFICATION_NAVIGATION_B_CENTER.x, QUALIFICATION_NAVIGATION_B_CENTER.y]]),
+  }),
+  Object.freeze({
+    chunkId: 'qualification-adjacent-floor', floor: -6, regionX: 1008, regionY: 1004,
+    positions: Object.freeze([[QUALIFICATION_ADJACENT_FLOOR_CENTER.x, QUALIFICATION_ADJACENT_FLOOR_CENTER.y]]),
+  }),
+]);
+
+function fixtureTile(position) {
   return {
-    record_type: 'tile', position: { x: 32280, y: 32155, floor: ACTIVE_FLOOR }, source_position: { legacy_x: 32280, legacy_y: 32155, legacy_z: 7 },
-    tile_record_id: 'tile:qualification-fixture-anchor', presentation: [{ export_record_id: 'presentation:qualification-fixture-anchor', appearance_source_id: 1, entity_identity_state: 'UNRESOLVED', presentation_order: { order: 0, plane: 0 }, source_role: 'ground', resolved_primitives: [{ sprite_source_id: 1, width_units: 32, height_units: 32, displacement: { dx_units: 0, dy_units: 0 }, source_profile_id: 'oteryn-atlas-15-32-appearance-spatial-v1', layer_index: 0, phase: 0, pattern: { x: 0, y: 0, z: 0 }, visual_coverage_offsets: [0, 0] }] }],
+    record_type: 'tile', position: { ...position }, source_position: { legacy_x: position.x, legacy_y: position.y, legacy_z: -position.floor },
+    tile_record_id: `tile:qualification-fixture-${position.x}-${position.y}`,
+    presentation: [{ export_record_id: `presentation:qualification-fixture-${position.x}-${position.y}`, appearance_source_id: 1, entity_identity_state: 'UNRESOLVED', presentation_order: { order: 0, plane: 0 }, source_role: 'ground', resolved_primitives: [{ sprite_source_id: 1, width_units: 32, height_units: 32, displacement: { dx_units: 0, dy_units: 0 }, source_profile_id: 'oteryn-atlas-15-32-appearance-spatial-v1', layer_index: 0, phase: 0, pattern: { x: 0, y: 0, z: 0 }, visual_coverage_offsets: [0, 0] }] }],
   };
+}
+function chunkBounds({ regionX, regionY }) {
+  return Object.freeze({
+    x_min: regionX * 32,
+    x_max_exclusive: (regionX + 1) * 32,
+    y_min: regionY * 32,
+    y_max_exclusive: (regionY + 1) * 32,
+  });
+}
+async function buildFixtureSourceChunks() {
+  const chunks = [];
+  for (const layout of FIXTURE_SOURCE_LAYOUT) {
+    const tiles = layout.positions.map(([x, y]) => fixtureTile({ x, y, floor: layout.floor }));
+    const byRow = new Map();
+    for (const tile of tiles) {
+      const values = byRow.get(tile.position.y) ?? [];
+      values.push(tile); byRow.set(tile.position.y, values);
+    }
+    const groups = [];
+    const parts = [];
+    let offset = 0;
+    for (const y of [...byRow.keys()].sort((left, right) => left - right)) {
+      const records = byRow.get(y).sort((left, right) => left.position.x - right.position.x);
+      const bytes = new TextEncoder().encode(`${records.map((record) => JSON.stringify(record)).join('\n')}\n`);
+      groups.push(Object.freeze({
+        offset,
+        bytes: bytes.byteLength,
+        contentId: await sha256ContentId(bytes),
+        yMin: y,
+        yMaxExclusive: y + 1,
+        tiles: records.length,
+        resolvedPrimitives: records.length,
+      }));
+      parts.push(bytes); offset += bytes.byteLength;
+    }
+    const bytes = Buffer.concat(parts);
+    chunks.push(Object.freeze({
+      chunkId: layout.chunkId,
+      floor: layout.floor,
+      logicalAddress: Object.freeze({ floor: layout.floor, region_x: layout.regionX, region_y: layout.regionY }),
+      path: `chunks/f${layout.floor}-r${layout.regionX}-c${layout.regionY}.jsonl`,
+      bounds: chunkBounds(layout),
+      contentId: await sha256ContentId(bytes),
+      bytes,
+      groups: Object.freeze(groups),
+      tiles: Object.freeze(tiles),
+    }));
+  }
+  return Object.freeze(chunks);
 }
 function fixturePixels() {
   const bytes = Buffer.alloc(PIXEL_BYTES);
@@ -61,6 +137,16 @@ function fixturePixels() {
     bytes[offset + 1] = 70 + ((y * 3) % 150);
     bytes[offset + 2] = 120 + (((x + y) * 2) % 120);
     bytes[offset + 3] = 255;
+  }
+  return bytes;
+}
+function fixtureAnimationPhasePixels(pixels) {
+  const bytes = Buffer.from(pixels);
+  for (let y = 8; y < 24; y += 1) for (let x = 8; x < 24; x += 1) {
+    const offset = (y * 32 + x) * 4;
+    bytes[offset] = 220 - bytes[offset];
+    bytes[offset + 1] = 190 - bytes[offset + 1];
+    bytes[offset + 2] = 80 + ((x + y) % 80);
   }
   return bytes;
 }
@@ -112,27 +198,47 @@ async function buildRuntimePixelBuckets(root, publicationRoot, pixelRoot, pixelC
   return manifest;
 }
 
-async function buildOverview(root, publicationRoot, semanticWorld, semanticFloors, chunkContentId) {
+function overviewCells(tiles) {
+  const cells = new Map();
+  for (const tile of tiles) {
+    const cellX = Math.floor(tile.position.x / 8);
+    const cellY = Math.floor(tile.position.y / 8);
+    const key = `${cellX}:${cellY}`;
+    const current = cells.get(key) ?? { cell_x: cellX, cell_y: cellY, resolvedPrimitives: 0, tiles: 0 };
+    current.tiles += 1; current.resolvedPrimitives += 1; cells.set(key, current);
+  }
+  return [...cells.values()].sort((left, right) => left.cell_x - right.cell_x || left.cell_y - right.cell_y);
+}
+
+async function buildOverview(root, publicationRoot, semanticWorld, semanticFloors, sourceChunks) {
   const floors = [];
+  const worldCounts = { cells: 0, chunks: 0, floors: 0, resolvedPrimitives: 0, tiles: 0 };
   for (const semanticEntry of semanticFloors) {
     const floor = semanticEntry.floor;
-    const active = floor === ACTIVE_FLOOR;
     const chunks = [];
-    if (active) {
+    for (const sourceChunk of sourceChunks.filter((entry) => entry.floor === floor)) {
+      const cells = overviewCells(sourceChunk.tiles);
+      const counts = { cells: cells.length, resolvedPrimitives: sourceChunk.tiles.length, tiles: sourceChunk.tiles.length };
       const chunkCore = {
         profile: overviewProfiles.chunk,
-        logicalAddress: { floor, region_x: 1008, region_y: 1004 },
-        sourceContentId: chunkContentId,
+        logicalAddress: sourceChunk.logicalAddress,
+        sourceContentId: sourceChunk.contentId,
         sourceFingerprint: SOURCE_FINGERPRINT,
         cellSizeTiles: 8,
-        cells: [{ cell_x: Math.floor(32280 / 8), cell_y: Math.floor(32155 / 8), tiles: 1, resolvedPrimitives: 1 }],
-        counts: { cells: 1, resolvedPrimitives: 1, tiles: 1 },
+        cells,
+        counts,
       };
       const bytes = canonicalJsonBytes(chunkCore);
-      const relative = `chunks/f${floor}-r1008-c1004.json`;
+      const relative = `chunks/f${floor}-r${sourceChunk.logicalAddress.region_x}-c${sourceChunk.logicalAddress.region_y}.json`;
       writeBytes(root, `overview/${relative}`, bytes);
-      chunks.push({ logicalAddress: chunkCore.logicalAddress, path: relative, bytes: bytes.length, contentId: await sha256ContentId(bytes), sourceContentId: chunkContentId, counts: chunkCore.counts });
+      chunks.push({ logicalAddress: chunkCore.logicalAddress, path: relative, bytes: bytes.length, contentId: await sha256ContentId(bytes), sourceContentId: sourceChunk.contentId, counts });
     }
+    const counts = chunks.reduce((total, chunk) => ({
+      cells: total.cells + chunk.counts.cells,
+      chunks: total.chunks + 1,
+      resolvedPrimitives: total.resolvedPrimitives + chunk.counts.resolvedPrimitives,
+      tiles: total.tiles + chunk.counts.tiles,
+    }), { cells: 0, chunks: 0, resolvedPrimitives: 0, tiles: 0 });
     const floorCore = {
       profile: overviewProfiles.floor,
       floor,
@@ -141,11 +247,13 @@ async function buildOverview(root, publicationRoot, semanticWorld, semanticFloor
       sourceFloorRoot: semanticEntry.rootContentId,
       bounds: BOUNDS,
       chunks,
-      counts: { cells: active ? 1 : 0, chunks: chunks.length, resolvedPrimitives: active ? 1 : 0, tiles: active ? 1 : 0 },
+      counts,
     };
     const floorManifest = { ...floorCore, rootContentId: await computeOverviewRoot(floorCore, overviewDomains.floor) };
     writeJson(root, `overview/floors/f${floor}.json`, floorManifest);
     floors.push({ floor, path: `floors/f${floor}.json`, rootContentId: floorManifest.rootContentId });
+    worldCounts.cells += counts.cells; worldCounts.chunks += counts.chunks;
+    worldCounts.floors += 1; worldCounts.resolvedPrimitives += counts.resolvedPrimitives; worldCounts.tiles += counts.tiles;
   }
   const worldCore = {
     profile: overviewProfiles.world,
@@ -153,26 +261,40 @@ async function buildOverview(root, publicationRoot, semanticWorld, semanticFloor
     source: { authority: 'Oteryn/Oteryn-Game', publicationRoot, semanticRoot: semanticWorld.rootContentId, sourceFingerprint: SOURCE_FINGERPRINT },
     semantics: { walkability: 'NOT_CLAIMED', collision: 'NOT_CLAIMED', terrainClassification: 'NOT_CLAIMED' },
     floors,
-    counts: { cells: 1, chunks: 1, floors: FLOORS.length, resolvedPrimitives: 1, tiles: 1 },
+    counts: worldCounts,
   };
   const world = { ...worldCore, rootContentId: await computeOverviewRoot(worldCore, overviewDomains.world) };
   writeJson(root, 'overview/world.json', world);
   return world;
 }
 
-async function buildMinimap(root, publicationRoot, pixelRoot, sourceContentId) {
+async function buildMinimap(root, publicationRoot, pixelRoot, sourceChunks) {
   const tileContentId = await sha256ContentId(MINIMAP_PNG);
-  const tileRelative = 'tiles/f-7-r126-c125.png';
   const floors = [];
+  let chunkCount = 0;
   for (const floor of FLOORS) {
-    const active = floor === ACTIVE_FLOOR;
-    const chunks = active ? [{
-      logicalAddress: { floor, region_x: 126, region_y: 125 },
-      path: tileRelative,
-      bytes: MINIMAP_PNG.byteLength,
-      contentId: tileContentId,
-      sourceContentId,
-    }] : [];
+    const regions = new Map();
+    for (const sourceChunk of sourceChunks.filter((entry) => entry.floor === floor)) {
+      const regionX = Math.floor((sourceChunk.logicalAddress.region_x * 32) / 256);
+      const regionY = Math.floor((sourceChunk.logicalAddress.region_y * 32) / 256);
+      const key = `${regionX}:${regionY}`;
+      const existing = regions.get(key) ?? { regionX, regionY, sourceContentIds: [] };
+      existing.sourceContentIds.push(sourceChunk.contentId); regions.set(key, existing);
+    }
+    const chunks = [];
+    for (const region of [...regions.values()].sort((left, right) => left.regionX - right.regionX || left.regionY - right.regionY)) {
+      const logicalAddress = { floor, region_x: region.regionX, region_y: region.regionY };
+      const tilePath = `tiles/f${floor}-r${region.regionX}-c${region.regionY}.png`;
+      writeBytes(root, `minimap/${tilePath}`, MINIMAP_PNG);
+      chunks.push({
+        logicalAddress,
+        path: tilePath,
+        bytes: MINIMAP_PNG.byteLength,
+        contentId: tileContentId,
+        sourceContentId: canonicalDigest(region.sourceContentIds.sort()),
+      });
+    }
+    chunkCount += chunks.length;
     const floorCore = {
       profile: minimapProfiles.floor,
       floor,
@@ -186,7 +308,6 @@ async function buildMinimap(root, publicationRoot, pixelRoot, sourceContentId) {
     writeJson(root, `minimap/floors/f${floor}.json`, floorManifest);
     floors.push({ floor, path: `floors/f${floor}.json`, rootContentId: floorManifest.rootContentId });
   }
-  writeBytes(root, `minimap/${tileRelative}`, MINIMAP_PNG);
   const worldCore = {
     profile: minimapProfiles.world,
     regionSpan: 256,
@@ -194,7 +315,7 @@ async function buildMinimap(root, publicationRoot, pixelRoot, sourceContentId) {
     source: { authority: 'Oteryn/Oteryn-Game', publicationRoot, pixelRoot },
     semantics: { terrainClassification: 'NOT_CLAIMED', walkability: 'NOT_CLAIMED' },
     floors,
-    counts: { floors: FLOORS.length, chunks: 1, tiles: 1 },
+    counts: { floors: FLOORS.length, chunks: chunkCount, tiles: chunkCount },
   };
   const world = { ...worldCore, rootContentId: await domainRoot(minimapDomains.world, worldCore) };
   writeJson(root, 'minimap/world.json', world);
@@ -226,22 +347,34 @@ function creatureSearchRecord(record) {
 async function buildQualificationAnimation(root, semanticRoot, pixelRoot, contentId, pixels) {
   const bucketId = 'q0000';
   const bucketPath = `buckets/${bucketId}.rgba`;
+  const secondPixels = fixtureAnimationPhasePixels(pixels);
+  const secondContentId = await sha256ContentId(secondPixels);
+  const bucketBytes = Buffer.concat([pixels, secondPixels]);
   const program = {
     profile: 'oteryn-atlas-animation-runtime-v1',
     object_programs: [],
     creature_programs: [{
-      animation: null,
+      animation: {
+        default_start_phase: 0,
+        loop_count: 0,
+        loop_type: 'infinite',
+        presentation_durations_ms: [180, 180],
+        synchronized: true,
+      },
       animation_program_id: 'animation-program:qualification-sentinel',
       displacement: { x: 0, y: 0 },
       height: 32,
-      outfit_presentation_id: 'outfit-presentation:qualification-sentinel',
-      phase_content_ids: [contentId],
-      phase_count: 1,
-      selection_policy: 'qualification-static-phase-v1',
+      outfit_presentation_id: QUALIFICATION_OUTFIT_PRESENTATION_ID,
+      phase_content_ids: [contentId, secondContentId],
+      phase_count: 2,
+      selection_policy: 'qualification-dynamic-phase-v1',
       width: 32,
     }],
     sprite_index: {},
-    blob_index: { [contentId]: { bucket: bucketId, bytes: pixels.length, height: 32, offset: 0, width: 32 } },
+    blob_index: {
+      [contentId]: { bucket: bucketId, bytes: pixels.length, height: 32, offset: 0, width: 32 },
+      [secondContentId]: { bucket: bucketId, bytes: secondPixels.length, height: 32, offset: pixels.length, width: 32 },
+    },
   };
   const programBytes = canonicalJsonBytes(program);
   const manifestCore = {
@@ -254,13 +387,13 @@ async function buildQualificationAnimation(root, semanticRoot, pixelRoot, conten
       appearance_product_root: pixelRoot,
       outfit_spatial_product_root: semanticRoot,
     },
-    buckets: [{ id: bucketId, path: bucketPath, bytes: pixels.length, digest: sha(pixels) }],
+    buckets: [{ id: bucketId, path: bucketPath, bytes: bucketBytes.length, digest: sha(bucketBytes) }],
     programs: { path: 'programs.json', bytes: programBytes.length, digest: sha(programBytes) },
   };
   const manifest = { ...manifestCore, rootContentId: canonicalDigest(manifestCore) };
   writeJson(root, 'animation/manifest.json', manifest);
   writeBytes(root, 'animation/programs.json', programBytes);
-  writeBytes(root, `animation/${bucketPath}`, pixels);
+  writeBytes(root, `animation/${bucketPath}`, bucketBytes);
   return manifest;
 }
 
@@ -330,24 +463,25 @@ function semanticRanking() {
   };
 }
 async function buildQualificationSearch(root, semanticRoot, creatureSearch) {
-  const semanticRecord = {
-    ...QUALIFICATION_SEMANTIC_RECORD,
-    aliases: [...QUALIFICATION_SEMANTIC_RECORD.aliases],
-    capabilities: [...QUALIFICATION_SEMANTIC_RECORD.capabilities],
-    position: { ...QUALIFICATION_SEMANTIC_RECORD.position },
-    provenance: { ...QUALIFICATION_SEMANTIC_RECORD.provenance },
-    search_terms: { label: QUALIFICATION_SEMANTIC_RECORD.search_terms.label, aliases: [...QUALIFICATION_SEMANTIC_RECORD.search_terms.aliases] },
-  };
+  const semanticRecords = QUALIFICATION_SEMANTIC_RECORDS.map((record) => ({
+    ...record,
+    aliases: [...record.aliases],
+    capabilities: [...record.capabilities],
+    position: { ...record.position },
+    provenance: { ...record.provenance },
+    search_terms: { label: record.search_terms.label, aliases: [...record.search_terms.aliases] },
+  }));
   const indexCore = {
     schema_version: 1,
     source: {
       authority: 'Oteryn/Oteryn-Atlas', repository: 'Oteryn/Oteryn-Atlas',
       contract_id: QUALIFICATION_SOURCE_CONTRACT, capability: 'qualification-semantic-search-v1',
       profile_id: 'oteryn-atlas-qualification-semantic-search-v1', game_revision: 'fixture',
-      fixture_id: FIXTURE_ID, semantic_digest: semanticRoot, records: 1,
+      fixture_id: FIXTURE_ID, semantic_digest: semanticRoot, records: semanticRecords.length,
+      default_navigation: { ...QUALIFICATION_DEFAULT_NAVIGATION },
     },
     input_floor_aliases: Object.fromEntries(FLOORS.map((floor) => [String(floor), floor])),
-    ranking: semanticRanking(), records: [semanticRecord],
+    ranking: semanticRanking(), records: semanticRecords,
   };
   const index = { ...indexCore, index_digest: canonicalDigest(indexCore.records) };
   const catalog = {
@@ -373,19 +507,51 @@ export async function buildQualificationWorld(destination) {
   fs.mkdirSync(root, { recursive: true });
 
   const pixel = await buildPixelPublication(root);
-  const chunkBytes = new TextEncoder().encode(`${JSON.stringify(fixtureTile())}\n`);
-  const chunkContentId = await sha256ContentId(chunkBytes);
+  const sourceChunks = await buildFixtureSourceChunks();
+  const fixtureTileRecords = sourceChunks.flatMap((chunk) => chunk.tiles);
   const semanticFloors = [];
   const runtimeFloorSeeds = [];
   for (const floor of FLOORS) {
-    const counts = floor === ACTIVE_FLOOR ? { bytes: chunkBytes.byteLength, resolvedPrimitives: 1, tiles: 1 } : { bytes: 0, resolvedPrimitives: 0, tiles: 0 };
-    const semanticCore = { profile: SEMANTIC_PROFILE, floor, bounds: BOUNDS, sourceFingerprint: SOURCE_FINGERPRINT, chunks: floor === ACTIVE_FLOOR ? [{ logicalAddress: { floor, region_x: 1008, region_y: 1004 }, contentId: chunkContentId, bytes: chunkBytes.byteLength, tiles: 1, resolvedPrimitives: 1, path: CHUNK_PATH }] : [], counts };
+    const floorChunks = sourceChunks.filter((chunk) => chunk.floor === floor);
+    const counts = floorChunks.reduce((total, chunk) => ({
+      bytes: total.bytes + chunk.bytes.byteLength,
+      resolvedPrimitives: total.resolvedPrimitives + chunk.tiles.length,
+      tiles: total.tiles + chunk.tiles.length,
+    }), { bytes: 0, resolvedPrimitives: 0, tiles: 0 });
+    const semanticCore = {
+      profile: SEMANTIC_PROFILE,
+      floor,
+      bounds: BOUNDS,
+      sourceFingerprint: SOURCE_FINGERPRINT,
+      chunks: floorChunks.map((chunk) => ({
+        logicalAddress: chunk.logicalAddress,
+        contentId: chunk.contentId,
+        bytes: chunk.bytes.byteLength,
+        tiles: chunk.tiles.length,
+        resolvedPrimitives: chunk.tiles.length,
+        path: chunk.path,
+      })),
+      counts,
+    };
     const semantic = { ...semanticCore, rootContentId: await rootedContentId(FLOOR_DOMAIN, semanticCore) };
     writeJson(root, `publication/semantic/floors/f${floor}.json`, semantic);
     semanticFloors.push({ floor, path: `floors/f${floor}.json`, rootContentId: semantic.rootContentId, counts });
     runtimeFloorSeeds.push({ floor, semantic });
   }
-  const semanticCore = { profile: SEMANTIC_PROFILE, fabricRoot: `fixture:${FIXTURE_ID}`, sourceFingerprint: SOURCE_FINGERPRINT, floors: semanticFloors, counts: { floors: 16, shards: 1, tiles: 1, resolvedPrimitives: 1, uniqueSpriteRefs: 1, bytes: chunkBytes.byteLength } };
+  const semanticCore = {
+    profile: SEMANTIC_PROFILE,
+    fabricRoot: `fixture:${FIXTURE_ID}`,
+    sourceFingerprint: SOURCE_FINGERPRINT,
+    floors: semanticFloors,
+    counts: {
+      floors: FLOORS.length,
+      shards: sourceChunks.length,
+      tiles: fixtureTileRecords.length,
+      resolvedPrimitives: fixtureTileRecords.length,
+      uniqueSpriteRefs: 1,
+      bytes: sourceChunks.reduce((sum, chunk) => sum + chunk.bytes.byteLength, 0),
+    },
+  };
   const semanticWorld = { ...semanticCore, rootContentId: await rootedContentId(SEMANTIC_DOMAIN, semanticCore) };
   writeJson(root, 'publication/semantic/world.json', semanticWorld);
 
@@ -393,10 +559,48 @@ export async function buildQualificationWorld(destination) {
   const publication = { ...publicationCore, rootContentId: await rootedContentId(PUBLICATION_DOMAIN, publicationCore) };
   writeJson(root, 'publication/publication.json', publication);
 
-  const runtimeWorldCore = { profile: RUNTIME_WORLD_PROFILE, source: { authority: 'Oteryn/Oteryn-Game', publicationRoot: publication.rootContentId, semanticRoot: semanticWorld.rootContentId, pixelRoot: pixel.manifest.rootContentId, sourceFingerprint: SOURCE_FINGERPRINT }, regionSpan: 32, rowGroupSpan: 1, floors: [], counts: { floors: 16, groups: 1, resolvedPrimitives: 1, shards: 1, sourceBytes: chunkBytes.byteLength, tiles: 1 }, visualBounds: { maxWidthUnits: 32, maxHeightUnits: 32, minDxUnits: 0, maxDxUnits: 0, minDyUnits: 0, maxDyUnits: 0, overscanTiles: { left: 0, right: 0, top: 0, bottom: 0 } } };
+  const runtimeWorldCore = {
+    profile: RUNTIME_WORLD_PROFILE,
+    source: { authority: 'Oteryn/Oteryn-Game', publicationRoot: publication.rootContentId, semanticRoot: semanticWorld.rootContentId, pixelRoot: pixel.manifest.rootContentId, sourceFingerprint: SOURCE_FINGERPRINT },
+    regionSpan: 32,
+    rowGroupSpan: 1,
+    floors: [],
+    counts: {
+      floors: FLOORS.length,
+      groups: sourceChunks.reduce((sum, chunk) => sum + chunk.groups.length, 0),
+      resolvedPrimitives: fixtureTileRecords.length,
+      shards: sourceChunks.length,
+      sourceBytes: sourceChunks.reduce((sum, chunk) => sum + chunk.bytes.byteLength, 0),
+      tiles: fixtureTileRecords.length,
+    },
+    visualBounds: { maxWidthUnits: 32, maxHeightUnits: 32, minDxUnits: 0, maxDxUnits: 0, minDyUnits: 0, maxDyUnits: 0, overscanTiles: { left: 0, right: 0, top: 0, bottom: 0 } },
+  };
   for (const { floor, semantic } of runtimeFloorSeeds) {
-    const chunks = floor === ACTIVE_FLOOR ? [{ logicalAddress: { floor, region_x: 1008, region_y: 1004 }, path: CHUNK_PATH, contentId: chunkContentId, bytes: chunkBytes.byteLength, worldChunk: { identityAuthority: false, chunk_id: 'qualification-anchor', floor, bounds: BOUNDS, semantic_root: semanticWorld.rootContentId, pixel_root: pixel.manifest.rootContentId, content_hash: chunkContentId, estimated_memory_cost: chunkBytes.byteLength, dependencies: [semantic.rootContentId, semanticWorld.rootContentId, pixel.manifest.rootContentId] }, groups: [{ offset: 0, bytes: chunkBytes.byteLength, contentId: chunkContentId, yMin: 32155, yMaxExclusive: 32156, tiles: 1, resolvedPrimitives: 1 }] }] : [];
-    const counts = { chunks: chunks.length, groups: chunks.length, resolvedPrimitives: chunks.length, sourceBytes: chunks.length ? chunkBytes.byteLength : 0, tiles: chunks.length };
+    const chunks = sourceChunks.filter((chunk) => chunk.floor === floor).map((chunk) => ({
+      logicalAddress: chunk.logicalAddress,
+      path: chunk.path,
+      contentId: chunk.contentId,
+      bytes: chunk.bytes.byteLength,
+      worldChunk: {
+        identityAuthority: false,
+        chunk_id: chunk.chunkId,
+        floor,
+        bounds: chunk.bounds,
+        semantic_root: semanticWorld.rootContentId,
+        pixel_root: pixel.manifest.rootContentId,
+        content_hash: chunk.contentId,
+        estimated_memory_cost: chunk.bytes.byteLength,
+        dependencies: [semantic.rootContentId, semanticWorld.rootContentId, pixel.manifest.rootContentId],
+      },
+      groups: chunk.groups,
+    }));
+    const counts = chunks.reduce((total, chunk) => ({
+      chunks: total.chunks + 1,
+      groups: total.groups + chunk.groups.length,
+      resolvedPrimitives: total.resolvedPrimitives + chunk.groups.reduce((sum, group) => sum + group.resolvedPrimitives, 0),
+      sourceBytes: total.sourceBytes + chunk.bytes,
+      tiles: total.tiles + chunk.groups.reduce((sum, group) => sum + group.tiles, 0),
+    }), { chunks: 0, groups: 0, resolvedPrimitives: 0, sourceBytes: 0, tiles: 0 });
     const core = { profile: RUNTIME_FLOOR_PROFILE, floor, sourcePublicationRoot: publication.rootContentId, sourceSemanticRoot: semanticWorld.rootContentId, sourceFloorRoot: semantic.rootContentId, sourceFingerprint: SOURCE_FINGERPRINT, regionSpan: 32, rowGroupSpan: 1, bounds: BOUNDS, chunks, counts };
     const runtimeFloor = { ...core, rootContentId: await rootedContentId(RUNTIME_FLOOR_DOMAIN, core) };
     writeJson(root, `runtime-index/floors/f${floor}.json`, runtimeFloor);
@@ -404,11 +608,11 @@ export async function buildQualificationWorld(destination) {
   }
   const runtimeWorld = { ...runtimeWorldCore, rootContentId: await rootedContentId(RUNTIME_WORLD_DOMAIN, runtimeWorldCore) };
   writeJson(root, 'runtime-index/world.json', runtimeWorld);
-  writeBytes(root, `publication/semantic/${CHUNK_PATH}`, chunkBytes);
+  for (const chunk of sourceChunks) writeBytes(root, `publication/semantic/${chunk.path}`, chunk.bytes);
 
   const pixelBuckets = await buildRuntimePixelBuckets(root, publication.rootContentId, pixel.manifest.rootContentId, pixel.pixelContentId, pixel.pixels);
-  const overview = await buildOverview(root, publication.rootContentId, semanticWorld, semanticFloors, chunkContentId);
-  const minimap = await buildMinimap(root, publication.rootContentId, pixel.manifest.rootContentId, chunkContentId);
+  const overview = await buildOverview(root, publication.rootContentId, semanticWorld, semanticFloors, sourceChunks);
+  const minimap = await buildMinimap(root, publication.rootContentId, pixel.manifest.rootContentId, sourceChunks);
 
   const animation = await buildQualificationAnimation(root, semanticWorld.rootContentId, pixel.manifest.rootContentId, pixel.pixelContentId, pixel.pixels);
   const creatures = await buildQualificationCreatures(root, semanticWorld.rootContentId, animation);

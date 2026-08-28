@@ -5,6 +5,7 @@ import {
   qualificationResult,
 } from './runtime.mjs';
 import { assertUserVisibleSurface, captureUserVisualEvidence } from '../support/user-acceptance.mjs';
+import { QUALIFICATION_SEMANTIC_RECORD } from '../support/qualification-fixture-scenarios.mjs';
 
 async function expectMapQualifiedSearchFailed(page, pattern) {
   const { status, result } = await qualificationResult(page);
@@ -24,7 +25,7 @@ test('semantic search HTTP outage degrades search without invalidating map quali
   const search = await expectMapQualifiedSearchFailed(page, /index\.json HTTP 503/i);
   expect(search.records).toBe(0);
   expect(search.lastResults).toBe(0);
-  await page.locator('#search-input').fill('Thais');
+  await page.locator('#search-input').fill(QUALIFICATION_SEMANTIC_RECORD.label);
   const degradedResults = page.locator('#semantic-search-results-desktop');
   await expect(degradedResults).toBeVisible();
   await expect(degradedResults).toContainText(/Search unavailable/i);
@@ -52,7 +53,7 @@ test('creature search catalog outage fails the combined search surface closed on
   const search = await expectMapQualifiedSearchFailed(page, /creatures\.json HTTP 503/i);
   expect(search.records).toBeGreaterThan(0);
   expect(search.creatureSearchRecords).toBe(0);
-  await page.locator('#search-input').fill('Thais');
+  await page.locator('#search-input').fill(QUALIFICATION_SEMANTIC_RECORD.label);
   const degradedResults = page.locator('#semantic-search-results-desktop');
   await expect(degradedResults).toBeVisible();
   await expect(degradedResults).toContainText(/Search unavailable/i);

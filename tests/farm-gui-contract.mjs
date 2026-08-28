@@ -10,6 +10,7 @@ import {
 } from '../web/fullworld-farm-explorer.mjs';
 
 const DIGEST = 'sha256:81505e91d7089f91e71813ec43f97118932db9cc7fd76d291fa399447ee2dfa4';
+const QUALIFICATION_DIGEST = `sha256:${'c'.repeat(64)}`;
 const monsterId = `monster-entity:${'a'.repeat(32)}`;
 const npcId = `npc-entity:${'b'.repeat(32)}`;
 const catalog = () => ({
@@ -26,6 +27,16 @@ const catalog = () => ({
     { kind: 'monster', label: 'Unresolved Beast', record_id: `monster:${'3'.repeat(32)}`, position: { x: 102, y: 200, floor: -7 }, resolution_state: 'UNRESOLVED' },
   ],
 });
+const qualificationCatalog = () => ({
+  ...catalog(),
+  source: {
+    contract_id: 'oteryn-atlas-qualification-fixture-v1',
+    capability: 'qualification-creatures-v1',
+    coordinate_profile: 'oteryn-native-floor-v1',
+    fixture_id: 'atlas-qualification-world-v2',
+    semantic_digest: QUALIFICATION_DIGEST,
+  },
+});
 test('Farm Explorer separates merged map interaction from still-blocked presentation enrichment', () => {
   const readiness = buildFarmUiReadiness({ interactionSeamAvailable: true, presentationSeamAvailable: false });
   assert.equal(readiness.item_task.state, 'UPSTREAM_BLOCKED');
@@ -40,6 +51,17 @@ test('custom monster search returns only resolved Game-owned monster entity iden
   const results = searchFarmMonsterTargets(records, 'alpha', { limit: 10 });
   assert.deepEqual(results.map((record) => record.entity_id), [monsterId]);
   assert.equal(results[0].label, 'Alpha Beast');
+});
+
+test('Farm Explorer accepts a qualification creature catalog only when its exact fixture trust binds the source', () => {
+  const trust = {
+    gameSha: 'fixture',
+    qualificationFixtureId: 'atlas-qualification-world-v2',
+    semanticRoot: QUALIFICATION_DIGEST,
+  };
+  assert.equal(validateFarmCreatureCatalog(qualificationCatalog(), trust).length, 3);
+  assert.throws(() => validateFarmCreatureCatalog(qualificationCatalog(), { ...trust, semanticRoot: `sha256:${'d'.repeat(64)}` }), /digest|trust/i);
+  assert.throws(() => validateFarmCreatureCatalog({ ...qualificationCatalog(), source: { ...qualificationCatalog().source, fixture_id: 'other-fixture' } }, trust), /fixture|trust/i);
 });
 
 test('map-selected monster uses canonical creature state even when a farm target already exists', () => {

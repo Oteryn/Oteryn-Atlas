@@ -9,8 +9,9 @@ import {
   waitForRendererCommit,
 } from '../support/diagnostics.mjs';
 import { assertNoRuntimeFailures, captureRuntimeFailures, gotoAtlas } from './runtime.mjs';
+import { OVERFLOW_NPC, qualificationEntry } from '../support/qualification-fixture-scenarios.mjs';
 
-const ENTRY = '/web/fullworld.html?x=32361&y=32198&floor=-7&zoom=2&mode=map&animation=off&creatures=npc&npcRole=shop';
+const ENTRY = qualificationEntry(OVERFLOW_NPC.position, { animation: 'off', creatures: 'npc', npcRole: 'shop' });
 const TOLERANCE_PX = 0.25;
 
 async function resizeAndAlign(page, width, height) {

@@ -6,6 +6,12 @@ import {
   gotoAtlas,
   waitForAtlas,
 } from './runtime.mjs';
+import {
+  MIXED_SCENE,
+  OVERFLOW_NPC,
+  qualificationEntry,
+  sceneEntry,
+} from '../support/qualification-fixture-scenarios.mjs';
 
 async function creatureState(page) {
   await page.waitForFunction(() => ['PASS', 'FAIL'].includes(globalThis.__OTERYN_ATLAS_CREATURES__?.status), null, { timeout: 30_000 });
@@ -14,10 +20,9 @@ async function creatureState(page) {
 
 test('desktop shipped creature controls persist independently and expose bounded diagnostics', async ({ page }) => {
   const runtime = captureRuntimeFailures(page);
-  await gotoAtlas(page, `${DESKTOP_ENTRY}&creatures=npc,monster`);
+  await gotoAtlas(page, sceneEntry(MIXED_SCENE));
   await waitForAtlas(page);
   let creatures = await creatureState(page);
-  test.skip(creatures.status === 'FAIL' && /HTTP 404/.test(creatures.error ?? ''), 'Current target has no optional creature publication.');
   expect(creatures.status, creatures.error ?? 'creature runtime').toBe('PASS');
 
   const npc = page.locator('input[data-creature-kind="npc"]');
@@ -41,15 +46,14 @@ test('desktop shipped creature controls persist independently and expose bounded
 
 test('desktop creature search creates a stable deep link and inspector state when published', async ({ page }) => {
   const runtime = captureRuntimeFailures(page);
-  await gotoAtlas(page, `${DESKTOP_ENTRY}&creatures=npc,monster`);
+  await gotoAtlas(page, sceneEntry(MIXED_SCENE));
   await waitForAtlas(page);
   const creatures = await creatureState(page);
-  test.skip(creatures.status === 'FAIL' && /HTTP 404/.test(creatures.error ?? ''), 'Current target has no optional creature publication.');
   expect(creatures.status, creatures.error ?? 'creature runtime').toBe('PASS');
 
   const search = page.locator('#creature-search');
-  await search.fill('Sam');
-  const result = page.locator('#creature-results button').filter({ hasText: /Sam/i }).first();
+  await search.fill(OVERFLOW_NPC.label);
+  const result = page.locator('#creature-results button').filter({ hasText: OVERFLOW_NPC.label }).first();
   await expect(result).toBeVisible();
   await Promise.all([
     page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
@@ -59,17 +63,16 @@ test('desktop creature search creates a stable deep link and inspector state whe
   const selected = await creatureState(page);
   expect(selected.status, selected.error ?? 'creature runtime after selection').toBe('PASS');
   expect(new URL(page.url()).searchParams.get('creature')).toMatch(/^(?:npc|monster):[0-9a-f]{32}$/);
-  await expect(page.locator('#creature-inspector')).toContainText(/Sam/i);
+  await expect(page.locator('#creature-inspector')).toContainText(OVERFLOW_NPC.label);
   assertNoRuntimeFailures(runtime);
 });
 
 test('desktop NPC category filter persists and uses functional icon rendering when published', async ({ page }) => {
   const runtime = captureRuntimeFailures(page);
-  const entry = '/web/fullworld.html?x=32361&y=32198&floor=-7&zoom=2&mode=map&creatures=npc&npcRole=shop';
+  const entry = qualificationEntry(OVERFLOW_NPC.position, { creatures: 'npc', npcRole: 'shop' });
   await gotoAtlas(page, entry);
   await waitForAtlas(page);
   let creatures = await creatureState(page);
-  test.skip(creatures.status === 'FAIL' && /HTTP 404/.test(creatures.error ?? ''), 'Current target has no optional creature publication.');
   expect(creatures.status, creatures.error ?? 'creature runtime').toBe('PASS');
   await expect(page.locator('#npc-role-filter')).toBeVisible();
   await expect(page.locator('#npc-role-filter')).toHaveValue('shop');
@@ -107,10 +110,9 @@ test('desktop creature overlay repaints in the same turn as continuous pan', asy
       });
     });
   });
-  await gotoAtlas(page, '/web/fullworld.html?x=32364&y=32240.2&floor=-7&zoom=1.04&mode=map&creatures=npc,monster');
+  await gotoAtlas(page, sceneEntry(MIXED_SCENE, { zoom: 1.04 }));
   await waitForAtlas(page);
   const creatures = await creatureState(page);
-  test.skip(creatures.status === 'FAIL' && /HTTP 404/.test(creatures.error ?? ''), 'Current target has no optional creature publication.');
   expect(creatures.status, creatures.error ?? 'creature runtime').toBe('PASS');
   await expect.poll(() => page.evaluate(() => globalThis.__OTERYN_ATLAS_CREATURES__?.drawnRecords ?? 0)).toBeGreaterThan(0);
   await page.evaluate(() => { globalThis.__OTERYN_CREATURE_PAN_PROBE__.active = true; });

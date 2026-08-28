@@ -6,6 +6,7 @@ import {
   gotoAtlas,
   waitForAtlas,
 } from './runtime.mjs';
+import { MIXED_SCENE, sceneEntry } from '../support/qualification-fixture-scenarios.mjs';
 
 test('mobile critical controls, backdrop close and responsive resize remain usable', async ({ page }) => {
   const runtime = captureRuntimeFailures(page);
@@ -44,11 +45,10 @@ test('mobile critical controls, backdrop close and responsive resize remain usab
 });
 
 test('mobile shipped creature controls are truthful when the optional product is present', async ({ page }) => {
-  await gotoAtlas(page, `${MOBILE_ENTRY}&creatures=npc,monster`);
+  await gotoAtlas(page, sceneEntry(MIXED_SCENE));
   await waitForAtlas(page);
   await page.waitForFunction(() => ['PASS', 'FAIL'].includes(globalThis.__OTERYN_ATLAS_CREATURES__?.status), null, { timeout: 30_000 });
   const creatures = await page.evaluate(() => globalThis.__OTERYN_ATLAS_CREATURES__);
-  test.skip(creatures.status === 'FAIL' && /HTTP 404/.test(creatures.error ?? ''), 'Current target has no optional creature publication.');
   expect(creatures.status, creatures.error ?? 'creature runtime').toBe('PASS');
 
   await page.locator('#mobile-controls-toggle').click();

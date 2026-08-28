@@ -6,6 +6,7 @@ import {
   gotoAtlas,
   waitForAtlas,
 } from './runtime.mjs';
+import { MIXED_SCENE, OVERLAP_MONSTERS, qualificationEntry, sceneEntry } from '../support/qualification-fixture-scenarios.mjs';
 
 async function creatureState(page) {
   await page.waitForFunction(() => ['PASS', 'FAIL'].includes(globalThis.__OTERYN_ATLAS_CREATURES__?.status), null, { timeout: 30_000 });
@@ -22,23 +23,14 @@ async function discoverNpc(page) {
 }
 
 function targetEntry(record, zoom = 2) {
-  const params = new URLSearchParams({
-    x: String(record.position.x), y: String(record.position.y), floor: String(record.position.floor),
-    zoom: String(zoom), mode: 'map', creatures: 'npc,monster', creature: record.record_id,
+  return qualificationEntry(record.position, {
+    zoom, mode: 'map', creatures: 'npc,monster', creature: record.record_id,
   });
-  return `/web/fullworld.html?${params.toString()}`;
 }
 
 const OVERLAP_MONSTER_FIXTURE = Object.freeze({
-  kind: 'monster',
-  label: 'Misguided Thief',
-  record_id: 'monster:014cc0368c5989dd788e2af63e087e83',
-  position: Object.freeze({ floor: -10, x: 32522, y: 32419 }),
-  record_ids: Object.freeze([
-    'monster:014cc0368c5989dd788e2af63e087e83',
-    'monster:6c316dffde0b35aa6a9165eb46694374',
-    'monster:7a7d419f84cf4eac5cad81f7cb266dae',
-  ]),
+  ...OVERLAP_MONSTERS[0],
+  record_ids: Object.freeze(OVERLAP_MONSTERS.map((record) => record.record_id)),
 });
 
 async function clickCommittedTarget(page, expectedRecordId, expectedLabel) {
@@ -64,10 +56,10 @@ async function clickCommittedTarget(page, expectedRecordId, expectedLabel) {
 
 test('desktop NPC activation uses fresh committed geometry and does not select the base tile', async ({ page }) => {
   const runtime = captureRuntimeFailures(page);
-  await gotoAtlas(page, `${DESKTOP_ENTRY}&creatures=npc,monster`);
+  await gotoAtlas(page, sceneEntry(MIXED_SCENE));
   await waitForAtlas(page);
   const initial = await creatureState(page);
-  test.skip(initial.status === 'FAIL' && /HTTP 404/.test(initial.error ?? ''), 'Current target has no optional creature publication.');
+  expect(initial.status, initial.error ?? 'creature runtime').toBe('PASS');
   const record = await discoverNpc(page);
   expect(record).not.toBeNull();
 
@@ -95,10 +87,10 @@ async function discoverMonster(page) {
 
 test('desktop monster activation opens Monster spawn card and survives canonical reload', async ({ page }) => {
   const runtime = captureRuntimeFailures(page);
-  await gotoAtlas(page, `${DESKTOP_ENTRY}&creatures=npc,monster`);
+  await gotoAtlas(page, sceneEntry(MIXED_SCENE));
   await waitForAtlas(page);
   const initial = await creatureState(page);
-  test.skip(initial.status === 'FAIL' && /HTTP 404/.test(initial.error ?? ''), 'Current target has no optional creature publication.');
+  expect(initial.status, initial.error ?? 'creature runtime').toBe('PASS');
   const record = await discoverMonster(page);
   expect(record).not.toBeNull();
 
@@ -139,7 +131,7 @@ test('desktop monster activation opens Monster spawn card and survives canonical
   await expect.poll(() => page.evaluate(() => globalThis.__OTERYN_ATLAS_CREATURES__?.cardState)).toBe('chooser');
   const choices = page.locator('#creature-card-choices button');
   expect(await choices.count()).toBeGreaterThanOrEqual(3);
-  await expect(choices.first()).toContainText('Misguided Thief');
+  await expect(choices.first()).toContainText(OVERLAP_MONSTER_FIXTURE.label);
   await choices.first().click();
   expect(OVERLAP_MONSTER_FIXTURE.record_ids).toContain((await creatureState(page)).cardRecordId);
   await expect(page.locator('#creature-card-kind')).toHaveText('Monster spawn');
@@ -151,10 +143,10 @@ test('desktop Details synchronizes inspector and Copy link exposes truthful manu
   await page.addInitScript(() => {
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: undefined });
   });
-  await gotoAtlas(page, `${DESKTOP_ENTRY}&creatures=npc,monster`);
+  await gotoAtlas(page, sceneEntry(MIXED_SCENE));
   await waitForAtlas(page);
   const initial = await creatureState(page);
-  test.skip(initial.status === 'FAIL' && /HTTP 404/.test(initial.error ?? ''), 'Current target has no optional creature publication.');
+  expect(initial.status, initial.error ?? 'creature runtime').toBe('PASS');
   const record = await discoverNpc(page);
   await gotoAtlas(page, targetEntry(record));
   await waitForAtlas(page);
@@ -172,10 +164,10 @@ test('desktop Details synchronizes inspector and Copy link exposes truthful manu
 
 test('desktop pan invalidates stale creature geometry before the next activation', async ({ page }) => {
   const runtime = captureRuntimeFailures(page);
-  await gotoAtlas(page, `${DESKTOP_ENTRY}&creatures=npc,monster`);
+  await gotoAtlas(page, sceneEntry(MIXED_SCENE));
   await waitForAtlas(page);
   const initial = await creatureState(page);
-  test.skip(initial.status === 'FAIL' && /HTTP 404/.test(initial.error ?? ''), 'Current target has no optional creature publication.');
+  expect(initial.status, initial.error ?? 'creature runtime').toBe('PASS');
   const record = await discoverNpc(page);
   await gotoAtlas(page, targetEntry(record));
   await waitForAtlas(page);
@@ -200,10 +192,10 @@ test('desktop pan invalidates stale creature geometry before the next activation
 
 test('desktop creature layer invalidation closes a card for a now-hidden placement', async ({ page }) => {
   const runtime = captureRuntimeFailures(page);
-  await gotoAtlas(page, `${DESKTOP_ENTRY}&creatures=npc,monster`);
+  await gotoAtlas(page, sceneEntry(MIXED_SCENE));
   await waitForAtlas(page);
   const initial = await creatureState(page);
-  test.skip(initial.status === 'FAIL' && /HTTP 404/.test(initial.error ?? ''), 'Current target has no optional creature publication.');
+  expect(initial.status, initial.error ?? 'creature runtime').toBe('PASS');
   const record = await discoverNpc(page);
   await gotoAtlas(page, targetEntry(record));
   await waitForAtlas(page);

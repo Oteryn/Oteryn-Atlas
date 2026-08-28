@@ -14,8 +14,9 @@ import {
   serializeActionLog,
 } from '../support/seeded-actions.mjs';
 import { assertNoRuntimeFailures, captureRuntimeFailures, gotoAtlas } from './runtime.mjs';
+import { DENSE_MONSTER_SCENE, sceneEntry } from '../support/qualification-fixture-scenarios.mjs';
 
-const ENTRY = '/web/fullworld.html?x=33018&y=32009&floor=-7&zoom=2&mode=map&animation=off&creatures=npc,monster';
+const ENTRY = sceneEntry(DENSE_MONSTER_SCENE, { animation: 'off' });
 const DEFAULT_SEED = 0x85;
 const DEFAULT_LENGTH = 18;
 const TOLERANCE_PX = 0.25;

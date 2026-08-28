@@ -14,6 +14,7 @@ import {
   gotoAtlas,
   waitForAtlas,
 } from './runtime.mjs';
+import { NAVIGATION_A, NAVIGATION_B, qualificationEntry } from '../support/qualification-fixture-scenarios.mjs';
 
 async function navigateCoordinates(page, x, y, floor = -7) {
   await page.locator('#search-input').fill(`${x} ${y} ${floor}`);
@@ -34,7 +35,7 @@ test('reordered authenticated range completion cannot commit a stale pan target'
   const before = await committedRenderer(page);
   const faults = await installHeldRangeRequests(page, { limit: 2 });
   try {
-    await navigateCoordinates(page, 32469, 32341);
+    await navigateCoordinates(page, NAVIGATION_B.center.x, NAVIGATION_B.center.y);
     const held = await faults.waitForHeld(2);
     expect(held).toHaveLength(2);
     expect(held[0].range).toMatch(/^bytes=\d+-\d+$/);
@@ -44,8 +45,8 @@ test('reordered authenticated range completion cannot commit a stale pan target'
     faults.release(0);
     const expected = viewFromUrl(page.url());
     const committed = await waitForCommittedView(page, expected, before.generation);
-    expect(committed.transform.centerTileX).toBe(32469);
-    expect(committed.transform.centerTileY).toBe(32341);
+    expect(committed.transform.centerTileX).toBe(NAVIGATION_B.center.x);
+    expect(committed.transform.centerTileY).toBe(NAVIGATION_B.center.y);
     expect(faults.evidence().released).toEqual([1, 0]);
     assertNoRuntimeFailures(runtime);
   } finally {
@@ -60,15 +61,15 @@ test('superseded delayed range abort stays expected and newest view is the only 
   const before = await committedRenderer(page);
   const faults = await installHeldRangeRequests(page, { limit: 8 });
   try {
-    await navigateCoordinates(page, 32469, 32341);
+    await navigateCoordinates(page, NAVIGATION_B.center.x, NAVIGATION_B.center.y);
     await faults.waitForHeld(1);
-    await navigateCoordinates(page, 32569, 32441);
+    await navigateCoordinates(page, NAVIGATION_A.center.x, NAVIGATION_A.center.y);
     faults.releaseAll();
 
     const expected = viewFromUrl(page.url());
     const committed = await waitForCommittedView(page, expected, before.generation);
-    expect(committed.transform.centerTileX).toBe(32569);
-    expect(committed.transform.centerTileY).toBe(32441);
+    expect(committed.transform.centerTileX).toBe(NAVIGATION_A.center.x);
+    expect(committed.transform.centerTileY).toBe(NAVIGATION_A.center.y);
     const qualified = await waitForQualifiedView(page, expected);
     expect(qualified.status).toBe('PASS');
     assertNoRuntimeFailures(runtime);
@@ -79,16 +80,15 @@ test('superseded delayed range abort stays expected and newest view is the only 
 
 test('resize and rapid creature toggles during pending ranges converge on latest committed geometry', async ({ page }) => {
   const runtime = captureRuntimeFailures(page);
-  await gotoAtlas(page, `${DESKTOP_ENTRY}&creatures=npc,monster`);
+  await gotoAtlas(page, qualificationEntry(NAVIGATION_A.center, { creatures: 'npc,monster' }));
   await waitForAtlas(page);
   const creatures = await waitCreatureRuntime(page);
-  test.skip(creatures.status === 'FAIL' && /HTTP 404/.test(creatures.error ?? ''), 'Current target has no optional creature publication.');
   expect(creatures.status, creatures.error ?? 'creature runtime').toBe('PASS');
 
   const faults = await installHeldRangeRequests(page, { limit: 8 });
   try {
     const before = await committedRenderer(page);
-    await navigateCoordinates(page, 32469, 32341);
+    await navigateCoordinates(page, NAVIGATION_B.center.x, NAVIGATION_B.center.y);
     await faults.waitForHeld(1);
 
     await page.setViewportSize({ width: 1180, height: 760 });
@@ -120,7 +120,7 @@ test('reload during an in-flight range discards the old operation and requalifie
   await waitForAtlas(page);
   const faults = await installHeldRangeRequests(page, { limit: 1 });
   try {
-    await navigateCoordinates(page, 32469, 32341);
+    await navigateCoordinates(page, NAVIGATION_B.center.x, NAVIGATION_B.center.y);
     await faults.waitForHeld(1);
     const expected = viewFromUrl(page.url());
     await page.reload({ waitUntil: 'domcontentloaded' });
@@ -142,8 +142,8 @@ test('browser back supersedes an in-flight historical view without stale commit'
   const faults = await installHeldRangeRequests(page, { limit: 1 });
   try {
     const moved = new URL(page.url());
-    moved.searchParams.set('x', '32469');
-    moved.searchParams.set('y', '32341');
+    moved.searchParams.set('x', String(NAVIGATION_B.center.x));
+    moved.searchParams.set('y', String(NAVIGATION_B.center.y));
     await page.goto(moved.href, { waitUntil: 'domcontentloaded' });
     await faults.waitForHeld(1);
     await page.goBack({ waitUntil: 'domcontentloaded' });

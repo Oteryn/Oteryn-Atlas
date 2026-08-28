@@ -3,6 +3,13 @@ const QUALIFICATION_MARKER = 'oteryn-atlas-qualification-trust-v1';
 const QUALIFICATION_FIXTURE_ID = 'atlas-qualification-world-v2';
 const BOUNDED_MARKER = 'oteryn-atlas-bounded-real-trust-v1';
 const BOUNDED_FIXTURE_ID = 'atlas-bounded-real-world-v1';
+const LEGACY_DEFAULT = Object.freeze({ x: '32369', y: '32241', floor: '-7' });
+const QUALIFICATION_DEFAULT_NAVIGATION = Object.freeze({
+  contract_id: 'oteryn-atlas-qualification-default-navigation-v1',
+  record_id: 'semantic-record:qualification-harbor',
+});
+const CANONICAL_RELATIVE_FULLWORLD = /^\/web\/fullworld\.html(?:\?[^#%\s]*)?(?:#[^%\s]*)?$/;
+const CANONICAL_ABSOLUTE_FULLWORLD = /^http:\/\/atlas-web:8080\/web\/fullworld\.html(?:\?[^#%\s]*)?(?:#[^%\s]*)?$/;
 const ROOT_FIELDS = Object.freeze([
   'publicationRoot', 'semanticRoot', 'pixelRoot', 'overviewRoot', 'minimapRoot',
   'runtimeIndexRoot', 'pixelBucketRoot', 'sourceFingerprint', 'productDigest',
@@ -44,17 +51,24 @@ function validateSemanticIndex(index, trust) {
   if (index.source.contract_id !== 'oteryn-atlas-qualification-fixture-v1' || index.source.capability !== 'qualification-semantic-search-v1') {
     throw new TypeError('qualification semantic source contract mismatch');
   }
+  const navigation = index.source.default_navigation;
+  if (!navigation || typeof navigation !== 'object' || Array.isArray(navigation)
+    || navigation.contract_id !== QUALIFICATION_DEFAULT_NAVIGATION.contract_id
+    || navigation.record_id !== QUALIFICATION_DEFAULT_NAVIGATION.record_id) {
+    throw new TypeError('qualification semantic default navigation identity mismatch');
+  }
   if (!Array.isArray(index.records)) throw new TypeError('qualification semantic records are missing');
-  const navigable = index.records.filter((record) => {
-    const position = record?.position;
-    return Array.isArray(record?.capabilities)
-      && record.capabilities.includes('navigation')
-      && Number.isSafeInteger(position?.x)
-      && Number.isSafeInteger(position?.y)
-      && Number.isSafeInteger(position?.floor);
-  });
-  if (navigable.length !== 1) throw new TypeError(`qualification semantic index must contain exactly one navigable record, observed ${navigable.length}`);
-  return navigable[0];
+  const defaults = index.records.filter((record) => record?.id === navigation.record_id);
+  if (defaults.length !== 1) {
+    throw new TypeError(`qualification semantic index must contain exactly one default navigation record, observed ${defaults.length}`);
+  }
+  const record = defaults[0];
+  const position = record?.position;
+  if (!Array.isArray(record?.capabilities) || !record.capabilities.includes('navigation')
+    || !Number.isSafeInteger(position?.x) || !Number.isSafeInteger(position?.y) || !Number.isSafeInteger(position?.floor)) {
+    throw new TypeError('qualification semantic default navigation record is not navigable');
+  }
+  return record;
 }
 
 function rewriteEntry(entry, position) {
@@ -68,9 +82,41 @@ function rewriteEntry(entry, position) {
   return isRelative ? `${url.pathname}${url.search}${url.hash}` : url.href;
 }
 
+function canonicalFullWorldUrl(entry) {
+  if (typeof entry !== 'string') throw new TypeError('Atlas entry must be a string');
+  const relative = CANONICAL_RELATIVE_FULLWORLD.test(entry);
+  const absolute = CANONICAL_ABSOLUTE_FULLWORLD.test(entry);
+  if (!relative && !absolute) return null;
+  try {
+    const url = new URL(entry, relative ? 'http://atlas.invalid' : undefined);
+    if (url.pathname !== '/web/fullworld.html') return null;
+    if (absolute && (url.protocol !== 'http:' || url.host !== 'atlas-web:8080' || url.username || url.password || url.href !== entry)) return null;
+    const serialized = new URL(url.href);
+    for (const field of Object.keys(LEGACY_DEFAULT)) {
+      serialized.searchParams.set(field, url.searchParams.get(field) ?? '');
+    }
+    const canonical = relative ? `${serialized.pathname}${serialized.search}${serialized.hash}` : serialized.href;
+    if (canonical !== entry) return null;
+    return url;
+  } catch {
+    return null;
+  }
+}
+
+function isUnambiguousLegacyDefaultEntry(entry) {
+  const url = canonicalFullWorldUrl(entry);
+  if (!url) return false;
+  for (const [field, value] of Object.entries(LEGACY_DEFAULT)) {
+    const values = url.searchParams.getAll(field);
+    if (values.length !== 1 || values[0] !== value) return false;
+  }
+  return true;
+}
+
 export async function resolveQualificationEntry(entry, { qualificationTrustJson, readSemanticIndex }) {
   const trustState = parseTrust(qualificationTrustJson);
   if (!trustState || trustState.mode === 'bounded') return entry;
+  if (!isUnambiguousLegacyDefaultEntry(entry)) return entry;
   if (typeof readSemanticIndex !== 'function') throw new TypeError('qualification semantic reader is required');
   const semanticIndex = await readSemanticIndex();
   const record = validateSemanticIndex(semanticIndex, trustState.descriptor);

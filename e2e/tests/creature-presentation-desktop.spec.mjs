@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import {
+  ANIMATED_MONSTER_SCENE,
   DENSE_MONSTER_SCENE,
   LONG_NAME_NPC,
   MIXED_SCENE,
@@ -7,13 +8,14 @@ import {
   OVERFLOW_NPC,
   TWO_ROLE_NPC,
   sceneEntry,
-} from '../support/creature-presentation-fixtures.mjs';
+} from '../support/qualification-fixture-scenarios.mjs';
 import {
   assertCssRect,
   assertPresentationContract,
   assertRecordIdsPublished,
   badgeLayoutFor,
   labelLayoutFor,
+  revalidatePublicationPresentationRecord,
   revalidatePublicationRecord,
   viewportSize,
   waitForPresentationCommit,
@@ -113,12 +115,12 @@ test('desktop factual role rows preserve canonical roles, overflow count and act
   ]);
   expect(badge.rects).toHaveLength(2);
   const viewport = await viewportSize(page);
-  badge.rects.forEach((rect, index) => assertCssRect(rect, viewport, `Albinius badge ${index}`));
+  badge.rects.forEach((rect, index) => assertCssRect(rect, viewport, `fixture two-role badge ${index}`));
 
   state = await openScenario(page, sceneEntry(OVERFLOW_NPC, { creatures: 'npc' }));
   await revalidatePublicationRecord(page, OVERFLOW_NPC);
-  await captureUserVisualEvidence(page, testInfo, 'creature-presentation.overflow-eremo', {
-    note: 'Factual five-role Eremo fixture; expected row is first two roles plus +3 overflow.',
+  await captureUserVisualEvidence(page, testInfo, 'creature-presentation.overflow-fixture-guide', {
+    note: 'Fixture five-role Guide; expected row is first two roles plus +3 overflow.',
   });
   assertPresentationContract(state);
   badge = badgeLayoutFor(state, OVERFLOW_NPC.record_id);
@@ -138,7 +140,7 @@ test('desktop factual role rows preserve canonical roles, overflow count and act
     { kind: 'overflow', hiddenCount: 3 },
   ]);
   await captureUserVisualEvidence(page, testInfo, 'creature-presentation.overflow-filter-trainer', {
-    note: 'Active factual trainer filter must stay explicitly visible without rewriting canonical Eremo roles.',
+    note: 'Active fixture trainer filter must stay explicitly visible without rewriting canonical Guide roles.',
   });
   await page.reload({ waitUntil: 'domcontentloaded' });
   await waitForAtlas(page);
@@ -294,7 +296,13 @@ test('desktop selection, camera/floor changes and animation preserve layout-life
   expect(state.selectedRecordId).toBe(TWO_ROLE_NPC.record_id);
   expect(labelLayoutFor(state, TWO_ROLE_NPC.record_id)?.priority).toBe('selected');
 
-  state = await openScenario(page, '/web/fullworld.html?x=32831&y=32596&floor=-12&zoom=2&mode=map&animation=off&creatures=monster');
+  state = await openScenario(page, sceneEntry(ANIMATED_MONSTER_SCENE, { zoom: 2, mode: 'map', animation: 'off', creatures: 'monster' }));
+  const animatedFixture = await revalidatePublicationPresentationRecord(page, ANIMATED_MONSTER_SCENE.record);
+  expect(animatedFixture.outfit_presentation?.outfit_presentation_id,
+    'animation oracle must use the protected fixture presentation source').toBe(ANIMATED_MONSTER_SCENE.record.outfit_presentation_id);
+  expect(new URL(page.url()).searchParams.get('x')).toBe(String(ANIMATED_MONSTER_SCENE.center.x));
+  expect(new URL(page.url()).searchParams.get('y')).toBe(String(ANIMATED_MONSTER_SCENE.center.y));
+  expect(new URL(page.url()).searchParams.get('floor')).toBe(String(ANIMATED_MONSTER_SCENE.center.floor));
   render = assertPresentationContract(state);
   expect(state.pixelDrawnRecords, 'animation layout probe requires factual pixel-rendered creatures').toBeGreaterThan(0);
   const stableLayoutGeneration = render.labelLayoutGeneration;

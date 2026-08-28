@@ -1,13 +1,17 @@
 import { expect, test } from '@playwright/test';
-import { MOBILE_ENTRY, assertNoRuntimeFailures, captureRuntimeFailures, gotoAtlas, waitForAtlas } from './runtime.mjs';
+import { assertNoRuntimeFailures, captureRuntimeFailures, gotoAtlas, waitForAtlas } from './runtime.mjs';
 import { canvasPng, exactPngPixelsEqual } from '../support/visual-oracle.mjs';
-
-const MONSTER_PLAYBACK_ENTRY = '/web/fullworld.html?x=32724&y=31155&floor=-15&zoom=2&mode=minimap&perf=reference&animation=off&creatures=npc,monster';
 import { assertUserVisibleSurface, captureUserVisualEvidence } from '../support/user-acceptance.mjs';
+import { visualSourceScenarios } from '../support/visual-source-scenarios.mjs';
+
+function mobileSource() {
+  return visualSourceScenarios(process.env.ATLAS_QUALIFICATION_TRUST_JSON).mobile;
+}
 
 test('mobile Atlas-owned chrome and drawers retain reviewed user-facing visual contracts', async ({ page }, testInfo) => {
   const runtime = captureRuntimeFailures(page);
-  await gotoAtlas(page, `${MOBILE_ENTRY}&creatures=npc,monster`);
+  const source = mobileSource();
+  await gotoAtlas(page, `${source.entry}&creatures=npc,monster`);
   await waitForAtlas(page);
 
   const initialMetrics = await assertUserVisibleSurface(page, {
@@ -57,20 +61,20 @@ test('mobile Atlas-owned chrome and drawers retain reviewed user-facing visual c
   });
 
   const mobileSearch = page.locator('#mobile-search-input');
-  await mobileSearch.fill('Thais');
+  await mobileSearch.fill(source.semantic.query);
   const results = page.locator('#semantic-search-results-mobile');
   await expect(results).toBeVisible();
-  const thais = results.getByRole('option').filter({ hasText: 'Thais' }).first();
-  await expect(thais).toBeVisible();
+  const selectedSemanticRecord = results.getByRole('option').filter({ hasText: source.semantic.label }).first();
+  await expect(selectedSemanticRecord).toBeVisible();
   await captureUserVisualEvidence(page, testInfo, 'mobile.search', {
     note: 'Mobile semantic-search result list as presented inside the controls drawer.',
   });
   await Promise.all([
     page.waitForURL((url) => Boolean(url.searchParams.get('semantic'))),
-    thais.tap(),
+    selectedSemanticRecord.tap(),
   ]);
   await waitForAtlas(page);
-  await expect(page.locator('#inspector-content')).toContainText('Thais');
+  await expect(page.locator('#inspector-content')).toContainText(source.semantic.label);
 
   const inspectorToggle = page.getByRole('button', { name: 'Open inspector' });
   await inspectorToggle.tap();
@@ -113,7 +117,7 @@ test('mobile Atlas-owned chrome and drawers retain reviewed user-facing visual c
     note: 'Landscape-like mobile resize with the map and primary controls still usable.',
   });
 
-  await gotoAtlas(page, MONSTER_PLAYBACK_ENTRY);
+  await gotoAtlas(page, source.monsterPlaybackEntry);
   await waitForAtlas(page);
   await page.locator('#mobile-controls-toggle').click();
   const npcToggle = page.locator('input[data-creature-kind="npc"]');
