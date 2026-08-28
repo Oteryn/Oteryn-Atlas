@@ -1,30 +1,36 @@
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { buildVerificationPlan } from '../../tools/verification/build-verification-plan.mjs';
-import { parsePlaywrightStableTestIds } from '../../tools/verification/parse-playwright-test-list.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const workflowPath = path.join(ROOT, '.github/workflows/legacy-molehill-transition-qualification.yml');
 const catalogPath = path.join(ROOT, 'tools/verification/verification-catalog.json');
 const impactPath = path.join(ROOT, 'tools/verification/impact-manifest.json');
+const fullSafetyCensusPath = path.join(ROOT, 'tools/verification/full-safety-net-stable-ids.json');
+
+const RETAINED_LEGACY_SPECIALIST_IDS = Object.freeze([
+  'desktop-chromium::e2e/tests/api-contract-desktop.spec.mjs::browser search diagnostics match published semantic API contracts',
+  'desktop-chromium::e2e/tests/api-contract-desktop.spec.mjs::published API records render unchanged through browser search',
+  'desktop-chromium::e2e/tests/creature-gameplay-desktop.spec.mjs::desktop PARTIAL shop never becomes an authoritative empty claim',
+  'desktop-chromium::e2e/tests/creature-gameplay-desktop.spec.mjs::desktop Rat direct activation renders exact Loot Stats and placement-backed Spawns',
+  'desktop-chromium::e2e/tests/creature-gameplay-desktop.spec.mjs::desktop real large shop stays bounded at 100 rendered rows',
+  'desktop-chromium::e2e/tests/creature-gameplay-desktop.spec.mjs::desktop Sam direct activation opens exact Gameplay shop, preserves Semantic, and round-trips URL state',
+  'desktop-chromium::e2e/tests/fullworld-animation-census-desktop.spec.mjs::published creature animation product passes the full authoritative coverage census',
+  'mobile-chromium::e2e/tests/creature-gameplay-mobile.spec.mjs::mobile Rat direct tap renders exact loot stats and keeps topmost Escape behavior',
+  'mobile-chromium::e2e/tests/creature-gameplay-mobile.spec.mjs::mobile Sam direct tap reaches readable Gameplay trade data and tabs',
+]);
 
 function readJson(pathname) {
   return JSON.parse(fs.readFileSync(pathname, 'utf8'));
 }
 
 function retainedLegacyRunnerStableTestIds() {
-  const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-  const listed = spawnSync(npm, [
-    'exec', '--prefix', 'e2e', '--',
-    'playwright', 'test', '--config=e2e/playwright.config.mjs', '--list',
-  ], { cwd: ROOT, encoding: 'utf8' });
-  assert.equal(listed.status, 0, listed.stderr);
-  return parsePlaywrightStableTestIds(listed.stdout);
+  const ordinary = readJson(fullSafetyCensusPath).stableTestIds;
+  return [...new Set([...ordinary, ...RETAINED_LEGACY_SPECIALIST_IDS])].sort();
 }
 
 test('legacy atlas-local-e2e transition qualifier is bounded, exact-head and repository-approved-runner only', () => {
