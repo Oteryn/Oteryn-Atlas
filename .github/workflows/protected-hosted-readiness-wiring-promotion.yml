@@ -117,7 +117,11 @@ jobs:
           trap cleanup EXIT
 
           compose config -q
-          compose up -d --wait atlas-publication
+          if ! compose up -d --wait atlas-publication; then
+            compose ps -a || true
+            compose logs --no-color atlas-publication-ready atlas-publication || true
+            exit 1
+          fi
           publication_id="$(compose ps -q atlas-publication)"
           test -n "$publication_id"
           docker exec "$publication_id" wget -q -O /dev/null http://127.0.0.1:8081/__atlas/readiness
