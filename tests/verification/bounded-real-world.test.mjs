@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
+import { decodeSemanticGroup } from '../../src/browser/fullworld.mjs';
 import {
   BOUNDED_REAL_WORLD_ID,
   boundedRealTrustDescriptor,
@@ -50,6 +51,33 @@ test('bounded-real product is deterministic and binds exact real ancillary bytes
 
   fs.rmSync(path.dirname(firstRoot), { recursive: true, force: true });
   fs.rmSync(path.dirname(secondRoot), { recursive: true, force: true });
+});
+
+test('bounded-real runtime group ranges decode through the production semantic decoder', async () => {
+  const root = tempDir('atlas-bounded-range-decode');
+  await buildBoundedRealWorld(root, { sourceRoot: ROOT });
+  const runtimeWorld = JSON.parse(fs.readFileSync(path.join(root, 'runtime-index/world.json'), 'utf8'));
+  let decodedGroups = 0;
+  for (const floorEntry of runtimeWorld.floors) {
+    const runtimeFloor = JSON.parse(fs.readFileSync(path.join(root, 'runtime-index', floorEntry.path), 'utf8'));
+    for (const chunk of runtimeFloor.chunks) {
+      const source = fs.readFileSync(path.join(root, 'publication/semantic', chunk.path));
+      for (const group of chunk.groups) {
+        const bytes = source.subarray(group.offset, group.offset + group.bytes);
+        const tiles = decodeSemanticGroup(bytes, {
+          chunk,
+          floor: runtimeFloor.floor,
+          group,
+          regionSpan: runtimeWorld.regionSpan,
+          visualBounds: runtimeWorld.visualBounds,
+        });
+        assert.equal(tiles.length, group.tiles);
+        decodedGroups += 1;
+      }
+    }
+  }
+  assert.equal(decodedGroups, runtimeWorld.counts.groups);
+  fs.rmSync(path.dirname(root), { recursive: true, force: true });
 });
 
 test('bounded-real runtime creature census is only the four exact compatibility fixtures', async () => {
