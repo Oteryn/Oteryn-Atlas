@@ -2,7 +2,7 @@ name: Legacy Molehill transition qualification
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [labeled]
 
 permissions:
   contents: read
@@ -15,6 +15,7 @@ jobs:
   legacy-qualification:
     name: Capture exact-head legacy transition evidence
     if: >-
+      github.event.label.name == 'atlas-legacy-transition-qualification' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       (github.event.pull_request.head.ref == 'feat/issue-179-legacy-transition-qualifier' ||
        github.event.pull_request.head.ref == 'feat/issue-179-protected-controller-v2-promotion' ||
@@ -267,6 +268,7 @@ jobs:
     needs: legacy-qualification
     if: >-
       needs.legacy-qualification.result == 'success' &&
+      github.event.label.name == 'atlas-legacy-transition-qualification' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       (github.event.pull_request.head.ref == 'feat/issue-179-legacy-transition-qualifier' ||
        github.event.pull_request.head.ref == 'feat/issue-179-protected-controller-v2-promotion' ||

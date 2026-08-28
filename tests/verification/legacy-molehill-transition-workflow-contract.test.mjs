@@ -37,7 +37,11 @@ test('legacy atlas-local-e2e transition qualifier is bounded, exact-head and rep
   assert.equal(fs.existsSync(workflowPath), true, 'legacy transition workflow must exist');
   const workflow = fs.readFileSync(workflowPath, 'utf8');
 
-  assert.match(workflow, /pull_request:/);
+  assert.match(workflow, /pull_request:\s*\n\s*types:\s*\[labeled\]/);
+  assert.doesNotMatch(workflow, /\b(?:opened|synchronize|reopened|ready_for_review)\b/,
+    'the legacy capture must not start on ordinary PR lifecycle events or pushes');
+  assert.match(workflow, /github\.event\.label\.name == 'atlas-legacy-transition-qualification'/,
+    'a maintainer must explicitly add the qualification label before a legacy capture can start');
   assert.match(workflow, /feat\/issue-179-legacy-transition-qualifier/);
   assert.match(workflow, /feat\/issue-179-protected-controller-v2-promotion/);
   assert.match(workflow, /fix\/issue-179-protected-census-readonly-mount/);
