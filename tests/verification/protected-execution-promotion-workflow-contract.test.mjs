@@ -51,9 +51,9 @@ test('protected execution promotion preauthorizes the qualification trust-descri
   assert.match(workflow, /fix\/issue-179-qualification-trust-descriptor/);
   assert.doesNotMatch(heavy, /fix\/issue-179-qualification-trust-descriptor/);
   assert.match(workflow, /qualificationTrustDescriptor/);
+  assert.match(workflow, /buildQualificationWorld/);
+  assert.match(workflow, /resolveFullWorldTrust/);
   assert.match(workflow, /tests\/verification\/qualification-world\.test\.mjs/);
   assert.match(workflow, /tests\/verification\/protected-hosted-compose-promotion\.test\.mjs/);
   assert.match(workflow, /tools\/verification\/qualification-world\.mjs/);
-  assert.match(workflow, /\.github\/workflows\/protected-hosted-executor\.yml/);
-  assert.match(workflow, /sha256:f53fb9c6bd0b32618a44a48b7e27d21c26ee170443764deb115224042afa996e/);
 });
