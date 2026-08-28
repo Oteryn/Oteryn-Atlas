@@ -33,7 +33,8 @@ test('qualification world is deterministic, complete for the 16-floor runtime co
 });
 
 test('qualification trust descriptor is the exact browser trust subset of the verified product manifest', async () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-qualification-trust-'));
+  const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-qualification-trust-'));
+  const root = path.join(parent, 'world');
   try {
     await buildQualificationWorld(root);
     const verified = await verifyQualificationWorld(root);
@@ -54,6 +55,6 @@ test('qualification trust descriptor is the exact browser trust subset of the ve
     });
     assert.equal(Object.isFrozen(descriptor), true);
   } finally {
-    fs.rmSync(root, { recursive: true, force: true });
+    fs.rmSync(parent, { recursive: true, force: true });
   }
 });
