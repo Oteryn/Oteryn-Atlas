@@ -19,7 +19,7 @@ jobs:
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.head.ref == 'fix/issue-179-protected-hosted-compose-promotion'
     runs-on: ubuntu-24.04
-    timeout-minutes: 8
+    timeout-minutes: 10
     permissions:
       contents: read
       pull-requests: read
@@ -68,7 +68,7 @@ jobs:
           fetch-depth: 0
           path: candidate
 
-      - name: Fence current PR head before hosted config proof
+      - name: Fence current PR head before hosted browser proof
         shell: bash
         run: |
           set -euo pipefail
@@ -82,25 +82,80 @@ jobs:
           test "$(git -C candidate rev-parse HEAD)" = "$ATLAS_CODE_REVISION"
           test "$(git -C trusted-base rev-parse HEAD)" = "$ATLAS_BASE_SHA"
 
-      - name: Validate protected compose plane without browser execution
+      - name: Prove protected trust bootstrap with one zero-retry browser test
         shell: bash
         run: |
           set -euo pipefail
-          node --test candidate/tests/verification/protected-hosted-compose-promotion.test.mjs
-          mkdir -p "$RUNNER_TEMP/atlas-compose-publication" "$RUNNER_TEMP/atlas-compose-artifacts"
-          : > "$RUNNER_TEMP/atlas-protected-test-list.txt"
-          ATLAS_CODE_REVISION="$ATLAS_CODE_REVISION" \
-          ATLAS_EXECUTION_CONTEXT="$PWD/candidate" \
-          ATLAS_E2E_ARTIFACTS_HOST="$RUNNER_TEMP/atlas-compose-artifacts" \
-          ATLAS_PROTECTED_TEST_LIST="$RUNNER_TEMP/atlas-protected-test-list.txt" \
-          ATLAS_E2E_SHARD='1/1' \
-          ATLAS_VERIFICATION_PLAN_SHA256='sha256:0000000000000000000000000000000000000000000000000000000000000000' \
-          ATLAS_QUALIFICATION_TRUST_JSON='{}' \
-          ATLAS_QUALIFICATION_PUBLICATION_HOST="$RUNNER_TEMP/atlas-compose-publication" \
-          docker compose \
-            -f candidate/e2e/compose.protected-hosted-executor.yml \
-            -f candidate/e2e/compose.github-hosted.yml \
-            config -q
+          node --test \
+            candidate/tests/verification/protected-hosted-compose-promotion.test.mjs \
+            candidate/tests/verification/protected-hosted-compose-promotion-workflow-contract.test.mjs
+
+          source_root="$RUNNER_TEMP/atlas-compose-publication"
+          artifacts_root="$RUNNER_TEMP/atlas-compose-artifacts"
+          trust_path="$RUNNER_TEMP/atlas-compose-trust.json"
+          test_list="$RUNNER_TEMP/atlas-protected-test-list.txt"
+          rm -rf "$source_root" "$artifacts_root"
+          mkdir -p "$source_root" "$artifacts_root"
+          : > "$test_list"
+
+          SOURCE_ROOT="$source_root" TRUST_PATH="$trust_path" node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import { buildQualificationWorld, qualificationTrustDescriptor, verifyQualificationWorld } from './trusted-base/tools/verification/qualification-world.mjs';
+
+          await buildQualificationWorld(process.env.SOURCE_ROOT);
+          const manifest = await verifyQualificationWorld(process.env.SOURCE_ROOT);
+          fs.writeFileSync(process.env.TRUST_PATH, `${JSON.stringify(qualificationTrustDescriptor(manifest))}\n`);
+          NODE
+
+          export ATLAS_VERIFICATION_PLAN_SHA256="sha256:$(printf '1%.0s' {1..64})"
+          export ATLAS_E2E_SHARD='1/1'
+          export ATLAS_QUALIFICATION_PUBLICATION_HOST="$source_root"
+          export ATLAS_QUALIFICATION_TRUST_JSON="$(cat "$trust_path")"
+          export ATLAS_EXECUTION_CONTEXT="$PWD/trusted-base"
+          export ATLAS_E2E_ARTIFACTS_HOST="$artifacts_root"
+          export ATLAS_PROTECTED_TEST_LIST="$test_list"
+          export COMPOSE_PROJECT_NAME="atlas-compose-promotion-$GITHUB_RUN_ID"
+
+          compose() {
+            docker compose \
+              -f candidate/e2e/compose.protected-hosted-executor.yml \
+              -f candidate/e2e/compose.github-hosted.yml \
+              "$@"
+          }
+          cleanup() {
+            compose down -v --remove-orphans >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          compose config -q
+          if ! compose up -d --wait atlas-publication atlas-web; then
+            compose ps -a || true
+            compose logs --no-color atlas-publication-ready atlas-publication atlas-web-ready atlas-web || true
+            exit 1
+          fi
+
+          publication_id="$(compose ps -q atlas-publication)"
+          web_id="$(compose ps -q atlas-web)"
+          test -n "$publication_id"
+          test -n "$web_id"
+          docker exec "$web_id" grep -Fq '__OTERYN_ATLAS_QUALIFICATION_TRUST__' /usr/share/nginx/html/web/fullworld.html
+          if grep -Fq '__OTERYN_ATLAS_QUALIFICATION_TRUST__' trusted-base/web/fullworld.html; then
+            echo 'protected bootstrap must not mutate the trusted source checkout' >&2
+            exit 1
+          fi
+          if docker exec "$publication_id" wget -q -O /dev/null http://127.0.0.1:8081/fullworld/atlas-publication-readiness.json; then
+            echo 'readiness manifest must not be exposed through the ordinary FullWorld namespace' >&2
+            exit 1
+          fi
+
+          compose run --rm e2e \
+            ./node_modules/.bin/playwright test \
+            --config=playwright.config.mjs \
+            tests/accessibility-desktop.spec.mjs \
+            --project=desktop-chromium \
+            --grep='desktop critical controls expose truthful accessible names and disabled states' \
+            --workers=1 \
+            --retries=0
 
       - name: Fence exact head and publish one-time compatibility status
         shell: bash
@@ -117,5 +172,5 @@ jobs:
             "repos/$GITHUB_REPOSITORY/statuses/$ATLAS_CODE_REVISION" \
             -f state='success' \
             -f context='atlas-local-e2e' \
-            -f description='Protected hosted compose bootstrap; no browser E2E executed' \
+            -f description='Protected hosted trust bootstrap; 1 Chromium test, retries=0' \
             -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
