@@ -74,17 +74,19 @@ test('Phase D hosted execution stays packed until Phase E calibrates sharding', 
   assert.match(executor, /ATLAS_E2E_SHARD:\s*\$\{\{ matrix\.shard \}\}\/1/);
 });
 
-test('protected-base test implementations and candidate additions execute from separate contexts', () => {
-  assert.match(executor, /protected-playwright-test-list\.txt/);
-  assert.match(executor, /candidate-additions-test-list\.txt/);
+test('protected-base test implementations and candidate additions execute from separate capability-scoped contexts', () => {
+  assert.match(executor, /test-lists\/\$dataCapability\/protected\.txt/);
+  assert.match(executor, /test-lists\/\$dataCapability\/candidate-additions\.txt/);
   assert.match(executor, /--placement protected/);
   assert.match(executor, /--placement candidate-additions/);
+  assert.match(executor, /--data-capability "\$dataCapability"/);
   assert.match(executor, /protected-execution-context/);
   assert.match(executor, /candidate-additions-execution-context/);
   assert.match(executor, /rm -rf "\$protected_context\/e2e"/);
   assert.match(executor, /cp -a protected-control\/e2e "\$protected_context\/e2e"/);
-  assert.match(executor, /candidateAdditionalStableTestIds/);
-  assert.match(executor, /--additional-summary/);
+  assert.match(executor, /placement: \$placement, dataCapability: \$dataCapability, summaryPath: \$summaryPath/);
+  assert.match(executor, /--source-manifest/);
+  assert.doesNotMatch(executor, /--additional-summary/);
 });
 
 test('candidate browser execution and hosted publication share one internal default network with no host IPC', () => {
