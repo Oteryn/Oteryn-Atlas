@@ -58,18 +58,21 @@ test('qualification override fails closed instead of silently falling back to pr
 
 test('Playwright never predefines qualification trust after protected web bootstrap promotion', () => {
   const navigation = runtime.indexOf('page.goto');
-  const trustResolution = runtime.indexOf('resolveQualificationEntry(entry, {');
-  const trustBinding = runtime.indexOf('qualificationTrustJson: process.env.ATLAS_QUALIFICATION_TRUST_JSON', trustResolution);
-  const resolvedNavigation = runtime.indexOf('page.goto(resolvedEntry,', trustResolution);
+  const gotoAtlasStart = runtime.indexOf('export async function gotoAtlas');
+  const nextExport = runtime.indexOf('\nexport ', gotoAtlasStart + 1);
   assert(navigation >= 0, 'Atlas navigation is missing');
-  assert(trustResolution >= 0, 'qualification entry resolution is missing');
-  assert(trustBinding > trustResolution && trustBinding < resolvedNavigation, 'qualification trust input must be bound while resolving the entry before navigation');
-  assert(resolvedNavigation > trustResolution, 'Atlas navigation must use the resolved qualification entry');
-  assert.equal(runtime.indexOf('page.goto(entry,'), -1, 'Atlas navigation must not use raw entry');
+  assert(gotoAtlasStart >= 0 && nextExport > gotoAtlasStart, 'gotoAtlas source bounds are missing');
+  const gotoAtlasSource = runtime.slice(gotoAtlasStart, nextExport);
+  const resolver = /resolveQualificationEntry\\s*\\(\\s*entry\\s*,\\s*\\{[\\s\\S]*?\\bqualificationTrustJson\\s*:\\s*process\\.env\\.ATLAS_QUALIFICATION_TRUST_JSON\\b[\\s\\S]*?\\}\\s*\\)/.exec(gotoAtlasSource);
+  assert(resolver, 'qualification trust input must be bound while resolving the entry');
+  const resolverBinding = gotoAtlasSource.indexOf('qualificationTrustJson', resolver.index);
+  const navigationCalls = [...gotoAtlasSource.matchAll(/\\bpage\\s*\\.\\s*goto\\s*\\(\\s*([A-Za-z_$][\\w$]*)\\b/g)];
+  assert.equal(navigationCalls.length, 1, 'gotoAtlas must make exactly one navigation');
+  assert.equal(navigationCalls[0][1], 'resolvedEntry', 'Atlas navigation must use the resolved qualification entry');
+  assert(navigationCalls[0].index > resolverBinding, 'Atlas navigation must occur after qualification entry resolution');
   assert.doesNotMatch(runtime, /page\.addInitScript/);
   assert.doesNotMatch(runtime, /qualificationTrustInstalledPages/);
   assert.doesNotMatch(runtime, /installQualificationTrust/);
   assert.doesNotMatch(runtime, /Object\.defineProperty\(globalThis,\s*['"]__OTERYN_ATLAS_QUALIFICATION_TRUST__/);
-  assert.match(runtime, /resolveQualificationEntry\(entry,\s*\{\s*qualificationTrustJson:\s*process\.env\.ATLAS_QUALIFICATION_TRUST_JSON,/);
   assert.doesNotMatch(runtime, /__OTERYN_ATLAS_QUALIFICATION_TRUST__/);
 });
