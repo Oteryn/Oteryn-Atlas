@@ -89,10 +89,132 @@ services:
       timeout: 2s
       retries: 30
 
+  atlas-web-ready:
+    image: mcr.microsoft.com/playwright:v1.62.0-noble@sha256:baed2032d533817f3dbe6425de795788430ba345e819a1201337009ba17c9d07
+    read_only: true
+    network_mode: none
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 128
+    mem_limit: 512m
+    cpus: 1.0
+    environment:
+      ATLAS_QUALIFICATION_TRUST_JSON: ${ATLAS_QUALIFICATION_TRUST_JSON:?ATLAS_QUALIFICATION_TRUST_JSON must identify verified qualification roots}
+    volumes:
+      - ${ATLAS_EXECUTION_CONTEXT:?ATLAS_EXECUTION_CONTEXT is required}/web:/source-web:ro
+      - atlas-ready-web:/ready-web
+    tmpfs:
+      - /tmp
+    command:
+      - bash
+      - -lc
+      - |-
+        node --input-type=module <<'NODE'
+        import crypto from 'node:crypto';
+        import fs from 'node:fs';
+
+        function treeDigest(root) {
+          const hash = crypto.createHash('sha256');
+          function walk(directory, prefix = '') {
+            for (const name of fs.readdirSync(directory).sort()) {
+              const absolute = directory + '/' + name;
+              const relative = prefix ? prefix + '/' + name : name;
+              const stat = fs.lstatSync(absolute);
+              if (stat.isSymbolicLink()) throw new TypeError('protected web bootstrap forbids symbolic links: ' + relative);
+              if (stat.isDirectory()) {
+                hash.update('dir\0' + relative + '\0');
+                walk(absolute, relative);
+                continue;
+              }
+              if (!stat.isFile()) throw new TypeError('protected web bootstrap forbids special files: ' + relative);
+              const bytes = fs.readFileSync(absolute);
+              hash.update('file\0' + relative + '\0' + String(bytes.length) + '\0');
+              hash.update(bytes);
+            }
+          }
+          walk(root);
+          return 'sha256:' + hash.digest('hex');
+        }
+
+        function copyDirectoryContents(source, destination) {
+          for (const name of fs.readdirSync(source).sort()) {
+            fs.cpSync(source + '/' + name, destination + '/' + name, { recursive: true });
+          }
+        }
+
+        const raw = process.env.ATLAS_QUALIFICATION_TRUST_JSON;
+        let descriptor;
+        try { descriptor = JSON.parse(raw); }
+        catch (error) { throw new TypeError('ATLAS_QUALIFICATION_TRUST_JSON is invalid JSON: ' + error.message); }
+        if (!descriptor || typeof descriptor !== 'object' || Array.isArray(descriptor)) {
+          throw new TypeError('ATLAS_QUALIFICATION_TRUST_JSON must encode an object');
+        }
+        const rootFields = [
+          'publicationRoot', 'semanticRoot', 'pixelRoot', 'overviewRoot', 'minimapRoot',
+          'runtimeIndexRoot', 'pixelBucketRoot', 'sourceFingerprint', 'productDigest',
+        ];
+        const exactKeys = ['marker', 'fixtureId', 'dataCapability', ...rootFields].sort();
+        if (JSON.stringify(Object.keys(descriptor).sort()) !== JSON.stringify(exactKeys)) {
+          throw new TypeError('qualification trust descriptor fields mismatch');
+        }
+        for (const field of rootFields) {
+          if (!/^sha256:[0-9a-f]{64}$/.test(descriptor[field])) throw new TypeError('qualification trust ' + field + ' is invalid');
+        }
+        const identities = {
+          'oteryn-atlas-qualification-trust-v1': ['atlas-qualification-world-v2', 'qualification_fixture'],
+          'oteryn-atlas-bounded-real-trust-v1': ['atlas-bounded-real-world-v1', 'bounded_real_world'],
+        };
+        const expected = identities[descriptor.marker];
+        if (!expected || descriptor.fixtureId !== expected[0] || descriptor.dataCapability !== expected[1]) {
+          throw new TypeError('qualification trust identity mismatch');
+        }
+
+        treeDigest('/source-web');
+        const expectedWeb = '/tmp/expected-web';
+        fs.rmSync(expectedWeb, { recursive: true, force: true });
+        fs.cpSync('/source-web', expectedWeb, { recursive: true });
+        const htmlPath = expectedWeb + '/fullworld.html';
+        const source = fs.readFileSync(htmlPath, 'utf8');
+        const head = '<head>';
+        const headIndex = source.indexOf(head);
+        if (headIndex < 0 || source.indexOf(head, headIndex + head.length) >= 0) throw new TypeError('fullworld head bootstrap anchor is not exact');
+        const firstScript = source.indexOf('<script');
+        if (firstScript >= 0 && firstScript < headIndex + head.length) throw new TypeError('candidate script precedes protected trust bootstrap anchor');
+        const serialized = JSON.stringify(descriptor)
+          .replaceAll('&', '\\u0026')
+          .replaceAll('<', '\\u003c')
+          .replaceAll('>', '\\u003e')
+          .replaceAll('\u2028', '\\u2028')
+          .replaceAll('\u2029', '\\u2029');
+        const bootstrap = '<script id="atlas-protected-qualification-trust">Object.defineProperty(globalThis, \'__OTERYN_ATLAS_QUALIFICATION_TRUST__\', { value: Object.freeze(' + serialized + '), writable: false, configurable: false, enumerable: false });</script>';
+        const injected = source.replace(head, head + '\n  ' + bootstrap);
+        const bootstrapIndex = injected.indexOf(bootstrap);
+        const firstCandidateScript = injected.indexOf('<script', bootstrapIndex + bootstrap.length);
+        if (bootstrapIndex < 0 || (firstCandidateScript >= 0 && bootstrapIndex >= firstCandidateScript)) {
+          throw new TypeError('protected trust bootstrap is not first');
+        }
+        fs.writeFileSync(htmlPath, injected);
+
+        const expectedDigest = treeDigest(expectedWeb);
+        const readyEntries = fs.readdirSync('/ready-web');
+        if (readyEntries.length === 0) {
+          copyDirectoryContents(expectedWeb, '/ready-web');
+        } else {
+          const readyDigest = treeDigest('/ready-web');
+          if (readyDigest !== expectedDigest) throw new TypeError('protected web bootstrap re-entry digest mismatch');
+        }
+        const readyDigest = treeDigest('/ready-web');
+        if (readyDigest !== expectedDigest) throw new TypeError('protected web bootstrap materialization digest mismatch');
+        NODE
+
   atlas-web:
     depends_on:
       atlas-publication:
         condition: service_healthy
+      atlas-web-ready:
+        condition: service_completed_successfully
     environment:
       ATLAS_PUBLICATION_ORIGIN: http://atlas-publication:8081
       ATLAS_PUBLICATION_SCHEME: http
@@ -100,6 +222,7 @@ services:
       ATLAS_PUBLICATION_HOST_HEADER: atlas-publication
       ATLAS_PUBLICATION_HOST: atlas-publication
     volumes:
+      - atlas-ready-web:/usr/share/nginx/html/web:ro
       - ${ATLAS_QUALIFICATION_PUBLICATION_HOST:?ATLAS_QUALIFICATION_PUBLICATION_HOST must identify a verified qualification publication}/web/semantic-search:/usr/share/nginx/html/web/semantic-search:ro
       - ${ATLAS_QUALIFICATION_PUBLICATION_HOST:?ATLAS_QUALIFICATION_PUBLICATION_HOST must identify a verified qualification publication}/web/creature-gameplay:/usr/share/nginx/html/web/creature-gameplay:ro
 
@@ -110,3 +233,4 @@ services:
 
 volumes:
   atlas-ready-publication:
+  atlas-ready-web:
