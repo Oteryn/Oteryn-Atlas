@@ -19,11 +19,28 @@ export function validateCreatureSearchRecords(records) {
     requireValue(RECORD_ID.test(record.record_id ?? ''), 'creature search record id invalid');
     if (record.entity_id != null) requireValue(ENTITY_ID.test(record.entity_id), 'creature search entity id invalid');
     requireValue(record.position && Number.isSafeInteger(record.position.x) && Number.isSafeInteger(record.position.y) && Number.isSafeInteger(record.position.floor), 'creature search position invalid');
+    if (record.provenance != null) {
+      requireValue(record.provenance && typeof record.provenance === 'object' && !Array.isArray(record.provenance), 'creature search provenance invalid');
+      requireValue(typeof record.provenance.authority === 'string' && record.provenance.authority.length > 0, 'creature search provenance authority invalid');
+      requireValue(typeof record.provenance.source_capability === 'string' && record.provenance.source_capability.length > 0, 'creature search provenance capability invalid');
+    }
     const key = `${record.kind}:${normalize(record.label)}`;
     requireValue(!seen.has(key), 'creature search duplicate label/kind');
     seen.add(key);
   }
   return records;
+}
+
+export function validateCreatureSearchCatalog(catalog, expectedSource) {
+  requireValue(catalog?.schema_version === 1, 'unsupported creature search catalog schema');
+  requireValue(expectedSource && typeof expectedSource === 'object' && !Array.isArray(expectedSource), 'creature search source expectations invalid');
+  requireValue(catalog.source?.contract_id === expectedSource.creatureContractId && catalog.source?.capability === expectedSource.creatureCapability, 'creature search source unsupported');
+  requireValue(catalog.source?.coordinate_profile === 'oteryn-native-floor-v1', 'creature search coordinate profile unsupported');
+  requireValue(catalog.source?.semantic_digest === expectedSource.creatureSemanticDigest, 'creature search semantic digest mismatch');
+  if (expectedSource.fixtureId == null) requireValue(catalog.source?.fixture_id == null, 'production creature search source must not claim fixture identity');
+  else requireValue(catalog.source?.fixture_id === expectedSource.fixtureId, 'creature search fixture identity invalid');
+  validateCreatureSearchRecords(catalog.records);
+  return catalog;
 }
 
 function parse(raw) {
@@ -45,9 +62,10 @@ export function creatureSemanticRecord(source, score = 0) {
     position: Object.freeze({ ...source.position }),
     bounds: null,
     provenance: Object.freeze({
-      authority: 'Oteryn/Oteryn-Game',
-      source_capability: 'static-creatures-v1',
-      resolution_state: source.resolution_state ?? 'UNKNOWN',
+      authority: source.provenance?.authority ?? 'Oteryn/Oteryn-Game',
+      source_capability: source.provenance?.source_capability ?? 'static-creatures-v1',
+      fixture_id: source.provenance?.fixture_id ?? null,
+      resolution_state: source.provenance?.resolution_state ?? source.resolution_state ?? 'UNKNOWN',
     }),
     capabilities: Object.freeze(['static-placement']),
     score,
