@@ -1,0 +1,151 @@
+name: Protected hosted readiness reentry promotion
+
+on:
+  pull_request:
+    types: [labeled]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: atlas-protected-hosted-readiness-reentry-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  targeted-compatibility:
+    name: Publish targeted protected hosted readiness reentry evidence
+    if: >-
+      github.event.label.name == 'atlas-legacy-transition-qualification' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'fix/issue-179-protected-hosted-readiness-reentry'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+      statuses: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      ATLAS_PR_NUMBER: ${{ github.event.pull_request.number }}
+      ATLAS_CODE_REVISION: ${{ github.event.pull_request.head.sha }}
+      ATLAS_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      ATLAS_CHANGED_FILE_COUNT: ${{ github.event.pull_request.changed_files }}
+    steps:
+      - name: Require exact four-file readiness reentry delta
+        shell: bash
+        run: |
+          set -euo pipefail
+          rows="$(mktemp)"
+          expected="$(mktemp)"
+          trap 'rm -f "$rows" "$expected"' EXIT
+          gh api --paginate \
+            "repos/$GITHUB_REPOSITORY/pulls/$ATLAS_PR_NUMBER/files?per_page=100" \
+            --jq '.[].filename' | sort > "$rows"
+          test "$(wc -l < "$rows" | tr -d '[:space:]')" = "$ATLAS_CHANGED_FILE_COUNT"
+          printf '%s\n' \
+            '.github/workflows/protected-hosted-readiness-reentry-promotion.yml' \
+            'e2e/compose.github-hosted.yml' \
+            'tests/verification/protected-hosted-compose-promotion.test.mjs' \
+            'tests/verification/protected-hosted-readiness-reentry-promotion-workflow-contract.test.mjs' \
+            > "$expected"
+          diff -u "$expected" "$rows"
+
+      - name: Check out exact protected base
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+          path: trusted-base
+
+      - name: Check out exact candidate head as bounded config data
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+          path: candidate
+
+      - name: Fence current PR head before hosted proof
+        shell: bash
+        run: |
+          set -euo pipefail
+          payload="$RUNNER_TEMP/atlas-readiness-reentry-before.json"
+          gh api "repos/$GITHUB_REPOSITORY/pulls/$ATLAS_PR_NUMBER" > "$payload"
+          node trusted-base/tools/verification/assert-current-pr-head.mjs \
+            --payload "$payload" \
+            --repository "$GITHUB_REPOSITORY" \
+            --pr-number "$ATLAS_PR_NUMBER" \
+            --expected-head-sha "$ATLAS_CODE_REVISION"
+          test "$(git -C candidate rev-parse HEAD)" = "$ATLAS_CODE_REVISION"
+          test "$(git -C trusted-base rev-parse HEAD)" = "$ATLAS_BASE_SHA"
+
+      - name: Prove exact readiness reentry validation without browser execution
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --test candidate/tests/verification/protected-hosted-compose-promotion.test.mjs
+
+          source_root="$RUNNER_TEMP/atlas-readiness-reentry-source"
+          artifacts_root="$RUNNER_TEMP/atlas-readiness-reentry-artifacts"
+          test_list="$RUNNER_TEMP/atlas-readiness-reentry-test-list.txt"
+          rm -rf "$source_root" "$artifacts_root"
+          mkdir -p "$source_root/publication" "$source_root/data/creatures" "$artifacts_root"
+          printf '{"profile":"readiness-reentry-bootstrap"}\n' > "$source_root/publication/publication.json"
+          printf '{"schema_version":1,"source":{"capability":"readiness-reentry-bootstrap"}}\n' > "$source_root/data/creatures/index.json"
+          : > "$test_list"
+
+          export ATLAS_VERIFICATION_PLAN_SHA256="sha256:$(printf '2%.0s' {1..64})"
+          export ATLAS_E2E_SHARD='1/1'
+          export ATLAS_QUALIFICATION_PUBLICATION_HOST="$source_root"
+          export ATLAS_QUALIFICATION_TRUST_JSON='{}'
+          export ATLAS_EXECUTION_CONTEXT="$PWD/candidate"
+          export ATLAS_E2E_ARTIFACTS_HOST="$artifacts_root"
+          export ATLAS_PROTECTED_TEST_LIST="$test_list"
+          export COMPOSE_PROJECT_NAME="atlas-readiness-reentry-$GITHUB_RUN_ID"
+
+          compose() {
+            docker compose \
+              -f candidate/e2e/compose.protected-hosted-executor.yml \
+              -f candidate/e2e/compose.github-hosted.yml \
+              "$@"
+          }
+          cleanup() {
+            compose down -v --remove-orphans >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          compose config -q
+          if ! compose up -d --wait atlas-publication; then
+            compose ps -a || true
+            compose logs --no-color atlas-publication-ready atlas-publication || true
+            exit 1
+          fi
+          if ! compose run --rm atlas-publication-ready; then
+            compose ps -a || true
+            compose logs --no-color atlas-publication-ready atlas-publication || true
+            exit 1
+          fi
+          publication_id="$(compose ps -q atlas-publication)"
+          test -n "$publication_id"
+          docker exec "$publication_id" wget -q -O /dev/null http://127.0.0.1:8081/__atlas/readiness
+          docker exec "$publication_id" wget -q -O /dev/null http://127.0.0.1:8081/fullworld/publication/publication.json
+          docker exec "$publication_id" wget -q -O /dev/null http://127.0.0.1:8081/data/creatures/index.json
+
+      - name: Fence exact head and publish one-time compatibility status
+        shell: bash
+        run: |
+          set -euo pipefail
+          payload="$RUNNER_TEMP/atlas-readiness-reentry-after.json"
+          gh api "repos/$GITHUB_REPOSITORY/pulls/$ATLAS_PR_NUMBER" > "$payload"
+          node trusted-base/tools/verification/assert-current-pr-head.mjs \
+            --payload "$payload" \
+            --repository "$GITHUB_REPOSITORY" \
+            --pr-number "$ATLAS_PR_NUMBER" \
+            --expected-head-sha "$ATLAS_CODE_REVISION"
+          gh api --method POST \
+            "repos/$GITHUB_REPOSITORY/statuses/$ATLAS_CODE_REVISION" \
+            -f state='success' \
+            -f context='atlas-local-e2e' \
+            -f description='Protected hosted readiness reentry proof; no browser E2E executed' \
+            -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"

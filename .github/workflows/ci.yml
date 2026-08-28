@@ -401,7 +401,7 @@ jobs:
           retention-days: 14
 
   verification-browser:
-    name: Local Docker Playwright evidence
+    name: Protected Hosted Playwright evidence
     if: >-
       github.event_name == 'pull_request' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
@@ -410,22 +410,122 @@ jobs:
       - verification-node
       - change-classification
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 45
     permissions:
       contents: read
-      statuses: read
+      actions: read
+      pull-requests: read
     env:
       GH_TOKEN: ${{ github.token }}
       ATLAS_CODE_REVISION: ${{ github.event.pull_request.head.sha }}
+      ATLAS_PR_NUMBER: ${{ github.event.pull_request.number }}
     steps:
-      - name: Require exact-head local Docker Playwright status
+      - name: Require exact-head protected hosted fan-in
         shell: bash
         run: |
           set -euo pipefail
           test "$GITHUB_REPOSITORY" = 'Oteryn/Oteryn-Atlas'
-          state="$(gh api "repos/$GITHUB_REPOSITORY/commits/$ATLAS_CODE_REVISION/statuses" --jq '[.[] | select(.context == "atlas-local-e2e")][0].state // ""')"
-          test "$state" = success
+          [[ "$ATLAS_CODE_REVISION" =~ ^[a-f0-9]{40}$ ]]
+          [[ "$ATLAS_PR_NUMBER" =~ ^[0-9]+$ ]]
+          gate_dir="$RUNNER_TEMP/atlas-protected-hosted-gate-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          rm -rf "$gate_dir"
+          mkdir -p "$gate_dir"
+          selected_run=''
+          selected_artifact=''
+          selected_controller=''
+          selected_base=''
 
+          for attempt in {1..120}; do
+            gh api "repos/$GITHUB_REPOSITORY/pulls/$ATLAS_PR_NUMBER" > "$gate_dir/current-pr.json"
+            current_head="$(jq -r '.head.sha' "$gate_dir/current-pr.json")"
+            current_base="$(jq -r '.base.sha' "$gate_dir/current-pr.json")"
+            test "$current_head" = "$ATLAS_CODE_REVISION"
+            [[ "$current_base" =~ ^[a-f0-9]{40}$ ]]
+
+            gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?per_page=100" > "$gate_dir/repository-artifacts.json"
+            mapfile -t matches < <(jq -r --arg suffix "-$ATLAS_CODE_REVISION" '
+              [.artifacts[] | select(.expired == false and (.name | startswith("protected-hosted-fan-in-")) and (.name | endswith($suffix)))]
+              | sort_by(.id) | reverse | .[] | [.id, .workflow_run.id, .name] | @tsv
+            ' "$gate_dir/repository-artifacts.json")
+
+            for match in "${matches[@]}"; do
+              IFS=$'\t' read -r artifact_id run_id artifact_name <<<"$match"
+              [[ "$artifact_id" =~ ^[0-9]+$ ]] || continue
+              [[ "$run_id" =~ ^[0-9]+$ ]] || continue
+              if [[ ! "$artifact_name" =~ ^protected-hosted-fan-in-([0-9]+)-([a-f0-9]{40})$ ]]; then
+                echo 'protected hosted fan-in artifact identity is malformed' >&2
+                exit 1
+              fi
+              test "${BASH_REMATCH[2]}" = "$ATLAS_CODE_REVISION"
+              controller_run_id="${BASH_REMATCH[1]}"
+
+              gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run_id" > "$gate_dir/executor.json"
+              jq -e '
+                .name == "Protected Hosted Verification Executor" and
+                .path == ".github/workflows/protected-hosted-executor.yml" and
+                .status == "completed" and
+                .conclusion == "success"
+              ' "$gate_dir/executor.json" >/dev/null || continue
+
+              gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run_id/jobs?per_page=100" > "$gate_dir/jobs.json"
+              fan_in_count="$(jq '[.jobs[] | select(.name == "fan-in" and .status == "completed" and .conclusion == "success")] | length' "$gate_dir/jobs.json")"
+              [[ "$fan_in_count" == '1' ]] || continue
+
+              gh api "repos/$GITHUB_REPOSITORY/actions/runs/$controller_run_id" > "$gate_dir/controller.json"
+              jq -e --argjson pr "$ATLAS_PR_NUMBER" --arg head "$ATLAS_CODE_REVISION" --arg base "$current_base" '
+                .name == "Protected Verification Controller" and
+                .path == ".github/workflows/protected-verification-controller.yml" and
+                .event == "pull_request_target" and
+                .status == "completed" and
+                .conclusion == "success" and
+                .head_sha == $head and
+                any(.pull_requests[]?; .number == $pr and .base.sha == $base)
+              ' "$gate_dir/controller.json" >/dev/null || continue
+
+              selected_run="$run_id"
+              selected_artifact="$artifact_name"
+              selected_controller="$controller_run_id"
+              selected_base="$current_base"
+              break
+            done
+
+            [[ -n "$selected_run" ]] && break
+            if (( attempt < 120 )); then sleep 20; fi
+          done
+
+          [[ "$selected_run" =~ ^[0-9]+$ ]]
+          [[ "$selected_controller" =~ ^[0-9]+$ ]]
+          [[ "$selected_base" =~ ^[a-f0-9]{40}$ ]]
+          test -n "$selected_artifact"
+          mkdir -p "$gate_dir/evidence"
+          gh run download "$selected_run" --repo "$GITHUB_REPOSITORY" --name "$selected_artifact" --dir "$gate_dir/evidence"
+          mapfile -t evidence_files < <(find "$gate_dir/evidence" -type f -name protected-hosted-fan-in.json)
+          test "${#evidence_files[@]}" -eq 1
+          node --input-type=module - "${evidence_files[0]}" "$ATLAS_CODE_REVISION" <<'NODE'
+          import fs from 'node:fs';
+          const [evidencePath, expectedHead] = process.argv.slice(2);
+          const evidence = JSON.parse(fs.readFileSync(evidencePath, 'utf8'));
+          const digest = /^sha256:[a-f0-9]{64}$/;
+          if (evidence.status !== 'success') throw new Error('protected hosted fan-in status is not success');
+          if (evidence.candidateHeadSha !== expectedHead) throw new Error('protected hosted fan-in head mismatch');
+          if (evidence.evidenceScope !== 'hosted-placement') throw new Error('protected hosted fan-in scope mismatch');
+          if (!digest.test(evidence.planDigest ?? '') || !digest.test(evidence.expectedStableTestIdsDigest ?? '')) {
+            throw new Error('protected hosted fan-in digest identity is invalid');
+          }
+          if (!Array.isArray(evidence.executedStableTestIds) || evidence.executedStableTestIds.length === 0) {
+            throw new Error('protected hosted fan-in executed stable-ID set is empty');
+          }
+          if (new Set(evidence.executedStableTestIds).size !== evidence.executedStableTestIds.length) {
+            throw new Error('protected hosted fan-in contains duplicate stable IDs');
+          }
+          if (!Array.isArray(evidence.specialistStableTestIds) || !Array.isArray(evidence.reviewGroupIds)) {
+            throw new Error('protected hosted fan-in placement metadata is missing');
+          }
+          NODE
+
+          gh api "repos/$GITHUB_REPOSITORY/pulls/$ATLAS_PR_NUMBER" > "$gate_dir/final-pr.json"
+          test "$(jq -r '.head.sha' "$gate_dir/final-pr.json")" = "$ATLAS_CODE_REVISION"
+          test "$(jq -r '.base.sha' "$gate_dir/final-pr.json")" = "$selected_base"
   atlas-gate:
     name: atlas-gate
     if: ${{ always() }}

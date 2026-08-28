@@ -1,0 +1,465 @@
+name: Legacy Molehill transition qualification
+
+on:
+  pull_request:
+    types: [labeled]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: atlas-legacy-transition-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  legacy-qualification:
+    name: Capture exact-head legacy transition evidence
+    if: >-
+      github.event.label.name == 'atlas-legacy-transition-qualification' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      (github.event.pull_request.head.ref == 'feat/issue-179-legacy-transition-qualifier' ||
+       github.event.pull_request.head.ref == 'feat/issue-179-protected-controller-v2-promotion')
+    runs-on:
+      group: atlas-runners
+      labels: oteryn-atlas-pc
+    timeout-minutes: 180
+    permissions:
+      contents: read
+      pull-requests: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      ATLAS_PR_NUMBER: ${{ github.event.pull_request.number }}
+      ATLAS_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+      ATLAS_CODE_REVISION: ${{ github.event.pull_request.head.sha }}
+      ATLAS_EXPECTED_REVISION: ${{ github.event.pull_request.head.sha }}
+      ATLAS_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      ATLAS_PUBLICATION_ORIGIN: http://192.168.1.2:8097
+      ATLAS_E2E_WORKERS: '1'
+      ATLAS_E2E_RESOURCE_CLASS: browser-full
+      ATLAS_E2E_AUTHORITY_MODE: authoritative
+      ATLAS_USER_VISUAL_EVIDENCE: '1'
+      ATLAS_TRUSTED_EVIDENCE_ROOT: C:\Oteryn\evidence\atlas-legacy-transition
+    steps:
+      - name: Verify repository-approved Molehill runner identity
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:GITHUB_REPOSITORY -ne 'Oteryn/Oteryn-Atlas') { throw 'Unexpected repository.' }
+          if ($env:RUNNER_NAME -notmatch '^oteryn-molehill-atlas(?:-[0-9]+)?$') { throw "Unexpected runner: $env:RUNNER_NAME" }
+          if ($env:RUNNER_OS -ne 'Windows') { throw "Unexpected runner OS: $env:RUNNER_OS" }
+          docker version | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw 'Docker is unavailable.' }
+
+      - name: Check out exact protected-base policy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+          path: trusted-base
+
+      - name: Check out exact candidate head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+          path: candidate
+
+      - name: Fence current PR head before heavy execution
+        shell: powershell
+        working-directory: candidate
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $payload = gh api "repos/$env:GITHUB_REPOSITORY/pulls/$env:ATLAS_PR_NUMBER"
+          if ($LASTEXITCODE -ne 0) { throw 'GitHub PR lookup failed.' }
+          [IO.File]::WriteAllText(
+            (Join-Path $PWD 'artifacts-current-pr.json'),
+            ($payload -join "`n"),
+            [Text.UTF8Encoding]::new($false)
+          )
+          node ..\trusted-base\tools\verification\assert-current-pr-head.mjs `
+            --payload artifacts-current-pr.json `
+            --repository $env:GITHUB_REPOSITORY `
+            --pr-number $env:ATLAS_PR_NUMBER `
+            --expected-head-sha $env:ATLAS_CODE_REVISION
+          if ($LASTEXITCODE -ne 0) { throw 'Current-head fence failed.' }
+          if ((git rev-parse HEAD).Trim() -ne $env:ATLAS_CODE_REVISION) { throw 'Candidate checkout mismatch.' }
+          if ((git -C ../trusted-base rev-parse HEAD).Trim() -ne $env:ATLAS_BASE_SHA) { throw 'Protected-base checkout mismatch.' }
+
+      - name: Preserve protected legacy acceptance machinery
+        shell: powershell
+        working-directory: candidate
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $paths = @(
+            'e2e/run.ps1',
+            'e2e/publish-local-e2e-status.ps1',
+            'e2e/approve-visual-user-acceptance.ps1',
+            'e2e/user-visual-scenarios.json',
+            'tools/verification/validate-e2e-evidence.mjs'
+          )
+          git diff --exit-code $env:ATLAS_BASE_SHA $env:ATLAS_CODE_REVISION -- $paths
+          if ($LASTEXITCODE -ne 0) { throw 'Candidate modified protected legacy acceptance machinery.' }
+
+      - name: Build exact protected lower-bound verification plan
+        shell: powershell
+        working-directory: candidate
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force artifacts/verification | Out-Null
+          npm ci --prefix e2e
+          $env:ATLAS_ARTIFACTS_DIR = "$PWD/artifacts/verification/playwright-list"
+          cmd.exe /d /s /c "npm exec --prefix e2e -- playwright test --config=e2e/playwright.config.mjs --list > `"artifacts\verification\playwright-test-list.txt`""
+          if ($LASTEXITCODE -ne 0) { throw "Playwright list enumeration failed with exit code $LASTEXITCODE." }
+          $stableIdsScript = @'
+          import fs from 'node:fs';
+          import { parsePlaywrightStableTestIds } from '../../../trusted-base/tools/verification/parse-playwright-test-list.mjs';
+          const listPath = process.argv[2];
+          const outputPath = process.argv[3];
+          if (!listPath || !outputPath || process.argv.length !== 4) throw new TypeError('stable-ID wrapper requires input and output paths');
+          const stableIds = parsePlaywrightStableTestIds(fs.readFileSync(listPath, 'utf8'));
+          fs.writeFileSync(outputPath, `${JSON.stringify(stableIds)}\n`);
+          '@
+          $stableIdsScriptPath = Join-Path $PWD 'artifacts/verification/parse-stable-test-ids.mjs'
+          [IO.File]::WriteAllText($stableIdsScriptPath, $stableIdsScript, [Text.UTF8Encoding]::new($false))
+          node $stableIdsScriptPath artifacts/verification/playwright-test-list.txt artifacts/verification/stable-test-ids.json
+          $stableIdsExitCode = $LASTEXITCODE
+          Remove-Item -LiteralPath $stableIdsScriptPath -Force -ErrorAction SilentlyContinue
+          if ($stableIdsExitCode -ne 0) { throw 'Stable-ID census failed.' }
+          $mergeBase = (git merge-base $env:ATLAS_CODE_REVISION $env:ATLAS_BASE_SHA).Trim()
+          if (-not $mergeBase) { throw 'Unable to resolve merge base.' }
+          $env:ATLAS_MERGE_BASE = $mergeBase
+          $changedFilesScript = @'
+          import fs from 'node:fs';
+          import { execFileSync } from 'node:child_process';
+          const output = execFileSync('git', ['diff', '--name-status', '-z', '--find-renames', process.env.ATLAS_MERGE_BASE, process.env.ATLAS_CODE_REVISION]);
+          const fields = output.toString('utf8').split('\0');
+          const changes = [];
+          for (let i = 0; i < fields.length && fields[i];) {
+            const status = fields[i++];
+            if (/^[RC]/.test(status)) {
+              const previousPath = fields[i++];
+              const path = fields[i++];
+              changes.push({ path, previousPath });
+            } else {
+              changes.push({ path: fields[i++] });
+            }
+          }
+          if (changes.length === 0) throw new Error('Transition qualification requires non-empty changed-file evidence.');
+          fs.writeFileSync(process.argv[2], `${JSON.stringify(changes)}\n`);
+          '@
+          $changedFilesScriptPath = Join-Path $env:RUNNER_TEMP "atlas-transition-changed-files-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT.mjs"
+          [IO.File]::WriteAllText($changedFilesScriptPath, $changedFilesScript, [Text.UTF8Encoding]::new($false))
+          node $changedFilesScriptPath artifacts/verification/changed-files.json
+          $changedFilesExitCode = $LASTEXITCODE
+          Remove-Item -LiteralPath $changedFilesScriptPath -Force -ErrorAction SilentlyContinue
+          if ($changedFilesExitCode -ne 0) { throw 'Changed-file evidence generation failed.' }
+          $planOutput = @(
+            & node ..\trusted-base\tools\verification\build-verification-plan.mjs `
+              --changed-files artifacts/verification/changed-files.json `
+              --trusted-impact ..\trusted-base\tools\verification\impact-manifest.json `
+              --candidate-impact tools/verification/impact-manifest.json `
+              --trusted-catalog ..\trusted-base\tools\verification\verification-catalog.json `
+              --candidate-catalog tools/verification/verification-catalog.json `
+              --repository $env:GITHUB_REPOSITORY `
+              --head-sha $env:ATLAS_CODE_REVISION `
+              --integration-base-sha $env:ATLAS_BASE_SHA `
+              --merge-base-sha $mergeBase `
+              --stable-test-ids artifacts/verification/stable-test-ids.json
+          )
+          $planExitCode = $LASTEXITCODE
+          if ($planExitCode -ne 0) { throw 'Protected lower-bound plan construction failed.' }
+          $planPath = Join-Path $PWD 'artifacts/verification/pr-verification-plan.json'
+          [IO.File]::WriteAllText(
+            $planPath,
+            (($planOutput -join "`n") + "`n"),
+            [Text.UTF8Encoding]::new($false)
+          )
+
+      - name: Capture exact-head legacy transition qualification
+        shell: powershell
+        working-directory: candidate
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $evidenceRoot = Join-Path $env:ATLAS_TRUSTED_EVIDENCE_ROOT (Join-Path $env:ATLAS_CODE_REVISION $env:GITHUB_RUN_ID)
+          if (Test-Path -LiteralPath $evidenceRoot) { throw "Refusing to overwrite trusted evidence root: $evidenceRoot" }
+          New-Item -ItemType Directory -Force $evidenceRoot | Out-Null
+          Copy-Item artifacts/verification/pr-verification-plan.json (Join-Path $evidenceRoot 'pr-verification-plan.json') -Force
+          $metadata = [ordered]@{
+            version = 1
+            purpose = 'legacy-atlas-local-e2e-transition'
+            repository = $env:GITHUB_REPOSITORY
+            prNumber = [int]$env:ATLAS_PR_NUMBER
+            headSha = $env:ATLAS_CODE_REVISION
+            baseSha = $env:ATLAS_BASE_SHA
+            headRef = $env:ATLAS_HEAD_REF
+            workflowRunId = [long]$env:GITHUB_RUN_ID
+          }
+          $metadata | ConvertTo-Json | Set-Content -Encoding utf8 (Join-Path $evidenceRoot 'run-metadata.json')
+          $env:ATLAS_VERIFICATION_PLAN_PATH = "$PWD/artifacts/verification/pr-verification-plan.json"
+          $env:ATLAS_E2E_PROJECT = "atlas-legacy-transition-$env:GITHUB_RUN_ID"
+          $env:ATLAS_E2E_ARTIFACTS_HOST = Join-Path $evidenceRoot 'run'
+          .\e2e\run.ps1
+          if ($LASTEXITCODE -ne 0) { throw "Legacy transition qualification failed with exit code $LASTEXITCODE." }
+
+      - name: Fence current PR head after heavy execution
+        shell: powershell
+        working-directory: candidate
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $payload = gh api "repos/$env:GITHUB_REPOSITORY/pulls/$env:ATLAS_PR_NUMBER"
+          if ($LASTEXITCODE -ne 0) { throw 'GitHub PR lookup failed.' }
+          [IO.File]::WriteAllText(
+            (Join-Path $PWD 'artifacts-current-pr-after.json'),
+            ($payload -join "`n"),
+            [Text.UTF8Encoding]::new($false)
+          )
+          node ..\trusted-base\tools\verification\assert-current-pr-head.mjs `
+            --payload artifacts-current-pr-after.json `
+            --repository $env:GITHUB_REPOSITORY `
+            --pr-number $env:ATLAS_PR_NUMBER `
+            --expected-head-sha $env:ATLAS_CODE_REVISION
+          if ($LASTEXITCODE -ne 0) { throw 'Post-execution current-head fence failed.' }
+
+      - name: Prepare bounded metadata only
+        if: always()
+        shell: powershell
+        working-directory: candidate
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $evidenceRoot = Join-Path $env:ATLAS_TRUSTED_EVIDENCE_ROOT (Join-Path $env:ATLAS_CODE_REVISION $env:GITHUB_RUN_ID)
+          $runRoot = Join-Path $evidenceRoot 'run'
+          $safeRoot = Join-Path $PWD 'artifacts/github-evidence'
+          New-Item -ItemType Directory -Force $safeRoot | Out-Null
+          $copies = @(
+            @{ Source = (Join-Path $runRoot 'summary.json'); Name = 'summary.json' },
+            @{ Source = (Join-Path $runRoot 'resource-admission.json'); Name = 'resource-admission.json' },
+            @{ Source = (Join-Path $runRoot 'slot-lease.json'); Name = 'slot-lease.json' },
+            @{ Source = (Join-Path $runRoot 'publication-forwarder.log'); Name = 'publication-forwarder.log' },
+            @{ Source = (Join-Path $runRoot 'publication-forwarder.err.log'); Name = 'publication-forwarder.err.log' },
+            @{ Source = (Join-Path $evidenceRoot 'pr-verification-plan.json'); Name = 'pr-verification-plan.json' },
+            @{ Source = (Join-Path $evidenceRoot 'run-metadata.json'); Name = 'run-metadata.json' }
+          )
+          foreach ($copy in $copies) {
+            if (Test-Path -LiteralPath $copy.Source) { Copy-Item -LiteralPath $copy.Source -Destination (Join-Path $safeRoot $copy.Name) -Force }
+          }
+          Write-Output "Trusted full-frame evidence retained locally at $evidenceRoot"
+
+      - name: Publish bounded machine metadata only
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: atlas-legacy-transition-metadata-${{ github.run_id }}
+          path: |
+            candidate/artifacts/github-evidence/summary.json
+            candidate/artifacts/github-evidence/resource-admission.json
+            candidate/artifacts/github-evidence/slot-lease.json
+            candidate/artifacts/github-evidence/publication-forwarder.log
+            candidate/artifacts/github-evidence/publication-forwarder.err.log
+            candidate/artifacts/github-evidence/pr-verification-plan.json
+            candidate/artifacts/github-evidence/run-metadata.json
+          if-no-files-found: warn
+          retention-days: 7
+
+  protected-census-bootstrap:
+    name: Publish targeted protected-census compatibility evidence
+    if: >-
+      github.event.label.name == 'atlas-legacy-transition-qualification' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'fix/issue-179-protected-census-readonly-mount'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+      statuses: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      ATLAS_PR_NUMBER: ${{ github.event.pull_request.number }}
+      ATLAS_CODE_REVISION: ${{ github.event.pull_request.head.sha }}
+      ATLAS_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      ATLAS_CHANGED_FILE_COUNT: ${{ github.event.pull_request.changed_files }}
+      ATLAS_CANDIDATE_IMAGE: mcr.microsoft.com/playwright:v1.62.0-noble@sha256:baed2032d533817f3dbe6425de795788430ba345e819a1201337009ba17c9d07
+    steps:
+      - name: Require exact bounded bootstrap delta
+        shell: bash
+        run: |
+          set -euo pipefail
+          rows="$(mktemp)"
+          expected="$(mktemp)"
+          trap 'rm -f "$rows" "$expected"' EXIT
+          gh api --paginate \
+            "repos/$GITHUB_REPOSITORY/pulls/$ATLAS_PR_NUMBER/files?per_page=100" \
+            --jq '.[].filename' | sort > "$rows"
+          test "$(wc -l < "$rows" | tr -d '[:space:]')" = "$ATLAS_CHANGED_FILE_COUNT"
+          printf '%s\n' \
+            '.github/workflows/legacy-molehill-transition-qualification.yml' \
+            '.github/workflows/protected-verification-controller.yml' \
+            'tests/verification/protected-controller-workflow-contract.test.mjs' \
+            > "$expected"
+          diff -u "$expected" "$rows"
+
+      - name: Check out exact protected-base policy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+          path: trusted-base
+
+      - name: Check out exact candidate head as sandbox data
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+          path: candidate
+
+      - name: Fence current PR head before hosted smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          payload="$RUNNER_TEMP/atlas-pr234-current-before.json"
+          gh api "repos/$GITHUB_REPOSITORY/pulls/$ATLAS_PR_NUMBER" > "$payload"
+          node trusted-base/tools/verification/assert-current-pr-head.mjs \
+            --payload "$payload" \
+            --repository "$GITHUB_REPOSITORY" \
+            --pr-number "$ATLAS_PR_NUMBER" \
+            --expected-head-sha "$ATLAS_CODE_REVISION"
+          test "$(git -C candidate rev-parse HEAD)" = "$ATLAS_CODE_REVISION"
+          test "$(git -C trusted-base rev-parse HEAD)" = "$ATLAS_BASE_SHA"
+
+      - name: Install protected-base census dependencies only
+        shell: bash
+        run: npm ci --prefix trusted-base/e2e --ignore-scripts --no-audit --no-fund
+
+      - name: Prove protected census module resolution without browser execution
+        shell: bash
+        run: |
+          set -euo pipefail
+          test ! -e candidate/e2e/node_modules
+          ln -s /protected-e2e-node-modules/node_modules candidate/e2e/node_modules
+          timeout --signal=KILL 120s docker run --rm \
+            --network none \
+            --read-only \
+            --cap-drop ALL \
+            --security-opt no-new-privileges \
+            --pids-limit 192 \
+            --memory 1536m \
+            --cpus 2 \
+            --user 1000:1000 \
+            --tmpfs /tmp:rw,nosuid,nodev,size=256m \
+            --mount "type=bind,src=$PWD/candidate,dst=/candidate,readonly" \
+            --mount "type=bind,src=$PWD/trusted-base/e2e/node_modules,dst=/protected-e2e-node-modules/node_modules,readonly" \
+            "$ATLAS_CANDIDATE_IMAGE" \
+            bash -lc 'cd /candidate && CI=1 ATLAS_ARTIFACTS_DIR=/tmp/artifacts /candidate/e2e/node_modules/.bin/playwright test --config=/candidate/e2e/playwright.config.mjs --list >/tmp/playwright-list.txt && test -s /tmp/playwright-list.txt'
+
+      - name: Fence exact head and publish one-time compatibility status
+        shell: bash
+        run: |
+          set -euo pipefail
+          payload="$RUNNER_TEMP/atlas-pr234-current-after.json"
+          gh api "repos/$GITHUB_REPOSITORY/pulls/$ATLAS_PR_NUMBER" > "$payload"
+          node trusted-base/tools/verification/assert-current-pr-head.mjs \
+            --payload "$payload" \
+            --repository "$GITHUB_REPOSITORY" \
+            --pr-number "$ATLAS_PR_NUMBER" \
+            --expected-head-sha "$ATLAS_CODE_REVISION"
+          gh api --method POST \
+            "repos/$GITHUB_REPOSITORY/statuses/$ATLAS_CODE_REVISION" \
+            -f state='success' \
+            -f context='atlas-local-e2e' \
+            -f description='Targeted protected census bootstrap; no browser E2E executed' \
+            -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+
+  publish-reviewed-status:
+    name: Publish reviewed atlas-local-e2e transition status
+    needs: legacy-qualification
+    if: >-
+      needs.legacy-qualification.result == 'success' &&
+      github.event.label.name == 'atlas-legacy-transition-qualification' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      (github.event.pull_request.head.ref == 'feat/issue-179-legacy-transition-qualifier' ||
+       github.event.pull_request.head.ref == 'feat/issue-179-protected-controller-v2-promotion')
+    runs-on:
+      group: atlas-runners
+      labels: oteryn-atlas-pc
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+      statuses: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      ATLAS_PR_NUMBER: ${{ github.event.pull_request.number }}
+      ATLAS_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+      ATLAS_CODE_REVISION: ${{ github.event.pull_request.head.sha }}
+      ATLAS_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      ATLAS_TRUSTED_EVIDENCE_ROOT: C:\Oteryn\evidence\atlas-legacy-transition
+    steps:
+      - name: Check out exact protected-base policy for acceptance
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+          path: trusted-base
+
+      - name: Check out exact reviewed candidate head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+          path: candidate
+
+      - name: Fence current PR head before reviewed status publication
+        shell: powershell
+        working-directory: candidate
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $payload = gh api "repos/$env:GITHUB_REPOSITORY/pulls/$env:ATLAS_PR_NUMBER"
+          if ($LASTEXITCODE -ne 0) { throw 'GitHub PR lookup failed.' }
+          $currentPrPayload = Join-Path $env:RUNNER_TEMP "atlas-transition-current-pr-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT.json"
+          [IO.File]::WriteAllText(
+            $currentPrPayload,
+            ($payload -join "`n"),
+            [Text.UTF8Encoding]::new($false)
+          )
+          node ..\trusted-base\tools\verification\assert-current-pr-head.mjs `
+            --payload $currentPrPayload `
+            --repository $env:GITHUB_REPOSITORY `
+            --pr-number $env:ATLAS_PR_NUMBER `
+            --expected-head-sha $env:ATLAS_CODE_REVISION
+          if ($LASTEXITCODE -ne 0) { throw 'Status-publication current-head fence failed.' }
+          git diff --exit-code $env:ATLAS_BASE_SHA $env:ATLAS_CODE_REVISION -- `
+            e2e/run.ps1 `
+            e2e/publish-local-e2e-status.ps1 `
+            e2e/approve-visual-user-acceptance.ps1 `
+            e2e/user-visual-scenarios.json `
+            tools/verification/validate-e2e-evidence.mjs
+          if ($LASTEXITCODE -ne 0) { throw 'Candidate modified protected legacy acceptance machinery.' }
+
+      - name: Require independently reviewed full-frame evidence
+        shell: powershell
+        working-directory: candidate
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $evidenceRoot = Join-Path $env:ATLAS_TRUSTED_EVIDENCE_ROOT (Join-Path $env:ATLAS_CODE_REVISION $env:GITHUB_RUN_ID)
+          $summary = Join-Path $evidenceRoot 'run\summary.json'
+          $plan = Join-Path $evidenceRoot 'pr-verification-plan.json'
+          $review = Join-Path $evidenceRoot 'run\visual-review.json'
+          if (-not (Test-Path -LiteralPath $summary)) { throw 'Exact-head Playwright summary is missing.' }
+          if (-not (Test-Path -LiteralPath $plan)) { throw 'Exact-head verification plan is missing.' }
+          if (-not (Test-Path -LiteralPath $review)) {
+            throw "Visual review is pending. Open every required trusted local frame, then create the bound visual-review.json before re-running only this failed publication job."
+          }
+          .\e2e\publish-local-e2e-status.ps1 `
+            -SummaryPath $summary `
+            -VerificationPlanPath $plan `
+            -RemoteBranch $env:ATLAS_HEAD_REF `
+            -Repository $env:GITHUB_REPOSITORY `
+            -Context 'atlas-local-e2e' `
+            -VisualReviewPath $review
+          if ($LASTEXITCODE -ne 0) { throw 'atlas-local-e2e status publication failed.' }

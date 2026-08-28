@@ -224,6 +224,19 @@
       ]
     },
     {
+      "pathPrefix": ".github/workflows/legacy-molehill-transition-qualification.yml",
+      "domains": [
+        "legacy-fullworld-transition"
+      ],
+      "minimumProfile": "full",
+      "requiredGroups": [
+        "deterministic.core",
+        "e2e.full",
+        "fullworld.animation-census",
+        "integration.source-contract"
+      ]
+    },
+    {
       "pathPrefix": "src/browser/creature-gameplay",
       "domains": [
         "creature-gameplay-source"
