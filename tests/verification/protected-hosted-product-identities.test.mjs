@@ -17,6 +17,6 @@ test('protected hosted product identities pin qualification and bounded-real pro
   });
   assert.deepEqual(identities.bounded_real_world, {
     id: 'atlas-bounded-real-world-v1',
-    digest: 'sha256:4b3d3a81c8b0d1d2980f2eafc97d208e404b9b8e23f3de3d8f087f270f2e330e',
+    digest: 'sha256:a19f0371eb5afcdf8c40156d732d5602e970400ec9369607f901e2f0a58c92b6',
   });
 });

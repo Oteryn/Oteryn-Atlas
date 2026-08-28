@@ -27,6 +27,41 @@ function exactDigest(value, label) {
   return value;
 }
 
+const PROTECTED_PROMOTION_QUALIFICATIONS = freeze({
+  'fix/issue-179-bounded-real-row-framing': {
+    id: 'bounded-real-row-framing-v1',
+    headRef: 'fix/issue-179-bounded-real-row-framing',
+    changedFiles: [
+      'tests/verification/bounded-real-world.test.mjs',
+      'tests/verification/protected-hosted-product-identities.test.mjs',
+      'tools/verification/bounded-real-world.mjs',
+      'tools/verification/protected-hosted-product-identities.json',
+    ],
+    expectedProductDigest: 'sha256:a19f0371eb5afcdf8c40156d732d5602e970400ec9369607f901e2f0a58c92b6',
+  },
+  'fix/issue-179-qualification-trust-descriptor': {
+    id: 'qualification-trust-descriptor-v1',
+    headRef: 'fix/issue-179-qualification-trust-descriptor',
+    changedFiles: [
+      '.github/workflows/protected-hosted-executor.yml',
+      'tests/verification/protected-hosted-compose-promotion.test.mjs',
+      'tests/verification/qualification-world.test.mjs',
+      'tools/verification/qualification-world.mjs',
+    ],
+    expectedProductDigest: 'sha256:f53f1dcb8961c42e82191644b7628cfb4f30641344c8876f4178d37a94dd4cd5',
+  },
+});
+
+export function resolveProtectedPromotionQualification(headRef) {
+  if (typeof headRef !== 'string' || headRef.length === 0) {
+    throw new TypeError('protected promotion head ref must be non-empty');
+  }
+  const qualification = PROTECTED_PROMOTION_QUALIFICATIONS[headRef];
+  if (!qualification) throw new TypeError(`unsupported protected promotion qualification: ${headRef}`);
+  exactDigest(qualification.expectedProductDigest, 'protected promotion product digest');
+  return qualification;
+}
+
 function exactStableIds(value, label, { allowEmpty = false } = {}) {
   if (!Array.isArray(value) || (!allowEmpty && value.length === 0)
     || value.some((id) => typeof id !== 'string' || !id.includes('::'))) {

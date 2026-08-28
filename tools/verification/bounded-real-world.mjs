@@ -103,7 +103,7 @@ async function mapChunks(anchors) {
   }
   const chunks = [];
   for (const group of [...grouped.values()].sort((a, b) => a.floor - b.floor || a.region_y - b.region_y || a.region_x - b.region_x)) {
-    const rows = group.anchors.sort((a, b) => a.y - b.y || a.x - b.x).map((anchor, index) => Buffer.concat([canonicalJsonBytes(tileAt(anchor, index)), Buffer.from('\n')]));
+    const rows = group.anchors.sort((a, b) => a.y - b.y || a.x - b.x).map((anchor, index) => Buffer.from(canonicalJsonBytes(tileAt(anchor, index))));
     const bytes = Buffer.concat(rows); let offset = 0; const ranges = [];
     for (let index = 0; index < rows.length; index += 1) {
       const row = rows[index]; const anchor = group.anchors[index];

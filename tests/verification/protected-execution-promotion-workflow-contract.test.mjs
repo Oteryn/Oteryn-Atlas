@@ -18,12 +18,23 @@ test('protected execution promotion qualification is GitHub-hosted, exact-head, 
   assert.match(workflow, /github\.event\.label\.name == 'atlas-legacy-transition-qualification'/);
   assert.match(workflow, /fix\/issue-179-protected-execution-contract-promotion/);
   assert.doesNotMatch(heavy, /fix\/issue-179-protected-execution-contract-promotion/);
+  assert.match(workflow, /fix\/issue-179-bounded-real-row-framing/);
+  assert.doesNotMatch(heavy, /fix\/issue-179-bounded-real-row-framing/);
   assert.match(workflow, /runs-on:\s*ubuntu-24\.04/);
   assert.doesNotMatch(workflow, /group:\s*atlas-runners|labels:\s*oteryn-atlas-pc/);
   assert.match(workflow, /\.github\/workflows\/protected-execution-promotion-qualification\.yml/);
   assert.match(workflow, /tests\/verification\/protected-execution-promotion-workflow-contract\.test\.mjs/);
   assert.match(workflow, /tests\/verification\/protected-hosted-execution\.test\.mjs/);
   assert.match(workflow, /tools\/verification\/protected-hosted-execution\.mjs/);
+  assert.match(workflow, /resolveProtectedPromotionQualification/);
+  assert.match(workflow, /tests\/verification\/bounded-real-world\.test\.mjs/);
+  assert.match(workflow, /tests\/verification\/protected-hosted-product-identities\.test\.mjs/);
+  assert.match(workflow, /protected-hosted-product-identities\.json/);
+  assert.match(workflow, /Prove qualification promotion binds protected product identity/);
+  assert.match(workflow, /\/trusted\/tools\/verification\/protected-hosted-product-identities\.json/);
+  assert.match(workflow, /qualification promotion digest does not match protected product registry/);
+  assert.match(workflow, /buildBoundedRealWorld/);
+  assert.match(workflow, /expectedProductDigest/);
   assert.match(workflow, /assert-current-pr-head\.mjs/);
   assert.match(workflow, /--network none/);
   assert.match(workflow, /--read-only/);
@@ -33,4 +44,35 @@ test('protected execution promotion qualification is GitHub-hosted, exact-head, 
   assert.match(workflow, /statuses:\s*write/);
   assert.match(workflow, /context='atlas-local-e2e'|context.*atlas-local-e2e/s);
   assert.doesNotMatch(workflow, /playwright test|\\e2e\\run\.ps1|ATLAS_PUBLICATION_ORIGIN|visual-review\.json|synology/i);
+});
+
+test('protected execution promotion preauthorizes the qualification trust-descriptor repair on exact GitHub-hosted evidence', () => {
+  const workflow = fs.readFileSync(workflowPath, 'utf8');
+  const legacy = fs.readFileSync(legacyWorkflowPath, 'utf8');
+  const heavy = legacy.split('  legacy-qualification:')[1]?.split('  protected-census-bootstrap:')[0] ?? '';
+
+  assert.match(workflow, /fix\/issue-179-qualification-trust-descriptor/);
+  assert.doesNotMatch(heavy, /fix\/issue-179-qualification-trust-descriptor/);
+  assert.match(workflow, /qualificationTrustDescriptor/);
+  assert.match(workflow, /buildQualificationWorld/);
+  assert.match(workflow, /resolveFullWorldTrust/);
+  assert.match(workflow, /tests\/verification\/qualification-world\.test\.mjs/);
+  assert.match(workflow, /tests\/verification\/protected-hosted-compose-promotion\.test\.mjs/);
+  assert.match(workflow, /tools\/verification\/qualification-world\.mjs/);
+});
+
+test('qualification product-binding proof executes candidate code only in the networkless read-only sandbox', () => {
+  const workflow = fs.readFileSync(workflowPath, 'utf8');
+  const proof = workflow.split('      - name: Prove qualification promotion binds protected product identity')[1]
+    ?.split('      - name: Prove protected hosted execution contract without browser execution')[0] ?? '';
+
+  assert.match(proof, /docker run --rm/);
+  assert.match(proof, /--network none/);
+  assert.match(proof, /--read-only/);
+  assert.match(proof, /--cap-drop ALL/);
+  assert.match(proof, /--security-opt no-new-privileges/);
+  assert.match(proof, /candidate,dst=\/candidate,readonly/);
+  assert.match(proof, /trusted-base,dst=\/trusted,readonly/);
+  assert.match(proof, /node \/proof\.mjs/);
+  assert.doesNotMatch(proof, /node --input-type=module <<'NODE'/);
 });

@@ -81,6 +81,36 @@ jobs:
           test "$(git -C candidate rev-parse HEAD)" = "$ATLAS_CODE_REVISION"
           test "$(git -C trusted-base rev-parse HEAD)" = "$ATLAS_BASE_SHA"
 
+      - name: Prove qualification promotion binds protected product identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          proof="$RUNNER_TEMP/atlas-qualification-promotion-binding-proof.mjs"
+          cat > "$proof" <<'NODE'
+          import fs from 'node:fs';
+          import { resolveProtectedPromotionQualification } from '/candidate/tools/verification/protected-hosted-execution.mjs';
+          const registry = JSON.parse(fs.readFileSync('/trusted/tools/verification/protected-hosted-product-identities.json', 'utf8'));
+          const qualification = resolveProtectedPromotionQualification('fix/issue-179-qualification-trust-descriptor');
+          if (qualification.expectedProductDigest !== registry.qualification_fixture?.digest) {
+            throw new TypeError('qualification promotion digest does not match protected product registry');
+          }
+          NODE
+          timeout --signal=KILL 120s docker run --rm \
+            --network none \
+            --read-only \
+            --cap-drop ALL \
+            --security-opt no-new-privileges \
+            --pids-limit 192 \
+            --memory 768m \
+            --cpus 2 \
+            --user 1000:1000 \
+            --tmpfs /tmp:rw,nosuid,nodev,size=64m \
+            --mount "type=bind,src=$PWD/trusted-base,dst=/trusted,readonly" \
+            --mount "type=bind,src=$PWD/candidate,dst=/candidate,readonly" \
+            --mount "type=bind,src=$proof,dst=/proof.mjs,readonly" \
+            "$ATLAS_CANDIDATE_IMAGE" \
+            node /proof.mjs
+
       - name: Prove protected hosted execution contract without browser execution
         shell: bash
         run: |
@@ -115,4 +145,313 @@ jobs:
             -f state='success' \
             -f context='atlas-local-e2e' \
             -f description='Targeted protected execution bootstrap; no browser E2E executed' \
+            -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+
+  bounded-real-row-framing:
+    name: Publish bounded-real row-framing compatibility evidence
+    if: >-
+      github.event.label.name == 'atlas-legacy-transition-qualification' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'fix/issue-179-bounded-real-row-framing'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+      statuses: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      ATLAS_PR_NUMBER: ${{ github.event.pull_request.number }}
+      ATLAS_CODE_REVISION: ${{ github.event.pull_request.head.sha }}
+      ATLAS_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      ATLAS_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+      ATLAS_CHANGED_FILE_COUNT: ${{ github.event.pull_request.changed_files }}
+      ATLAS_CANDIDATE_IMAGE: mcr.microsoft.com/playwright:v1.62.0-noble@sha256:baed2032d533817f3dbe6425de795788430ba345e819a1201337009ba17c9d07
+    steps:
+      - name: Check out exact protected-base policy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+          path: trusted-base
+
+      - name: Check out exact candidate head as sandbox data
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+          path: candidate
+
+      - name: Fence current PR head before protected product proof
+        shell: bash
+        run: |
+          set -euo pipefail
+          payload="$RUNNER_TEMP/atlas-bounded-row-framing-before.json"
+          gh api "repos/$GITHUB_REPOSITORY/pulls/$ATLAS_PR_NUMBER" > "$payload"
+          node trusted-base/tools/verification/assert-current-pr-head.mjs \
+            --payload "$payload" \
+            --repository "$GITHUB_REPOSITORY" \
+            --pr-number "$ATLAS_PR_NUMBER" \
+            --expected-head-sha "$ATLAS_CODE_REVISION"
+          test "$(git -C candidate rev-parse HEAD)" = "$ATLAS_CODE_REVISION"
+          test "$(git -C trusted-base rev-parse HEAD)" = "$ATLAS_BASE_SHA"
+
+      - name: Resolve protected qualification and require exact candidate delta
+        shell: bash
+        run: |
+          set -euo pipefail
+          rows="$(mktemp)"
+          expected="$(mktemp)"
+          trap 'rm -f "$rows" "$expected"' EXIT
+          gh api --paginate \
+            "repos/$GITHUB_REPOSITORY/pulls/$ATLAS_PR_NUMBER/files?per_page=100" \
+            --jq '.[].filename' | sort > "$rows"
+          test "$(wc -l < "$rows" | tr -d '[:space:]')" = "$ATLAS_CHANGED_FILE_COUNT"
+          node --input-type=module - "$ATLAS_HEAD_REF" "$expected" <<'NODE'
+          import fs from 'node:fs';
+          import { resolveProtectedPromotionQualification } from './trusted-base/tools/verification/protected-hosted-execution.mjs';
+          const qualification = resolveProtectedPromotionQualification(process.argv[2]);
+          fs.writeFileSync(process.argv[3], `${[...qualification.changedFiles].sort().join('\n')}\n`, 'utf8');
+          NODE
+          diff -u "$expected" "$rows"
+
+      - name: Rebuild and verify exact protected bounded-real product in networkless sandbox
+        shell: bash
+        run: |
+          set -euo pipefail
+          proof="$RUNNER_TEMP/atlas-bounded-row-framing-proof.mjs"
+          cat > "$proof" <<'NODE'
+          import fs from 'node:fs';
+          import os from 'node:os';
+          import path from 'node:path';
+          import { resolveProtectedPromotionQualification } from '/trusted/tools/verification/protected-hosted-execution.mjs';
+          import { buildBoundedRealWorld, verifyBoundedRealWorld } from '/candidate/tools/verification/bounded-real-world.mjs';
+
+          const qualification = resolveProtectedPromotionQualification(process.env.ATLAS_HEAD_REF);
+          const registry = JSON.parse(fs.readFileSync('/candidate/tools/verification/protected-hosted-product-identities.json', 'utf8'));
+          if (registry.bounded_real_world?.digest !== qualification.expectedProductDigest) {
+            throw new TypeError('bounded-real protected registry digest does not match protected qualification');
+          }
+          const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-bounded-row-framing-'));
+          const product = path.join(temp, 'product');
+          try {
+            const built = await buildBoundedRealWorld(product, { sourceRoot: '/candidate' });
+            const verified = await verifyBoundedRealWorld(product);
+            if (built.productDigest !== qualification.expectedProductDigest || verified.productDigest !== qualification.expectedProductDigest) {
+              throw new TypeError('rebuilt bounded-real product digest does not match protected qualification');
+            }
+          } finally {
+            fs.rmSync(temp, { recursive: true, force: true });
+          }
+          NODE
+          timeout --signal=KILL 180s docker run --rm \
+            --network none \
+            --read-only \
+            --cap-drop ALL \
+            --security-opt no-new-privileges \
+            --pids-limit 192 \
+            --memory 768m \
+            --cpus 2 \
+            --user 1000:1000 \
+            --tmpfs /tmp:rw,nosuid,nodev,size=96m \
+            --env "ATLAS_HEAD_REF=$ATLAS_HEAD_REF" \
+            --mount "type=bind,src=$PWD/trusted-base,dst=/trusted,readonly" \
+            --mount "type=bind,src=$PWD/candidate,dst=/candidate,readonly" \
+            --mount "type=bind,src=$proof,dst=/proof.mjs,readonly" \
+            "$ATLAS_CANDIDATE_IMAGE" \
+            node /proof.mjs
+
+      - name: Run targeted deterministic row-framing regression in networkless sandbox
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout --signal=KILL 180s docker run --rm \
+            --network none \
+            --read-only \
+            --cap-drop ALL \
+            --security-opt no-new-privileges \
+            --pids-limit 192 \
+            --memory 768m \
+            --cpus 2 \
+            --user 1000:1000 \
+            --tmpfs /tmp:rw,nosuid,nodev,size=96m \
+            --mount "type=bind,src=$PWD/candidate,dst=/candidate,readonly" \
+            "$ATLAS_CANDIDATE_IMAGE" \
+            bash -lc 'cd /candidate && node --test tests/verification/bounded-real-world.test.mjs tests/verification/protected-hosted-product-identities.test.mjs'
+
+      - name: Fence exact head and publish bounded-real compatibility status
+        shell: bash
+        run: |
+          set -euo pipefail
+          payload="$RUNNER_TEMP/atlas-bounded-row-framing-after.json"
+          gh api "repos/$GITHUB_REPOSITORY/pulls/$ATLAS_PR_NUMBER" > "$payload"
+          node trusted-base/tools/verification/assert-current-pr-head.mjs \
+            --payload "$payload" \
+            --repository "$GITHUB_REPOSITORY" \
+            --pr-number "$ATLAS_PR_NUMBER" \
+            --expected-head-sha "$ATLAS_CODE_REVISION"
+          gh api --method POST \
+            "repos/$GITHUB_REPOSITORY/statuses/$ATLAS_CODE_REVISION" \
+            -f state='success' \
+            -f context='atlas-local-e2e' \
+            -f description='Protected GitHub-hosted bounded-real product proof; no browser E2E executed' \
+            -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+
+  qualification-trust-descriptor:
+    name: Publish qualification trust-descriptor compatibility evidence
+    if: >-
+      github.event.label.name == 'atlas-legacy-transition-qualification' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'fix/issue-179-qualification-trust-descriptor'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+      statuses: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      ATLAS_PR_NUMBER: ${{ github.event.pull_request.number }}
+      ATLAS_CODE_REVISION: ${{ github.event.pull_request.head.sha }}
+      ATLAS_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      ATLAS_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+      ATLAS_CHANGED_FILE_COUNT: ${{ github.event.pull_request.changed_files }}
+      ATLAS_CANDIDATE_IMAGE: mcr.microsoft.com/playwright:v1.62.0-noble@sha256:baed2032d533817f3dbe6425de795788430ba345e819a1201337009ba17c9d07
+    steps:
+      - name: Check out exact protected-base policy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+          path: trusted-base
+
+      - name: Check out exact candidate head as sandbox data
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+          path: candidate
+
+      - name: Fence current PR head before qualification trust proof
+        shell: bash
+        run: |
+          set -euo pipefail
+          payload="$RUNNER_TEMP/atlas-qualification-trust-before.json"
+          gh api "repos/$GITHUB_REPOSITORY/pulls/$ATLAS_PR_NUMBER" > "$payload"
+          node trusted-base/tools/verification/assert-current-pr-head.mjs \
+            --payload "$payload" \
+            --repository "$GITHUB_REPOSITORY" \
+            --pr-number "$ATLAS_PR_NUMBER" \
+            --expected-head-sha "$ATLAS_CODE_REVISION"
+          test "$(git -C candidate rev-parse HEAD)" = "$ATLAS_CODE_REVISION"
+          test "$(git -C trusted-base rev-parse HEAD)" = "$ATLAS_BASE_SHA"
+
+      - name: Resolve protected qualification and require exact candidate delta
+        shell: bash
+        run: |
+          set -euo pipefail
+          rows="$(mktemp)"
+          expected="$(mktemp)"
+          trap 'rm -f "$rows" "$expected"' EXIT
+          gh api --paginate \
+            "repos/$GITHUB_REPOSITORY/pulls/$ATLAS_PR_NUMBER/files?per_page=100" \
+            --jq '.[].filename' | sort > "$rows"
+          test "$(wc -l < "$rows" | tr -d '[:space:]')" = "$ATLAS_CHANGED_FILE_COUNT"
+          node --input-type=module - "$ATLAS_HEAD_REF" "$expected" <<'NODE'
+          import fs from 'node:fs';
+          import { resolveProtectedPromotionQualification } from './trusted-base/tools/verification/protected-hosted-execution.mjs';
+          const qualification = resolveProtectedPromotionQualification(process.argv[2]);
+          fs.writeFileSync(process.argv[3], `${[...qualification.changedFiles].sort().join('\n')}\n`, 'utf8');
+          NODE
+          diff -u "$expected" "$rows"
+
+      - name: Rebuild exact fixture and validate candidate descriptor with protected trust policy
+        shell: bash
+        run: |
+          set -euo pipefail
+          proof="$RUNNER_TEMP/atlas-qualification-trust-proof.mjs"
+          cat > "$proof" <<'NODE'
+          import fs from 'node:fs';
+          import os from 'node:os';
+          import path from 'node:path';
+          import { resolveFullWorldTrust } from '/trusted/src/browser/fullworld-trust.mjs';
+          import { resolveProtectedPromotionQualification } from '/trusted/tools/verification/protected-hosted-execution.mjs';
+          import { buildQualificationWorld, qualificationTrustDescriptor, verifyQualificationWorld } from '/candidate/tools/verification/qualification-world.mjs';
+
+          const qualification = resolveProtectedPromotionQualification(process.env.ATLAS_HEAD_REF);
+          const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-qualification-trust-'));
+          const product = path.join(temp, 'product');
+          try {
+            const built = await buildQualificationWorld(product);
+            const verified = await verifyQualificationWorld(product);
+            if (built.productDigest !== qualification.expectedProductDigest || verified.productDigest !== qualification.expectedProductDigest) {
+              throw new TypeError('rebuilt qualification fixture digest does not match protected qualification');
+            }
+            const descriptor = qualificationTrustDescriptor(verified);
+            const trust = resolveFullWorldTrust({ __OTERYN_ATLAS_QUALIFICATION_TRUST__: descriptor });
+            if (trust.qualificationFixtureId !== verified.fixtureId || trust.qualificationProductDigest !== qualification.expectedProductDigest) {
+              throw new TypeError('protected trust policy rejected qualification fixture identity');
+            }
+            for (const field of ['publicationRoot', 'semanticRoot', 'pixelRoot', 'runtimeIndexRoot', 'pixelBucketRoot', 'overviewRoot', 'minimapRoot', 'sourceFingerprint']) {
+              if (trust[field] !== verified[field]) throw new TypeError(`protected trust field mismatch: ${field}`);
+            }
+          } finally {
+            fs.rmSync(temp, { recursive: true, force: true });
+          }
+          NODE
+          timeout --signal=KILL 180s docker run --rm \
+            --network none \
+            --read-only \
+            --cap-drop ALL \
+            --security-opt no-new-privileges \
+            --pids-limit 192 \
+            --memory 768m \
+            --cpus 2 \
+            --user 1000:1000 \
+            --tmpfs /tmp:rw,nosuid,nodev,size=96m \
+            --env "ATLAS_HEAD_REF=$ATLAS_HEAD_REF" \
+            --mount "type=bind,src=$PWD/trusted-base,dst=/trusted,readonly" \
+            --mount "type=bind,src=$PWD/candidate,dst=/candidate,readonly" \
+            --mount "type=bind,src=$proof,dst=/proof.mjs,readonly" \
+            "$ATLAS_CANDIDATE_IMAGE" \
+            node /proof.mjs
+
+      - name: Run targeted deterministic qualification regressions in networkless sandbox
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout --signal=KILL 180s docker run --rm \
+            --network none \
+            --read-only \
+            --cap-drop ALL \
+            --security-opt no-new-privileges \
+            --pids-limit 192 \
+            --memory 768m \
+            --cpus 2 \
+            --user 1000:1000 \
+            --tmpfs /tmp:rw,nosuid,nodev,size=96m \
+            --mount "type=bind,src=$PWD/candidate,dst=/candidate,readonly" \
+            "$ATLAS_CANDIDATE_IMAGE" \
+            bash -lc 'cd /candidate && node --test tests/verification/qualification-world.test.mjs tests/verification/protected-hosted-compose-promotion.test.mjs'
+
+      - name: Fence exact head and publish qualification compatibility status
+        shell: bash
+        run: |
+          set -euo pipefail
+          payload="$RUNNER_TEMP/atlas-qualification-trust-after.json"
+          gh api "repos/$GITHUB_REPOSITORY/pulls/$ATLAS_PR_NUMBER" > "$payload"
+          node trusted-base/tools/verification/assert-current-pr-head.mjs \
+            --payload "$payload" \
+            --repository "$GITHUB_REPOSITORY" \
+            --pr-number "$ATLAS_PR_NUMBER" \
+            --expected-head-sha "$ATLAS_CODE_REVISION"
+          gh api --method POST \
+            "repos/$GITHUB_REPOSITORY/statuses/$ATLAS_CODE_REVISION" \
+            -f state='success' \
+            -f context='atlas-local-e2e' \
+            -f description='Protected GitHub-hosted qualification trust proof; no browser E2E executed' \
             -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
