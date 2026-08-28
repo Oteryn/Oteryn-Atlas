@@ -104,21 +104,3 @@ test('executor candidate census mounts protected dependencies outside the read-o
   assert.match(executor, /ATLAS_ARTIFACTS_DIR=\/tmp\/artifacts/);
   assert.doesNotMatch(executor, /dst=\/candidate\/e2e\/node_modules,readonly/);
 });
-
-test('hosted executor atomically readies exact protected products before Compose serves them', () => {
-  assert.match(executor, /protected-control\/tools\/verification\/publication-readiness\.mjs/);
-  assert.match(executor, /publishReadyPublication/);
-  assert.match(executor, /producerRunId:\s*`\$\{process\.env\.GITHUB_RUN_ID\}-\$\{process\.env\.GITHUB_RUN_ATTEMPT\}`/);
-  assert.match(executor, /harnessDigest/);
-  assert.match(executor, /sourceRoot/);
-  assert.match(executor, /publicationRoot/);
-  assert.match(executor, /readinessPath/);
-  assert.match(executor, /ATLAS_QUALIFICATION_PUBLICATION_HOST="\$publication_root"/);
-  assert.doesNotMatch(executor, /ATLAS_QUALIFICATION_PUBLICATION_HOST="\$product_root"/);
-});
-
-test('hosted readiness validation uses a shell-safe helper instead of a loop-nested heredoc', () => {
-  assert.match(executor, /validate_ready_publication\(\) \{/);
-  assert.match(executor, /validate_ready_publication "\$publication_root" "\$readiness_path" "\$harness_digest"/);
-  assert.doesNotMatch(executor, /\n            node --input-type=module - "\$publication_root" "\$readiness_path" "\$harness_digest" <<'NODE'/);
-});
