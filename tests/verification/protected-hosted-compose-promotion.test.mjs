@@ -76,6 +76,19 @@ test('protected hosted web bootstrap injects immutable qualification trust befor
   assert.doesNotMatch(override, /\/source-web:(?!ro)|\/ready-web:ro/);
 });
 
+test('qualification bootstrap rewrites only the protected legacy entry into fixture bounds', () => {
+  const override = readRequired('e2e/compose.github-hosted.yml', 'GitHub-hosted qualification compose override');
+  assert.match(override, /descriptor\.marker === 'oteryn-atlas-qualification-trust-v1'/);
+  assert.match(override, /descriptor\.fixtureId === 'atlas-qualification-world-v2'/);
+  assert.match(override, /searchParams\.get\('x'\) === '32369'/);
+  assert.match(override, /searchParams\.get\('y'\) === '32241'/);
+  assert.match(override, /searchParams\.get\('floor'\) === '-7'/);
+  assert.match(override, /searchParams\.set\('x', '32280'\)/);
+  assert.match(override, /searchParams\.set\('y', '32155'\)/);
+  assert.match(override, /history\.replaceState\(history\.state, '', qualificationEntry\)/);
+  assert.doesNotMatch(override, /Math\.(?:min|max)\([^\n]*(?:searchParams|qualificationEntry)|clamp(?:ed|ing)?[^\n]*(?:x|y)/i);
+});
+
 test('protected hosted web bootstrap reentry is exact validation only and never overwrites stale bytes', () => {
   const override = readRequired('e2e/compose.github-hosted.yml', 'GitHub-hosted qualification compose override');
   assert.match(override, /function treeDigest\(root\)/);
