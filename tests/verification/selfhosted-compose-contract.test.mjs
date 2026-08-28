@@ -18,7 +18,8 @@ test('self-hosted Compose sends checkout into images instead of bind mounting ru
 });
 
 test('required PR gate is status-only while nightly keeps the no-bind self-hosted Compose path', () => {
-  assert.match(ci, /atlas-local-e2e/);
+  assert.match(ci, /protected-hosted-fan-in-/);
+  assert.doesNotMatch(ci, /atlas-local-e2e/);
   assert.doesNotMatch(ci, /compose\.selfhosted\.yml/);
   assert.doesNotMatch(ci, /docker cp/);
   assert.match(nightly, /compose\.selfhosted\.yml/);

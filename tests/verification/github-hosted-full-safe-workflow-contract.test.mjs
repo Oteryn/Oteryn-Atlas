@@ -19,9 +19,11 @@ test('authoritative full-safe browser execution uses the protected GitHub-hosted
   assert.doesNotMatch(protectedWorkflow, /192\.168\.|synology|molehill/i);
 });
 
-test('legacy pull-request CI remains transitional and does not impersonate the protected hosted executor', () => {
-  assert.match(legacyWorkflow, /name:\s*Local Docker Playwright evidence/);
-  assert.match(legacyWorkflow, /atlas-local-e2e/);
+test('pull-request CI requires protected hosted fan-in and no longer depends on local status', () => {
+  assert.match(legacyWorkflow, /name:\s*Protected Hosted Playwright evidence/);
+  assert.match(legacyWorkflow, /actions\/artifacts\?per_page=100/);
+  assert.match(legacyWorkflow, /protected-hosted-fan-in-/);
+  assert.doesNotMatch(legacyWorkflow, /atlas-local-e2e/);
   assert.doesNotMatch(legacyWorkflow, /name:\s*Protected Hosted Verification Executor/);
   assert.doesNotMatch(legacyWorkflow, /protected-hosted-fan-in\.mjs/);
 });

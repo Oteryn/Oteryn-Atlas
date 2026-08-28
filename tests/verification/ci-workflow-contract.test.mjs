@@ -23,7 +23,7 @@ function block(source, start, end) {
   return source.slice(begin, finish === -1 ? source.length : finish);
 }
 
-test('atlas-gate requires exact-head local Docker browser evidence', () => {
+test('atlas-gate requires exact-head protected hosted browser evidence', () => {
   const nodeJob = block(ci, '  verification-node:\n', '  verification-browser:\n');
   const browserJob = block(ci, '  verification-browser:\n', '  atlas-gate:\n');
   const gateStart = ci.indexOf('  atlas-gate:\n');
@@ -47,14 +47,17 @@ test('atlas-gate requires exact-head local Docker browser evidence', () => {
   assert.match(browserJob, /github\.event\.pull_request\.head\.repo\.full_name == github\.repository/);
   assert.match(browserJob, /- verification-node/);
   assert.match(browserJob, /runs-on: ubuntu-24\.04/);
-  assert.match(browserJob, /statuses: read/);
+  assert.match(browserJob, /actions:\s*read/);
+  assert.match(browserJob, /pull-requests:\s*read/);
   assert.match(browserJob, /ATLAS_CODE_REVISION: \$\{\{ github\.event\.pull_request\.head\.sha \}\}/);
-  assert.match(browserJob, /atlas-local-e2e/);
-  assert.match(browserJob, /commits\/\$ATLAS_CODE_REVISION\/statuses/);
-  assert.match(browserJob, /test "\$state" = success/);
-  assert.doesNotMatch(browserJob, /group: atlas-runners/);
-  assert.doesNotMatch(browserJob, /labels: oteryn-atlas/);
-  assert.doesNotMatch(browserJob, /docker compose|compose\.selfhosted\.yml/);
+  assert.match(browserJob, /ATLAS_PR_NUMBER: \$\{\{ github\.event\.pull_request\.number \}\}/);
+  assert.match(browserJob, /actions\/artifacts\?per_page=100/);
+  assert.match(browserJob, /protected-hosted-fan-in-/);
+  assert.match(browserJob, /name == "fan-in"/);
+  assert.match(browserJob, /candidateHeadSha/);
+  assert.match(browserJob, /evidenceScope/);
+  assert.doesNotMatch(browserJob, /atlas-local-e2e/);
+  assert.doesNotMatch(browserJob, /group: atlas-runners|labels: oteryn-atlas|docker compose|compose\.selfhosted\.yml/i);
 
   assert.match(gate, /- verification-node/);
   assert.match(gate, /- verification-browser/);
@@ -63,7 +66,6 @@ test('atlas-gate requires exact-head local Docker browser evidence', () => {
   assert.match(gate, /GITHUB_EVENT_NAME/);
   assert.match(gate, /pull_request.*VERIFICATION_BROWSER.*success/s);
 });
-
 test('local Docker status publisher only accepts exact clean all-pass evidence', () => {
   const publisherUrl = new URL('../../e2e/publish-local-e2e-status.ps1', import.meta.url);
   assert.equal(fs.existsSync(publisherUrl), true, 'missing local E2E status publisher');
