@@ -89,6 +89,7 @@ test('qualification override fails closed instead of silently falling back to pr
 
 test('Playwright resolves qualification navigation before the only Atlas navigation', async () => {
   const originalTrustJson = process.env.ATLAS_QUALIFICATION_TRUST_JSON;
+  const originalExpectedRevision = process.env.ATLAS_EXPECTED_REVISION;
   const semanticIndex = {
     source: {
       fixture_id: descriptor.fixtureId,
@@ -99,22 +100,27 @@ test('Playwright resolves qualification navigation before the only Atlas navigat
     records: [{ capabilities: ['navigation'], position: { x: 101, y: 202, floor: -3 } }],
   };
   const navigations = [];
+  const events = [];
   const page = {
     request: {
       get: async (url) => {
+        events.push('semantic-index');
         assert.equal(url, '/web/semantic-search/index.json');
         return { ok: () => true, status: () => 200, json: async () => semanticIndex };
       },
     },
     goto: async (...args) => {
+      events.push('goto');
       navigations.push(args);
       return { ok: () => true, status: () => 200, headers: () => ({}) };
     },
   };
   process.env.ATLAS_QUALIFICATION_TRUST_JSON = JSON.stringify(descriptor);
+  delete process.env.ATLAS_EXPECTED_REVISION;
   try {
     const gotoAtlas = await loadGotoAtlasForContract();
     await gotoAtlas(page, '/web/fullworld.html?x=1&y=2&floor=0&zoom=2&mode=map');
+    assert.deepEqual(events, ['semantic-index', 'goto']);
     assert.deepEqual(navigations, [[
       '/web/fullworld.html?x=101&y=202&floor=-3&zoom=2&mode=map',
       { waitUntil: 'domcontentloaded' },
@@ -122,6 +128,8 @@ test('Playwright resolves qualification navigation before the only Atlas navigat
   } finally {
     if (originalTrustJson === undefined) delete process.env.ATLAS_QUALIFICATION_TRUST_JSON;
     else process.env.ATLAS_QUALIFICATION_TRUST_JSON = originalTrustJson;
+    if (originalExpectedRevision === undefined) delete process.env.ATLAS_EXPECTED_REVISION;
+    else process.env.ATLAS_EXPECTED_REVISION = originalExpectedRevision;
   }
   assert.doesNotMatch(runtime, /page\s*\.\s*addInitScript/);
   assert.doesNotMatch(runtime, /qualificationTrustInstalledPages/);
