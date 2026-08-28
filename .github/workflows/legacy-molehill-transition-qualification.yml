@@ -30,6 +30,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       ATLAS_PR_NUMBER: ${{ github.event.pull_request.number }}
       ATLAS_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+      ATLAS_HEAD_REF: ${{ github.event.pull_request.head.ref }}
       ATLAS_CODE_REVISION: ${{ github.event.pull_request.head.sha }}
       ATLAS_EXPECTED_REVISION: ${{ github.event.pull_request.head.sha }}
       ATLAS_BASE_SHA: ${{ github.event.pull_request.base.sha }}
@@ -263,11 +264,12 @@ jobs:
           retention-days: 7
 
   protected-census-bootstrap:
-    name: Publish targeted protected-census compatibility evidence
+    name: Publish targeted protected-control compatibility evidence
     if: >-
       github.event.label.name == 'atlas-legacy-transition-qualification' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
-      github.event.pull_request.head.ref == 'fix/issue-179-protected-census-readonly-mount'
+      (github.event.pull_request.head.ref == 'fix/issue-179-protected-census-readonly-mount' ||
+       github.event.pull_request.head.ref == 'fix/issue-179-protected-execution-contract-promotion')
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -293,11 +295,27 @@ jobs:
             "repos/$GITHUB_REPOSITORY/pulls/$ATLAS_PR_NUMBER/files?per_page=100" \
             --jq '.[].filename' | sort > "$rows"
           test "$(wc -l < "$rows" | tr -d '[:space:]')" = "$ATLAS_CHANGED_FILE_COUNT"
-          printf '%s\n' \
-            '.github/workflows/legacy-molehill-transition-qualification.yml' \
-            '.github/workflows/protected-verification-controller.yml' \
-            'tests/verification/protected-controller-workflow-contract.test.mjs' \
-            > "$expected"
+          case "$ATLAS_HEAD_REF" in
+            fix/issue-179-protected-census-readonly-mount)
+              printf '%s\n' \
+                '.github/workflows/legacy-molehill-transition-qualification.yml' \
+                '.github/workflows/protected-verification-controller.yml' \
+                'tests/verification/protected-controller-workflow-contract.test.mjs' \
+                > "$expected"
+              ;;
+            fix/issue-179-protected-execution-contract-promotion)
+              printf '%s\n' \
+                '.github/workflows/legacy-molehill-transition-qualification.yml' \
+                'tests/verification/legacy-molehill-transition-workflow-contract.test.mjs' \
+                'tests/verification/protected-hosted-execution.test.mjs' \
+                'tools/verification/protected-hosted-execution.mjs' \
+                > "$expected"
+              ;;
+            *)
+              echo "Unexpected protected-control bootstrap branch: $ATLAS_HEAD_REF" >&2
+              exit 1
+              ;;
+          esac
           diff -u "$expected" "$rows"
 
       - name: Check out exact protected-base policy
@@ -331,10 +349,12 @@ jobs:
           test "$(git -C trusted-base rev-parse HEAD)" = "$ATLAS_BASE_SHA"
 
       - name: Install protected-base census dependencies only
+        if: github.event.pull_request.head.ref == 'fix/issue-179-protected-census-readonly-mount'
         shell: bash
         run: npm ci --prefix trusted-base/e2e --ignore-scripts --no-audit --no-fund
 
       - name: Prove protected census module resolution without browser execution
+        if: github.event.pull_request.head.ref == 'fix/issue-179-protected-census-readonly-mount'
         shell: bash
         run: |
           set -euo pipefail
@@ -355,6 +375,25 @@ jobs:
             "$ATLAS_CANDIDATE_IMAGE" \
             bash -lc 'cd /candidate && CI=1 ATLAS_ARTIFACTS_DIR=/tmp/artifacts /candidate/e2e/node_modules/.bin/playwright test --config=/candidate/e2e/playwright.config.mjs --list >/tmp/playwright-list.txt && test -s /tmp/playwright-list.txt'
 
+      - name: Prove protected hosted execution contract without browser execution
+        if: github.event.pull_request.head.ref == 'fix/issue-179-protected-execution-contract-promotion'
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout --signal=KILL 120s docker run --rm \
+            --network none \
+            --read-only \
+            --cap-drop ALL \
+            --security-opt no-new-privileges \
+            --pids-limit 192 \
+            --memory 768m \
+            --cpus 2 \
+            --user 1000:1000 \
+            --tmpfs /tmp:rw,nosuid,nodev,size=64m \
+            --mount "type=bind,src=$PWD/candidate,dst=/candidate,readonly" \
+            "$ATLAS_CANDIDATE_IMAGE" \
+            bash -lc 'cd /candidate && node --test tests/verification/protected-hosted-execution.test.mjs'
+
       - name: Fence exact head and publish one-time compatibility status
         shell: bash
         run: |
@@ -370,7 +409,7 @@ jobs:
             "repos/$GITHUB_REPOSITORY/statuses/$ATLAS_CODE_REVISION" \
             -f state='success' \
             -f context='atlas-local-e2e' \
-            -f description='Targeted protected census bootstrap; no browser E2E executed' \
+            -f description='Targeted protected-control bootstrap; no browser E2E executed' \
             -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
 
   publish-reviewed-status:
