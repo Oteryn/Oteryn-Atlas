@@ -74,6 +74,36 @@ test('qualification navigation preserves absolute host, query state, and hash af
   assert.equal(resolved, 'http://atlas-web:8080/web/fullworld.html?mode=auto&x=32280&y=32155&floor=-7&zoom=0.25&semantic=fixture#details');
 });
 
+test('qualification navigation accepts only canonical raw FullWorld route forms before parsing', async () => {
+  const httpsDefault = 'https://atlas-web:8080/web/fullworld.html?x=32369&y=32241&floor=-7&zoom=2';
+  assert.equal(await resolveQualificationEntry(httpsDefault, {
+    qualificationTrustJson: JSON.stringify(trust),
+    readSemanticIndex: async () => semanticIndex,
+  }), 'https://atlas-web:8080/web/fullworld.html?x=32280&y=32155&floor=-7&zoom=2');
+
+  const inputs = [
+    '/web/a/../fullworld.html?x=32369&y=32241&floor=-7',
+    'web/fullworld.html?x=32369&y=32241&floor=-7',
+    'javascript:/web/fullworld.html?x=32369&y=32241&floor=-7',
+    'http://atlas-web:8080/web/a/../fullworld.html?x=32369&y=32241&floor=-7',
+    'https://not-atlas.example/web/fullworld.html?x=32369&y=32241&floor=-7',
+    '/web/fullworld.html?x=32369&y=32241&floor=-7&mode=~',
+    '/web/fullworld.html?x=32369&y=32241&floor=-7&mode=żółw',
+    '/web/fullworld.html?x=32369&y=32241&floor=-7#żółw',
+    'http://user@atlas-web:8080/web/fullworld.html?x=32369&y=32241&floor=-7',
+    'http://atlas-web:80/web/fullworld.html?x=32369&y=32241&floor=-7',
+    'https://atlas-web:443/web/fullworld.html?x=32369&y=32241&floor=-7',
+  ];
+  let reads = 0;
+  for (const input of inputs) {
+    assert.equal(await resolveQualificationEntry(input, {
+      qualificationTrustJson: JSON.stringify(trust),
+      readSemanticIndex: async () => { reads += 1; throw new Error('unexpected qualification read'); },
+    }), input);
+  }
+  assert.equal(reads, 0);
+});
+
 test('nonmatching qualification routes remain byte-for-byte caller-owned without semantic reads', async () => {
   const inputs = [
     '/web/fullworld.html?x=32369&x=32369&y=32241&floor=-7',

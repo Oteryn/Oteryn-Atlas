@@ -58,9 +58,38 @@ function validateSemanticIndex(index, trust) {
 }
 
 const SHARED_HISTORICAL_DEFAULT = Object.freeze({ x: '32369', y: '32241', floor: '-7' });
+const CANONICAL_FULLWORLD_PATH = '/web/fullworld.html';
+const CANONICAL_ATLAS_ORIGINS = Object.freeze([
+  'http://atlas-web:8080',
+  'https://atlas-web:8080',
+]);
+
+function hasCanonicalRawFullWorldPath(entry, prefix) {
+  if (!entry.startsWith(prefix)) return false;
+  const suffix = entry.slice(prefix.length);
+  return suffix === '' || suffix.startsWith('?') || suffix.startsWith('#');
+}
+
+function isCanonicalHistoricalEntryForm(entry) {
+  if (typeof entry !== 'string' || entry.length === 0) return false;
+  if (hasCanonicalRawFullWorldPath(entry, CANONICAL_FULLWORLD_PATH)) return true;
+  return CANONICAL_ATLAS_ORIGINS.some((origin) => hasCanonicalRawFullWorldPath(entry, `${origin}${CANONICAL_FULLWORLD_PATH}`));
+}
+
+function serializeEntry(url, isRelative) {
+  return isRelative ? `${url.pathname}${url.search}${url.hash}` : url.href;
+}
+
+function isCanonicalSerializedHistoricalDefault(entry, url) {
+  const canonical = new URL(url.href);
+  for (const [field, value] of Object.entries(SHARED_HISTORICAL_DEFAULT)) {
+    canonical.searchParams.set(field, value);
+  }
+  return entry === serializeEntry(canonical, entry.startsWith(CANONICAL_FULLWORLD_PATH));
+}
 
 function isSharedHistoricalDefault(entry) {
-  if (typeof entry !== 'string' || entry.length === 0) return false;
+  if (!isCanonicalHistoricalEntryForm(entry)) return false;
   let url;
   try {
     url = new URL(entry, 'http://atlas.invalid');
@@ -68,6 +97,7 @@ function isSharedHistoricalDefault(entry) {
     return false;
   }
   if (url.pathname !== '/web/fullworld.html') return false;
+  if (!isCanonicalSerializedHistoricalDefault(entry, url)) return false;
   return Object.entries(SHARED_HISTORICAL_DEFAULT).every(([field, value]) => {
     const values = url.searchParams.getAll(field);
     return values.length === 1 && values[0] === value;
@@ -82,7 +112,7 @@ function rewriteEntry(entry, position) {
   url.searchParams.set('x', String(position.x));
   url.searchParams.set('y', String(position.y));
   url.searchParams.set('floor', String(position.floor));
-  return isRelative ? `${url.pathname}${url.search}${url.hash}` : url.href;
+  return serializeEntry(url, isRelative);
 }
 
 export async function resolveQualificationEntry(entry, { qualificationTrustJson, readSemanticIndex }) {
