@@ -38,9 +38,10 @@ test('protected controller binds protected and candidate censuses and rejects st
   assert.match(workflow, /product-identities\.json/);
 });
 
-test('candidate census mounts protected dependencies outside the read-only candidate tree', () => {
+test('candidate census mounts protected dependencies outside the read-only candidate tree with Node module-resolution semantics intact', () => {
   assert.match(workflow, /--mount "type=bind,src=\$candidate_dir,dst=\/candidate,readonly"/);
-  assert.match(workflow, /ln -s \/protected-e2e-node-modules "\$candidate_dir\/e2e\/node_modules"/);
-  assert.match(workflow, /dst=\/protected-e2e-node-modules,readonly/);
+  assert.match(workflow, /ln -s \/protected-e2e\/node_modules "\$candidate_dir\/e2e\/node_modules"/);
+  assert.match(workflow, /dst=\/protected-e2e\/node_modules,readonly/);
+  assert.doesNotMatch(workflow, /dst=\/protected-e2e-node-modules/);
   assert.doesNotMatch(workflow, /dst=\/candidate\/e2e\/node_modules/);
 });
