@@ -120,6 +120,12 @@
       "domains": ["verification-governance"],
       "minimumProfile": "full",
       "requiredGroups": ["deterministic.core", "e2e.full"]
+    },
+    {
+      "pathPrefix": ".github/workflows/legacy-molehill-transition-qualification.yml",
+      "domains": ["legacy-fullworld-transition"],
+      "minimumProfile": "full",
+      "requiredGroups": ["deterministic.core", "e2e.full", "fullworld.animation-census", "integration.source-contract"]
     }
   ],
   "crossDomainEscalations": [
