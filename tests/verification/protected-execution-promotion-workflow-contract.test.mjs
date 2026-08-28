@@ -42,3 +42,18 @@ test('protected execution promotion qualification is GitHub-hosted, exact-head, 
   assert.match(workflow, /context='atlas-local-e2e'|context.*atlas-local-e2e/s);
   assert.doesNotMatch(workflow, /playwright test|\\e2e\\run\.ps1|ATLAS_PUBLICATION_ORIGIN|visual-review\.json|synology/i);
 });
+
+test('protected execution promotion preauthorizes the qualification trust-descriptor repair on exact GitHub-hosted evidence', () => {
+  const workflow = fs.readFileSync(workflowPath, 'utf8');
+  const legacy = fs.readFileSync(legacyWorkflowPath, 'utf8');
+  const heavy = legacy.split('  legacy-qualification:')[1]?.split('  protected-census-bootstrap:')[0] ?? '';
+
+  assert.match(workflow, /fix\/issue-179-qualification-trust-descriptor/);
+  assert.doesNotMatch(heavy, /fix\/issue-179-qualification-trust-descriptor/);
+  assert.match(workflow, /qualificationTrustDescriptor/);
+  assert.match(workflow, /tests\/verification\/qualification-world\.test\.mjs/);
+  assert.match(workflow, /tests\/verification\/protected-hosted-compose-promotion\.test\.mjs/);
+  assert.match(workflow, /tools\/verification\/qualification-world\.mjs/);
+  assert.match(workflow, /\.github\/workflows\/protected-hosted-executor\.yml/);
+  assert.match(workflow, /sha256:f53fb9c6bd0b32618a44a48b7e27d21c26ee170443764deb115224042afa996e/);
+});
