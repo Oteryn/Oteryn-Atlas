@@ -41,3 +41,10 @@ test('candidate census mounts protected dependencies outside the read-only candi
   assert.match(workflow, /dst=\/protected-e2e-node-modules,readonly/);
   assert.doesNotMatch(workflow, /dst=\/candidate\/e2e\/node_modules/);
 });
+
+test('candidate census mounts protected dependencies outside the read-only candidate tree', () => {
+  assert.match(workflow, /--mount "type=bind,src=\$candidate_dir,dst=\/candidate,readonly"/);
+  assert.match(workflow, /ln -s \/protected-e2e-node-modules "\$candidate_dir\/e2e\/node_modules"/);
+  assert.match(workflow, /dst=\/protected-e2e-node-modules,readonly/);
+  assert.doesNotMatch(workflow, /dst=\/candidate\/e2e\/node_modules/);
+});

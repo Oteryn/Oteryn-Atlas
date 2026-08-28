@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { DESKTOP_ENTRY, assertNoRuntimeFailures, captureRuntimeFailures, gotoAtlas, waitForAtlas } from './runtime.mjs';
-import { assertUserVisibleSurface, captureUserVisualEvidence } from '../support/user-acceptance.mjs';
+import { assertUserVisibleSurface, captureUserVisualEvidence, waitForCurrentDetailScene } from '../support/user-acceptance.mjs';
 
 async function waitRep(page, expected) {
   await page.waitForFunction(
@@ -142,6 +142,7 @@ test('audit coordinate Go, wheel zoom and drag pan', async ({ page }, testInfo) 
   await page.mouse.move(box.x + box.width / 2 + 80, box.y + box.height / 2 + 40, { steps: 4 });
   await page.mouse.up();
   await expect.poll(() => new URL(page.url()).searchParams.get('x')).not.toBe(p0.searchParams.get('x'));
+  await waitForCurrentDetailScene(page);
   const navigationMetrics = await assertUserVisibleSurface(page, {
     label: 'desktop coordinate pan navigation',
     minimumMapAreaRatio: 0.28,

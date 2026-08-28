@@ -84,6 +84,8 @@ let persistentCache = null;
 let worldQuery = null;
 let detailReady = false;
 let detailStreaming = false;
+let viewEpoch = 0;
+let detailSceneViewEpoch = null;
 const floorBundles = new Map();
 const overviewCellsByFloor = new Map();
 const overviewChunksByFloor = new Map();
@@ -225,6 +227,8 @@ function publishView() {
     requestedMode: normalizeViewMode(view.mode),
     representation: blend.representation,
     detailReady,
+    viewEpoch,
+    detailSceneViewEpoch,
   });
   globalThis.__OTERYN_ATLAS_VIEW__ = snapshot;
   globalThis.__OTERYN_ATLAS_EFFECTIVE_PRESENTATION__ = effectivePresentation;
@@ -389,12 +393,12 @@ function scheduleRefresh(delay = 100) {
   }), delay);
 }
 
-function refreshIsCurrent(epoch, floor) {
-  return epoch === refreshEpoch && view.floor === floor;
+function refreshIsCurrent(epoch, floor, expectedViewEpoch) {
+  return epoch === refreshEpoch && view.floor === floor && viewEpoch === expectedViewEpoch;
 }
 
-function progressiveRender(records, residentBuckets, epoch, floorAtStart, neededBucketCount) {
-  if (!refreshIsCurrent(epoch, floorAtStart)) return;
+function progressiveRender(records, residentBuckets, epoch, floorAtStart, viewEpochAtStart, neededBucketCount) {
+  if (!refreshIsCurrent(epoch, floorAtStart, viewEpochAtStart)) return;
   const readyRecords = recordsForResidentBuckets(records, pixelCatalog, runtimePixelCatalog, residentBuckets);
   sceneRecords = readyRecords;
   setRendererRecords(readyRecords);
@@ -413,10 +417,11 @@ async function refreshScene() {
   const epoch = ++refreshEpoch;
   const started = performance.now();
   const floorAtStart = view.floor;
+  const viewEpochAtStart = viewEpoch;
   const bundle = await loadFloorBundle(floorAtStart);
-  if (!refreshIsCurrent(epoch, floorAtStart)) return;
+  if (!refreshIsCurrent(epoch, floorAtStart, viewEpochAtStart)) return;
   await ensureOverviewCells(floorAtStart, bundle);
-  if (!refreshIsCurrent(epoch, floorAtStart)) return;
+  if (!refreshIsCurrent(epoch, floorAtStart, viewEpochAtStart)) return;
 
   // Verified overview is intentionally painted before any semantic-range or
   // pixel-bucket dependency. A slow authenticated detail stream must never
@@ -437,6 +442,7 @@ async function refreshScene() {
     commitRenderer();
     lastSceneLoadMs = performance.now() - started;
     if (initialLoadMs == null) initialLoadMs = performance.now() - bootStartedMs;
+    detailSceneViewEpoch = null;
     detailReady = false;
     publishView();
     detailBadge.textContent = 'VISUAL MINIMAP LOD';
@@ -452,6 +458,7 @@ async function refreshScene() {
     return;
   }
 
+  detailSceneViewEpoch = null;
   detailReady = false;
   publishView();
   detailBadge.textContent = 'AUTHENTICATED DETAIL STREAM';
@@ -465,7 +472,7 @@ async function refreshScene() {
   updateDiagnostics();
 
   const groupedTiles = await mapLimit(sceneGroups, GROUP_CONCURRENCY, ({ chunk, group }) => semanticStore.loadGroup(floorAtStart, chunk, group, { signal: controller.signal }));
-  if (!refreshIsCurrent(epoch, floorAtStart)) return;
+  if (!refreshIsCurrent(epoch, floorAtStart, viewEpochAtStart)) return;
   const tileMap = new Map();
   for (const tiles of groupedTiles) for (const tile of filterTilesForBounds(tiles, retainBounds)) {
     const key = `${tile.floor}:${tile.x}:${tile.y}`;
@@ -490,7 +497,7 @@ async function refreshScene() {
       signal: controller.signal,
       onLoad: ({ source, bytes: loadedBytes }) => { if (source === 'network') pixelNetworkBytes += loadedBytes; },
     });
-    if (!refreshIsCurrent(epoch, floorAtStart)) return;
+    if (!refreshIsCurrent(epoch, floorAtStart, viewEpochAtStart)) return;
     renderer.uploadBundle(bytes);
     loadedPixelBundleBytes = bytes.byteLength;
     pixelTransport = 'local-max-bundle';
@@ -498,26 +505,27 @@ async function refreshScene() {
     const residentBuckets = new Set(renderer.uploadedBucketIds());
     const missingBuckets = neededBuckets.filter((bucketId) => !residentBuckets.has(bucketId));
     pixelTransport = 'stable-buckets';
-    progressiveRender(records, residentBuckets, epoch, floorAtStart, neededBuckets.length);
+    progressiveRender(records, residentBuckets, epoch, floorAtStart, viewEpochAtStart, neededBuckets.length);
     await mapLimit(missingBuckets, PIXEL_BUCKET_CONCURRENCY, async (bucketId) => {
       const bytes = await loadVerifiedPixelBucket(runtimePixelCatalog, bucketId, fetch, {
         persistentCache,
         signal: controller.signal,
         onLoad: ({ source, bytes: loadedBytes }) => { if (source === 'network') pixelNetworkBytes += loadedBytes; },
       });
-      if (!refreshIsCurrent(epoch, floorAtStart)) return null;
+      if (!refreshIsCurrent(epoch, floorAtStart, viewEpochAtStart)) return null;
       loadedBucketBytes.set(bucketId, bytes.byteLength);
       renderer.uploadBucket(bucketId, bytes);
       residentBuckets.add(bucketId);
-      progressiveRender(records, residentBuckets, epoch, floorAtStart, neededBuckets.length);
+      progressiveRender(records, residentBuckets, epoch, floorAtStart, viewEpochAtStart, neededBuckets.length);
       return bucketId;
     });
-    if (!refreshIsCurrent(epoch, floorAtStart)) return;
+    if (!refreshIsCurrent(epoch, floorAtStart, viewEpochAtStart)) return;
   }
 
   sceneRecords = records;
   setRendererRecords(sceneRecords);
   detailReady = true;
+  detailSceneViewEpoch = viewEpochAtStart;
   publishView();
   commitRenderer();
   if (renderStats.gpuTextureBytes > performanceProfile.gpuTextureBudgetBytes) throw new Error('GPU texture allocation exceeds runtime profile budget');
@@ -804,6 +812,7 @@ function pointerWorld(event) {
 function applyView(next, options = {}) {
   const previousFloor = view?.floor;
   view = clampView(next);
+  viewEpoch += 1;
   selected = view.selected ? { x: view.selected.x, y: view.selected.y } : null;
   if (previousFloor != null && previousFloor !== view.floor) {
     semanticStore.clearForFloorChange();
@@ -872,6 +881,7 @@ function wireInteraction() {
     const dy = event.clientY - dragging.startClientY;
     if (Math.abs(dx) + Math.abs(dy) > 3) dragging.moved = true;
     view = clampView({ ...view, x: dragging.startX - dx / (32 * view.zoom), y: dragging.startY - dy / (32 * view.zoom) });
+    viewEpoch += 1;
     syncViewUi();
     scheduleRender('drag');
     scheduleRefresh(140);
@@ -900,6 +910,7 @@ function wireInteraction() {
         const blend = lodBlend(view.zoom, view.mode, detailReady);
         const target = { floor: view.floor, x: Math.floor(point.x), y: Math.floor(point.y) };
         view = clampView(blend.minimap >= 0.5 ? { ...view, x: point.x, y: point.y, selected: target } : { ...view, selected: target });
+        viewEpoch += 1;
         selected = view.selected ? { x: view.selected.x, y: view.selected.y } : null;
         syncViewUi();
         renderInspector();
@@ -909,7 +920,7 @@ function wireInteraction() {
     if (shouldRefresh) scheduleRefresh(0);
   });
   canvas.addEventListener('pointercancel', () => { dragging = null; canvas.classList.remove('dragging'); });
-  window.addEventListener('resize', () => { scheduleRender('resize'); scheduleRefresh(100); if (view?.animation === 'on') drawWorldAnimation(animationLogicalMs).catch(failClosed); });
+  window.addEventListener('resize', () => { viewEpoch += 1; scheduleRender('resize'); scheduleRefresh(100); if (view?.animation === 'on') drawWorldAnimation(animationLogicalMs).catch(failClosed); });
   document.addEventListener('visibilitychange', syncAnimationLoop);
 }
 
@@ -960,6 +971,7 @@ async function boot() {
   view = parseFullWorldViewState(location.search, runtimeWorld);
   if (!animationRuntime && view.animation === 'on') view = Object.freeze({ ...view, animation: 'off' });
   view = await chooseInitialPublishedView(view);
+  viewEpoch += 1;
   selected = view.selected ? { x: view.selected.x, y: view.selected.y } : null;
   const semanticBase = new URL('./', new URL(publication.semantic.path, publicationBase));
   persistentCache = new VerifiedContentCache({ enabled: true, maxEntryBytes: 96 * 1024 * 1024 });

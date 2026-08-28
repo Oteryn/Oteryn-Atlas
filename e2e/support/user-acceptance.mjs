@@ -85,6 +85,17 @@ export async function assertUserVisibleSurface(page, {
   return Object.freeze(metrics);
 }
 
+export async function waitForCurrentDetailScene(page) {
+  await page.waitForFunction(() => {
+    const presentation = globalThis.__OTERYN_ATLAS_EFFECTIVE_PRESENTATION__;
+    return presentation?.representation === 'detail'
+      && presentation.detailReady === true
+      && Number.isSafeInteger(presentation.viewEpoch)
+      && presentation.detailSceneViewEpoch === presentation.viewEpoch;
+  }, null, { timeout: 60_000 });
+  return page.evaluate(() => globalThis.__OTERYN_ATLAS_EFFECTIVE_PRESENTATION__);
+}
+
 async function runtimeSnapshot(page) {
   return page.evaluate(() => {
     const view = globalThis.__OTERYN_ATLAS_VIEW__;

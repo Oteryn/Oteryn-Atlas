@@ -110,3 +110,35 @@ test('visual user acceptance contract enumerates complete primary user-facing st
   assert.match(gameplayRealDesktop, /235 gold/);
   assert.match(gameplayRealDesktop, /80 gold/);
 });
+
+test('coordinate-pan evidence waits for the current detail scene rather than a stale render', async () => {
+  const app = await read('web/fullworld-app.mjs');
+  const helper = await read('e2e/support/user-acceptance.mjs');
+  const audit = await read('e2e/tests/audit-desktop.spec.mjs');
+  const coordinatePan = audit.slice(audit.indexOf("test('audit coordinate Go, wheel zoom and drag pan'"));
+
+  assert.match(app, /let viewEpoch = 0;/);
+  assert.match(app, /let detailSceneViewEpoch = null;/);
+  assert.match(app, /function refreshIsCurrent\(epoch, floor, expectedViewEpoch\)/);
+  assert.match(app, /viewEpoch === expectedViewEpoch/);
+  assert.match(app, /const viewEpochAtStart = viewEpoch;/);
+  assert.match(app, /detailSceneViewEpoch = viewEpochAtStart;\s*publishView\(\);/);
+  assert.match(applyViewSource(app), /viewEpoch \+= 1;/);
+  assert.match(wireInteractionSource(app), /view = clampView\(\{ \.\.\.view, x: dragging\.startX[\s\S]*?viewEpoch \+= 1;[\s\S]*?scheduleRefresh\(140\);/);
+  assert.match(wireInteractionSource(app), /window\.addEventListener\('resize', \(\) => \{ viewEpoch \+= 1; scheduleRender\('resize'\); scheduleRefresh\(100\);/);
+  assert.match(helper, /export async function waitForCurrentDetailScene/);
+  assert.match(helper, /detailSceneViewEpoch === presentation\.viewEpoch/);
+  assert.match(coordinatePan, /await waitForCurrentDetailScene\(page\);[\s\S]*?captureUserVisualEvidence\(page, testInfo, 'desktop\.coordinate-pan'/);
+});
+
+function applyViewSource(source) {
+  const start = source.indexOf('function applyView(');
+  const end = source.indexOf('\nfunction wireInteraction()', start);
+  return source.slice(start, end);
+}
+
+function wireInteractionSource(source) {
+  const start = source.indexOf('function wireInteraction()');
+  const end = source.indexOf('\nasync function chooseInitialPublishedView()', start);
+  return source.slice(start, end);
+}
