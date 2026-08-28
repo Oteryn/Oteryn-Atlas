@@ -31,7 +31,7 @@ test('protected execution promotion qualification is GitHub-hosted, exact-head, 
   assert.match(workflow, /tests\/verification\/protected-hosted-product-identities\.test\.mjs/);
   assert.match(workflow, /protected-hosted-product-identities\.json/);
   assert.match(workflow, /Prove qualification promotion binds protected product identity/);
-  assert.match(workflow, /trusted-base\/tools\/verification\/protected-hosted-product-identities\.json/);
+  assert.match(workflow, /\/trusted\/tools\/verification\/protected-hosted-product-identities\.json/);
   assert.match(workflow, /qualification promotion digest does not match protected product registry/);
   assert.match(workflow, /buildBoundedRealWorld/);
   assert.match(workflow, /expectedProductDigest/);
