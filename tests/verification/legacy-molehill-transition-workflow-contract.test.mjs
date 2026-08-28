@@ -39,6 +39,14 @@ test('PowerShell PR-head fences write JSON as UTF-8 without BOM before Node pars
   assert.doesNotMatch(workflow, /gh api[^\r\n]*>\s*artifacts-current-pr(?:-after)?\.json/);
 });
 
+test('PowerShell transition planner writes its plan JSON as UTF-8 without BOM', () => {
+  const workflow = fs.readFileSync(workflowPath, 'utf8');
+
+  assert.match(workflow, /\$planOutput = @\(\s*& node \.\.\\trusted-base\\tools\\verification\\build-verification-plan\.mjs/s);
+  assert.match(workflow, /\[IO\.File\]::WriteAllText\(\s*\$planPath,\s*\(\(\$planOutput -join "`n"\) \+ "`n"\),\s*\[Text\.UTF8Encoding\]::new\(\$false\)\s*\)/s);
+  assert.doesNotMatch(workflow, /--stable-test-ids artifacts\/verification\/stable-test-ids\.json\s*`?\s*> artifacts\/verification\/pr-verification-plan\.json/);
+});
+
 test('PowerShell transition steps never embed Bash heredoc redirection', () => {
   const workflow = fs.readFileSync(workflowPath, 'utf8');
   assert.doesNotMatch(workflow, /<<\s*['"]?[A-Za-z_][A-Za-z0-9_]*['"]?/, 'PowerShell cannot parse Bash heredoc redirection');

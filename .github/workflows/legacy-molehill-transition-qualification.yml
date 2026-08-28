@@ -155,19 +155,27 @@ jobs:
           $changedFilesExitCode = $LASTEXITCODE
           Remove-Item -LiteralPath $changedFilesScriptPath -Force -ErrorAction SilentlyContinue
           if ($changedFilesExitCode -ne 0) { throw 'Changed-file evidence generation failed.' }
-          node ..\trusted-base\tools\verification\build-verification-plan.mjs `
-            --changed-files artifacts/verification/changed-files.json `
-            --trusted-impact ..\trusted-base\tools\verification\impact-manifest.json `
-            --candidate-impact tools/verification/impact-manifest.json `
-            --trusted-catalog ..\trusted-base\tools\verification\verification-catalog.json `
-            --candidate-catalog tools/verification/verification-catalog.json `
-            --repository $env:GITHUB_REPOSITORY `
-            --head-sha $env:ATLAS_CODE_REVISION `
-            --integration-base-sha $env:ATLAS_BASE_SHA `
-            --merge-base-sha $mergeBase `
-            --stable-test-ids artifacts/verification/stable-test-ids.json `
-            > artifacts/verification/pr-verification-plan.json
-          if ($LASTEXITCODE -ne 0) { throw 'Protected lower-bound plan construction failed.' }
+          $planOutput = @(
+            & node ..\trusted-base\tools\verification\build-verification-plan.mjs `
+              --changed-files artifacts/verification/changed-files.json `
+              --trusted-impact ..\trusted-base\tools\verification\impact-manifest.json `
+              --candidate-impact tools/verification/impact-manifest.json `
+              --trusted-catalog ..\trusted-base\tools\verification\verification-catalog.json `
+              --candidate-catalog tools/verification/verification-catalog.json `
+              --repository $env:GITHUB_REPOSITORY `
+              --head-sha $env:ATLAS_CODE_REVISION `
+              --integration-base-sha $env:ATLAS_BASE_SHA `
+              --merge-base-sha $mergeBase `
+              --stable-test-ids artifacts/verification/stable-test-ids.json
+          )
+          $planExitCode = $LASTEXITCODE
+          if ($planExitCode -ne 0) { throw 'Protected lower-bound plan construction failed.' }
+          $planPath = Join-Path $PWD 'artifacts/verification/pr-verification-plan.json'
+          [IO.File]::WriteAllText(
+            $planPath,
+            (($planOutput -join "`n") + "`n"),
+            [Text.UTF8Encoding]::new($false)
+          )
 
       - name: Capture exact-head legacy transition qualification
         shell: powershell
