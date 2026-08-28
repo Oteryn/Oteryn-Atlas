@@ -66,7 +66,9 @@ test('protected hosted web bootstrap injects immutable qualification trust befor
   assert.match(override, /__OTERYN_ATLAS_QUALIFICATION_TRUST__/);
   assert.match(override, /Object\.defineProperty\(globalThis, '__OTERYN_ATLAS_QUALIFICATION_TRUST__'/);
   assert.match(override, /const serialized = JSON\.stringify\(descriptor\)/);
-  assert.match(override, /Object\.freeze\(\$\{serialized\}\)/);
+  assert.match(override, /Object\.freeze\(\$\$\{serialized\}\)/);
+  assert.match(override, /qualification trust \$\$\{field\} is invalid/);
+  assert.match(override, /\$\$\{head\}\\n  \$\$\{bootstrap\}/);
   assert.match(override, /writable: false, configurable: false, enumerable: false/);
   assert.match(override, /const head = '<head>'/);
   assert.match(override, /source\.indexOf\('<script'\)/);
