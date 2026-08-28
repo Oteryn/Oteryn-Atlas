@@ -92,9 +92,9 @@ test('visual user acceptance contract enumerates complete primary user-facing st
   const audit = await read('e2e/tests/audit-desktop.spec.mjs');
   const degraded = await read('e2e/tests/degraded-search-desktop.spec.mjs');
   const resilience = await read('e2e/tests/resilience-desktop.spec.mjs');
-  const gameplayDesktop = await read('e2e/tests/creature-gameplay-desktop.spec.mjs');
-  const gameplayMobile = await read('e2e/tests/creature-gameplay-mobile.spec.mjs');
-  const gameplayRealDesktop = await read('e2e/tests/creature-gameplay-real-desktop.spec.mjs');
+  const gameplayDesktop = await read('e2e/tests/creature-gameplay-fixture-desktop.spec.mjs');
+  const gameplayMobile = await read('e2e/tests/creature-gameplay-fixture-mobile.spec.mjs');
+  const gameplayRealDesktop = await read('e2e/tests/creature-gameplay-desktop.spec.mjs');
   for (const id of ['desktop.minimap', 'desktop.classic', 'desktop.floor-mode', 'desktop.coordinate-pan']) {
     assert.ok(audit.includes(id), `visual audit must cover ${id}`);
   }

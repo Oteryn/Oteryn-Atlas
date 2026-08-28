@@ -67,8 +67,8 @@
         "e2e/tests/accessibility-mobile.spec.mjs",
         "e2e/tests/audit-desktop.spec.mjs",
         "e2e/tests/audit-mobile.spec.mjs",
-        "e2e/tests/creature-gameplay-desktop.spec.mjs",
-        "e2e/tests/creature-gameplay-mobile.spec.mjs",
+        "e2e/tests/creature-gameplay-fixture-desktop.spec.mjs",
+        "e2e/tests/creature-gameplay-fixture-mobile.spec.mjs",
         "e2e/tests/creature-interaction-desktop.spec.mjs",
         "e2e/tests/creature-interaction-mobile.spec.mjs",
         "e2e/tests/creature-presentation-desktop.spec.mjs",
@@ -134,10 +134,13 @@
     },
     "integration.source-contract": {
       "specs": [
-        "e2e/tests/api-contract-desktop.spec.mjs"
+        "e2e/tests/api-contract-desktop.spec.mjs",
+        "e2e/tests/creature-gameplay-desktop.spec.mjs",
+        "e2e/tests/creature-gameplay-mobile.spec.mjs"
       ],
       "projects": [
-        "desktop-chromium"
+        "desktop-chromium",
+        "mobile-chromium"
       ],
       "resourceClass": "browser-targeted",
       "evidence": "machine-summary",
@@ -169,25 +172,6 @@
         "dataCapability": "bounded_real_world",
         "visualReview": true,
         "specialistReason": "private-visual"
-      },
-      "fullSafetyNet": false
-    },
-    "integration.creature-gameplay": {
-      "specs": [
-        "e2e/tests/creature-gameplay-real-desktop.spec.mjs"
-      ],
-      "projects": [
-        "desktop-chromium"
-      ],
-      "resourceClass": "browser-targeted",
-      "evidence": "machine-summary",
-      "capabilities": {
-        "browser": true,
-        "hosted": true,
-        "requiresPublication": true,
-        "dataCapability": "bounded_real_world",
-        "visualReview": false,
-        "specialistReason": null
       },
       "fullSafetyNet": false
     }

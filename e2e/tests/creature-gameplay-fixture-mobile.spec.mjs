@@ -2,24 +2,18 @@ import { expect, test } from '@playwright/test';
 import { assertNoRuntimeFailures, captureRuntimeFailures, gotoAtlas, waitForAtlas } from './runtime.mjs';
 import { assertUserVisibleSurface, captureUserVisualEvidence } from '../support/user-acceptance.mjs';
 
-const SAM = Object.freeze({ entityId: 'npc-entity:f8d4f0200616061ffa4ae0b4c38c6d3e', label: 'Sam' });
-const RAT = Object.freeze({ entityId: 'monster-entity:80295e51265b3662bfbea2ea01ee3ccb', label: 'Rat' });
+async function discoverByKind(request, kind) {
+  const response = await request.get('/data/creatures/search.json');
+  expect(response.ok(), `creature search HTTP ${response.status()}`).toBeTruthy();
+  const product = await response.json();
+  const record = product.records.find((row) => row.kind === kind && typeof row.entity_id === 'string' && row.entity_id.length > 0) ?? null;
+  expect(record, `missing ${kind} fixture with entity identity`).not.toBeNull();
+  return record;
+}
 
 async function creatureState(page) {
   await page.waitForFunction(() => ['PASS', 'FAIL'].includes(globalThis.__OTERYN_ATLAS_CREATURES__?.status), null, { timeout: 30_000 });
   return page.evaluate(() => globalThis.__OTERYN_ATLAS_CREATURES__);
-}
-
-async function discoverByEntity(page, fixture) {
-  const record = await page.evaluate(async (entityId) => {
-    const response = await fetch('/data/creatures/search.json', { cache: 'no-store' });
-    if (!response.ok) throw new Error(`creature search HTTP ${response.status}`);
-    const product = await response.json();
-    return product.records.find((row) => row.entity_id === entityId) ?? null;
-  }, fixture.entityId);
-  expect(record, `missing exact fixture ${fixture.label}`).not.toBeNull();
-  expect(record.label).toBe(fixture.label);
-  return record;
 }
 
 function targetEntry(record) {
@@ -29,6 +23,7 @@ function targetEntry(record) {
   });
   return `/web/fullworld.html?${params.toString()}`;
 }
+
 async function tapCommittedTarget(page, record) {
   const state = await creatureState(page);
   expect(state.cardRecordId).toBe(record.record_id);
@@ -47,24 +42,19 @@ async function tapCommittedTarget(page, record) {
   await expect(page.locator('#creature-quick-card')).toBeVisible();
 }
 
-async function openFixture(page, fixture) {
-  await gotoAtlas(page, '/web/fullworld.html?x=32369&y=32241&floor=-7&zoom=2&mode=map&creatures=npc,monster');
-  await waitForAtlas(page);
-  const record = await discoverByEntity(page, fixture);
+async function openFixtureRecord(page, request, kind) {
+  const record = await discoverByKind(request, kind);
   await gotoAtlas(page, targetEntry(record));
   await waitForAtlas(page);
   await tapCommittedTarget(page, record);
   return record;
 }
 
-test('mobile Sam direct tap reaches readable Gameplay trade data and tabs', async ({ page }, testInfo) => {
+test('mobile fixture NPC tap reaches Gameplay shell with touch-sized tabs', async ({ page, request }, testInfo) => {
   const runtime = captureRuntimeFailures(page);
-  await openFixture(page, SAM);
-  await expect(page.locator('#creature-card-body')).toContainText('Shop · 71 sells · 67 buys');
+  const record = await openFixtureRecord(page, request, 'npc');
   await page.locator('#creature-card-details').tap();
   await expect(page.locator('#mobile-inspector-panel')).toHaveClass(/mobile-open/);
-  await expect(page.locator('#gameplay-section-sells')).toContainText('20 gold');
-  await expect(page.locator('#gameplay-section-buys')).toContainText('7 gold');
   const gameplayTab = page.locator('#inspector-tab-gameplay');
   const semanticTab = page.locator('#inspector-tab-semantic');
   const liveTab = page.locator('#inspector-tab-live');
@@ -74,41 +64,34 @@ test('mobile Sam direct tap reaches readable Gameplay trade data and tabs', asyn
     expect(box.height).toBeGreaterThanOrEqual(44);
   }
   await semanticTab.tap();
-  await expect(page.locator('#creature-inspector')).toContainText(`Entity: ${SAM.entityId}`);
+  await expect(page.locator('#creature-inspector')).toContainText(`Record: ${record.record_id}`);
+  await expect(page.locator('#creature-inspector')).toContainText(`Entity: ${record.entity_id}`);
   await gameplayTab.tap();
-  await expect(page.locator('#gameplay-section-sells')).toContainText('20 gold');
+  await expect(gameplayTab).toHaveAttribute('aria-selected', 'true');
   await expect(liveTab).toBeDisabled();
-  await page.locator('.creature-gameplay-search').fill('battle axe');
-  await expect(page.locator('#gameplay-section-sells')).toContainText('235 gold');
-  await expect(page.locator('#gameplay-section-buys')).toContainText('80 gold');
   const gameplayMetrics = await assertUserVisibleSurface(page, {
-    label: 'Mobile creature Gameplay inspector',
+    label: 'Mobile fixture Gameplay inspector',
     elements: [
       { selector: '#mobile-inspector-panel', label: 'Gameplay inspector' },
       { selector: '#inspector-tab-gameplay', label: 'Gameplay tab', interactive: true, minWidth: 44, minHeight: 44 },
-      { selector: '#gameplay-section-sells', label: 'Sells section' },
-      { selector: '#gameplay-section-buys', label: 'Buys section' },
+      { selector: '#inspector-tab-semantic', label: 'Semantic tab', interactive: true, minWidth: 44, minHeight: 44 },
     ],
   });
   await captureUserVisualEvidence(page, testInfo, 'mobile.creature-gameplay', {
     surfaceMetrics: gameplayMetrics,
-    note: 'Mobile verified Sam Gameplay drawer with readable trade data and touch-sized tabs.',
+    note: 'Mobile fixture-backed Gameplay drawer with touch-sized tab navigation.',
   });
   assertNoRuntimeFailures(runtime);
 });
 
-test('mobile Rat direct tap renders exact loot stats and keeps topmost Escape behavior', async ({ page }) => {
+test('mobile fixture monster tap keeps topmost Escape behavior', async ({ page, request }) => {
   const runtime = captureRuntimeFailures(page);
-  await openFixture(page, RAT);
+  await openFixtureRecord(page, request, 'monster');
   const card = page.locator('#creature-quick-card');
   const details = page.locator('#creature-card-details');
   await expect(card).toBeVisible();
   await details.tap();
   await expect(page.locator('#mobile-inspector-panel')).toHaveClass(/mobile-open/);
-  await expect(page.locator('#gameplay-section-loot')).toContainText('gold coin');
-  await expect(page.locator('#gameplay-section-loot')).toContainText('100%');
-  await expect(page.locator('#gameplay-section-stats')).toContainText(/Health\s*20/);
-  await expect(page.locator('#gameplay-section-stats')).toContainText(/Experience\s*5/);
   await page.keyboard.press('Escape');
   await expect(page.locator('#mobile-inspector-panel')).not.toHaveClass(/mobile-open/);
   await expect(card).toBeVisible();

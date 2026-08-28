@@ -15,7 +15,7 @@ const productDigest = `sha256:${'3'.repeat(64)}`;
 const workerDigest = `sha256:${'4'.repeat(64)}`;
 const executionDigest = `sha256:${'5'.repeat(64)}`;
 const hostedId = 'desktop-chromium::e2e/tests/desktop.spec.mjs::hosted';
-const boundedHostedId = 'desktop-chromium::e2e/tests/creature-gameplay-real-desktop.spec.mjs::bounded real';
+const boundedHostedId = 'desktop-chromium::e2e/tests/creature-gameplay-desktop.spec.mjs::bounded real';
 const candidateAdditionalId = 'desktop-chromium::e2e/tests/desktop.spec.mjs::candidate addition';
 const specialistId = 'desktop-chromium::e2e/tests/fullworld-animation-census-desktop.spec.mjs::specialist';
 
@@ -47,8 +47,8 @@ function hostedGroup() {
 
 function boundedHostedGroup() {
   return {
-    id: 'integration.creature-gameplay',
-    specs: ['e2e/tests/creature-gameplay-real-desktop.spec.mjs'],
+    id: 'integration.source-contract',
+    specs: ['e2e/tests/creature-gameplay-desktop.spec.mjs'],
     projects: ['desktop-chromium'],
     stableTestIds: [],
     capabilities: capabilities({ dataCapability: 'bounded_real_world' }),
@@ -135,7 +135,7 @@ test('executor rejects a stale PR head before execution', () => {
 
 test('hosted execution partitions exact stable IDs by data capability', () => {
   const result = buildProtectedHostedExecutionContract(plan({
-    requiredGroupIds: ['e2e.full', 'integration.creature-gameplay'],
+    requiredGroupIds: ['e2e.full', 'integration.source-contract'],
     groups: [hostedGroup(), boundedHostedGroup()],
     stableTestIds: [hostedId, boundedHostedId],
     requiredDataCapabilities: ['bounded_real_world', 'qualification_fixture'],
@@ -144,7 +144,7 @@ test('hosted execution partitions exact stable IDs by data capability', () => {
   assert.deepEqual(result.hosted.partitions, [
     {
       dataCapability: 'bounded_real_world',
-      groupIds: ['integration.creature-gameplay'],
+      groupIds: ['integration.source-contract'],
       stableTestIds: [boundedHostedId],
       protectedStableTestIds: [boundedHostedId],
       candidateAdditionalStableTestIds: [],

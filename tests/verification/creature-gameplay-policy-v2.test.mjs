@@ -17,9 +17,10 @@ function planFor(path) {
   });
 }
 
-test('creature gameplay runtime selects bounded real-world compatibility without FullWorld', () => {
+test('creature gameplay runtime preserves legacy bounded real-world stable IDs without FullWorld', () => {
   const plan = planFor('src/browser/creature-gameplay-model.mjs');
-  assert.ok(plan.requiredGroupIds.includes('integration.creature-gameplay'));
+  assert.ok(plan.requiredGroupIds.includes('integration.source-contract'));
+  assert.ok(plan.requiredGroupIds.includes('e2e.full'));
   assert.ok(plan.requiredDataCapabilities.includes('bounded_real_world'));
   assert.equal(plan.requiresRealFullWorld, false);
 });

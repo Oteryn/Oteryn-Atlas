@@ -66,10 +66,12 @@ test('bounded source contracts and complete FullWorld census remain isolated aft
 
   assert.deepEqual(bounded.map((entry) => entry.spec), [
     'e2e/tests/api-contract-desktop.spec.mjs',
-    'e2e/tests/creature-gameplay-real-desktop.spec.mjs',
+    'e2e/tests/creature-gameplay-desktop.spec.mjs',
+    'e2e/tests/creature-gameplay-mobile.spec.mjs',
   ]);
   assert.match(bounded[0].rationale, /source authority|contract_id/i);
   assert.match(bounded[1].rationale, /Game-owned|bounded canonical real/i);
+  assert.match(bounded[2].rationale, /Game-owned|bounded canonical real/i);
   assert.deepEqual(full.map((entry) => entry.spec), ['e2e/tests/fullworld-animation-census-desktop.spec.mjs']);
   assert.match(full[0].rationale, /complete published animation|production-wide coverage/i);
   assert.deepEqual(inventory.specs.filter((entry) => entry.splitRequired).map((entry) => entry.spec), [],

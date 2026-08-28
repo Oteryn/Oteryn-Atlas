@@ -244,7 +244,8 @@
       "minimumProfile": "targeted",
       "requiredGroups": [
         "deterministic.core",
-        "integration.creature-gameplay"
+        "e2e.full",
+        "integration.source-contract"
       ]
     },
     {
@@ -255,7 +256,8 @@
       "minimumProfile": "targeted",
       "requiredGroups": [
         "deterministic.core",
-        "integration.creature-gameplay"
+        "e2e.full",
+        "integration.source-contract"
       ]
     },
     {
@@ -266,7 +268,8 @@
       "minimumProfile": "targeted",
       "requiredGroups": [
         "deterministic.core",
-        "integration.creature-gameplay"
+        "e2e.full",
+        "integration.source-contract"
       ]
     },
     {
@@ -277,11 +280,12 @@
       "minimumProfile": "targeted",
       "requiredGroups": [
         "deterministic.core",
-        "integration.creature-gameplay"
+        "e2e.full",
+        "integration.source-contract"
       ]
     },
     {
-      "pathPrefix": "e2e/tests/creature-gameplay-",
+      "pathPrefix": "e2e/tests/creature-gameplay-desktop.spec.mjs",
       "domains": [
         "creature-gameplay-source",
         "verification-governance"
@@ -290,7 +294,20 @@
       "requiredGroups": [
         "deterministic.core",
         "e2e.full",
-        "integration.creature-gameplay"
+        "integration.source-contract"
+      ]
+    },
+    {
+      "pathPrefix": "e2e/tests/creature-gameplay-mobile.spec.mjs",
+      "domains": [
+        "creature-gameplay-source",
+        "verification-governance"
+      ],
+      "minimumProfile": "full",
+      "requiredGroups": [
+        "deterministic.core",
+        "e2e.full",
+        "integration.source-contract"
       ]
     }
   ],
