@@ -48,7 +48,7 @@ const PROTECTED_PROMOTION_QUALIFICATIONS = freeze({
       'tests/verification/qualification-world.test.mjs',
       'tools/verification/qualification-world.mjs',
     ],
-    expectedProductDigest: 'sha256:f53fb9c6bd0b32618a44a48b7e27d21c26ee170443764deb115224042afa996e',
+    expectedProductDigest: 'sha256:f53f1dcb8961c42e82191644b7628cfb4f30641344c8876f4178d37a94dd4cd5',
   },
 });
 

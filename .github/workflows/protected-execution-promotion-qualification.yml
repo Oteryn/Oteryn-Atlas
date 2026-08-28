@@ -81,6 +81,36 @@ jobs:
           test "$(git -C candidate rev-parse HEAD)" = "$ATLAS_CODE_REVISION"
           test "$(git -C trusted-base rev-parse HEAD)" = "$ATLAS_BASE_SHA"
 
+      - name: Prove qualification promotion binds protected product identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          proof="$RUNNER_TEMP/atlas-qualification-promotion-binding-proof.mjs"
+          cat > "$proof" <<'NODE'
+          import fs from 'node:fs';
+          import { resolveProtectedPromotionQualification } from '/candidate/tools/verification/protected-hosted-execution.mjs';
+          const registry = JSON.parse(fs.readFileSync('/trusted/tools/verification/protected-hosted-product-identities.json', 'utf8'));
+          const qualification = resolveProtectedPromotionQualification('fix/issue-179-qualification-trust-descriptor');
+          if (qualification.expectedProductDigest !== registry.qualification_fixture?.digest) {
+            throw new TypeError('qualification promotion digest does not match protected product registry');
+          }
+          NODE
+          timeout --signal=KILL 120s docker run --rm \
+            --network none \
+            --read-only \
+            --cap-drop ALL \
+            --security-opt no-new-privileges \
+            --pids-limit 192 \
+            --memory 768m \
+            --cpus 2 \
+            --user 1000:1000 \
+            --tmpfs /tmp:rw,nosuid,nodev,size=64m \
+            --mount "type=bind,src=$PWD/trusted-base,dst=/trusted,readonly" \
+            --mount "type=bind,src=$PWD/candidate,dst=/candidate,readonly" \
+            --mount "type=bind,src=$proof,dst=/proof.mjs,readonly" \
+            "$ATLAS_CANDIDATE_IMAGE" \
+            node /proof.mjs
+
       - name: Prove protected hosted execution contract without browser execution
         shell: bash
         run: |
