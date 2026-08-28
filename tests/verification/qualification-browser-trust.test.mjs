@@ -3,11 +3,41 @@ import fs from 'node:fs';
 import test from 'node:test';
 
 import { PRODUCTION_FULLWORLD_TRUST, resolveFullWorldTrust } from '../../src/browser/fullworld-trust.mjs';
-import { gotoAtlas } from '../../e2e/tests/runtime.mjs';
 
 const trustSource = fs.readFileSync(new URL('../../src/browser/fullworld-trust.mjs', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
 const runtime = fs.readFileSync(new URL('../../e2e/tests/runtime.mjs', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
 const root = (char) => `sha256:${char.repeat(64)}`;
+const PLAYWRIGHT_EXPECT_IMPORT = "import { expect } from '@playwright/test';";
+const QUALIFICATION_NAVIGATION_IMPORT = "import { resolveQualificationEntry } from './qualification-navigation.mjs';";
+
+function replaceExactlyOnce(source, expected, replacement) {
+  const first = source.indexOf(expected);
+  assert.notEqual(first, -1, `expected runtime import is missing: ${expected}`);
+  assert.equal(source.indexOf(expected, first + expected.length), -1, `runtime import is ambiguous: ${expected}`);
+  return `${source.slice(0, first)}${replacement}${source.slice(first + expected.length)}`;
+}
+
+async function loadGotoAtlasForContract() {
+  const qualificationNavigationUrl = new URL('../../e2e/tests/qualification-navigation.mjs', import.meta.url);
+  assert.equal(qualificationNavigationUrl.protocol, 'file:');
+  const expectShim = [
+    "import assert from 'node:assert/strict';",
+    'const expect = (actual, message) => ({',
+    '  not: { toBeNull: () => assert.notEqual(actual, null, message) },',
+    '  toBeTruthy: () => assert.equal(Boolean(actual), true, message),',
+    '  toBe: (expected) => assert.equal(actual, expected, message),',
+    '});',
+  ].join('\n');
+  let source = replaceExactlyOnce(runtime, PLAYWRIGHT_EXPECT_IMPORT, expectShim);
+  source = replaceExactlyOnce(
+    source,
+    QUALIFICATION_NAVIGATION_IMPORT,
+    `import { resolveQualificationEntry } from ${JSON.stringify(qualificationNavigationUrl.href)};`,
+  );
+  const moduleUrl = `data:text/javascript;base64,${Buffer.from(source, 'utf8').toString('base64')}`;
+  return (await import(moduleUrl)).gotoAtlas;
+}
+
 const descriptor = Object.freeze({
   marker: 'oteryn-atlas-qualification-trust-v1',
   fixtureId: 'atlas-qualification-world-v2',
@@ -83,6 +113,7 @@ test('Playwright resolves qualification navigation before the only Atlas navigat
   };
   process.env.ATLAS_QUALIFICATION_TRUST_JSON = JSON.stringify(descriptor);
   try {
+    const gotoAtlas = await loadGotoAtlasForContract();
     await gotoAtlas(page, '/web/fullworld.html?x=1&y=2&floor=0&zoom=2&mode=map');
     assert.deepEqual(navigations, [[
       '/web/fullworld.html?x=101&y=202&floor=-3&zoom=2&mode=map',
