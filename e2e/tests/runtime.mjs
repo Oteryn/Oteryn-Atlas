@@ -1,5 +1,7 @@
 import { expect } from '@playwright/test';
 
+import { resolveQualificationEntry } from './qualification-navigation.mjs';
+
 export const DESKTOP_ENTRY = '/web/fullworld.html?x=32369&y=32241&floor=-7&zoom=2&mode=map';
 export const MOBILE_ENTRY = '/web/fullworld.html?x=32369&y=32241&floor=-7&zoom=0.25&mode=auto';
 
@@ -65,8 +67,18 @@ export function captureRuntimeFailures(page) {
   return state;
 }
 
+async function readQualificationSemanticIndex(page) {
+  const response = await page.request.get('/web/semantic-search/index.json');
+  expect(response.ok(), `Qualification semantic index returned HTTP ${response.status()}`).toBeTruthy();
+  return response.json();
+}
+
 export async function gotoAtlas(page, entry) {
-  const response = await page.goto(entry, { waitUntil: 'domcontentloaded' });
+  const resolvedEntry = await resolveQualificationEntry(entry, {
+    qualificationTrustJson: process.env.ATLAS_QUALIFICATION_TRUST_JSON,
+    readSemanticIndex: () => readQualificationSemanticIndex(page),
+  });
+  const response = await page.goto(resolvedEntry, { waitUntil: 'domcontentloaded' });
   expect(response, 'Atlas navigation did not produce an HTTP response').not.toBeNull();
   expect(response.ok(), `Atlas entry returned HTTP ${response.status()}`).toBeTruthy();
   const expectedRevision = process.env.ATLAS_EXPECTED_REVISION?.trim();
