@@ -84,6 +84,7 @@ test('nonmatching qualification routes remain byte-for-byte caller-owned without
     '/web/fullworld.html?x=100&y=200&floor=7&mode=map',
     '/web/fullworld.html?x=&y=32241&floor=-7',
     '/web/not-fullworld.html?x=32369&y=32241&floor=-7',
+    'http://[',
   ];
   let reads = 0;
   for (const input of inputs) {
