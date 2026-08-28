@@ -28,6 +28,7 @@ test('production FullWorld trust remains the exact default without an override',
   assert.match(PRODUCTION_FULLWORLD_TRUST.gameSha, /^[0-9a-f]{40}$/);
   assert.match(PRODUCTION_FULLWORLD_TRUST.minimapRoot, /^sha256:[0-9a-f]{64}$/);
 });
+
 test('qualification override is explicit, immutable and retains every fixture identity root', () => {
   const resolved = resolveFullWorldTrust({ __OTERYN_ATLAS_QUALIFICATION_TRUST__: descriptor });
   assert.equal(resolved.gameSha, 'fixture');
@@ -54,11 +55,13 @@ test('qualification override fails closed instead of silently falling back to pr
   }
   assert.match(trustSource, /sha256:\[0-9a-f\]\{64\}/);
 });
-test('Playwright injects qualification trust before navigation only when explicitly configured', () => {
-  const init = runtime.indexOf('page.addInitScript');
+
+test('Playwright never predefines qualification trust after protected web bootstrap promotion', () => {
   const navigation = runtime.indexOf('page.goto');
-  assert(init >= 0, 'qualification trust init script is missing');
-  assert(navigation > init, 'qualification trust must be injected before page.goto');
-  assert.match(runtime, /ATLAS_QUALIFICATION_TRUST_JSON/);
-  assert.match(runtime, /__OTERYN_ATLAS_QUALIFICATION_TRUST__/);
+  assert(navigation >= 0, 'Atlas navigation is missing');
+  assert.doesNotMatch(runtime, /page\.addInitScript/);
+  assert.doesNotMatch(runtime, /qualificationTrustInstalledPages/);
+  assert.doesNotMatch(runtime, /installQualificationTrust/);
+  assert.doesNotMatch(runtime, /Object\.defineProperty\(globalThis,\s*['"]__OTERYN_ATLAS_QUALIFICATION_TRUST__/);
+  assert.doesNotMatch(runtime, /ATLAS_QUALIFICATION_TRUST_JSON/);
 });
