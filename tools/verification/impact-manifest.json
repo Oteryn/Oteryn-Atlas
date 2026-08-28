@@ -106,8 +106,7 @@
       "requiredGroups": [
         "deterministic.core",
         "e2e.common-smoke",
-        "e2e.creatures",
-        "visual.creatures"
+        "e2e.creatures"
       ]
     },
     {

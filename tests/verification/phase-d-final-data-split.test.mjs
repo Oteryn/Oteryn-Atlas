@@ -45,3 +45,25 @@ test('creature gameplay separates fixture UI behavior from bounded real Game fac
     'e2e/tests/creature-gameplay-mobile.spec.mjs',
   ]);
 });
+
+test('fixture visual specs have exactly one hosted catalog placement', () => {
+  const visualSpecs = [
+    'e2e/tests/visual-desktop.spec.mjs',
+    'e2e/tests/visual-mobile.spec.mjs',
+  ];
+  const creatureImpact = JSON.parse(fs.readFileSync(new URL('../../tools/verification/impact-manifest.json', import.meta.url), 'utf8'))
+    .entries.find((entry) => entry.pathPrefix === 'src/browser/creature-');
+
+  for (const spec of visualSpecs) {
+    assert.equal(bySpec.get(spec)?.dataCapability, 'qualification_fixture');
+    assert.deepEqual(
+      Object.entries(catalog.groups)
+        .filter(([, group]) => group.specs.includes(spec))
+        .map(([id]) => id),
+      ['e2e.full'],
+      `${spec} must have one hosted fixture placement`,
+    );
+  }
+  assert.ok(creatureImpact, 'creature impact policy is missing');
+  assert.ok(!creatureImpact.requiredGroups.includes('visual.creatures'));
+});

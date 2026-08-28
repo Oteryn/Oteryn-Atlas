@@ -153,27 +153,6 @@
         "specialistReason": null
       },
       "fullSafetyNet": false
-    },
-    "visual.creatures": {
-      "specs": [
-        "e2e/tests/visual-desktop.spec.mjs",
-        "e2e/tests/visual-mobile.spec.mjs"
-      ],
-      "projects": [
-        "desktop-chromium",
-        "mobile-chromium"
-      ],
-      "resourceClass": "browser-targeted",
-      "evidence": "restricted-visual-review",
-      "capabilities": {
-        "browser": true,
-        "hosted": false,
-        "requiresPublication": true,
-        "dataCapability": "bounded_real_world",
-        "visualReview": true,
-        "specialistReason": "private-visual"
-      },
-      "fullSafetyNet": false
     }
   }
 }
