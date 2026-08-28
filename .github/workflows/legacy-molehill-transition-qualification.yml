@@ -353,7 +353,7 @@ jobs:
             --mount "type=bind,src=$PWD/candidate,dst=/candidate,readonly" \
             --mount "type=bind,src=$PWD/trusted-base/e2e/node_modules,dst=/protected-e2e-node-modules/node_modules,readonly" \
             "$ATLAS_CANDIDATE_IMAGE" \
-            bash -lc 'cd /candidate && CI=1 /candidate/e2e/node_modules/.bin/playwright test --config=/candidate/e2e/playwright.config.mjs --list >/tmp/playwright-list.txt && test -s /tmp/playwright-list.txt'
+            bash -lc 'cd /candidate && CI=1 ATLAS_ARTIFACTS_DIR=/tmp/artifacts /candidate/e2e/node_modules/.bin/playwright test --config=/candidate/e2e/playwright.config.mjs --list >/tmp/playwright-list.txt && test -s /tmp/playwright-list.txt'
 
       - name: Fence exact head and publish one-time compatibility status
         shell: bash

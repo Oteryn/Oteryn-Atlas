@@ -136,7 +136,7 @@ jobs:
             --mount "type=bind,src=$candidate_dir,dst=/candidate,readonly" \
             --mount "type=bind,src=$PWD/e2e/node_modules,dst=/protected-e2e-node-modules/node_modules,readonly" \
             "$ATLAS_CANDIDATE_IMAGE" \
-            bash -lc 'cd /candidate && CI=1 /candidate/e2e/node_modules/.bin/playwright test --config=/candidate/e2e/playwright.config.mjs --list' \
+            bash -lc 'cd /candidate && CI=1 ATLAS_ARTIFACTS_DIR=/tmp/artifacts /candidate/e2e/node_modules/.bin/playwright test --config=/candidate/e2e/playwright.config.mjs --list' \
             > artifacts/protected-controller/candidate-playwright-test-list.txt
           node tools/verification/parse-playwright-test-list.mjs \
             artifacts/protected-controller/candidate-playwright-test-list.txt \

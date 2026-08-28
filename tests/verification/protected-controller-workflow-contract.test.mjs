@@ -69,6 +69,7 @@ test('PR 234 bootstrap publishes legacy compatibility only after a GitHub-hosted
   assert.match(bootstrap, /--cap-drop ALL/);
   assert.match(bootstrap, /no-new-privileges/);
   assert.match(bootstrap, /\/protected-e2e-node-modules\/node_modules/);
+  assert.match(bootstrap, /ATLAS_ARTIFACTS_DIR=\/tmp\/artifacts[^']*playwright test[^']*--list/);
   assert.match(bootstrap, /assert-current-pr-head\.mjs/);
   assert.match(bootstrap, /statuses:\s*write/);
   assert.match(bootstrap, /context='atlas-local-e2e'|context.*atlas-local-e2e/s);
