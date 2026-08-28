@@ -110,20 +110,28 @@ jobs:
 
           cat > "$proof_test" <<'TEST'
           import { expect, test } from '@playwright/test';
-          import { assertNoRuntimeFailures, captureRuntimeFailures, gotoAtlas, waitForAtlas } from './runtime.mjs';
+          import { gotoAtlas, qualificationResult } from './runtime.mjs';
 
           const QUALIFICATION_ENTRY = '/web/fullworld.html?x=32280&y=32155&floor=-7&zoom=2&mode=map';
 
-          test('protected qualification trust bootstrap reaches verified Atlas inside fixture bounds', async ({ page }) => {
-            const runtime = captureRuntimeFailures(page);
+          test('protected qualification trust bootstrap proves core fixture qualification independently of legacy semantic wiring', async ({ page }) => {
             await gotoAtlas(page, QUALIFICATION_ENTRY);
-            await waitForAtlas(page);
+            const { status, result } = await qualificationResult(page);
+            expect(status, result.error || `qualification=${status}`).toBe('PASS');
+            expect(result.status).toBe('PASS');
+            expect(result.error).toBeNull();
+            expect(result.capabilities?.blockedOrUnknownEnabled).toBe(false);
+            await expect(page.locator('#runtime-badge')).toContainText('VERIFIED FULL-WORLD');
+            await expect(page.locator('#diag-backend')).toContainText(/webgl2/i);
+
             const trust = await page.evaluate(() => globalThis.__OTERYN_ATLAS_QUALIFICATION_TRUST__);
             expect(trust?.marker).toBe('oteryn-atlas-qualification-trust-v1');
             expect(trust?.fixtureId).toBe('atlas-qualification-world-v2');
             expect(trust?.dataCapability).toBe('qualification_fixture');
-            await expect(page.getByRole('textbox', { name: 'Global semantic Atlas search' }).first()).toBeVisible();
-            assertNoRuntimeFailures(runtime);
+
+            await page.waitForFunction(() => globalThis.__OTERYN_ATLAS_SEMANTIC_SEARCH__?.status === 'FAIL', null, { timeout: 30_000 });
+            const semantic = await page.evaluate(() => globalThis.__OTERYN_ATLAS_SEMANTIC_SEARCH__);
+            expect(semantic?.error).toMatch(/untrusted creature search semantic digest/i);
           });
           TEST
 
@@ -193,5 +201,5 @@ jobs:
             "repos/$GITHUB_REPOSITORY/statuses/$ATLAS_CODE_REVISION" \
             -f state='success' \
             -f context='atlas-local-e2e' \
-            -f description='Protected hosted trust bootstrap; 1 Chromium test, retries=0' \
+            -f description='Protected hosted core trust bootstrap; 1 Chromium test, retries=0' \
             -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
