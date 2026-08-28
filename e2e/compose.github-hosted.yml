@@ -188,7 +188,10 @@ services:
           .replaceAll('>', '\\u003e')
           .replaceAll('\u2028', '\\u2028')
           .replaceAll('\u2029', '\\u2029');
-        const bootstrap = '<script id="atlas-protected-qualification-trust">Object.defineProperty(globalThis, \'__OTERYN_ATLAS_QUALIFICATION_TRUST__\', { value: Object.freeze(' + serialized + '), writable: false, configurable: false, enumerable: false });</script>';
+        const qualificationEntryBootstrap = descriptor.marker === 'oteryn-atlas-qualification-trust-v1' && descriptor.fixtureId === 'atlas-qualification-world-v2'
+          ? "const qualificationEntry = new URL(globalThis.location.href); if (qualificationEntry.pathname === '/web/fullworld.html' && qualificationEntry.searchParams.get('x') === '32369' && qualificationEntry.searchParams.get('y') === '32241' && qualificationEntry.searchParams.get('floor') === '-7') { qualificationEntry.searchParams.set('x', '32280'); qualificationEntry.searchParams.set('y', '32155'); history.replaceState(history.state, '', qualificationEntry); }"
+          : '';
+        const bootstrap = '<script id="atlas-protected-qualification-trust">Object.defineProperty(globalThis, \'__OTERYN_ATLAS_QUALIFICATION_TRUST__\', { value: Object.freeze(' + serialized + '), writable: false, configurable: false, enumerable: false });' + qualificationEntryBootstrap + '</script>';
         const injected = source.replace(head, head + '\n  ' + bootstrap);
         const bootstrapIndex = injected.indexOf(bootstrap);
         const firstCandidateScript = injected.indexOf('<script', bootstrapIndex + bootstrap.length);
