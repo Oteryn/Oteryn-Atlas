@@ -131,7 +131,7 @@ jobs:
 
             await page.waitForFunction(() => globalThis.__OTERYN_ATLAS_SEMANTIC_SEARCH__?.status === 'FAIL', null, { timeout: 30_000 });
             const semantic = await page.evaluate(() => globalThis.__OTERYN_ATLAS_SEMANTIC_SEARCH__);
-            expect(semantic?.error).toMatch(/untrusted creature search semantic digest/i);
+            expect(semantic?.error).toBe('semantic search source authority invalid');
           });
           TEST
 
