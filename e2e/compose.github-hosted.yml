@@ -1,0 +1,34 @@
+services:
+  atlas-publication:
+    image: ghcr.io/nginx/nginx-unprivileged:1.31.3-alpine3.24-slim@sha256:22f839c5fb4007dc24d203a170a9e03fc185d660bfefc34ac6823a7aef085cbc
+    read_only: true
+    volumes:
+      - ${ATLAS_QUALIFICATION_PUBLICATION_HOST:?ATLAS_QUALIFICATION_PUBLICATION_HOST must identify a ready qualification publication}:/srv/atlas/fullworld:ro
+      - ${ATLAS_QUALIFICATION_PUBLICATION_HOST:?ATLAS_QUALIFICATION_PUBLICATION_HOST must identify a ready qualification publication}/data/creatures:/srv/atlas/data/creatures:ro
+      - ./nginx/qualification-publication.conf:/etc/nginx/conf.d/default.conf:ro
+    tmpfs:
+      - /tmp
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8081/__atlas/readiness && wget -q -O /dev/null http://127.0.0.1:8081/fullworld/publication/publication.json && wget -q -O /dev/null http://127.0.0.1:8081/data/creatures/index.json || exit 1"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  atlas-web:
+    depends_on:
+      atlas-publication:
+        condition: service_healthy
+    environment:
+      ATLAS_PUBLICATION_ORIGIN: http://atlas-publication:8081
+      ATLAS_PUBLICATION_SCHEME: http
+      ATLAS_PUBLICATION_UPSTREAM: atlas-publication:8081
+      ATLAS_PUBLICATION_HOST_HEADER: atlas-publication
+      ATLAS_PUBLICATION_HOST: atlas-publication
+    volumes:
+      - ${ATLAS_QUALIFICATION_PUBLICATION_HOST:?ATLAS_QUALIFICATION_PUBLICATION_HOST must identify a ready qualification publication}/web/semantic-search:/usr/share/nginx/html/web/semantic-search:ro
+      - ${ATLAS_QUALIFICATION_PUBLICATION_HOST:?ATLAS_QUALIFICATION_PUBLICATION_HOST must identify a ready qualification publication}/web/creature-gameplay:/usr/share/nginx/html/web/creature-gameplay:ro
+
+  e2e:
+    environment:
+      ATLAS_PUBLICATION_ORIGIN: http://atlas-publication:8081
+      ATLAS_QUALIFICATION_TRUST_JSON: ${ATLAS_QUALIFICATION_TRUST_JSON:?ATLAS_QUALIFICATION_TRUST_JSON must identify verified qualification roots}
