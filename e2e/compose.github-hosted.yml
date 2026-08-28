@@ -117,7 +117,7 @@ services:
         const raw = process.env.ATLAS_QUALIFICATION_TRUST_JSON;
         let descriptor;
         try { descriptor = JSON.parse(raw); }
-        catch (error) { throw new TypeError(`ATLAS_QUALIFICATION_TRUST_JSON is invalid JSON: ${error.message}`); }
+        catch (error) { throw new TypeError(`ATLAS_QUALIFICATION_TRUST_JSON is invalid JSON: $${error.message}`); }
         if (!descriptor || typeof descriptor !== 'object' || Array.isArray(descriptor)) {
           throw new TypeError('ATLAS_QUALIFICATION_TRUST_JSON must encode an object');
         }
@@ -130,7 +130,7 @@ services:
           throw new TypeError('qualification trust descriptor fields mismatch');
         }
         for (const field of rootFields) {
-          if (!/^sha256:[0-9a-f]{64}$/.test(descriptor[field])) throw new TypeError(`qualification trust ${field} is invalid`);
+          if (!/^sha256:[0-9a-f]{64}$/.test(descriptor[field])) throw new TypeError(`qualification trust $${field} is invalid`);
         }
         const identities = {
           'oteryn-atlas-qualification-trust-v1': ['atlas-qualification-world-v2', 'qualification_fixture'],
@@ -155,8 +155,8 @@ services:
           .replaceAll('>', '\\u003e')
           .replaceAll('\u2028', '\\u2028')
           .replaceAll('\u2029', '\\u2029');
-        const bootstrap = `<script id="atlas-protected-qualification-trust">Object.defineProperty(globalThis, '__OTERYN_ATLAS_QUALIFICATION_TRUST__', { value: Object.freeze(${serialized}), writable: false, configurable: false, enumerable: false });</script>`;
-        const injected = source.replace(head, `${head}\n  ${bootstrap}`);
+        const bootstrap = `<script id="atlas-protected-qualification-trust">Object.defineProperty(globalThis, '__OTERYN_ATLAS_QUALIFICATION_TRUST__', { value: Object.freeze($${serialized}), writable: false, configurable: false, enumerable: false });</script>`;
+        const injected = source.replace(head, `$${head}\n  $${bootstrap}`);
         const bootstrapIndex = injected.indexOf(bootstrap);
         const firstCandidateScript = injected.indexOf('<script', bootstrapIndex + bootstrap.length);
         if (bootstrapIndex < 0 || (firstCandidateScript >= 0 && bootstrapIndex >= firstCandidateScript)) {
