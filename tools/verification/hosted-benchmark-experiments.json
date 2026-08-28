@@ -26,6 +26,20 @@
       "gate": "W2_STABLE_WITH_RESOURCE_HEADROOM"
     },
     {
+      "id": "packed-w6",
+      "workers": 6,
+      "shards": 1,
+      "profiles": ["broad", "full"],
+      "gate": "W4_STABLE_WITH_RESOURCE_HEADROOM"
+    },
+    {
+      "id": "packed-w8",
+      "workers": 8,
+      "shards": 1,
+      "profiles": ["broad", "full"],
+      "gate": "W6_STABLE_WITH_RESOURCE_HEADROOM"
+    },
+    {
       "id": "shards2-w1",
       "workers": 1,
       "shards": 2,
@@ -48,7 +62,8 @@
   },
   "rules": [
     "Run packed-w1 first for every representative workload.",
-    "Do not run workers=2 or workers=4 until actual hosted runner resource telemetry justifies the candidate.",
+    "Measure packed workers=1/2/4/6/8 as separate single-job experiments; record every tier even when a higher tier is not eligible for policy selection.",
+    "Use actual hosted runner CPU/RAM and prior-tier stability as selection gates; a failed gate forbids selecting the higher tier but does not erase its measurement evidence.",
     "Do not run hosted shards for focused/targeted work solely to increase parallelism.",
     "Do not maximize workers and shards simultaneously; isolate the two parallelism axes before combined experiments are proposed.",
     "Compare axes deliberately rather than materializing a Cartesian matrix.",
