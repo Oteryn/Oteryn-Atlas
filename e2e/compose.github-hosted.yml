@@ -41,8 +41,8 @@ services:
         ];
         const hash = crypto.createHash('sha256');
         for (const relative of harnessFiles) {
-          hash.update(`${relative}\n`);
-          hash.update(fs.readFileSync(`/protected-control/${relative}`));
+          hash.update(relative + '\n');
+          hash.update(fs.readFileSync('/protected-control/' + relative));
           hash.update('\n');
         }
         const shardOrdinal = process.env.ATLAS_E2E_SHARD.split('/')[0];
@@ -51,8 +51,8 @@ services:
           repository: 'Oteryn/Oteryn-Atlas',
           candidateSha: process.env.ATLAS_CODE_REVISION,
           planDigest: process.env.ATLAS_VERIFICATION_PLAN_SHA256,
-          producerRunId: `${process.env.GITHUB_RUN_ID}-${shardOrdinal}`,
-          harnessDigest: `sha256:${hash.digest('hex')}`,
+          producerRunId: process.env.GITHUB_RUN_ID + '-' + shardOrdinal,
+          harnessDigest: 'sha256:' + hash.digest('hex'),
         };
         const manifest = publishReadyPublication({
           sourceDir: '/source',

@@ -32,7 +32,7 @@ test('protected GitHub-hosted qualification publication is atomically readied, s
   assert.match(override, /publishReadyPublication/);
   assert.match(override, /validateReadyPublication/);
   assert.match(override, /destinationDir:\s*'\/ready\/fullworld'/);
-  assert.match(override, /producerRunId:\s*`\$\{process\.env\.GITHUB_RUN_ID\}-\$\{shardOrdinal\}`/);
+  assert.match(override, /producerRunId:\s*process\.env\.GITHUB_RUN_ID \+ '-' \+ shardOrdinal/);
   assert.match(override, /atlas-ready-publication:\/ready/);
   assert.match(override, /atlas-publication-ready:[\s\S]*condition: service_completed_successfully/);
 
