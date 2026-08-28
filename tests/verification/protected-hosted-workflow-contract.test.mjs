@@ -116,3 +116,9 @@ test('hosted executor atomically readies exact protected products before Compose
   assert.match(executor, /ATLAS_QUALIFICATION_PUBLICATION_HOST="\$publication_root"/);
   assert.doesNotMatch(executor, /ATLAS_QUALIFICATION_PUBLICATION_HOST="\$product_root"/);
 });
+
+test('hosted readiness validation uses a shell-safe helper instead of a loop-nested heredoc', () => {
+  assert.match(executor, /validate_ready_publication\(\) \{/);
+  assert.match(executor, /validate_ready_publication "\$publication_root" "\$readiness_path" "\$harness_digest"/);
+  assert.doesNotMatch(executor, /\n            node --input-type=module - "\$publication_root" "\$readiness_path" "\$harness_digest" <<'NODE'/);
+});
