@@ -55,7 +55,7 @@ test('protected GitHub-hosted qualification publication is atomically readied, s
   assert.doesNotMatch(nginx, /proxy_pass|192\.168\.|synology|molehill/i);
 });
 
-test('protected hosted web bootstrap injects immutable qualification trust before candidate modules', () => {
+test('protected hosted web bootstrap injects immutable qualification trust before candidate modules without changing navigation', () => {
   const override = readRequired('e2e/compose.github-hosted.yml', 'GitHub-hosted qualification compose override');
   assert.match(override, /atlas-web-ready:/);
   assert.match(override, /network_mode:\s*none/);
@@ -74,19 +74,7 @@ test('protected hosted web bootstrap injects immutable qualification trust befor
   assert.match(override, /atlas-ready-web:\/usr\/share\/nginx\/html\/web:ro/);
   assert.match(override, /volumes:[\s\S]*atlas-ready-web:/);
   assert.doesNotMatch(override, /\/source-web:(?!ro)|\/ready-web:ro/);
-});
-
-test('qualification bootstrap rewrites only the protected legacy entry into fixture bounds', () => {
-  const override = readRequired('e2e/compose.github-hosted.yml', 'GitHub-hosted qualification compose override');
-  assert.match(override, /descriptor\.marker === 'oteryn-atlas-qualification-trust-v1'/);
-  assert.match(override, /descriptor\.fixtureId === 'atlas-qualification-world-v2'/);
-  assert.match(override, /searchParams\.get\('x'\) === '32369'/);
-  assert.match(override, /searchParams\.get\('y'\) === '32241'/);
-  assert.match(override, /searchParams\.get\('floor'\) === '-7'/);
-  assert.match(override, /searchParams\.set\('x', '32280'\)/);
-  assert.match(override, /searchParams\.set\('y', '32155'\)/);
-  assert.match(override, /history\.replaceState\(history\.state, '', qualificationEntry\)/);
-  assert.doesNotMatch(override, /Math\.(?:min|max)\([^\n]*(?:searchParams|qualificationEntry)|clamp(?:ed|ing)?[^\n]*(?:x|y)/i);
+  assert.doesNotMatch(override, /qualificationEntry|history\.replaceState|searchParams\.set\(['"](?:x|y|floor)['"]/);
 });
 
 test('protected hosted web bootstrap reentry is exact validation only and never overwrites stale bytes', () => {
