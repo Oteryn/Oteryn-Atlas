@@ -8,7 +8,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const workflowPath = path.join(ROOT, '.github/workflows/protected-hosted-compose-promotion.yml');
 const legacyWorkflowPath = path.join(ROOT, '.github/workflows/legacy-molehill-transition-qualification.yml');
 
-test('protected hosted compose promotion is bounded GitHub-hosted browser bootstrap and never Molehill E2E', () => {
+test('protected hosted compose promotion proves core trust bootstrap without claiming legacy semantic compatibility', () => {
   assert.equal(fs.existsSync(workflowPath), true, 'protected hosted compose promotion workflow must exist');
   const workflow = fs.readFileSync(workflowPath, 'utf8');
   const legacy = fs.readFileSync(legacyWorkflowPath, 'utf8');
@@ -27,7 +27,14 @@ test('protected hosted compose promotion is bounded GitHub-hosted browser bootst
   assert.match(workflow, /ATLAS_EXECUTION_CONTEXT="\$PWD\/trusted-base"/);
   assert.match(workflow, /proof_test="\$RUNNER_TEMP\/atlas-protected-compose-bootstrap-desktop\.spec\.mjs"/);
   assert.match(workflow, /x=32280&y=32155&floor=-7&zoom=2&mode=map/);
-  assert.match(workflow, /waitForAtlas\(page\)/);
+  assert.match(workflow, /qualificationResult\(page\)/);
+  assert.doesNotMatch(workflow, /waitForAtlas\(page\)/);
+  assert.match(workflow, /status, result\.error \|\| `qualification=\$\{status\}`\)\.toBe\('PASS'\)/);
+  assert.match(workflow, /result\.capabilities\?\.blockedOrUnknownEnabled\)\.toBe\(false\)/);
+  assert.match(workflow, /runtime-badge[^\n]*VERIFIED FULL-WORLD/);
+  assert.match(workflow, /diag-backend[^\n]*webgl2/);
+  assert.match(workflow, /__OTERYN_ATLAS_SEMANTIC_SEARCH__\?\.status === 'FAIL'/);
+  assert.match(workflow, /untrusted creature search semantic digest/);
   assert.match(workflow, /fixtureId\)\.toBe\('atlas-qualification-world-v2'\)/);
   assert.match(workflow, /dataCapability\)\.toBe\('qualification_fixture'\)/);
   assert.match(workflow, /--volume "\$proof_test:\/workspace\/e2e\/tests\/protected-compose-bootstrap-desktop\.spec\.mjs:ro"/);
