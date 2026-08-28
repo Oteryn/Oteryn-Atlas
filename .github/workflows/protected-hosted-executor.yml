@@ -277,7 +277,7 @@ jobs:
             exit 1
           fi
           test ! -e "$candidate_dir/e2e/node_modules"
-          ln -s /protected-e2e-node-modules "$candidate_dir/e2e/node_modules"
+          ln -s /protected-e2e-node-modules/node_modules "$candidate_dir/e2e/node_modules"
           timeout --signal=KILL 120s docker run --rm \
             --network none \
             --read-only \
@@ -289,9 +289,9 @@ jobs:
             --user 1000:1000 \
             --tmpfs /tmp:rw,nosuid,nodev,size=256m \
             --mount "type=bind,src=$candidate_dir,dst=/candidate,readonly" \
-            --mount "type=bind,src=$PWD/protected-control/e2e/node_modules,dst=/protected-e2e-node-modules,readonly" \
+            --mount "type=bind,src=$PWD/protected-control/e2e/node_modules,dst=/protected-e2e-node-modules/node_modules,readonly" \
             mcr.microsoft.com/playwright:v1.62.0-noble@sha256:baed2032d533817f3dbe6425de795788430ba345e819a1201337009ba17c9d07 \
-            bash -lc 'cd /candidate && CI=1 /candidate/e2e/node_modules/.bin/playwright test --config=/candidate/e2e/playwright.config.mjs --list' \
+            bash -lc 'cd /candidate && CI=1 ATLAS_ARTIFACTS_DIR=/tmp/artifacts /candidate/e2e/node_modules/.bin/playwright test --config=/candidate/e2e/playwright.config.mjs --list' \
             > artifacts/controller/candidate-playwright-source-list.txt
 
           if jq -e '.hosted.partitions[]? | select(.dataCapability == "real_fullworld")' "$execution" >/dev/null; then

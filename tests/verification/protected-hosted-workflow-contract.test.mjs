@@ -99,7 +99,8 @@ test('candidate browser execution and hosted publication share one internal defa
 
 test('executor candidate census mounts protected dependencies outside the read-only candidate tree', () => {
   assert.match(executor, /test ! -e "\$candidate_dir\/e2e\/node_modules"/);
-  assert.match(executor, /ln -s \/protected-e2e-node-modules "\$candidate_dir\/e2e\/node_modules"/);
-  assert.match(executor, /dst=\/protected-e2e-node-modules,readonly/);
+  assert.match(executor, /ln -s \/protected-e2e-node-modules\/node_modules "\$candidate_dir\/e2e\/node_modules"/);
+  assert.match(executor, /dst=\/protected-e2e-node-modules\/node_modules,readonly/);
+  assert.match(executor, /ATLAS_ARTIFACTS_DIR=\/tmp\/artifacts/);
   assert.doesNotMatch(executor, /dst=\/candidate\/e2e\/node_modules,readonly/);
 });
