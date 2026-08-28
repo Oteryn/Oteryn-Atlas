@@ -8,7 +8,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const workflowPath = path.join(ROOT, '.github/workflows/protected-hosted-compose-promotion.yml');
 const legacyWorkflowPath = path.join(ROOT, '.github/workflows/legacy-molehill-transition-qualification.yml');
 
-test('protected hosted compose promotion is bounded GitHub-hosted config proof and never Molehill E2E', () => {
+test('protected hosted compose promotion proves core trust bootstrap without claiming legacy semantic compatibility', () => {
   assert.equal(fs.existsSync(workflowPath), true, 'protected hosted compose promotion workflow must exist');
   const workflow = fs.readFileSync(workflowPath, 'utf8');
   const legacy = fs.readFileSync(legacyWorkflowPath, 'utf8');
@@ -22,9 +22,32 @@ test('protected hosted compose promotion is bounded GitHub-hosted config proof a
   assert.doesNotMatch(workflow, /group:\s*atlas-runners|labels:\s*oteryn-atlas-pc/);
   assert.match(workflow, /Require exact six-file compose promotion delta/);
   assert.match(workflow, /protected-hosted-compose-promotion\.test\.mjs/);
+  assert.match(workflow, /buildQualificationWorld/);
+  assert.match(workflow, /qualificationTrustDescriptor/);
+  assert.match(workflow, /ATLAS_EXECUTION_CONTEXT="\$PWD\/trusted-base"/);
+  assert.match(workflow, /proof_test="\$RUNNER_TEMP\/atlas-protected-compose-bootstrap-desktop\.spec\.mjs"/);
+  assert.match(workflow, /x=32280&y=32155&floor=-7&zoom=2&mode=map/);
+  assert.match(workflow, /qualificationResult\(page\)/);
+  assert.doesNotMatch(workflow, /waitForAtlas\(page\)/);
+  assert.match(workflow, /status, result\.error \|\| `qualification=\$\{status\}`\)\.toBe\('PASS'\)/);
+  assert.match(workflow, /result\.capabilities\?\.blockedOrUnknownEnabled\)\.toBe\(false\)/);
+  assert.match(workflow, /runtime-badge[^\n]*VERIFIED FULL-WORLD/);
+  assert.match(workflow, /diag-backend[^\n]*webgl2/);
+  assert.match(workflow, /__OTERYN_ATLAS_SEMANTIC_SEARCH__\?\.status === 'FAIL'/);
+  assert.match(workflow, /semantic\?\.error\)\.toBe\('semantic search source authority invalid'\)/);
+  assert.match(workflow, /fixtureId\)\.toBe\('atlas-qualification-world-v2'\)/);
+  assert.match(workflow, /dataCapability\)\.toBe\('qualification_fixture'\)/);
+  assert.match(workflow, /--volume "\$proof_test:\/workspace\/e2e\/tests\/protected-compose-bootstrap-desktop\.spec\.mjs:ro"/);
+  assert.match(workflow, /tests\/protected-compose-bootstrap-desktop\.spec\.mjs/);
+  assert.match(workflow, /--project=desktop-chromium/);
+  assert.match(workflow, /--workers=1/);
+  assert.match(workflow, /--retries=0/);
+  assert.match(workflow, /__OTERYN_ATLAS_QUALIFICATION_TRUST__/);
   assert.match(workflow, /docker compose[\s\S]*config -q/);
+  assert.match(workflow, /compose run --no-deps --rm/);
+  assert.doesNotMatch(workflow, /compose run --rm e2e/);
   assert.match(workflow, /assert-current-pr-head\.mjs/);
   assert.match(workflow, /statuses:\s*write/);
   assert.match(workflow, /context='atlas-local-e2e'|context.*atlas-local-e2e/s);
-  assert.doesNotMatch(workflow, /playwright test|\\e2e\\run\.ps1|ATLAS_PUBLICATION_ORIGIN|visual-review\.json|synology/i);
+  assert.doesNotMatch(workflow, /\\e2e\\run\.ps1|visual-review\.json|synology|molehill|--retries=[1-9]/i);
 });
