@@ -57,6 +57,23 @@ function validateSemanticIndex(index, trust) {
   return navigable[0];
 }
 
+const SHARED_HISTORICAL_DEFAULT = Object.freeze({ x: '32369', y: '32241', floor: '-7' });
+
+function isSharedHistoricalDefault(entry) {
+  if (typeof entry !== 'string' || entry.length === 0) return false;
+  let url;
+  try {
+    url = new URL(entry, 'http://atlas.invalid');
+  } catch {
+    return false;
+  }
+  if (url.pathname !== '/web/fullworld.html') return false;
+  return Object.entries(SHARED_HISTORICAL_DEFAULT).every(([field, value]) => {
+    const values = url.searchParams.getAll(field);
+    return values.length === 1 && values[0] === value;
+  });
+}
+
 function rewriteEntry(entry, position) {
   if (typeof entry !== 'string' || entry.length === 0) throw new TypeError('Atlas entry must be a non-empty string');
   const isRelative = entry.startsWith('/');
@@ -71,6 +88,7 @@ function rewriteEntry(entry, position) {
 export async function resolveQualificationEntry(entry, { qualificationTrustJson, readSemanticIndex }) {
   const trustState = parseTrust(qualificationTrustJson);
   if (!trustState || trustState.mode === 'bounded') return entry;
+  if (!isSharedHistoricalDefault(entry)) return entry;
   if (typeof readSemanticIndex !== 'function') throw new TypeError('qualification semantic reader is required');
   const semanticIndex = await readSemanticIndex();
   const record = validateSemanticIndex(semanticIndex, trustState.descriptor);
