@@ -39,6 +39,17 @@ const PROTECTED_PROMOTION_QUALIFICATIONS = freeze({
     ],
     expectedProductDigest: 'sha256:a19f0371eb5afcdf8c40156d732d5602e970400ec9369607f901e2f0a58c92b6',
   },
+  'fix/issue-179-qualification-trust-descriptor': {
+    id: 'qualification-trust-descriptor-v1',
+    headRef: 'fix/issue-179-qualification-trust-descriptor',
+    changedFiles: [
+      '.github/workflows/protected-hosted-executor.yml',
+      'tests/verification/protected-hosted-compose-promotion.test.mjs',
+      'tests/verification/qualification-world.test.mjs',
+      'tools/verification/qualification-world.mjs',
+    ],
+    expectedProductDigest: 'sha256:f53f1dcb8961c42e82191644b7628cfb4f30641344c8876f4178d37a94dd4cd5',
+  },
 });
 
 export function resolveProtectedPromotionQualification(headRef) {

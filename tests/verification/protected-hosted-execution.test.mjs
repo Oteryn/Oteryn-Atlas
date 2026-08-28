@@ -248,3 +248,20 @@ test('protected promotion qualification registry binds exact hosted proof for bo
   assert.equal(Object.isFrozen(spec.changedFiles), true);
   assert.throws(() => resolveProtectedPromotionQualification('fix/issue-179-unknown'), /unsupported.*promotion/i);
 });
+
+test('protected promotion qualification registry binds exact hosted proof for qualification trust descriptor', () => {
+  const spec = resolveProtectedPromotionQualification('fix/issue-179-qualification-trust-descriptor');
+  assert.deepEqual(spec, {
+    id: 'qualification-trust-descriptor-v1',
+    headRef: 'fix/issue-179-qualification-trust-descriptor',
+    changedFiles: [
+      '.github/workflows/protected-hosted-executor.yml',
+      'tests/verification/protected-hosted-compose-promotion.test.mjs',
+      'tests/verification/qualification-world.test.mjs',
+      'tools/verification/qualification-world.mjs',
+    ],
+    expectedProductDigest: 'sha256:f53f1dcb8961c42e82191644b7628cfb4f30641344c8876f4178d37a94dd4cd5',
+  });
+  assert.equal(Object.isFrozen(spec), true);
+  assert.equal(Object.isFrozen(spec.changedFiles), true);
+});
