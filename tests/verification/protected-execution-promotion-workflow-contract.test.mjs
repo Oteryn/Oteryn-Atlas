@@ -107,3 +107,24 @@ test('protected execution promotion preauthorizes candidate-modification overlay
   assert.match(job, /context='atlas-local-e2e'|context.*atlas-local-e2e/s);
   assert.doesNotMatch(job, /playwright test|group:\s*atlas-runners|labels:\s*oteryn-atlas-pc|ATLAS_PUBLICATION_ORIGIN|visual-review\.json|synology/i);
 });
+
+test('protected execution promotion preauthorizes planned-census modification filtering on exact GitHub-hosted evidence', () => {
+  const workflow = fs.readFileSync(workflowPath, 'utf8');
+  const legacy = fs.readFileSync(legacyWorkflowPath, 'utf8');
+  const heavy = legacy.split('  legacy-qualification:')[1]?.split('  protected-census-bootstrap:')[0] ?? '';
+  const job = workflow.split('  candidate-modification-census-filter:')[1] ?? '';
+
+  assert.match(job, /fix\/issue-179-protected-modification-census-filter/);
+  assert.doesNotMatch(heavy, /fix\/issue-179-protected-modification-census-filter/);
+  assert.match(job, /runs-on:\s*ubuntu-24\.04/);
+  assert.match(job, /tests\/verification\/protected-hosted-plan\.test\.mjs/);
+  assert.match(job, /tools\/verification\/protected-hosted-plan\.mjs/);
+  assert.match(job, /assert-current-pr-head\.mjs/);
+  assert.match(job, /--network none/);
+  assert.match(job, /--read-only/);
+  assert.match(job, /--cap-drop ALL/);
+  assert.match(job, /no-new-privileges/);
+  assert.match(job, /statuses:\s*write/);
+  assert.match(job, /context='atlas-local-e2e'|context.*atlas-local-e2e/s);
+  assert.doesNotMatch(job, /playwright test|group:\s*atlas-runners|labels:\s*oteryn-atlas-pc|ATLAS_PUBLICATION_ORIGIN|visual-review\.json|synology/i);
+});
