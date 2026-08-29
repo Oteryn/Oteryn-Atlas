@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import test from 'node:test';
 
 import { validateCreatureSearchCatalog } from '../../src/browser/creature-search.mjs';
@@ -6,11 +7,13 @@ import { validateSemanticSearchIndex } from '../../src/browser/semantic-search.m
 import { ancillarySourceExpectations, resolveQualificationManifestTrust } from '../../src/browser/fullworld-trust.mjs';
 
 const hash = (digit) => `sha256:${digit.repeat(64)}`;
-const trust = resolveQualificationManifestTrust({
+const qualificationDescriptor = Object.freeze({
+  marker: 'oteryn-atlas-qualification-trust-v1',
   fixtureId: 'atlas-qualification-world-v2', dataCapability: 'qualification_fixture',
   publicationRoot: hash('1'), semanticRoot: hash('2'), pixelRoot: hash('3'), overviewRoot: hash('4'),
   minimapRoot: hash('5'), runtimeIndexRoot: hash('6'), pixelBucketRoot: hash('7'), sourceFingerprint: hash('8'), productDigest: hash('9'),
 });
+const trust = resolveQualificationManifestTrust(qualificationDescriptor);
 const expected = ancillarySourceExpectations(trust).semanticSearch;
 function semanticIndex() {
   return {
@@ -43,4 +46,30 @@ test('creature search catalog binds qualification contract, digest and fixture i
   const catalog = validateCreatureSearchCatalog(creatureCatalog(), expected);
   assert.equal(catalog.records[0].provenance.authority, 'Oteryn/Oteryn-Atlas');
   assert.throws(() => validateCreatureSearchCatalog({ ...creatureCatalog(), source: { ...creatureCatalog().source, fixture_id: 'other' } }, expected), /fixture/i);
+});
+
+test('Farm Explorer consumes qualification creature identity only from the injected protected trust descriptor', () => {
+  const moduleUrl = new URL('../../web/fullworld-farm-explorer.mjs', import.meta.url).href;
+  const childSource = `
+    globalThis.__OTERYN_ATLAS_QUALIFICATION_TRUST__ = ${JSON.stringify(qualificationDescriptor)};
+    const { validateFarmCreatureCatalog } = await import(${JSON.stringify(moduleUrl)});
+    const catalog = ${JSON.stringify(creatureCatalog())};
+    const records = validateFarmCreatureCatalog(catalog);
+    if (records[0]?.label !== 'Fixture Guide') throw new Error('qualification catalog record missing');
+    for (const [field, value, expectedPattern] of [
+      ['fixture_id', 'other', /fixture/i],
+      ['semantic_digest', 'sha256:' + 'f'.repeat(64), /digest/i],
+    ]) {
+      const invalid = { ...catalog, source: { ...catalog.source, [field]: value } };
+      let rejected = false;
+      try { validateFarmCreatureCatalog(invalid); }
+      catch (error) {
+        if (!expectedPattern.test(String(error?.message ?? error))) throw error;
+        rejected = true;
+      }
+      if (!rejected) throw new Error('qualification source mismatch accepted: ' + field);
+    }
+  `;
+  const result = spawnSync(process.execPath, ['--input-type=module', '--eval', childSource], { encoding: 'utf8' });
+  assert.equal(result.status, 0, result.stderr || result.stdout);
 });
