@@ -146,3 +146,31 @@ test('protected execution promotion preauthorizes planned-census filtering plus 
   assert.match(job, /context='atlas-local-e2e'|context.*atlas-local-e2e/s);
   assert.doesNotMatch(job, /group:\s*atlas-runners|labels:\s*oteryn-atlas-pc|visual-review\.json|synology|real_fullworld/i);
 });
+
+test('protected execution promotion preauthorizes the functional qualification fixture repair with exact-census full fixture browser proof', () => {
+  const workflow = fs.readFileSync(workflowPath, 'utf8');
+  const legacy = fs.readFileSync(legacyWorkflowPath, 'utf8');
+  const heavy = legacy.split('  legacy-qualification:')[1]?.split('  protected-census-bootstrap:')[0] ?? '';
+  const job = workflow.split('  qualification-functional-fixture:')[1]?.split('  candidate-modification-overlay:')[0] ?? '';
+
+  assert.match(job, /fix\/issue-179-qualification-functional-fixture/);
+  assert.doesNotMatch(heavy, /fix\/issue-179-qualification-functional-fixture/);
+  assert.match(job, /runs-on:\s*ubuntu-24\.04/);
+  assert.match(job, /resolveProtectedPromotionQualification/);
+  assert.match(job, /parse-playwright-test-list\.mjs/);
+  assert.match(job, /verification-catalog\.json/);
+  assert.match(job, /e2e\.full/);
+  assert.match(job, /buildQualificationWorld/);
+  assert.match(job, /qualificationTrustDescriptor/);
+  assert.match(job, /protected-hosted-product-identities\.json/);
+  assert.match(job, /compose\.protected-hosted-executor\.yml/);
+  assert.match(job, /compose\.github-hosted\.yml/);
+  assert.match(job, /ATLAS_QUALIFICATION_PUBLICATION_HOST/);
+  assert.match(job, /playwright test/);
+  assert.match(job, /--workers=1/);
+  assert.match(job, /--retries=0/);
+  assert.match(job, /assert-current-pr-head\.mjs/);
+  assert.match(job, /statuses:\s*write/);
+  assert.match(job, /context='atlas-local-e2e'|context.*atlas-local-e2e/s);
+  assert.doesNotMatch(job, /group:\s*atlas-runners|labels:\s*oteryn-atlas-pc|visual-review\.json|synology|real_fullworld/i);
+});

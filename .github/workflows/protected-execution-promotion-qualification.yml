@@ -457,6 +457,282 @@ jobs:
             -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
 
 
+  qualification-functional-fixture:
+    name: Publish functional qualification fixture compatibility evidence
+    if: >-
+      github.event.label.name == 'atlas-legacy-transition-qualification' &&
+      github.event.pull_request.base.ref == 'main' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'fix/issue-179-qualification-functional-fixture'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      pull-requests: read
+      statuses: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      ATLAS_PR_NUMBER: ${{ github.event.pull_request.number }}
+      ATLAS_CODE_REVISION: ${{ github.event.pull_request.head.sha }}
+      ATLAS_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      ATLAS_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+      ATLAS_CHANGED_FILE_COUNT: ${{ github.event.pull_request.changed_files }}
+      ATLAS_CANDIDATE_IMAGE: mcr.microsoft.com/playwright:v1.62.0-noble@sha256:baed2032d533817f3dbe6425de795788430ba345e819a1201337009ba17c9d07
+    steps:
+      - name: Check out exact protected-base policy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+          path: trusted-base
+
+      - name: Check out exact candidate head as sandbox data
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+          path: candidate
+
+      - name: Fence current PR head before functional qualification proof
+        shell: bash
+        run: |
+          set -euo pipefail
+          payload="$RUNNER_TEMP/atlas-functional-qualification-before.json"
+          gh api "repos/$GITHUB_REPOSITORY/pulls/$ATLAS_PR_NUMBER" > "$payload"
+          node trusted-base/tools/verification/assert-current-pr-head.mjs \
+            --payload "$payload" \
+            --repository "$GITHUB_REPOSITORY" \
+            --pr-number "$ATLAS_PR_NUMBER" \
+            --expected-head-sha "$ATLAS_CODE_REVISION"
+          test "$(git -C candidate rev-parse HEAD)" = "$ATLAS_CODE_REVISION"
+          test "$(git -C trusted-base rev-parse HEAD)" = "$ATLAS_BASE_SHA"
+
+      - name: Resolve protected qualification and require exact functional candidate delta
+        shell: bash
+        run: |
+          set -euo pipefail
+          rows="$(mktemp)"
+          expected="$(mktemp)"
+          trap 'rm -f "$rows" "$expected"' EXIT
+          gh api --paginate \
+            "repos/$GITHUB_REPOSITORY/pulls/$ATLAS_PR_NUMBER/files?per_page=100" \
+            --jq '.[].filename' | sort > "$rows"
+          test "$(wc -l < "$rows" | tr -d '[:space:]')" = "$ATLAS_CHANGED_FILE_COUNT"
+          node --input-type=module - "$ATLAS_HEAD_REF" "$expected" <<'NODE'
+          import fs from 'node:fs';
+          import { resolveProtectedPromotionQualification } from './trusted-base/tools/verification/protected-hosted-execution.mjs';
+          const qualification = resolveProtectedPromotionQualification(process.argv[2]);
+          fs.writeFileSync(process.argv[3], `${[...qualification.changedFiles].sort().join('\n')}\n`, 'utf8');
+          NODE
+          diff -u "$expected" "$rows"
+
+      - name: Prove candidate Playwright stable-ID census exactly matches protected census
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci --prefix trusted-base/e2e --ignore-scripts --no-audit --no-fund
+          protected_list="$RUNNER_TEMP/atlas-functional-protected-list.txt"
+          candidate_list="$RUNNER_TEMP/atlas-functional-candidate-list.txt"
+          protected_ids="$RUNNER_TEMP/atlas-functional-protected-ids.json"
+          candidate_ids="$RUNNER_TEMP/atlas-functional-candidate-ids.json"
+          qualification_list="$RUNNER_TEMP/atlas-functional-qualification-list.txt"
+
+          (
+            cd trusted-base
+            ATLAS_ARTIFACTS_DIR="$RUNNER_TEMP/atlas-functional-protected-list-artifacts" \
+              npm exec --prefix e2e -- playwright test --config=e2e/playwright.config.mjs --list
+          ) > "$protected_list"
+
+          timeout --signal=KILL 120s docker run --rm \
+            --network none \
+            --read-only \
+            --cap-drop ALL \
+            --security-opt no-new-privileges \
+            --pids-limit 192 \
+            --memory 1536m \
+            --cpus 2 \
+            --user 1000:1000 \
+            --tmpfs /tmp:rw,nosuid,nodev,size=256m \
+            --mount "type=bind,src=$PWD/candidate,dst=/candidate,readonly" \
+            --mount "type=bind,src=$PWD/trusted-base/e2e/node_modules,dst=/protected-e2e-node-modules/node_modules,readonly" \
+            "$ATLAS_CANDIDATE_IMAGE" \
+            bash -lc 'cd /candidate && ln -s /protected-e2e-node-modules/node_modules e2e/node_modules && CI=1 ATLAS_ARTIFACTS_DIR=/tmp/artifacts e2e/node_modules/.bin/playwright test --config=e2e/playwright.config.mjs --list' \
+            > "$candidate_list"
+
+          node trusted-base/tools/verification/parse-playwright-test-list.mjs "$protected_list" > "$protected_ids"
+          node trusted-base/tools/verification/parse-playwright-test-list.mjs "$candidate_list" > "$candidate_ids"
+          diff -u "$protected_ids" "$candidate_ids"
+
+          CANDIDATE_LIST="$candidate_list" QUALIFICATION_LIST="$qualification_list" node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const catalog = JSON.parse(fs.readFileSync('./trusted-base/tools/verification/verification-catalog.json', 'utf8'));
+          const specs = new Set(catalog.groups?.['e2e.full']?.specs ?? []);
+          if (!specs.size) throw new TypeError('protected e2e.full qualification catalog is empty');
+          const rows = fs.readFileSync(process.env.CANDIDATE_LIST, 'utf8').split(/\r?\n/);
+          const selected = [];
+          for (const line of rows) {
+            const match = line.match(/^\s*\[([^\]]+)\]\s+›\s+([^:]+):\d+:\d+\s+›\s+(.+)$/);
+            if (!match) continue;
+            const spec = `e2e/tests/${match[2]}`;
+            if (specs.has(spec)) selected.push(line.trim());
+          }
+          if (!selected.length) throw new TypeError('protected e2e.full qualification selection is empty');
+          fs.writeFileSync(process.env.QUALIFICATION_LIST, `${selected.join('\n')}\n`, 'utf8');
+          NODE
+          test -s "$qualification_list"
+          printf '%s\n' "$qualification_list" > "$RUNNER_TEMP/atlas-functional-qualification-list-path.txt"
+
+      - name: Rebuild exact qualification fixture and run deterministic regressions in networkless sandbox
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_root="$RUNNER_TEMP/atlas-functional-qualification-world"
+          trust_dir="$RUNNER_TEMP/atlas-functional-qualification-trust"
+          trust_path="$trust_dir/qualification_fixture.json"
+          rm -rf "$source_root" "$trust_dir"
+          mkdir -p "$source_root" "$trust_dir"
+          chmod 0777 "$source_root" "$trust_dir"
+          proof="$RUNNER_TEMP/atlas-functional-qualification-proof.mjs"
+          cat > "$proof" <<'NODE'
+          import fs from 'node:fs';
+          import { resolveFullWorldTrust } from '/trusted/src/browser/fullworld-trust.mjs';
+          import { resolveProtectedPromotionQualification } from '/trusted/tools/verification/protected-hosted-execution.mjs';
+          import { buildQualificationWorld, qualificationTrustDescriptor, verifyQualificationWorld } from '/candidate/tools/verification/qualification-world.mjs';
+
+          const qualification = resolveProtectedPromotionQualification(process.env.ATLAS_HEAD_REF);
+          const registry = JSON.parse(fs.readFileSync('/candidate/tools/verification/protected-hosted-product-identities.json', 'utf8'));
+          if (registry.qualification_fixture?.digest !== qualification.expectedProductDigest) {
+            throw new TypeError('candidate qualification product registry does not match protected qualification');
+          }
+          const built = await buildQualificationWorld('/out/product');
+          const verified = await verifyQualificationWorld('/out/product');
+          if (built.productDigest !== qualification.expectedProductDigest || verified.productDigest !== qualification.expectedProductDigest) {
+            throw new TypeError('rebuilt qualification fixture digest does not match protected qualification');
+          }
+          const descriptor = qualificationTrustDescriptor(verified);
+          const trust = resolveFullWorldTrust({ __OTERYN_ATLAS_QUALIFICATION_TRUST__: descriptor });
+          if (trust.qualificationFixtureId !== verified.fixtureId || trust.qualificationProductDigest !== qualification.expectedProductDigest) {
+            throw new TypeError('protected trust policy rejected functional qualification fixture identity');
+          }
+          fs.writeFileSync('/out/qualification_fixture.json', `${JSON.stringify(descriptor)}\n`, 'utf8');
+          NODE
+          timeout --signal=KILL 180s docker run --rm \
+            --network none \
+            --read-only \
+            --cap-drop ALL \
+            --security-opt no-new-privileges \
+            --pids-limit 192 \
+            --memory 1024m \
+            --cpus 2 \
+            --user 1000:1000 \
+            --tmpfs /tmp:rw,nosuid,nodev,size=128m \
+            --env "ATLAS_HEAD_REF=$ATLAS_HEAD_REF" \
+            --mount "type=bind,src=$PWD/trusted-base,dst=/trusted,readonly" \
+            --mount "type=bind,src=$PWD/candidate,dst=/candidate,readonly" \
+            --mount "type=bind,src=$proof,dst=/proof.mjs,readonly" \
+            --mount "type=bind,src=$source_root,dst=/out" \
+            "$ATLAS_CANDIDATE_IMAGE" \
+            node /proof.mjs
+          test -s "$source_root/qualification_fixture.json"
+          mv "$source_root/qualification_fixture.json" "$trust_path"
+          test -s "$trust_path"
+
+          timeout --signal=KILL 180s docker run --rm \
+            --network none \
+            --read-only \
+            --cap-drop ALL \
+            --security-opt no-new-privileges \
+            --pids-limit 256 \
+            --memory 1536m \
+            --cpus 2 \
+            --user 1000:1000 \
+            --tmpfs /tmp:rw,nosuid,nodev,size=256m \
+            --mount "type=bind,src=$PWD/candidate,dst=/candidate,readonly" \
+            "$ATLAS_CANDIDATE_IMAGE" \
+            bash -lc 'cd /candidate && node --test tests/verification/*.test.mjs'
+
+          printf '%s\n' "$source_root/product" > "$RUNNER_TEMP/atlas-functional-source-root.txt"
+          printf '%s\n' "$trust_path" > "$RUNNER_TEMP/atlas-functional-trust-path.txt"
+
+      - name: Prove complete protected qualification functional safety net in Chromium
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_root="$(cat "$RUNNER_TEMP/atlas-functional-source-root.txt")"
+          trust_path="$(cat "$RUNNER_TEMP/atlas-functional-trust-path.txt")"
+          qualification_list="$(cat "$RUNNER_TEMP/atlas-functional-qualification-list-path.txt")"
+          execution_context="$RUNNER_TEMP/atlas-functional-execution-context"
+          artifacts="$RUNNER_TEMP/atlas-functional-browser-artifacts"
+          rm -rf "$execution_context" "$artifacts"
+          mkdir -p "$execution_context" "$artifacts"
+
+          rsync -a --delete --exclude='.git' candidate/ "$execution_context/"
+          for path in e2e e2e/tests e2e/support web src; do
+            test -d "$execution_context/$path"
+            test ! -L "$execution_context/$path"
+          done
+          rm -rf "$execution_context/e2e/node_modules"
+          rm -f "$execution_context/.dockerignore" "$execution_context/e2e/Dockerfile.dockerignore"
+          cp trusted-base/e2e/Dockerfile "$execution_context/e2e/Dockerfile"
+          cp trusted-base/e2e/package.json trusted-base/e2e/package-lock.json "$execution_context/e2e/"
+          cp trusted-base/e2e/playwright.config.mjs trusted-base/e2e/summary-reporter.mjs "$execution_context/e2e/"
+          mkdir -p "$execution_context/tools/verification"
+          cp trusted-base/tools/verification/stable-id.mjs "$execution_context/tools/verification/stable-id.mjs"
+
+          export COMPOSE_PROJECT_NAME="atlas-functional-qualification-${GITHUB_RUN_ID}"
+          export ATLAS_CODE_REVISION="$ATLAS_CODE_REVISION"
+          export ATLAS_VERIFICATION_PLAN_SHA256="sha256:$(printf '%s' "$ATLAS_CODE_REVISION" | sha256sum | awk '{print $1}')"
+          export ATLAS_E2E_SHARD='1/1'
+          export ATLAS_E2E_WORKERS='1'
+          export ATLAS_QUALIFICATION_PUBLICATION_HOST="$source_root"
+          export ATLAS_QUALIFICATION_TRUST_JSON="$(jq -c . "$trust_path")"
+          export ATLAS_EXECUTION_CONTEXT="$execution_context"
+          export ATLAS_E2E_ARTIFACTS_HOST="$artifacts"
+          export ATLAS_PROTECTED_TEST_LIST="$qualification_list"
+
+          compose_down() {
+            docker compose \
+              -f trusted-base/e2e/compose.protected-hosted-executor.yml \
+              -f trusted-base/e2e/compose.github-hosted.yml \
+              down -v --remove-orphans >/dev/null 2>&1 || true
+          }
+          trap compose_down EXIT
+          compose_down
+          docker compose \
+            -f trusted-base/e2e/compose.protected-hosted-executor.yml \
+            -f trusted-base/e2e/compose.github-hosted.yml \
+            up -d --wait atlas-publication atlas-web
+          docker compose \
+            -f trusted-base/e2e/compose.protected-hosted-executor.yml \
+            -f trusted-base/e2e/compose.github-hosted.yml \
+            build e2e
+          docker compose \
+            -f trusted-base/e2e/compose.protected-hosted-executor.yml \
+            -f trusted-base/e2e/compose.github-hosted.yml \
+            run --rm e2e \
+            bash -lc 'exec ./node_modules/.bin/playwright test --config=playwright.config.mjs --test-list=/run/atlas-protected-test-list.txt --workers=1 --retries=0'
+
+      - name: Fence exact head and publish functional qualification compatibility status
+        shell: bash
+        run: |
+          set -euo pipefail
+          payload="$RUNNER_TEMP/atlas-functional-qualification-after.json"
+          gh api "repos/$GITHUB_REPOSITORY/pulls/$ATLAS_PR_NUMBER" > "$payload"
+          node trusted-base/tools/verification/assert-current-pr-head.mjs \
+            --payload "$payload" \
+            --repository "$GITHUB_REPOSITORY" \
+            --pr-number "$ATLAS_PR_NUMBER" \
+            --expected-head-sha "$ATLAS_CODE_REVISION"
+          gh api --method POST \
+            "repos/$GITHUB_REPOSITORY/statuses/$ATLAS_CODE_REVISION" \
+            -f state='success' \
+            -f context='atlas-local-e2e' \
+            -f description='Protected GitHub-hosted complete qualification functional safety net' \
+            -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+
+
   candidate-modification-overlay:
     name: Publish candidate-modification overlay compatibility evidence
     if: >-
