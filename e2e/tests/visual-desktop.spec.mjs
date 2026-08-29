@@ -1,11 +1,11 @@
 import { expect, test } from '@playwright/test';
-import { assertNoRuntimeFailures, captureRuntimeFailures, gotoAtlas, waitForAtlas } from './runtime.mjs';
+import { DESKTOP_ENTRY, assertNoRuntimeFailures, captureRuntimeFailures, gotoAtlas, isQualificationFixtureExecution, waitForAtlas } from './runtime.mjs';
 import { canvasAlphaCount, comparePngOutsideRects } from '../support/visual-oracle.mjs';
 import { assertUserVisibleSurface, captureUserVisualEvidence } from '../support/user-acceptance.mjs';
-const ENTRY = '/web/fullworld.html?x=32361&y=32198&floor=-7&zoom=2&mode=map&creatures=npc,monster&animation=off';
-const VISUAL_ENTRY = '/web/fullworld.html?x=32369&y=32241&floor=-7&zoom=2&mode=map&animation=off';
-const CREATURE_ONLY_PLAYBACK_ENTRY = '/web/fullworld.html?x=32831&y=32596&floor=-12&zoom=2&mode=map&animation=off&creatures=monster';
-const NPC_ONLY_PLAYBACK_ENTRY = '/web/fullworld.html?x=32209&y=31924&floor=-12&zoom=2&mode=map&animation=off&creatures=npc';
+const ENTRY = `${DESKTOP_ENTRY}&creatures=npc,monster&animation=off`;
+const VISUAL_ENTRY = `${DESKTOP_ENTRY}&animation=off`;
+const CREATURE_ONLY_PLAYBACK_ENTRY = `${DESKTOP_ENTRY}&animation=off&creatures=monster`;
+const NPC_ONLY_PLAYBACK_ENTRY = `${DESKTOP_ENTRY}&animation=off&creatures=npc`;
 
 async function overlayOpaquePixels(page) {
   return page.locator('#creature-overlay').evaluate((canvas) => {
@@ -103,17 +103,18 @@ test('desktop Atlas-owned chrome and user journey retain reviewed visual contrac
   });
 
   const search = page.locator('#search-input');
-  await search.fill('Thais');
+  const semanticLabel = isQualificationFixtureExecution() ? 'Fixture Harbor' : 'Thais';
+  await search.fill(semanticLabel);
   const results = page.locator('#semantic-search-results-desktop');
   await expect(results).toBeVisible();
-  const thais = results.getByRole('option').filter({ hasText: 'Thais' }).first();
+  const thais = results.getByRole('option').filter({ hasText: semanticLabel }).first();
   await expect(thais).toBeVisible();
   await Promise.all([
     page.waitForURL((url) => Boolean(url.searchParams.get('semantic'))),
     thais.click(),
   ]);
   await waitForAtlas(page);
-  await expect(page.locator('#inspector-content')).toContainText('Thais');
+  await expect(page.locator('#inspector-content')).toContainText(semanticLabel);
   const inspectorMetrics = await assertUserVisibleSurface(page, {
     label: 'desktop search and inspector',
     minimumMapAreaRatio: 0.28,

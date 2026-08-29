@@ -4,6 +4,8 @@ import {
   assertNoRuntimeFailures,
   captureRuntimeFailures,
   gotoAtlas,
+  isQualificationFixtureExecution,
+  qualificationAnchor,
   waitForAtlas,
 } from './runtime.mjs';
 
@@ -12,9 +14,10 @@ test('desktop FullWorld qualifies, streams verified ranges and navigates semanti
   await gotoAtlas(page, DESKTOP_ENTRY);
   await waitForAtlas(page);
 
-  await expect(page.locator('#coord-x')).toHaveText('32369');
-  await expect(page.locator('#coord-y')).toHaveText('32241');
-  await expect(page.locator('#coord-floor')).toHaveText('-7');
+  const anchor = await qualificationAnchor(page);
+  await expect(page.locator('#coord-x')).toHaveText(String(anchor?.x ?? 32369));
+  await expect(page.locator('#coord-y')).toHaveText(String(anchor?.y ?? 32241));
+  await expect(page.locator('#coord-floor')).toHaveText(String(anchor?.floor ?? -7));
   await expect.poll(() => runtime.partialResponses, { timeout: 30_000 }).toBeGreaterThan(0);
 
   await page.locator('#overview-toggle').check();
@@ -28,10 +31,11 @@ test('desktop FullWorld qualifies, streams verified ranges and navigates semanti
   );
 
   const search = page.locator('#search-input');
-  await search.fill('Thais');
+  const semanticLabel = isQualificationFixtureExecution() ? 'Fixture Harbor' : 'Thais';
+  await search.fill(semanticLabel);
   const results = page.locator('#semantic-search-results-desktop');
   await expect(results).toBeVisible();
-  const thais = results.locator('.semantic-search-result').filter({ hasText: 'Thais' }).first();
+  const thais = results.locator('.semantic-search-result').filter({ hasText: semanticLabel }).first();
   await expect(thais).toBeVisible();
 
   const semanticNavigation = page.waitForURL(
@@ -42,8 +46,8 @@ test('desktop FullWorld qualifies, streams verified ranges and navigates semanti
   await semanticNavigation;
   await waitForAtlas(page);
 
-  await expect(page.locator('#inspector-content')).toContainText('Thais');
+  await expect(page.locator('#inspector-content')).toContainText(semanticLabel);
   await expect(page.locator('#inspector-content')).toContainText('Stable public id');
-  await expect(page.locator('[data-semantic-search-layer="town"]')).toContainText('Thais');
+  await expect(page.locator('[data-semantic-search-layer="town"]')).toContainText(semanticLabel);
   assertNoRuntimeFailures(runtime);
 });

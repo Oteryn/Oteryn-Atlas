@@ -14,7 +14,7 @@ import {
   gotoAtlas,
 } from './runtime.mjs';
 
-const NPC_ENTRY = '/web/fullworld.html?x=32361&y=32198&floor=-7&zoom=2&mode=map&animation=on&creatures=npc&npcRole=shop';
+const NPC_ENTRY = `${DESKTOP_ENTRY}&animation=on&creatures=npc&npcRole=shop`;
 const DRIFT_TOLERANCE_PX = 0.25;
 
 async function waitForFinalAlignment(page) {
@@ -69,7 +69,7 @@ test('NPC overlay never commits independently from the base renderer during cont
 });
 
 
-const MONSTER_ENTRY = '/web/fullworld.html?x=33018&y=32009&floor=-7&zoom=2&mode=map&animation=off&creatures=npc,monster';
+const MONSTER_ENTRY = `${DESKTOP_ENTRY}&animation=off&creatures=npc,monster`;
 
 test('creature geometry remains floor-isolated and restores through moved deep-link reload', async ({ page }, testInfo) => {
   const runtime = captureRuntimeFailures(page);

@@ -4,6 +4,7 @@ import {
   assertNoRuntimeFailures,
   captureRuntimeFailures,
   gotoAtlas,
+  isQualificationFixtureExecution,
   waitForAtlas,
 } from './runtime.mjs';
 
@@ -29,7 +30,13 @@ function targetEntry(record, zoom = 2) {
   return `/web/fullworld.html?${params.toString()}`;
 }
 
-const OVERLAP_MONSTER_FIXTURE = Object.freeze({
+const OVERLAP_MONSTER_FIXTURE = Object.freeze(isQualificationFixtureExecution() ? {
+  kind: 'monster',
+  label: 'Fixture Raider One',
+  record_id: `monster:${'b'.repeat(32)}`,
+  position: Object.freeze({ floor: -7, x: 32283, y: 32158 }),
+  record_ids: Object.freeze(['b', 'c', 'd'].map((hex) => `monster:${hex.repeat(32)}`)),
+} : {
   kind: 'monster',
   label: 'Misguided Thief',
   record_id: 'monster:014cc0368c5989dd788e2af63e087e83',
@@ -139,7 +146,7 @@ test('desktop monster activation opens Monster spawn card and survives canonical
   await expect.poll(() => page.evaluate(() => globalThis.__OTERYN_ATLAS_CREATURES__?.cardState)).toBe('chooser');
   const choices = page.locator('#creature-card-choices button');
   expect(await choices.count()).toBeGreaterThanOrEqual(3);
-  await expect(choices.first()).toContainText('Misguided Thief');
+  await expect(choices.first()).toContainText(OVERLAP_MONSTER_FIXTURE.label);
   await choices.first().click();
   expect(OVERLAP_MONSTER_FIXTURE.record_ids).toContain((await creatureState(page)).cardRecordId);
   await expect(page.locator('#creature-card-kind')).toHaveText('Monster spawn');

@@ -32,6 +32,35 @@ test('qualification world is deterministic, complete for the 16-floor runtime co
   fs.rmSync(root, { recursive: true, force: true });
 });
 
+test('qualification world carries a non-trivial searchable corpus and dynamic NPC/monster animation fixtures', async () => {
+  const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-qualification-functional-'));
+  const root = path.join(parent, 'world');
+  try {
+    await buildQualificationWorld(root);
+    const semantic = JSON.parse(fs.readFileSync(path.join(root, 'web', 'semantic-search', 'index.json'), 'utf8'));
+    const semanticFloor = JSON.parse(fs.readFileSync(path.join(root, 'publication', 'semantic', 'floors', 'f-7.json'), 'utf8'));
+    const runtimeFloor = JSON.parse(fs.readFileSync(path.join(root, 'runtime-index', 'floors', 'f-7.json'), 'utf8'));
+    const creatures = JSON.parse(fs.readFileSync(path.join(root, 'data', 'creatures', 'search.json'), 'utf8'));
+    const programs = JSON.parse(fs.readFileSync(path.join(root, 'animation', 'programs.json'), 'utf8'));
+    assert.ok(semanticFloor.chunks.length >= 9, 'qualification world must span multiple semantic chunks for range/race coverage');
+    assert.equal(runtimeFloor.chunks.length, semanticFloor.chunks.length, 'runtime and semantic qualification chunk census must agree');
+    assert.ok(runtimeFloor.bounds.x_max_exclusive - runtimeFloor.bounds.x_min >= 96, 'qualification x bounds must span at least three regions');
+    assert.ok(runtimeFloor.bounds.y_max_exclusive - runtimeFloor.bounds.y_min >= 96, 'qualification y bounds must span at least three regions');
+    assert.ok(semantic.records.length + creatures.records.length > 50, 'qualification search corpus must exercise bounded repeated-search behavior');
+    const dynamicKinds = new Set();
+    const creatureByPresentation = new Map((creatures.records ?? []).map((record) => [record.outfit_presentation?.outfit_presentation_id, record.kind]));
+    for (const program of programs.creature_programs ?? []) {
+      if (program.phase_count > 1 && new Set(program.phase_content_ids ?? []).size > 1) {
+        const kind = creatureByPresentation.get(program.outfit_presentation_id);
+        if (kind) dynamicKinds.add(kind);
+      }
+    }
+    assert.deepEqual([...dynamicKinds].sort(), ['monster', 'npc']);
+  } finally {
+    fs.rmSync(parent, { recursive: true, force: true });
+  }
+});
+
 test('qualification trust descriptor is the exact browser trust subset of the verified product manifest', async () => {
   const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-qualification-trust-'));
   const root = path.join(parent, 'world');

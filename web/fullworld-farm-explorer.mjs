@@ -1,9 +1,10 @@
-import { findCreatureById, validateCreatureSearchRecords } from '../src/browser/creature-search.mjs';
+import { findCreatureById, validateCreatureSearchCatalog } from '../src/browser/creature-search.mjs';
+import { FULLWORLD_TRUST, ancillarySourceExpectations } from '../src/browser/fullworld-trust.mjs';
 import { estimateKillTarget } from '../src/browser/farm-intelligence.mjs';
 import { parseFarmState, serializeFarmState } from '../src/browser/farm-state.mjs';
 
 const CREATURE_SEARCH_URL = new URL('./semantic-search/creatures.json', import.meta.url);
-const EXPECTED_CREATURE_DIGEST = 'sha256:81505e91d7089f91e71813ec43f97118932db9cc7fd76d291fa399447ee2dfa4';
+const ancillarySources = ancillarySourceExpectations(FULLWORLD_TRUST);
 const MAX_CATALOG_BYTES = 2 * 1024 * 1024;
 const MAX_RESULTS = 10;
 const TIME_BASES = new Set(['active_hunt', 'hunt_wall', 'trip_wall']);
@@ -30,13 +31,7 @@ export function buildFarmUiReadiness({ farmPublicationAvailable = false, interac
 }
 
 export function validateFarmCreatureCatalog(catalog) {
-  requireValue(catalog && typeof catalog === 'object' && !Array.isArray(catalog), 'creature catalog must be an object');
-  requireValue(catalog.schema_version === 1, 'creature catalog schema unsupported');
-  requireValue(catalog.source?.contract_id === 'oteryn-game-atlas-export-v1', 'creature catalog contract unsupported');
-  requireValue(catalog.source?.capability === 'static-creatures-v1', 'creature catalog capability unsupported');
-  requireValue(catalog.source?.semantic_digest === EXPECTED_CREATURE_DIGEST, 'creature catalog semantic digest untrusted');
-  requireValue(catalog.source?.coordinate_profile === 'oteryn-native-floor-v1', 'creature catalog coordinate profile unsupported');
-  return validateCreatureSearchRecords(catalog.records);
+  return validateCreatureSearchCatalog(catalog, ancillarySources.semanticSearch).records;
 }
 
 export function searchFarmMonsterTargets(records, query, { limit = MAX_RESULTS } = {}) {

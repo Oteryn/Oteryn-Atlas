@@ -73,6 +73,33 @@ async function readQualificationSemanticIndex(page) {
   return response.json();
 }
 
+export function isQualificationFixtureExecution() {
+  const raw = process.env.ATLAS_QUALIFICATION_TRUST_JSON;
+  if (!raw) return false;
+  try {
+    const trust = JSON.parse(raw);
+    return trust?.marker === 'oteryn-atlas-qualification-trust-v1'
+      && trust?.fixtureId === 'atlas-qualification-world-v2'
+      && trust?.dataCapability === 'qualification_fixture';
+  } catch {
+    return false;
+  }
+}
+
+export async function qualificationAnchor(page) {
+  if (!isQualificationFixtureExecution()) return null;
+  const index = await readQualificationSemanticIndex(page);
+  const records = (index.records ?? []).filter((record) => Array.isArray(record?.capabilities) && record.capabilities.includes('navigation'));
+  expect(records, 'qualification fixture must expose exactly one navigable semantic record').toHaveLength(1);
+  return records[0].position;
+}
+
+export async function fixtureAwarePosition(page, fallback, { dx = 0, dy = 0, floorDelta = 0 } = {}) {
+  const anchor = await qualificationAnchor(page);
+  if (!anchor) return Object.freeze({ ...fallback });
+  return Object.freeze({ x: anchor.x + dx, y: anchor.y + dy, floor: anchor.floor + floorDelta });
+}
+
 export async function gotoAtlas(page, entry) {
   const resolvedEntry = await resolveQualificationEntry(entry, {
     qualificationTrustJson: process.env.ATLAS_QUALIFICATION_TRUST_JSON,

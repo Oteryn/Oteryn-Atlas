@@ -4,6 +4,7 @@ import {
   assertNoRuntimeFailures,
   captureRuntimeFailures,
   gotoAtlas,
+  isQualificationFixtureExecution,
   waitForAtlas,
 } from './runtime.mjs';
 
@@ -23,8 +24,10 @@ test('mobile Farm Explorer remains reachable and truthful in the existing contro
   await page.locator('#mobile-controls-toggle').click();
   await expect(page.locator('#mobile-controls-panel')).toHaveClass(/mobile-open/);
   await expect(page.locator('#farm-explorer')).toBeVisible();
-  await page.locator('#farm-creature-search').fill('Cave Rat');
-  const caveRat = page.locator('#farm-creature-results .farm-creature-result').filter({ hasText: /^Cave Rat$/ }).first();
+  const monsterLabel = isQualificationFixtureExecution() ? 'Fixture Sentinel' : 'Cave Rat';
+  const monsterEntityId = isQualificationFixtureExecution() ? `monster-entity:${'a'.repeat(32)}` : 'monster-entity:8b41afe4c98e72744557d7adc250f7e6';
+  await page.locator('#farm-creature-search').fill(monsterLabel);
+  const caveRat = page.locator('#farm-creature-results .farm-creature-result').filter({ hasText: new RegExp(`^${monsterLabel}$`) }).first();
   await expect(caveRat).toBeVisible();
   await caveRat.click();
   await page.locator('#farm-target-kills').fill('90');

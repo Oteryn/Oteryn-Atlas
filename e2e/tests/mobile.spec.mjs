@@ -4,6 +4,7 @@ import {
   assertNoRuntimeFailures,
   captureRuntimeFailures,
   gotoAtlas,
+  isQualificationFixtureExecution,
   waitForAtlas,
 } from './runtime.mjs';
 
@@ -21,10 +22,11 @@ test('mobile FullWorld exposes drawers and semantic navigation', async ({ page }
   await expect(page.locator('#mobile-drawer-backdrop')).toBeVisible();
 
   const mobileSearch = page.locator('#mobile-search-input');
-  await mobileSearch.fill('Sam');
+  const semanticLabel = isQualificationFixtureExecution() ? 'Fixture Harbor' : 'Sam';
+  await mobileSearch.fill(semanticLabel);
   const results = page.locator('#semantic-search-results-mobile');
   await expect(results).toBeVisible();
-  const sam = results.locator('.semantic-search-result').filter({ hasText: 'Sam' }).first();
+  const sam = results.locator('.semantic-search-result').filter({ hasText: semanticLabel }).first();
   await expect(sam).toBeVisible();
 
   const semanticNavigation = page.waitForURL(
@@ -39,7 +41,7 @@ test('mobile FullWorld exposes drawers and semantic navigation', async ({ page }
   await inspectorToggle.click();
   await expect(inspectorToggle).toHaveAttribute('aria-expanded', 'true');
   await expect(page.locator('#mobile-inspector-panel')).toHaveClass(/mobile-open/);
-  await expect(page.locator('#inspector-content')).toContainText('Sam');
+  await expect(page.locator('#inspector-content')).toContainText(semanticLabel);
 
   await page.keyboard.press('Escape');
   await expect(inspectorToggle).toHaveAttribute('aria-expanded', 'false');
