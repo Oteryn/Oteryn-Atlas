@@ -125,6 +125,7 @@ test('protected hosted plan preserves protected IDs and accepts candidate additi
   assert.equal(plan.workerPolicyId, 'atlas-protected-hosted-workers-v1');
   assert.deepEqual(plan.stableTestIds, [baseId, candidateId].sort());
   assert.deepEqual(plan.candidateStableIdAdditions, [candidateId]);
+  assert.deepEqual(plan.candidateStableIdModifications, []);
   assert.deepEqual(plan.productIdentities, {
     qualification_fixture: { id: 'atlas-qualification-world-v2', digest: productDigest },
   });
@@ -135,6 +136,16 @@ test('protected hosted plan preserves protected IDs and accepts candidate additi
     'workerPolicyDigest', 'productIdentitiesDigest', 'expectedStableTestIdsDigest',
     'executionPolicyDigest', 'planDigest',
   ]) assert.match(plan[field], /^sha256:[a-f0-9]{64}$/, field);
+});
+
+test('changed existing spec IDs are candidate modifications while remaining protected lower-bound work', () => {
+  const plan = build({
+    changedFiles: [{ path: 'e2e/tests/desktop.spec.mjs' }],
+    candidateCensus: candidateCensus([baseId, candidateId]),
+  });
+  assert.deepEqual(plan.candidateStableIdAdditions, [candidateId]);
+  assert.deepEqual(plan.candidateStableIdModifications, [baseId]);
+  assert.ok(plan.stableTestIds.includes(baseId));
 });
 
 test('candidate deletion or replacement cannot remove the protected-base stable ID', () => {
