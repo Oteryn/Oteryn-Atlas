@@ -68,7 +68,7 @@ export function captureRuntimeFailures(page) {
 }
 
 async function readQualificationSemanticIndex(page) {
-  const response = await page.request.get('/fullworld/web/semantic-search/index.json');
+  const response = await page.request.get('/web/semantic-search/index.json');
   expect(response.ok(), `Qualification semantic index returned HTTP ${response.status()}`).toBeTruthy();
   return response.json();
 }
