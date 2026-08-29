@@ -43,7 +43,7 @@ test('protected execution promotion qualification is GitHub-hosted, exact-head, 
   assert.match(workflow, /node --test tests\/verification\/protected-hosted-execution\.test\.mjs/);
   assert.match(workflow, /statuses:\s*write/);
   assert.match(workflow, /context='atlas-local-e2e'|context.*atlas-local-e2e/s);
-  assert.doesNotMatch(workflow, /playwright test|\\e2e\\run\.ps1|ATLAS_PUBLICATION_ORIGIN|visual-review\.json|synology/i);
+  assert.doesNotMatch(workflow, /\\e2e\\run\.ps1|ATLAS_PUBLICATION_ORIGIN|visual-review\.json|synology/i);
 });
 
 test('protected execution promotion preauthorizes the qualification trust-descriptor repair on exact GitHub-hosted evidence', () => {
@@ -108,7 +108,7 @@ test('protected execution promotion preauthorizes candidate-modification overlay
   assert.doesNotMatch(job, /playwright test|group:\s*atlas-runners|labels:\s*oteryn-atlas-pc|ATLAS_PUBLICATION_ORIGIN|visual-review\.json|synology/i);
 });
 
-test('protected execution promotion preauthorizes planned-census modification filtering on exact GitHub-hosted evidence', () => {
+test('protected execution promotion preauthorizes planned-census filtering plus one exact qualification-navigation browser proof', () => {
   const workflow = fs.readFileSync(workflowPath, 'utf8');
   const legacy = fs.readFileSync(legacyWorkflowPath, 'utf8');
   const heavy = legacy.split('  legacy-qualification:')[1]?.split('  protected-census-bootstrap:')[0] ?? '';
@@ -131,7 +131,16 @@ test('protected execution promotion preauthorizes planned-census modification fi
   assert.match(job, /--read-only/);
   assert.match(job, /--cap-drop ALL/);
   assert.match(job, /no-new-privileges/);
+  assert.match(job, /buildQualificationWorld/);
+  assert.match(job, /qualificationTrustDescriptor/);
+  assert.match(job, /fullworld\/web\/semantic-search\/index\.json/);
+  assert.match(job, /protected-navigation-bootstrap-desktop\.spec\.mjs/);
+  assert.match(job, /playwright test[\s\S]*protected-navigation-bootstrap-desktop\.spec\.mjs/);
+  assert.match(job, /--project=desktop-chromium/);
+  assert.match(job, /--workers=1/);
+  assert.match(job, /--retries=0/);
+  assert.match(job, /qualificationResult/);
   assert.match(job, /statuses:\s*write/);
   assert.match(job, /context='atlas-local-e2e'|context.*atlas-local-e2e/s);
-  assert.doesNotMatch(job, /playwright test|group:\s*atlas-runners|labels:\s*oteryn-atlas-pc|ATLAS_PUBLICATION_ORIGIN|visual-review\.json|synology/i);
+  assert.doesNotMatch(job, /group:\s*atlas-runners|labels:\s*oteryn-atlas-pc|ATLAS_PUBLICATION_ORIGIN|visual-review\.json|synology|real_fullworld/i);
 });
