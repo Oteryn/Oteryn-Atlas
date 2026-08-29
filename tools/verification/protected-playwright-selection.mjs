@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { stableTestId } from './stable-id.mjs';
 
 const LIST_ROW = /^\s*\[([^\]]+)\]\s+›\s+([^:]+):\d+:\d+\s+›\s+(.+)$/;
-const PLACEMENTS = new Set(['protected', 'candidate-additions']);
+const PLACEMENTS = new Set(['protected', 'candidate-additions', 'candidate-modifications']);
 const HOSTED_DATA_CAPABILITIES = new Set(['qualification_fixture', 'bounded_real_world']);
 
 function exactStableIds(value, label, { allowEmpty = false } = {}) {
@@ -16,7 +16,7 @@ function exactStableIds(value, label, { allowEmpty = false } = {}) {
   return [...value].sort();
 }
 
-function exactPartition(partition, hostedSet, protectedSet, candidateAdditionSet, seenCapabilities, seenIds) {
+function exactPartition(partition, hostedSet, protectedSet, candidateAdditionSet, candidateModificationSet, seenCapabilities, seenIds) {
   if (!partition || typeof partition !== 'object' || Array.isArray(partition)) {
     throw new TypeError('protected Playwright data capability partition must be an object');
   }
@@ -40,6 +40,11 @@ function exactPartition(partition, hostedSet, protectedSet, candidateAdditionSet
     `${dataCapability} candidate-addition stable IDs`,
     { allowEmpty: true },
   );
+  const candidateModifiedStableTestIds = exactStableIds(
+    partition.candidateModifiedStableTestIds ?? [],
+    `${dataCapability} candidate-modification stable IDs`,
+    { allowEmpty: true },
+  );
   const sourcePartition = [...new Set([...protectedStableTestIds, ...candidateAdditionalStableTestIds])].sort();
   if (sourcePartition.length !== stableTestIds.length
     || sourcePartition.some((id, index) => id !== stableTestIds[index])) {
@@ -59,11 +64,15 @@ function exactPartition(partition, hostedSet, protectedSet, candidateAdditionSet
   if (candidateAdditionalStableTestIds.some((id) => !candidateAdditionSet.has(id))) {
     throw new TypeError(`protected Playwright ${dataCapability} partition contains a non-candidate-addition source ID`);
   }
+  if (candidateModifiedStableTestIds.some((id) => !protectedSet.has(id) || !candidateModificationSet.has(id))) {
+    throw new TypeError(`protected Playwright ${dataCapability} partition contains a non-candidate-modification source ID`);
+  }
   return Object.freeze({
     dataCapability,
     stableTestIds: Object.freeze(stableTestIds),
     protectedStableTestIds: Object.freeze(protectedStableTestIds),
     candidateAdditionalStableTestIds: Object.freeze(candidateAdditionalStableTestIds),
+    candidateModifiedStableTestIds: Object.freeze(candidateModifiedStableTestIds),
   });
 }
 
@@ -75,11 +84,13 @@ function validateExecution(execution) {
   const hosted = exactStableIds(execution.hosted.stableTestIds, 'hosted stable IDs', { allowEmpty: true });
   const protectedStableTestIds = exactStableIds(execution.hosted.protectedStableTestIds, 'protected hosted stable IDs', { allowEmpty: true });
   const candidateAdditionalStableTestIds = exactStableIds(execution.hosted.candidateAdditionalStableTestIds, 'candidate-addition hosted stable IDs', { allowEmpty: true });
+  const candidateModifiedStableTestIds = exactStableIds(execution.hosted.candidateModifiedStableTestIds ?? [], 'candidate-modification hosted stable IDs', { allowEmpty: true });
   const specialist = exactStableIds(execution.specialist.stableTestIds, 'specialist stable IDs', { allowEmpty: true });
   const specialistSet = new Set(specialist);
   const hostedSet = new Set(hosted);
   const protectedSet = new Set(protectedStableTestIds);
   const candidateAdditionSet = new Set(candidateAdditionalStableTestIds);
+  const candidateModificationSet = new Set(candidateModifiedStableTestIds);
 
   const placementOverlap = hosted.filter((id) => specialistSet.has(id));
   if (placementOverlap.length) throw new TypeError(`protected Playwright placement overlap: ${placementOverlap.join(', ')}`);
@@ -91,6 +102,9 @@ function validateExecution(execution) {
   }
   if (protectedStableTestIds.some((id) => !hostedSet.has(id)) || candidateAdditionalStableTestIds.some((id) => !hostedSet.has(id))) {
     throw new TypeError('protected Playwright source placement contains a non-hosted stable ID');
+  }
+  if (candidateModifiedStableTestIds.some((id) => !protectedSet.has(id))) {
+    throw new TypeError('protected Playwright candidate-modification overlay must be a subset of protected hosted stable IDs');
   }
 
   let partitions = [];
@@ -105,6 +119,7 @@ function validateExecution(execution) {
       hostedSet,
       protectedSet,
       candidateAdditionSet,
+      candidateModificationSet,
       seenCapabilities,
       seenIds,
     ));
@@ -112,12 +127,18 @@ function validateExecution(execution) {
     if (partitionIds.length !== hosted.length || partitionIds.some((id, index) => id !== hosted[index])) {
       throw new TypeError('protected Playwright data capability partitions must exactly partition hosted stable IDs');
     }
+    const partitionModificationIds = partitions.flatMap((partition) => partition.candidateModifiedStableTestIds).sort();
+    if (partitionModificationIds.length !== candidateModifiedStableTestIds.length
+      || partitionModificationIds.some((id, index) => id !== candidateModifiedStableTestIds[index])) {
+      throw new TypeError('protected Playwright data capability partitions must exactly cover candidate-modification overlay IDs');
+    }
   }
 
   return {
     hosted,
     protectedStableTestIds,
     candidateAdditionalStableTestIds,
+    candidateModifiedStableTestIds,
     specialist,
     partitions,
   };
@@ -125,14 +146,16 @@ function validateExecution(execution) {
 
 export function buildProtectedPlaywrightSelection(listText, execution, { placement, dataCapability } = {}) {
   if (typeof listText !== 'string') throw new TypeError('Playwright source list must be text');
-  if (!PLACEMENTS.has(placement)) throw new TypeError('protected Playwright selection placement must be protected or candidate-additions');
+  if (!PLACEMENTS.has(placement)) throw new TypeError('protected Playwright selection placement must be protected, candidate-additions or candidate-modifications');
   const validated = validateExecution(execution);
 
   let selectedStableIds;
   if (dataCapability == null) {
     selectedStableIds = placement === 'protected'
       ? validated.protectedStableTestIds
-      : validated.candidateAdditionalStableTestIds;
+      : placement === 'candidate-additions'
+        ? validated.candidateAdditionalStableTestIds
+        : validated.candidateModifiedStableTestIds;
   } else {
     if (!HOSTED_DATA_CAPABILITIES.has(dataCapability)) {
       throw new TypeError(`protected Playwright data capability is unsupported for hosted execution: ${dataCapability}`);
@@ -141,7 +164,9 @@ export function buildProtectedPlaywrightSelection(listText, execution, { placeme
     if (!partition) throw new TypeError(`protected Playwright data capability partition is missing: ${dataCapability}`);
     selectedStableIds = placement === 'protected'
       ? partition.protectedStableTestIds
-      : partition.candidateAdditionalStableTestIds;
+      : placement === 'candidate-additions'
+        ? partition.candidateAdditionalStableTestIds
+        : partition.candidateModifiedStableTestIds;
   }
 
   const rowsByStableId = new Map();
@@ -171,7 +196,7 @@ export function buildProtectedPlaywrightSelection(listText, execution, { placeme
 
 function parseArgs(argv) {
   if (argv.length !== 6 && argv.length !== 8) {
-    throw new TypeError('usage: protected-playwright-selection.mjs --list <list> --execution <execution.json> --placement <protected|candidate-additions> [--data-capability <qualification_fixture|bounded_real_world>]');
+    throw new TypeError('usage: protected-playwright-selection.mjs --list <list> --execution <execution.json> --placement <protected|candidate-additions|candidate-modifications> [--data-capability <qualification_fixture|bounded_real_world>]');
   }
   const allowed = ['--list', '--execution', '--placement', '--data-capability'];
   const result = {};
