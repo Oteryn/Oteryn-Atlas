@@ -104,15 +104,10 @@ function validateCandidateCensus(candidate, candidateHeadSha, catalogs) {
   });
 }
 
-function candidateStableIdModifications(changedPaths, protectedStableTestIds, candidateStableTestIds) {
+function deriveCandidateStableIdModifications(changedPaths, protectedStableTestIds, candidateStableTestIds) {
   const candidateSet = new Set(candidateStableTestIds);
   const shared = protectedStableTestIds.filter((id) => candidateSet.has(id));
   if (shared.length === 0) return [];
-
-  // The changed-file list comes from the protected controller's GitHub evidence. A
-  // candidate therefore cannot self-declare which protected tests deserve a second
-  // candidate-body proof. If change evidence is unavailable, fail closed by proving
-  // every shared protected stable ID from both bodies.
   if (!Array.isArray(changedPaths) || changedPaths.length === 0) return [...shared].sort();
 
   const changedSpecs = new Set(changedPaths.filter((path) => PLAYWRIGHT_SPEC.test(path)));
@@ -174,7 +169,7 @@ export function buildProtectedHostedPlan(input) {
     candidateVerificationCatalog: candidateCatalog,
     protectedStableTestIds: widenedStableIds,
   });
-  const candidateStableIdModifications = candidateStableIdModifications(
+  const candidateStableIdModifications = deriveCandidateStableIdModifications(
     basePlan.changedPaths,
     protectedCensus.stableTestIds,
     candidateCensus.census.stableTestIds,
