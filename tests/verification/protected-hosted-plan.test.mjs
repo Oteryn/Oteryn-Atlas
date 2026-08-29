@@ -174,3 +174,30 @@ test('every required publication capability must have an exact product identity'
   assert.throws(() => build({ productIdentities: {} }), /product.*qualification_fixture/i);
   assert.throws(() => build({ productIdentities: { qualification_fixture: { id: 'fixture', digest: 'not-a-digest' } } }), /product.*digest/i);
 });
+
+test('shared infrastructure modification overlay stays inside the exact planned stable-ID census', () => {
+  const specialistId = 'desktop-chromium::e2e/tests/specialist.spec.mjs::specialist census';
+  const trustedCatalog = catalog(['e2e/tests/desktop.spec.mjs']);
+  const candidateCatalog = catalog(['e2e/tests/desktop.spec.mjs', 'e2e/tests/candidate-new-desktop.spec.mjs']);
+  for (const current of [trustedCatalog, candidateCatalog]) {
+    current.groups['e2e.specialist'] = {
+      ...group(['e2e/tests/specialist.spec.mjs']),
+      capabilities: {
+        ...group().capabilities,
+        hosted: false,
+        dataCapability: 'real_fullworld',
+        specialistReason: 'real-fullworld-product',
+      },
+      fullSafetyNet: false,
+    };
+  }
+  const plan = build({
+    changedFiles: [{ path: 'e2e/tests/runtime.mjs' }],
+    trustedVerificationCatalog: trustedCatalog,
+    candidateVerificationCatalog: candidateCatalog,
+    protectedCensus: census([baseId, specialistId]),
+    candidateCensus: candidateCensus([baseId, candidateId, specialistId]),
+  });
+  assert.ok(!plan.stableTestIds.includes(specialistId));
+  assert.deepEqual(plan.candidateStableIdModifications, [baseId]);
+});

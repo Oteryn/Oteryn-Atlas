@@ -134,6 +134,7 @@ test('reload during an in-flight range discards the old operation and requalifie
     await faults.dispose();
   }
 });
+
 test('browser back supersedes an in-flight historical view without stale commit', async ({ page }) => {
   const runtime = captureRuntimeFailures(page);
   await gotoAtlas(page, DESKTOP_ENTRY);
@@ -144,7 +145,7 @@ test('browser back supersedes an in-flight historical view without stale commit'
     const moved = new URL(page.url());
     moved.searchParams.set('x', '32469');
     moved.searchParams.set('y', '32341');
-    await page.goto(moved.href, { waitUntil: 'domcontentloaded' });
+    await gotoAtlas(page, moved.href);
     await faults.waitForHeld(1);
     await page.goBack({ waitUntil: 'domcontentloaded' });
     faults.releaseAll();

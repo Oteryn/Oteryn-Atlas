@@ -43,7 +43,7 @@ test('protected execution promotion qualification is GitHub-hosted, exact-head, 
   assert.match(workflow, /node --test tests\/verification\/protected-hosted-execution\.test\.mjs/);
   assert.match(workflow, /statuses:\s*write/);
   assert.match(workflow, /context='atlas-local-e2e'|context.*atlas-local-e2e/s);
-  assert.doesNotMatch(workflow, /playwright test|\\e2e\\run\.ps1|ATLAS_PUBLICATION_ORIGIN|visual-review\.json|synology/i);
+  assert.doesNotMatch(workflow, /\\e2e\\run\.ps1|ATLAS_PUBLICATION_ORIGIN|visual-review\.json|synology/i);
 });
 
 test('protected execution promotion preauthorizes the qualification trust-descriptor repair on exact GitHub-hosted evidence', () => {
@@ -82,7 +82,7 @@ test('protected execution promotion preauthorizes candidate-modification overlay
   const workflow = fs.readFileSync(workflowPath, 'utf8');
   const legacy = fs.readFileSync(legacyWorkflowPath, 'utf8');
   const heavy = legacy.split('  legacy-qualification:')[1]?.split('  protected-census-bootstrap:')[0] ?? '';
-  const job = workflow.split('  candidate-modification-overlay:')[1] ?? '';
+  const job = workflow.split('  candidate-modification-overlay:')[1]?.split('  candidate-modification-census-filter:')[0] ?? '';
 
   assert.match(job, /fix\/issue-179-protected-candidate-modifications/);
   assert.doesNotMatch(heavy, /fix\/issue-179-protected-candidate-modifications/);
@@ -106,4 +106,43 @@ test('protected execution promotion preauthorizes candidate-modification overlay
   assert.match(job, /statuses:\s*write/);
   assert.match(job, /context='atlas-local-e2e'|context.*atlas-local-e2e/s);
   assert.doesNotMatch(job, /playwright test|group:\s*atlas-runners|labels:\s*oteryn-atlas-pc|ATLAS_PUBLICATION_ORIGIN|visual-review\.json|synology/i);
+});
+
+test('protected execution promotion preauthorizes planned-census filtering plus one exact qualification-navigation browser proof', () => {
+  const workflow = fs.readFileSync(workflowPath, 'utf8');
+  const legacy = fs.readFileSync(legacyWorkflowPath, 'utf8');
+  const heavy = legacy.split('  legacy-qualification:')[1]?.split('  protected-census-bootstrap:')[0] ?? '';
+  const job = workflow.split('  candidate-modification-census-filter:')[1] ?? '';
+
+  assert.match(job, /fix\/issue-179-protected-modification-census-filter/);
+  assert.doesNotMatch(heavy, /fix\/issue-179-protected-modification-census-filter/);
+  assert.match(job, /runs-on:\s*ubuntu-24\.04/);
+  assert.match(job, /tests\/verification\/protected-hosted-plan\.test\.mjs/);
+  assert.match(job, /tools\/verification\/protected-hosted-plan\.mjs/);
+  assert.match(job, /e2e\/tests\/qualification-navigation\.mjs/);
+  assert.match(job, /e2e\/tests\/runtime\.mjs/);
+  assert.match(job, /e2e\/tests\/race-desktop\.spec\.mjs/);
+  assert.match(job, /e2e\/tests\/state-desktop\.spec\.mjs/);
+  assert.match(job, /qualification-browser-trust\.test\.mjs/);
+  assert.match(job, /qualification-navigation-contract\.test\.mjs/);
+  assert.match(job, /qualification-navigation-input\.test\.mjs/);
+  assert.match(job, /assert-current-pr-head\.mjs/);
+  assert.match(job, /--network none/);
+  assert.match(job, /--read-only/);
+  assert.match(job, /--cap-drop ALL/);
+  assert.match(job, /no-new-privileges/);
+  assert.match(job, /buildQualificationWorld/);
+  assert.match(job, /qualificationTrustDescriptor/);
+  assert.match(job, /compose\.protected-hosted-executor\.yml/);
+  assert.match(job, /compose\.github-hosted\.yml/);
+  assert.match(job, /ATLAS_QUALIFICATION_PUBLICATION_HOST/);
+  assert.match(job, /protected-navigation-bootstrap-desktop\.spec\.mjs/);
+  assert.match(job, /playwright test[\s\S]*protected-navigation-bootstrap-desktop\.spec\.mjs/);
+  assert.match(job, /--project=desktop-chromium/);
+  assert.match(job, /--workers=1/);
+  assert.match(job, /--retries=0/);
+  assert.match(job, /qualificationResult/);
+  assert.match(job, /statuses:\s*write/);
+  assert.match(job, /context='atlas-local-e2e'|context.*atlas-local-e2e/s);
+  assert.doesNotMatch(job, /group:\s*atlas-runners|labels:\s*oteryn-atlas-pc|visual-review\.json|synology|real_fullworld/i);
 });
