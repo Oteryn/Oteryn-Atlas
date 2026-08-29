@@ -82,7 +82,7 @@ test('protected execution promotion preauthorizes candidate-modification overlay
   const workflow = fs.readFileSync(workflowPath, 'utf8');
   const legacy = fs.readFileSync(legacyWorkflowPath, 'utf8');
   const heavy = legacy.split('  legacy-qualification:')[1]?.split('  protected-census-bootstrap:')[0] ?? '';
-  const job = workflow.split('  candidate-modification-overlay:')[1] ?? '';
+  const job = workflow.split('  candidate-modification-overlay:')[1]?.split('  candidate-modification-census-filter:')[0] ?? '';
 
   assert.match(job, /fix\/issue-179-protected-candidate-modifications/);
   assert.doesNotMatch(heavy, /fix\/issue-179-protected-candidate-modifications/);
