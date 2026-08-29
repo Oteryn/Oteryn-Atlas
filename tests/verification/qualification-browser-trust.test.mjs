@@ -96,8 +96,16 @@ test('Playwright resolves qualification navigation before the only Atlas navigat
       semantic_digest: descriptor.semanticRoot,
       contract_id: 'oteryn-atlas-qualification-fixture-v1',
       capability: 'qualification-semantic-search-v1',
+      default_navigation: {
+        contract_id: 'oteryn-atlas-qualification-default-navigation-v1',
+        record_id: 'semantic-record:qualification-harbor',
+      },
     },
-    records: [{ capabilities: ['navigation'], position: { x: 101, y: 202, floor: -3 } }],
+    records: [{
+      id: 'semantic-record:qualification-harbor',
+      capabilities: ['navigation'],
+      position: { x: 101, y: 202, floor: -3 },
+    }],
   };
   const navigations = [];
   const events = [];
