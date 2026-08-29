@@ -53,6 +53,9 @@ function makeJobs() {
   return [
     {
       id: 1001,
+      run_id: 991,
+      run_attempt: 1,
+      head_sha: sha('1'),
       name: 'hosted-browser / shard 1',
       created_at: '2026-08-27T10:00:00.000Z',
       started_at: '2026-08-27T10:00:05.000Z',
@@ -70,6 +73,9 @@ function makeJobs() {
     },
     {
       id: 1002,
+      run_id: 991,
+      run_attempt: 1,
+      head_sha: sha('1'),
       name: 'hosted-browser / shard 2 + fan-in',
       created_at: '2026-08-27T10:00:20.000Z',
       started_at: '2026-08-27T10:00:25.000Z',
@@ -341,6 +347,9 @@ test('hosted benchmark collector preserves a cancelled failure even when no job 
   run.updated_at = '2026-08-27T10:00:15.000Z';
   const jobs = [{
     id: 1003,
+    run_id: 991,
+    run_attempt: 1,
+    head_sha: sha('1'),
     name: 'hosted-browser / cancelled before runner assignment',
     created_at: '2026-08-27T10:00:01.000Z',
     started_at: null,
