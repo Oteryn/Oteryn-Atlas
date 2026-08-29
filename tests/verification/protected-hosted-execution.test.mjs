@@ -302,7 +302,28 @@ test('protected promotion qualification registry binds exact functional qualific
       'web/fullworld-search.mjs',
     ],
     expectedProductDigest: 'sha256:7bac8358ecb8e44d05636f9657c318fa6bb6f22445143237c8fa207d45be820b',
+    candidateCensusMount: {
+      sourceTree: 'exact-candidate-checkout',
+      containerRoot: '/candidate',
+      readOnly: true,
+      dependencySource: '/protected-e2e-node-modules/node_modules',
+      dependencyTarget: 'e2e/node_modules',
+      dependencyLinkPhase: 'host-before-readonly-mount',
+    },
   });
   assert.equal(Object.isFrozen(spec), true);
   assert.equal(Object.isFrozen(spec.changedFiles), true);
+});
+
+test('functional qualification registry binds protected dependencies before the read-only candidate mount', () => {
+  const spec = resolveProtectedPromotionQualification('fix/issue-179-qualification-functional-fixture');
+  assert.deepEqual(spec.candidateCensusMount, {
+    sourceTree: 'exact-candidate-checkout',
+    containerRoot: '/candidate',
+    readOnly: true,
+    dependencySource: '/protected-e2e-node-modules/node_modules',
+    dependencyTarget: 'e2e/node_modules',
+    dependencyLinkPhase: 'host-before-readonly-mount',
+  });
+  assert.equal(Object.isFrozen(spec.candidateCensusMount), true);
 });
