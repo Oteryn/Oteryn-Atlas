@@ -48,13 +48,13 @@ jobs:
           if ($env:RUNNER_NAME -notmatch '^oteryn-molehill-atlas(?:-[0-9]+)?$') { throw "Unexpected runner: $env:RUNNER_NAME" }
           if ($env:RUNNER_OS -ne 'Windows') { throw "Unexpected runner OS: $env:RUNNER_OS" }
           function Test-MolehillDockerReady {
-            docker version *> $null
+            cmd.exe /d /c "docker version >NUL 2>NUL"
             return $LASTEXITCODE -eq 0
           }
           if (-not (Test-MolehillDockerReady)) {
             $started = $false
             try {
-              docker desktop start *> $null
+              cmd.exe /d /c "docker desktop start >NUL 2>NUL"
               $started = $LASTEXITCODE -eq 0
             } catch {
               $started = $false
