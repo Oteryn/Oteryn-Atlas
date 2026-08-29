@@ -666,6 +666,111 @@ jobs:
             "$ATLAS_CANDIDATE_IMAGE" \
             bash -lc 'cd /candidate && node --test tests/verification/protected-hosted-plan.test.mjs tests/verification/protected-execution-promotion-workflow-contract.test.mjs tests/verification/qualification-browser-trust.test.mjs tests/verification/qualification-navigation-contract.test.mjs tests/verification/qualification-navigation-input.test.mjs'
 
+      - name: Prove protected qualification navigation in one Chromium test
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_root="$RUNNER_TEMP/atlas-modification-filter-qualification"
+          trust_path="$RUNNER_TEMP/atlas-modification-filter-trust.json"
+          execution_context="$RUNNER_TEMP/atlas-modification-filter-context"
+          artifacts="$RUNNER_TEMP/atlas-modification-filter-artifacts"
+          test_list="$RUNNER_TEMP/atlas-modification-filter-test-list.txt"
+          rm -rf "$source_root" "$execution_context" "$artifacts"
+          mkdir -p "$execution_context" "$artifacts"
+          : > "$test_list"
+
+          SOURCE_ROOT="$source_root" TRUST_PATH="$trust_path" node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import {
+            buildQualificationWorld,
+            qualificationTrustDescriptor,
+            verifyQualificationWorld,
+          } from './trusted-base/tools/verification/qualification-world.mjs';
+
+          const built = await buildQualificationWorld(process.env.SOURCE_ROOT);
+          const verified = await verifyQualificationWorld(process.env.SOURCE_ROOT);
+          if (built.productDigest !== verified.productDigest || built.fixtureId !== verified.fixtureId) {
+            throw new TypeError('qualification fixture build/verify identity mismatch');
+          }
+          fs.writeFileSync(process.env.TRUST_PATH, `${JSON.stringify(qualificationTrustDescriptor(verified))}\n`, 'utf8');
+          NODE
+
+          rsync -a --delete --exclude='.git' candidate/ "$execution_context/"
+          for path in e2e e2e/tests web src; do
+            test -d "$execution_context/$path"
+            test ! -L "$execution_context/$path"
+          done
+          rm -rf "$execution_context/e2e/node_modules"
+          rm -f "$execution_context/.dockerignore" "$execution_context/e2e/Dockerfile.dockerignore"
+          cp trusted-base/e2e/Dockerfile "$execution_context/e2e/Dockerfile"
+          cp trusted-base/e2e/package.json trusted-base/e2e/package-lock.json "$execution_context/e2e/"
+          cp trusted-base/e2e/playwright.config.mjs trusted-base/e2e/summary-reporter.mjs "$execution_context/e2e/"
+          mkdir -p "$execution_context/tools/verification"
+          cp trusted-base/tools/verification/stable-id.mjs "$execution_context/tools/verification/stable-id.mjs"
+
+          cat > "$execution_context/e2e/tests/protected-navigation-bootstrap-desktop.spec.mjs" <<'SPEC'
+          import { test, expect } from '@playwright/test';
+          import { DESKTOP_ENTRY, gotoAtlas, qualificationResult } from './runtime.mjs';
+
+          test('protected qualification navigation resolves the verified fixture entry before Atlas navigation', async ({ page }) => {
+            const semanticResponse = await page.request.get('/web/semantic-search/index.json');
+            expect(semanticResponse.ok()).toBeTruthy();
+            const semanticIndex = await semanticResponse.json();
+            const navigable = semanticIndex.records.filter((record) => Array.isArray(record?.capabilities) && record.capabilities.includes('navigation'));
+            expect(navigable).toHaveLength(1);
+            const expected = navigable[0].position;
+
+            await gotoAtlas(page, DESKTOP_ENTRY);
+            const current = new URL(page.url());
+            expect(Number(current.searchParams.get('x'))).toBe(expected.x);
+            expect(Number(current.searchParams.get('y'))).toBe(expected.y);
+            expect(Number(current.searchParams.get('floor'))).toBe(expected.floor);
+            expect(current.searchParams.get('zoom')).toBe('2');
+            expect(current.searchParams.get('mode')).toBe('map');
+
+            const { status, result } = await qualificationResult(page);
+            expect(status, result.error || 'qualification status').toBe('PASS');
+            expect(result.status).toBe('PASS');
+            expect(result.error).toBeNull();
+            expect(result.capabilities?.blockedOrUnknownEnabled).toBe(false);
+            await expect(page.locator('#runtime-badge')).toContainText('VERIFIED FULL-WORLD');
+            await expect(page.locator('#diag-backend')).toContainText(/webgl2/i);
+          });
+          SPEC
+
+          export COMPOSE_PROJECT_NAME="atlas-modification-filter-${GITHUB_RUN_ID}"
+          export ATLAS_CODE_REVISION="$ATLAS_CODE_REVISION"
+          export ATLAS_VERIFICATION_PLAN_SHA256="sha256:$(printf '%s' "$ATLAS_CODE_REVISION" | sha256sum | awk '{print $1}')"
+          export ATLAS_E2E_SHARD='1/1'
+          export ATLAS_E2E_WORKERS='1'
+          export ATLAS_QUALIFICATION_PUBLICATION_HOST="$source_root"
+          export ATLAS_QUALIFICATION_TRUST_JSON="$(jq -c . "$trust_path")"
+          export ATLAS_EXECUTION_CONTEXT="$execution_context"
+          export ATLAS_E2E_ARTIFACTS_HOST="$artifacts"
+          export ATLAS_PROTECTED_TEST_LIST="$test_list"
+
+          compose_down() {
+            docker compose \
+              -f trusted-base/e2e/compose.protected-hosted-executor.yml \
+              -f trusted-base/e2e/compose.github-hosted.yml \
+              down -v --remove-orphans >/dev/null 2>&1 || true
+          }
+          trap compose_down EXIT
+          compose_down
+          docker compose \
+            -f trusted-base/e2e/compose.protected-hosted-executor.yml \
+            -f trusted-base/e2e/compose.github-hosted.yml \
+            up -d --wait atlas-publication atlas-web
+          docker compose \
+            -f trusted-base/e2e/compose.protected-hosted-executor.yml \
+            -f trusted-base/e2e/compose.github-hosted.yml \
+            build e2e
+          docker compose \
+            -f trusted-base/e2e/compose.protected-hosted-executor.yml \
+            -f trusted-base/e2e/compose.github-hosted.yml \
+            run --rm e2e \
+            bash -lc 'exec ./node_modules/.bin/playwright test tests/protected-navigation-bootstrap-desktop.spec.mjs --config=playwright.config.mjs --project=desktop-chromium --workers=1 --retries=0'
+
       - name: Fence exact head and publish planned-census compatibility status
         shell: bash
         run: |
@@ -681,5 +786,5 @@ jobs:
             "repos/$GITHUB_REPOSITORY/statuses/$ATLAS_CODE_REVISION" \
             -f state='success' \
             -f context='atlas-local-e2e' \
-            -f description='Protected GitHub-hosted planned-census proof; no browser E2E executed' \
+            -f description='Protected GitHub-hosted qualification-navigation Chromium proof' \
             -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
