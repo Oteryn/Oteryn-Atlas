@@ -9,6 +9,7 @@ import {
   waitForRendererCommit,
 } from '../support/diagnostics.mjs';
 import {
+  DESKTOP_ENTRY,
   assertNoRuntimeFailures,
   captureRuntimeFailures,
   gotoAtlas,
@@ -67,7 +68,6 @@ test('NPC overlay never commits independently from the base renderer during cont
   expect(analysis.mismatches, JSON.stringify(analysis.mismatches, null, 2)).toEqual([]);
   assertNoRuntimeFailures(runtime);
 });
-
 
 const MONSTER_ENTRY = `${DESKTOP_ENTRY}&animation=off&creatures=npc,monster`;
 
