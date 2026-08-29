@@ -147,7 +147,11 @@ function collectPhaseObservations(normalizedJobs, phaseMap, runConclusion) {
       if (!isPlainObject(step) || typeof step.name !== 'string' || step.name.length === 0) invalid(`job ${job.raw.id} step ${stepIndex} is malformed`);
       if (step.started_at == null || step.completed_at == null) continue;
       const stepStartedMs = parseTimestamp(step.started_at, `job ${job.raw.id} step ${stepIndex}.started_at`);
+      const stepCompletedMs = parseTimestamp(step.completed_at, `job ${job.raw.id} step ${stepIndex}.completed_at`);
       const stepDuration = durationMs(step.started_at, step.completed_at, `job ${job.raw.id} step ${stepIndex}`);
+      if (job.startedMs == null || job.completedMs == null || stepStartedMs < job.startedMs || stepCompletedMs > job.completedMs) {
+        invalid(`job ${job.raw.id} step ${stepIndex} is outside job timing window`);
+      }
       const matching = phases.filter((phase) => phase.patterns.some((pattern) => pattern.test(step.name)));
       if (matching.length > 1) invalid(`step ${JSON.stringify(step.name)} matches multiple benchmark phases`);
       if (matching.length === 1) {
