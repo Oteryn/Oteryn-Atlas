@@ -133,7 +133,9 @@ test('protected execution promotion preauthorizes planned-census filtering plus 
   assert.match(job, /no-new-privileges/);
   assert.match(job, /buildQualificationWorld/);
   assert.match(job, /qualificationTrustDescriptor/);
-  assert.match(job, /fullworld\/web\/semantic-search\/index\.json/);
+  assert.match(job, /compose\.protected-hosted-executor\.yml/);
+  assert.match(job, /compose\.github-hosted\.yml/);
+  assert.match(job, /ATLAS_QUALIFICATION_PUBLICATION_HOST/);
   assert.match(job, /protected-navigation-bootstrap-desktop\.spec\.mjs/);
   assert.match(job, /playwright test[\s\S]*protected-navigation-bootstrap-desktop\.spec\.mjs/);
   assert.match(job, /--project=desktop-chromium/);
@@ -142,5 +144,5 @@ test('protected execution promotion preauthorizes planned-census filtering plus 
   assert.match(job, /qualificationResult/);
   assert.match(job, /statuses:\s*write/);
   assert.match(job, /context='atlas-local-e2e'|context.*atlas-local-e2e/s);
-  assert.doesNotMatch(job, /group:\s*atlas-runners|labels:\s*oteryn-atlas-pc|ATLAS_PUBLICATION_ORIGIN|visual-review\.json|synology|real_fullworld/i);
+  assert.doesNotMatch(job, /group:\s*atlas-runners|labels:\s*oteryn-atlas-pc|visual-review\.json|synology|real_fullworld/i);
 });
