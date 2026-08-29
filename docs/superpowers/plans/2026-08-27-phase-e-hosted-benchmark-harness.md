@@ -18,7 +18,7 @@
 - Every evidence record binds exact repository/head/base/plan/product/stable-ID/harness/workflow identities.
 - `profile=full` does not imply `dataCapability=real_fullworld`.
 - GitHub-hosted measurements define ordinary defaults; Molehill data is specialist-only evidence.
-- Measure the packed single-job worker ladder `workers=1/2/4/6/8`; every tier above 1 is conditional on measured stability and resource headroom. Keep the 2/4-shard multi-job candidates isolated from the packed worker axis.
+- Measure the packed single-job worker ladder `workers=1/2/4/6/8`: the separate candidates are `workers=1`, `workers=2`, `workers=4`, `workers=6`, and `workers=8`. Every tier above 1 is conditional on measured stability and resource headroom. Keep the 2/4-shard multi-job candidates isolated from the packed worker axis.
 - Missing metrics are not coerced to zero. Optional/non-applicable metrics are explicit observations with status and source.
 - All pre-final-Phase-D measurements are labeled `NON_AUTHORITATIVE_PRE_PHASE_D`.
 
