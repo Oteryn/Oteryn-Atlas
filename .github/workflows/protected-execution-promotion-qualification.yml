@@ -569,3 +569,222 @@ jobs:
             -f context='atlas-local-e2e' \
             -f description='Protected GitHub-hosted candidate-modification proof; no browser E2E executed' \
             -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+
+
+  candidate-modification-census-filter:
+    name: Publish planned-census modification-filter compatibility evidence
+    if: >-
+      github.event.label.name == 'atlas-legacy-transition-qualification' &&
+      github.event.pull_request.base.ref == 'main' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'fix/issue-179-protected-modification-census-filter'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+      statuses: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      ATLAS_PR_NUMBER: ${{ github.event.pull_request.number }}
+      ATLAS_CODE_REVISION: ${{ github.event.pull_request.head.sha }}
+      ATLAS_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      ATLAS_CHANGED_FILE_COUNT: ${{ github.event.pull_request.changed_files }}
+      ATLAS_CANDIDATE_IMAGE: mcr.microsoft.com/playwright:v1.62.0-noble@sha256:baed2032d533817f3dbe6425de795788430ba345e819a1201337009ba17c9d07
+    steps:
+      - name: Check out exact protected-base policy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+          path: trusted-base
+
+      - name: Check out exact candidate head as sandbox data
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+          path: candidate
+
+      - name: Fence current PR head before planned-census proof
+        shell: bash
+        run: |
+          set -euo pipefail
+          payload="$RUNNER_TEMP/atlas-modification-filter-before.json"
+          gh api "repos/$GITHUB_REPOSITORY/pulls/$ATLAS_PR_NUMBER" > "$payload"
+          node trusted-base/tools/verification/assert-current-pr-head.mjs \
+            --payload "$payload" \
+            --repository "$GITHUB_REPOSITORY" \
+            --pr-number "$ATLAS_PR_NUMBER" \
+            --expected-head-sha "$ATLAS_CODE_REVISION"
+          test "$(git -C candidate rev-parse HEAD)" = "$ATLAS_CODE_REVISION"
+          test "$(git -C trusted-base rev-parse HEAD)" = "$ATLAS_BASE_SHA"
+
+      - name: Require exact planned-census modification-filter promotion delta
+        shell: bash
+        run: |
+          set -euo pipefail
+          rows="$(mktemp)"
+          expected="$(mktemp)"
+          trap 'rm -f "$rows" "$expected"' EXIT
+          gh api --paginate \
+            "repos/$GITHUB_REPOSITORY/pulls/$ATLAS_PR_NUMBER/files?per_page=100" \
+            --jq '.[].filename' | sort > "$rows"
+          test "$(wc -l < "$rows" | tr -d '[:space:]')" = "$ATLAS_CHANGED_FILE_COUNT"
+          printf '%s\n' \
+            '.github/workflows/protected-execution-promotion-qualification.yml' \
+            'e2e/tests/qualification-navigation.mjs' \
+            'e2e/tests/race-desktop.spec.mjs' \
+            'e2e/tests/runtime.mjs' \
+            'e2e/tests/state-desktop.spec.mjs' \
+            'tests/verification/protected-execution-promotion-workflow-contract.test.mjs' \
+            'tests/verification/protected-hosted-plan.test.mjs' \
+            'tests/verification/qualification-browser-trust.test.mjs' \
+            'tests/verification/qualification-navigation-contract.test.mjs' \
+            'tests/verification/qualification-navigation-input.test.mjs' \
+            'tools/verification/protected-hosted-plan.mjs' \
+            > "$expected"
+          diff -u "$expected" "$rows"
+
+      - name: Prove planned-census modification filtering in networkless read-only sandbox
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout --signal=KILL 120s docker run --rm \
+            --network none \
+            --read-only \
+            --cap-drop ALL \
+            --security-opt no-new-privileges \
+            --pids-limit 128 \
+            --memory 512m \
+            --cpus 2 \
+            --user 1000:1000 \
+            --tmpfs /tmp:rw,nosuid,nodev,size=64m \
+            --mount "type=bind,src=$PWD/candidate,dst=/candidate,readonly" \
+            "$ATLAS_CANDIDATE_IMAGE" \
+            bash -lc 'cd /candidate && node --test tests/verification/protected-hosted-plan.test.mjs tests/verification/protected-execution-promotion-workflow-contract.test.mjs tests/verification/qualification-browser-trust.test.mjs tests/verification/qualification-navigation-contract.test.mjs tests/verification/qualification-navigation-input.test.mjs'
+
+      - name: Prove protected qualification navigation in one Chromium test
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_root="$RUNNER_TEMP/atlas-modification-filter-qualification"
+          trust_path="$RUNNER_TEMP/atlas-modification-filter-trust.json"
+          execution_context="$RUNNER_TEMP/atlas-modification-filter-context"
+          artifacts="$RUNNER_TEMP/atlas-modification-filter-artifacts"
+          test_list="$RUNNER_TEMP/atlas-modification-filter-test-list.txt"
+          rm -rf "$source_root" "$execution_context" "$artifacts"
+          mkdir -p "$execution_context" "$artifacts"
+          : > "$test_list"
+
+          SOURCE_ROOT="$source_root" TRUST_PATH="$trust_path" node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import {
+            buildQualificationWorld,
+            qualificationTrustDescriptor,
+            verifyQualificationWorld,
+          } from './trusted-base/tools/verification/qualification-world.mjs';
+
+          const built = await buildQualificationWorld(process.env.SOURCE_ROOT);
+          const verified = await verifyQualificationWorld(process.env.SOURCE_ROOT);
+          if (built.productDigest !== verified.productDigest || built.fixtureId !== verified.fixtureId) {
+            throw new TypeError('qualification fixture build/verify identity mismatch');
+          }
+          fs.writeFileSync(process.env.TRUST_PATH, `${JSON.stringify(qualificationTrustDescriptor(verified))}\n`, 'utf8');
+          NODE
+
+          rsync -a --delete --exclude='.git' candidate/ "$execution_context/"
+          for path in e2e e2e/tests web src; do
+            test -d "$execution_context/$path"
+            test ! -L "$execution_context/$path"
+          done
+          rm -rf "$execution_context/e2e/node_modules"
+          rm -f "$execution_context/.dockerignore" "$execution_context/e2e/Dockerfile.dockerignore"
+          cp trusted-base/e2e/Dockerfile "$execution_context/e2e/Dockerfile"
+          cp trusted-base/e2e/package.json trusted-base/e2e/package-lock.json "$execution_context/e2e/"
+          cp trusted-base/e2e/playwright.config.mjs trusted-base/e2e/summary-reporter.mjs "$execution_context/e2e/"
+          mkdir -p "$execution_context/tools/verification"
+          cp trusted-base/tools/verification/stable-id.mjs "$execution_context/tools/verification/stable-id.mjs"
+
+          cat > "$execution_context/e2e/tests/protected-navigation-bootstrap-desktop.spec.mjs" <<'SPEC'
+          import { test, expect } from '@playwright/test';
+          import { DESKTOP_ENTRY, gotoAtlas, qualificationResult } from './runtime.mjs';
+
+          test('protected qualification navigation resolves the verified fixture entry before Atlas navigation', async ({ page }) => {
+            const semanticResponse = await page.request.get('/web/semantic-search/index.json');
+            expect(semanticResponse.ok()).toBeTruthy();
+            const semanticIndex = await semanticResponse.json();
+            const navigable = semanticIndex.records.filter((record) => Array.isArray(record?.capabilities) && record.capabilities.includes('navigation'));
+            expect(navigable).toHaveLength(1);
+            const expected = navigable[0].position;
+
+            await gotoAtlas(page, DESKTOP_ENTRY);
+            const current = new URL(page.url());
+            expect(Number(current.searchParams.get('x'))).toBe(expected.x);
+            expect(Number(current.searchParams.get('y'))).toBe(expected.y);
+            expect(Number(current.searchParams.get('floor'))).toBe(expected.floor);
+            expect(current.searchParams.get('zoom')).toBe('2');
+            expect(current.searchParams.get('mode')).toBe('map');
+
+            const { status, result } = await qualificationResult(page);
+            expect(status, result.error || 'qualification status').toBe('PASS');
+            expect(result.status).toBe('PASS');
+            expect(result.error).toBeNull();
+            expect(result.capabilities?.blockedOrUnknownEnabled).toBe(false);
+            await expect(page.locator('#runtime-badge')).toContainText('VERIFIED FULL-WORLD');
+            await expect(page.locator('#diag-backend')).toContainText(/webgl2/i);
+          });
+          SPEC
+
+          export COMPOSE_PROJECT_NAME="atlas-modification-filter-${GITHUB_RUN_ID}"
+          export ATLAS_CODE_REVISION="$ATLAS_CODE_REVISION"
+          export ATLAS_VERIFICATION_PLAN_SHA256="sha256:$(printf '%s' "$ATLAS_CODE_REVISION" | sha256sum | awk '{print $1}')"
+          export ATLAS_E2E_SHARD='1/1'
+          export ATLAS_E2E_WORKERS='1'
+          export ATLAS_QUALIFICATION_PUBLICATION_HOST="$source_root"
+          export ATLAS_QUALIFICATION_TRUST_JSON="$(jq -c . "$trust_path")"
+          export ATLAS_EXECUTION_CONTEXT="$execution_context"
+          export ATLAS_E2E_ARTIFACTS_HOST="$artifacts"
+          export ATLAS_PROTECTED_TEST_LIST="$test_list"
+
+          compose_down() {
+            docker compose \
+              -f trusted-base/e2e/compose.protected-hosted-executor.yml \
+              -f trusted-base/e2e/compose.github-hosted.yml \
+              down -v --remove-orphans >/dev/null 2>&1 || true
+          }
+          trap compose_down EXIT
+          compose_down
+          docker compose \
+            -f trusted-base/e2e/compose.protected-hosted-executor.yml \
+            -f trusted-base/e2e/compose.github-hosted.yml \
+            up -d --wait atlas-publication atlas-web
+          docker compose \
+            -f trusted-base/e2e/compose.protected-hosted-executor.yml \
+            -f trusted-base/e2e/compose.github-hosted.yml \
+            build e2e
+          docker compose \
+            -f trusted-base/e2e/compose.protected-hosted-executor.yml \
+            -f trusted-base/e2e/compose.github-hosted.yml \
+            run --rm e2e \
+            bash -lc 'exec ./node_modules/.bin/playwright test tests/protected-navigation-bootstrap-desktop.spec.mjs --config=playwright.config.mjs --project=desktop-chromium --workers=1 --retries=0'
+
+      - name: Fence exact head and publish planned-census compatibility status
+        shell: bash
+        run: |
+          set -euo pipefail
+          payload="$RUNNER_TEMP/atlas-modification-filter-after.json"
+          gh api "repos/$GITHUB_REPOSITORY/pulls/$ATLAS_PR_NUMBER" > "$payload"
+          node trusted-base/tools/verification/assert-current-pr-head.mjs \
+            --payload "$payload" \
+            --repository "$GITHUB_REPOSITORY" \
+            --pr-number "$ATLAS_PR_NUMBER" \
+            --expected-head-sha "$ATLAS_CODE_REVISION"
+          gh api --method POST \
+            "repos/$GITHUB_REPOSITORY/statuses/$ATLAS_CODE_REVISION" \
+            -f state='success' \
+            -f context='atlas-local-e2e' \
+            -f description='Protected GitHub-hosted qualification-navigation Chromium proof' \
+            -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
