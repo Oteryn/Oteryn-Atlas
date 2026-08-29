@@ -13,7 +13,7 @@ import {
   parseReplayActionLog,
   serializeActionLog,
 } from '../support/seeded-actions.mjs';
-import { assertNoRuntimeFailures, captureRuntimeFailures, gotoAtlas } from './runtime.mjs';
+import { DESKTOP_ENTRY, assertNoRuntimeFailures, captureRuntimeFailures, gotoAtlas } from './runtime.mjs';
 
 const ENTRY = `${DESKTOP_ENTRY}&animation=off&creatures=npc,monster`;
 const DEFAULT_SEED = 0x85;
