@@ -183,7 +183,17 @@ test('hosted benchmark schema cannot claim authoritative post-Phase-D evidence w
   authoritative.authority = 'AUTHORITATIVE_POST_PHASE_D';
   authoritative.phaseDState = 'FINAL_PROTECTED_MERGED';
   authoritative.identity.protectedPhaseDSha = sha('8');
+  authoritative.identity.integrationBaseSha = sha('8');
   assert.equal(validateHostedBenchmarkEvidence(authoritative), authoritative);
+
+  const driftedBase = makeEvidence();
+  driftedBase.authority = 'AUTHORITATIVE_POST_PHASE_D';
+  driftedBase.phaseDState = 'FINAL_PROTECTED_MERGED';
+  driftedBase.identity.protectedPhaseDSha = sha('8');
+  assert.throws(
+    () => validateHostedBenchmarkEvidence(driftedBase),
+    /integrationBaseSha.*protectedPhaseDSha/i,
+  );
 });
 
 test('hosted benchmark schema keeps profile and data capability independent', async () => {
