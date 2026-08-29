@@ -104,7 +104,7 @@ test('Playwright resolves qualification navigation before the only Atlas navigat
   const page = {
     request: {
       get: async (url) => {
-        assert.equal(url, '/fullworld/web/semantic-search/index.json');
+        assert.equal(url, '/web/semantic-search/index.json');
         return {
           ok: () => true,
           status: () => 200,
