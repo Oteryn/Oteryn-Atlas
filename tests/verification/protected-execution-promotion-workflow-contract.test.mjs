@@ -13,7 +13,6 @@ test('protected execution promotion qualification is GitHub-hosted, exact-head, 
   const workflow = fs.readFileSync(workflowPath, 'utf8');
   const legacy = fs.readFileSync(legacyWorkflowPath, 'utf8');
   const heavy = legacy.split('  legacy-qualification:')[1]?.split('  protected-census-bootstrap:')[0] ?? '';
-
   assert.match(workflow, /pull_request:\s*\n\s*types:\s*\[labeled\]/);
   assert.match(workflow, /github\.event\.label\.name == 'atlas-legacy-transition-qualification'/);
   assert.match(workflow, /fix\/issue-179-protected-execution-contract-promotion/);
@@ -50,7 +49,6 @@ test('protected execution promotion preauthorizes the qualification trust-descri
   const workflow = fs.readFileSync(workflowPath, 'utf8');
   const legacy = fs.readFileSync(legacyWorkflowPath, 'utf8');
   const heavy = legacy.split('  legacy-qualification:')[1]?.split('  protected-census-bootstrap:')[0] ?? '';
-
   assert.match(workflow, /fix\/issue-179-qualification-trust-descriptor/);
   assert.doesNotMatch(heavy, /fix\/issue-179-qualification-trust-descriptor/);
   assert.match(workflow, /qualificationTrustDescriptor/);
@@ -65,7 +63,6 @@ test('qualification product-binding proof executes candidate code only in the ne
   const workflow = fs.readFileSync(workflowPath, 'utf8');
   const proof = workflow.split('      - name: Prove qualification promotion binds protected product identity')[1]
     ?.split('      - name: Prove protected hosted execution contract without browser execution')[0] ?? '';
-
   assert.match(proof, /docker run --rm/);
   assert.match(proof, /--network none/);
   assert.match(proof, /--read-only/);
@@ -77,13 +74,11 @@ test('qualification product-binding proof executes candidate code only in the ne
   assert.doesNotMatch(proof, /node --input-type=module <<'NODE'/);
 });
 
-
 test('protected execution promotion preauthorizes candidate-modification overlay on exact GitHub-hosted evidence', () => {
   const workflow = fs.readFileSync(workflowPath, 'utf8');
   const legacy = fs.readFileSync(legacyWorkflowPath, 'utf8');
   const heavy = legacy.split('  legacy-qualification:')[1]?.split('  protected-census-bootstrap:')[0] ?? '';
   const job = workflow.split('  candidate-modification-overlay:')[1]?.split('  candidate-modification-census-filter:')[0] ?? '';
-
   assert.match(job, /fix\/issue-179-protected-candidate-modifications/);
   assert.doesNotMatch(heavy, /fix\/issue-179-protected-candidate-modifications/);
   assert.match(job, /runs-on:\s*ubuntu-24\.04/);
@@ -113,7 +108,6 @@ test('protected execution promotion preauthorizes planned-census filtering plus 
   const legacy = fs.readFileSync(legacyWorkflowPath, 'utf8');
   const heavy = legacy.split('  legacy-qualification:')[1]?.split('  protected-census-bootstrap:')[0] ?? '';
   const job = workflow.split('  candidate-modification-census-filter:')[1] ?? '';
-
   assert.match(job, /fix\/issue-179-protected-modification-census-filter/);
   assert.doesNotMatch(heavy, /fix\/issue-179-protected-modification-census-filter/);
   assert.match(job, /runs-on:\s*ubuntu-24\.04/);
@@ -152,7 +146,6 @@ test('protected execution promotion preauthorizes the functional qualification f
   const legacy = fs.readFileSync(legacyWorkflowPath, 'utf8');
   const heavy = legacy.split('  legacy-qualification:')[1]?.split('  protected-census-bootstrap:')[0] ?? '';
   const job = workflow.split('  qualification-functional-fixture:')[1]?.split('  candidate-modification-overlay:')[0] ?? '';
-
   assert.match(job, /fix\/issue-179-qualification-functional-fixture/);
   assert.doesNotMatch(heavy, /fix\/issue-179-qualification-functional-fixture/);
   assert.match(job, /runs-on:\s*ubuntu-24\.04/);
@@ -173,4 +166,16 @@ test('protected execution promotion preauthorizes the functional qualification f
   assert.match(job, /statuses:\s*write/);
   assert.match(job, /context='atlas-local-e2e'|context.*atlas-local-e2e/s);
   assert.doesNotMatch(job, /group:\s*atlas-runners|labels:\s*oteryn-atlas-pc|visual-review\.json|synology|real_fullworld/i);
+});
+
+test('functional qualification candidate census materializes Node dependency link before the read-only sandbox mount', () => {
+  const workflow = fs.readFileSync(workflowPath, 'utf8');
+  const job = workflow.split('  qualification-functional-fixture:')[1]?.split('  candidate-modification-overlay:')[0] ?? '';
+  const census = job.split('      - name: Prove candidate Playwright stable-ID census exactly matches protected census')[1]
+    ?.split('      - name: Rebuild exact qualification fixture and run deterministic regressions in networkless sandbox')[0] ?? '';
+  assert.match(census, /test ! -e candidate\/e2e\/node_modules/);
+  assert.match(census, /ln -s \/protected-e2e-node-modules\/node_modules candidate\/e2e\/node_modules/);
+  assert.match(census, /--mount "type=bind,src=\$PWD\/candidate,dst=\/candidate,readonly"/);
+  assert.doesNotMatch(census, /bash -lc '[^']*ln -s [^']*e2e\/node_modules/);
+  assert.match(census, /ATLAS_ARTIFACTS_DIR=\/tmp\/artifacts[^']*playwright test[^']*--list/);
 });
