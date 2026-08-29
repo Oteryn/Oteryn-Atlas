@@ -87,12 +87,15 @@ function validatePhaseMap(phaseMap) {
   });
 }
 
-function normalizeJobs(jobs) {
+function normalizeJobs(jobs, run, identity) {
   if (!Array.isArray(jobs) || jobs.length === 0) invalid('jobs must contain at least one GitHub Actions job');
   return jobs.map((job, jobIndex) => {
     if (!isPlainObject(job) || !Number.isInteger(job.id) || typeof job.name !== 'string' || job.name.length === 0) {
       invalid(`job ${jobIndex} identity is malformed`);
     }
+    if (job.run_id !== run.id) invalid(`job ${job.id} run_id does not match GitHub workflow run`);
+    if (job.run_attempt !== run.run_attempt) invalid(`job ${job.id} run_attempt does not match GitHub workflow run`);
+    if (job.head_sha !== identity.candidateSha) invalid(`job ${job.id} head_sha does not match candidateSha`);
     const createdMs = parseTimestamp(job.created_at, `job ${job.id}.created_at`);
     if (!Array.isArray(job.steps)) invalid(`job ${job.id} steps are missing`);
 
@@ -244,7 +247,7 @@ export function collectHostedBenchmarkEvidence({
   const runCompletedMs = parseTimestamp(run.updated_at, 'run.updated_at');
   if (runCompletedMs < runCreatedMs) invalid('negative duration for GitHub workflow run');
 
-  const normalizedJobs = normalizeJobs(jobs);
+  const normalizedJobs = normalizeJobs(jobs, run, identity);
   const { observations, duplicateSetupMs, sourceJobs } = collectPhaseObservations(normalizedJobs, phaseMap, run.conclusion);
   const startedJobs = normalizedJobs.filter((job) => job.timingStatus === 'STARTED');
   const queueProvisioning = startedJobs.length > 0
