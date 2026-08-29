@@ -76,3 +76,34 @@ test('qualification product-binding proof executes candidate code only in the ne
   assert.match(proof, /node \/proof\.mjs/);
   assert.doesNotMatch(proof, /node --input-type=module <<'NODE'/);
 });
+
+
+test('protected execution promotion preauthorizes candidate-modification overlay on exact GitHub-hosted evidence', () => {
+  const workflow = fs.readFileSync(workflowPath, 'utf8');
+  const legacy = fs.readFileSync(legacyWorkflowPath, 'utf8');
+  const heavy = legacy.split('  legacy-qualification:')[1]?.split('  protected-census-bootstrap:')[0] ?? '';
+  const job = workflow.split('  candidate-modification-overlay:')[1] ?? '';
+
+  assert.match(job, /fix\/issue-179-protected-candidate-modifications/);
+  assert.doesNotMatch(heavy, /fix\/issue-179-protected-candidate-modifications/);
+  assert.match(job, /runs-on:\s*ubuntu-24\.04/);
+  assert.match(job, /\.github\/workflows\/protected-execution-promotion-qualification\.yml/);
+  assert.match(job, /\.github\/workflows\/protected-hosted-executor\.yml/);
+  assert.match(job, /tests\/verification\/candidate-modification-overlay\.test\.mjs/);
+  assert.match(job, /tests\/verification\/protected-execution-promotion-workflow-contract\.test\.mjs/);
+  assert.match(job, /tests\/verification\/protected-hosted-plan\.test\.mjs/);
+  assert.match(job, /tests\/verification\/protected-hosted-workflow-contract\.test\.mjs/);
+  assert.match(job, /tools\/verification\/protected-hosted-execution\.mjs/);
+  assert.match(job, /tools\/verification\/protected-hosted-fan-in\.mjs/);
+  assert.match(job, /tools\/verification\/protected-hosted-plan\.mjs/);
+  assert.match(job, /tools\/verification\/protected-hosted-shard-summary\.mjs/);
+  assert.match(job, /tools\/verification\/protected-playwright-selection\.mjs/);
+  assert.match(job, /assert-current-pr-head\.mjs/);
+  assert.match(job, /--network none/);
+  assert.match(job, /--read-only/);
+  assert.match(job, /--cap-drop ALL/);
+  assert.match(job, /no-new-privileges/);
+  assert.match(job, /statuses:\s*write/);
+  assert.match(job, /context='atlas-local-e2e'|context.*atlas-local-e2e/s);
+  assert.doesNotMatch(job, /playwright test|group:\s*atlas-runners|labels:\s*oteryn-atlas-pc|ATLAS_PUBLICATION_ORIGIN|visual-review\.json|synology/i);
+});
