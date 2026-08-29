@@ -169,11 +169,12 @@ export function buildProtectedHostedPlan(input) {
     candidateVerificationCatalog: candidateCatalog,
     protectedStableTestIds: widenedStableIds,
   });
+  const plannedStableIdSet = new Set(basePlan.stableTestIds);
   const candidateStableIdModifications = deriveCandidateStableIdModifications(
     basePlan.changedPaths,
     protectedCensus.stableTestIds,
     candidateCensus.census.stableTestIds,
-  );
+  ).filter((id) => plannedStableIdSet.has(id));
 
   const productIdentities = validateProductIdentities(input.productIdentities, basePlan.requiredDataCapabilities);
   const protectedCensusDigest = protectedCensus.digest;
