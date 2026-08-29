@@ -93,6 +93,14 @@ const PROTECTED_PROMOTION_QUALIFICATIONS = freeze({
       dependencyTarget: 'e2e/node_modules',
       dependencyLinkPhase: 'host-before-readonly-mount',
     },
+    deterministicRuntimeShim: {
+      command: 'python',
+      target: '/usr/bin/python3',
+      shimRoot: '/tmp/atlas-python-bin',
+      pycacheRoot: '/tmp/atlas-python-pycache',
+      network: 'none',
+      rootFilesystem: 'read-only',
+    },
   },
 });
 

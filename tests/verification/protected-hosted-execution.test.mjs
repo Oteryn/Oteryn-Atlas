@@ -310,6 +310,14 @@ test('protected promotion qualification registry binds exact functional qualific
       dependencyTarget: 'e2e/node_modules',
       dependencyLinkPhase: 'host-before-readonly-mount',
     },
+    deterministicRuntimeShim: {
+      command: 'python',
+      target: '/usr/bin/python3',
+      shimRoot: '/tmp/atlas-python-bin',
+      pycacheRoot: '/tmp/atlas-python-pycache',
+      network: 'none',
+      rootFilesystem: 'read-only',
+    },
   });
   assert.equal(Object.isFrozen(spec), true);
   assert.equal(Object.isFrozen(spec.changedFiles), true);
@@ -326,4 +334,17 @@ test('functional qualification registry binds protected dependencies before the 
     dependencyLinkPhase: 'host-before-readonly-mount',
   });
   assert.equal(Object.isFrozen(spec.candidateCensusMount), true);
+});
+
+test('functional qualification registry pins the deterministic Python compatibility shim', () => {
+  const spec = resolveProtectedPromotionQualification('fix/issue-179-qualification-functional-fixture');
+  assert.deepEqual(spec.deterministicRuntimeShim, {
+    command: 'python',
+    target: '/usr/bin/python3',
+    shimRoot: '/tmp/atlas-python-bin',
+    pycacheRoot: '/tmp/atlas-python-pycache',
+    network: 'none',
+    rootFilesystem: 'read-only',
+  });
+  assert.equal(Object.isFrozen(spec.deterministicRuntimeShim), true);
 });
