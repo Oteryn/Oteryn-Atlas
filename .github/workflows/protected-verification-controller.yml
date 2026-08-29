@@ -1,4 +1,5 @@
 name: Protected Verification Controller
+# Host recovery remains outside the protected controller; specialist runner readiness is owned by protected transition workflows.
 
 on:
   pull_request_target:
