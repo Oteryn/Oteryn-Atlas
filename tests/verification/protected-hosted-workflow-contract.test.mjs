@@ -74,11 +74,13 @@ test('Phase D hosted execution stays packed until Phase E calibrates sharding', 
   assert.match(executor, /ATLAS_E2E_SHARD:\s*\$\{\{ matrix\.shard \}\}\/1/);
 });
 
-test('protected-base test implementations and candidate additions execute from separate capability-scoped contexts', () => {
+test('protected lower-bound, candidate modifications and candidate additions execute from capability-scoped contexts', () => {
   assert.match(executor, /test-lists\/\$dataCapability\/protected\.txt/);
   assert.match(executor, /test-lists\/\$dataCapability\/candidate-additions\.txt/);
+  assert.match(executor, /test-lists\/\$dataCapability\/candidate-modifications\.txt/);
   assert.match(executor, /--placement protected/);
   assert.match(executor, /--placement candidate-additions/);
+  assert.match(executor, /--placement candidate-modifications/);
   assert.match(executor, /--data-capability "\$dataCapability"/);
   assert.match(executor, /protected-execution-context/);
   assert.match(executor, /candidate-additions-execution-context/);
