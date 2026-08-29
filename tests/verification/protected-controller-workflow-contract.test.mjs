@@ -95,3 +95,16 @@ test('legacy transition recovers only the approved Molehill Docker engine with b
   assert.match(workflow, /Host recovery remains outside the protected controller/);
   assert.doesNotMatch(workflow, /docker desktop start|Docker Desktop\.exe|Start-Process|Start-Service|Stop-Process|Stop-Service/);
 });
+
+test('Docker readiness probes do not become terminating PowerShell errors under fail-closed admission', () => {
+  const heavyStart = legacyTransition.indexOf('  legacy-qualification:\n');
+  const bootstrapStart = legacyTransition.indexOf('  protected-census-bootstrap:\n');
+  assert.notEqual(heavyStart, -1, 'missing legacy-qualification');
+  assert.notEqual(bootstrapStart, -1, 'missing protected-census-bootstrap');
+  const heavy = legacyTransition.slice(heavyStart, bootstrapStart);
+
+  assert.match(heavy, /cmd\.exe \/d \/c "docker version >NUL 2>NUL"/);
+  assert.match(heavy, /cmd\.exe \/d \/c "docker desktop start >NUL 2>NUL"/);
+  assert.doesNotMatch(heavy, /docker version \*> \$null/);
+  assert.doesNotMatch(heavy, /docker desktop start \*> \$null/);
+});
