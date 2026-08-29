@@ -18,7 +18,7 @@
 - Every evidence record binds exact repository/head/base/plan/product/stable-ID/harness/workflow identities.
 - `profile=full` does not imply `dataCapability=real_fullworld`.
 - GitHub-hosted measurements define ordinary defaults; Molehill data is specialist-only evidence.
-- No universal 1/2/4/6/8 worker ladder; packed 1-worker is the baseline, 2/4 workers and 2/4 shards are conditional experiment candidates only.
+- Measure the packed single-job worker ladder `workers=1/2/4/6/8`; every tier above 1 is conditional on measured stability and resource headroom. Keep the 2/4-shard multi-job candidates isolated from the packed worker axis.
 - Missing metrics are not coerced to zero. Optional/non-applicable metrics are explicit observations with status and source.
 - All pre-final-Phase-D measurements are labeled `NON_AUTHORITATIVE_PRE_PHASE_D`.
 
@@ -36,7 +36,7 @@
 - Consumes: no runtime policy; only static Phase E measurement requirements.
 - Produces: canonical metric IDs, canonical phase matching rules, allowed authority states, and non-authoritative experiment candidate definitions.
 
-- [ ] **Step 1: Write the failing contract test** proving schema version, complete metric inventory, no 6/8 worker candidates, packed `workers=1/shards=1` baseline, broad/full-only shard candidates, zero retries and measurement-only semantics.
+- [ ] **Step 1: Write the failing contract test** proving schema version, complete metric inventory, the exact packed `workers=1/2/4/6/8` ladder, isolated broad/full-only 2/4-shard candidates, zero retries and measurement-only semantics.
 - [ ] **Step 2: Run** `node --test tests/verification/hosted-benchmark-contract.test.mjs` and confirm failure because the contract files do not exist.
 - [ ] **Step 3: Add the three JSON contracts** with explicit required identities, required metrics and guarded candidate shapes.
 - [ ] **Step 4: Re-run** the contract test and require PASS.
@@ -74,7 +74,7 @@
 
 - [ ] **Step 1: Write the workflow contract test** requiring docs to mark all pre-final-D numbers `NON_AUTHORITATIVE_PRE_PHASE_D`, require >=3 clean repetitions for material candidates, forbid Molehill authority for ordinary defaults, preserve zero retries, and require exact plan/product/stable-ID/head identities.
 - [ ] **Step 2: Run** `node --test tests/verification/hosted-benchmark-workflow-contract.test.mjs` and confirm failure because the harness document is absent.
-- [ ] **Step 3: Write the harness document** with the packed baseline first, conditional workers 2/4, conditional shards 2/4, cold/restored-cache, current/thin-image, per-shard/build-once input, eager/gated DAG experiments, plus decision metrics and explicit non-authority language.
+- [ ] **Step 3: Write the harness document** with the packed baseline first, conditional workers 2/4/6/8 as separate single-job experiments, isolated conditional shards 2/4, cold/restored-cache, current/thin-image, per-shard/build-once input, eager/gated DAG experiments, plus decision metrics and explicit non-authority language.
 - [ ] **Step 4: Re-run** the workflow contract test and require PASS.
 - [ ] **Step 5: Commit** `docs(verification): document hosted Phase E benchmark harness`.
 
