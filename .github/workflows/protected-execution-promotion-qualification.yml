@@ -545,6 +545,8 @@ jobs:
               npm exec --prefix e2e -- playwright test --config=e2e/playwright.config.mjs --list
           ) > "$protected_list"
 
+          test ! -e candidate/e2e/node_modules
+          ln -s /protected-e2e-node-modules/node_modules candidate/e2e/node_modules
           timeout --signal=KILL 120s docker run --rm \
             --network none \
             --read-only \
@@ -558,7 +560,7 @@ jobs:
             --mount "type=bind,src=$PWD/candidate,dst=/candidate,readonly" \
             --mount "type=bind,src=$PWD/trusted-base/e2e/node_modules,dst=/protected-e2e-node-modules/node_modules,readonly" \
             "$ATLAS_CANDIDATE_IMAGE" \
-            bash -lc 'cd /candidate && ln -s /protected-e2e-node-modules/node_modules e2e/node_modules && CI=1 ATLAS_ARTIFACTS_DIR=/tmp/artifacts e2e/node_modules/.bin/playwright test --config=e2e/playwright.config.mjs --list' \
+            bash -lc 'cd /candidate && CI=1 ATLAS_ARTIFACTS_DIR=/tmp/artifacts e2e/node_modules/.bin/playwright test --config=e2e/playwright.config.mjs --list' \
             > "$candidate_list"
 
           node trusted-base/tools/verification/parse-playwright-test-list.mjs "$protected_list" > "$protected_ids"
