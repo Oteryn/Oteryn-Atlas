@@ -47,8 +47,31 @@ jobs:
           if ($env:GITHUB_REPOSITORY -ne 'Oteryn/Oteryn-Atlas') { throw 'Unexpected repository.' }
           if ($env:RUNNER_NAME -notmatch '^oteryn-molehill-atlas(?:-[0-9]+)?$') { throw "Unexpected runner: $env:RUNNER_NAME" }
           if ($env:RUNNER_OS -ne 'Windows') { throw "Unexpected runner OS: $env:RUNNER_OS" }
-          docker version | Out-Null
-          if ($LASTEXITCODE -ne 0) { throw 'Docker is unavailable.' }
+          function Test-MolehillDockerReady {
+            docker version *> $null
+            return $LASTEXITCODE -eq 0
+          }
+          if (-not (Test-MolehillDockerReady)) {
+            $started = $false
+            try {
+              docker desktop start *> $null
+              $started = $LASTEXITCODE -eq 0
+            } catch {
+              $started = $false
+            }
+            if (-not $started) {
+              $dockerDesktop = Join-Path $env:ProgramFiles 'Docker\Docker\Docker Desktop.exe'
+              if (-not (Test-Path -LiteralPath $dockerDesktop -PathType Leaf)) {
+                throw 'Docker Desktop executable is unavailable.'
+              }
+              Start-Process -FilePath $dockerDesktop
+            }
+            for ($attempt = 0; $attempt -lt 60; $attempt += 1) {
+              if (Test-MolehillDockerReady) { break }
+              Start-Sleep -Seconds 2
+            }
+          }
+          if (-not (Test-MolehillDockerReady)) { throw 'Docker is unavailable.' }
 
       - name: Check out exact protected-base policy
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
