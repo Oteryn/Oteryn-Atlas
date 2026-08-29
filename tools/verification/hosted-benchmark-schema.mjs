@@ -92,6 +92,9 @@ function validateIdentity(identity, authority, phaseDState) {
     if (typeof identity.protectedPhaseDSha !== 'string' || !SHA.test(identity.protectedPhaseDSha)) {
       invalid('authoritative evidence requires exact protected Phase D SHA');
     }
+    if (identity.integrationBaseSha !== identity.protectedPhaseDSha) {
+      invalid('authoritative evidence requires integrationBaseSha to equal protectedPhaseDSha');
+    }
   } else {
     invalid('authority is not allowlisted');
   }
