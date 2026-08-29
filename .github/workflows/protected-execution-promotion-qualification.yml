@@ -635,8 +635,15 @@ jobs:
           test "$(wc -l < "$rows" | tr -d '[:space:]')" = "$ATLAS_CHANGED_FILE_COUNT"
           printf '%s\n' \
             '.github/workflows/protected-execution-promotion-qualification.yml' \
+            'e2e/tests/qualification-navigation.mjs' \
+            'e2e/tests/race-desktop.spec.mjs' \
+            'e2e/tests/runtime.mjs' \
+            'e2e/tests/state-desktop.spec.mjs' \
             'tests/verification/protected-execution-promotion-workflow-contract.test.mjs' \
             'tests/verification/protected-hosted-plan.test.mjs' \
+            'tests/verification/qualification-browser-trust.test.mjs' \
+            'tests/verification/qualification-navigation-contract.test.mjs' \
+            'tests/verification/qualification-navigation-input.test.mjs' \
             'tools/verification/protected-hosted-plan.mjs' \
             > "$expected"
           diff -u "$expected" "$rows"
@@ -657,7 +664,7 @@ jobs:
             --tmpfs /tmp:rw,nosuid,nodev,size=64m \
             --mount "type=bind,src=$PWD/candidate,dst=/candidate,readonly" \
             "$ATLAS_CANDIDATE_IMAGE" \
-            bash -lc 'cd /candidate && node --test tests/verification/protected-hosted-plan.test.mjs tests/verification/protected-execution-promotion-workflow-contract.test.mjs'
+            bash -lc 'cd /candidate && node --test tests/verification/protected-hosted-plan.test.mjs tests/verification/protected-execution-promotion-workflow-contract.test.mjs tests/verification/qualification-browser-trust.test.mjs tests/verification/qualification-navigation-contract.test.mjs tests/verification/qualification-navigation-input.test.mjs'
 
       - name: Fence exact head and publish planned-census compatibility status
         shell: bash

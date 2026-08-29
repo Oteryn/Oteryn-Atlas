@@ -119,6 +119,13 @@ test('protected execution promotion preauthorizes planned-census modification fi
   assert.match(job, /runs-on:\s*ubuntu-24\.04/);
   assert.match(job, /tests\/verification\/protected-hosted-plan\.test\.mjs/);
   assert.match(job, /tools\/verification\/protected-hosted-plan\.mjs/);
+  assert.match(job, /e2e\/tests\/qualification-navigation\.mjs/);
+  assert.match(job, /e2e\/tests\/runtime\.mjs/);
+  assert.match(job, /e2e\/tests\/race-desktop\.spec\.mjs/);
+  assert.match(job, /e2e\/tests\/state-desktop\.spec\.mjs/);
+  assert.match(job, /qualification-browser-trust\.test\.mjs/);
+  assert.match(job, /qualification-navigation-contract\.test\.mjs/);
+  assert.match(job, /qualification-navigation-input\.test\.mjs/);
   assert.match(job, /assert-current-pr-head\.mjs/);
   assert.match(job, /--network none/);
   assert.match(job, /--read-only/);
