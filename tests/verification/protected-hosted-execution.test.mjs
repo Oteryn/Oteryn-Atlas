@@ -265,3 +265,44 @@ test('protected promotion qualification registry binds exact hosted proof for qu
   assert.equal(Object.isFrozen(spec), true);
   assert.equal(Object.isFrozen(spec.changedFiles), true);
 });
+
+test('protected promotion qualification registry binds exact functional qualification fixture repair', () => {
+  const spec = resolveProtectedPromotionQualification('fix/issue-179-qualification-functional-fixture');
+  assert.deepEqual(spec, {
+    id: 'qualification-functional-fixture-v1',
+    headRef: 'fix/issue-179-qualification-functional-fixture',
+    changedFiles: [
+      'e2e/support/creature-presentation-fixtures.mjs',
+      'e2e/tests/audit-desktop.spec.mjs',
+      'e2e/tests/creature-interaction-desktop.spec.mjs',
+      'e2e/tests/creature-presentation-desktop.spec.mjs',
+      'e2e/tests/creatures-desktop.spec.mjs',
+      'e2e/tests/desktop.spec.mjs',
+      'e2e/tests/farm-explorer-desktop.spec.mjs',
+      'e2e/tests/farm-explorer-mobile.spec.mjs',
+      'e2e/tests/geometry-desktop.spec.mjs',
+      'e2e/tests/geometry-mobile.spec.mjs',
+      'e2e/tests/mobile.spec.mjs',
+      'e2e/tests/performance-desktop.spec.mjs',
+      'e2e/tests/race-desktop.spec.mjs',
+      'e2e/tests/runtime.mjs',
+      'e2e/tests/soak-desktop.spec.mjs',
+      'e2e/tests/state-desktop.spec.mjs',
+      'e2e/tests/stress-desktop.spec.mjs',
+      'e2e/tests/visual-desktop.spec.mjs',
+      'e2e/tests/visual-mobile.spec.mjs',
+      'src/browser/semantic-search.mjs',
+      'tests/verification/protected-hosted-product-identities.test.mjs',
+      'tests/verification/qualification-semantic-source-trust.test.mjs',
+      'tests/verification/qualification-world.test.mjs',
+      'tools/verification/protected-hosted-product-identities.json',
+      'tools/verification/qualification-fixture-definition.mjs',
+      'tools/verification/qualification-world.mjs',
+      'web/fullworld-farm-explorer.mjs',
+      'web/fullworld-search.mjs',
+    ],
+    expectedProductDigest: 'sha256:7bac8358ecb8e44d05636f9657c318fa6bb6f22445143237c8fa207d45be820b',
+  });
+  assert.equal(Object.isFrozen(spec), true);
+  assert.equal(Object.isFrozen(spec.changedFiles), true);
+});
