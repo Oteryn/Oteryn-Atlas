@@ -318,6 +318,12 @@ jobs:
               --placement candidate-additions \
               --data-capability "$dataCapability" \
               > "artifacts/controller/test-lists/$dataCapability/candidate-additions.txt"
+            node protected-control/tools/verification/protected-playwright-selection.mjs \
+              --list artifacts/controller/candidate-playwright-source-list.txt \
+              --execution "$execution" \
+              --placement candidate-modifications \
+              --data-capability "$dataCapability" \
+              > "artifacts/controller/test-lists/$dataCapability/candidate-modifications.txt"
           done
 
       - name: Build exact protected products required by hosted partitions
@@ -385,7 +391,7 @@ jobs:
           fs.writeFileSync(outputPath, `${JSON.stringify(products, null, 2)}\n`);
           NODE
 
-      - name: Build separate protected-body and candidate-addition execution contexts
+      - name: Build separate protected-body and candidate execution contexts
         shell: bash
         run: |
           set -euo pipefail
@@ -477,9 +483,11 @@ jobs:
             test -s "$trust_path"
             protected_list="$PWD/artifacts/controller/test-lists/$dataCapability/protected.txt"
             candidate_list="$PWD/artifacts/controller/test-lists/$dataCapability/candidate-additions.txt"
+            modification_list="$PWD/artifacts/controller/test-lists/$dataCapability/candidate-modifications.txt"
             test -f "$protected_list"
             test -f "$candidate_list"
-            if [[ ! -s "$protected_list" && ! -s "$candidate_list" ]]; then
+            test -f "$modification_list"
+            if [[ ! -s "$protected_list" && ! -s "$candidate_list" && ! -s "$modification_list" ]]; then
               echo "hosted partition has no selected source tests: $dataCapability" >&2
               exit 1
             fi
@@ -512,6 +520,22 @@ jobs:
                 -f protected-control/e2e/compose.github-hosted.yml \
                 run --rm e2e
               append_source protected "$dataCapability" "$ATLAS_E2E_ARTIFACTS_HOST/summary.json"
+            fi
+
+            if [[ -s "$modification_list" ]]; then
+              export ATLAS_EXECUTION_CONTEXT="$candidate_context"
+              export ATLAS_PROTECTED_TEST_LIST="$modification_list"
+              export ATLAS_E2E_ARTIFACTS_HOST="$shard_root/sources/candidate-modifications/$dataCapability"
+              mkdir -p "$ATLAS_E2E_ARTIFACTS_HOST"
+              docker compose \
+                -f protected-control/e2e/compose.protected-hosted-executor.yml \
+                -f protected-control/e2e/compose.github-hosted.yml \
+                build e2e
+              docker compose \
+                -f protected-control/e2e/compose.protected-hosted-executor.yml \
+                -f protected-control/e2e/compose.github-hosted.yml \
+                run --rm e2e
+              append_source candidate-modifications "$dataCapability" "$ATLAS_E2E_ARTIFACTS_HOST/summary.json"
             fi
 
             if [[ -s "$candidate_list" ]]; then

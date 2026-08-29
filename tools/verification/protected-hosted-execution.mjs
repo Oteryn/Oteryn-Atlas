@@ -133,7 +133,7 @@ function partitionByCandidateAdditions(stableTestIds, candidateAdditionSet) {
   return { protectedStableTestIds, candidateAdditionalStableTestIds };
 }
 
-function partitionHostedByDataCapability(hostedGroups, hostedStableTestIds, candidateAdditionSet) {
+function partitionHostedByDataCapability(hostedGroups, hostedStableTestIds, candidateAdditionSet, candidateModificationSet) {
   const stableIdCapability = new Map();
   for (const id of hostedStableTestIds) {
     const capabilities = [...new Set(hostedGroups
@@ -150,11 +150,13 @@ function partitionHostedByDataCapability(hostedGroups, hostedStableTestIds, cand
     .sort()
     .map((dataCapability) => {
       const stableTestIds = hostedStableTestIds.filter((id) => stableIdCapability.get(id) === dataCapability);
+      const candidateModifiedStableTestIds = stableTestIds.filter((id) => candidateModificationSet.has(id));
       return {
         dataCapability,
         groupIds: hostedGroups.filter((group) => group.capabilities.dataCapability === dataCapability).map((group) => group.id).sort(),
         stableTestIds,
         ...partitionByCandidateAdditions(stableTestIds, candidateAdditionSet),
+        ...(candidateModifiedStableTestIds.length ? { candidateModifiedStableTestIds } : {}),
       };
     });
 }
@@ -203,11 +205,17 @@ export function buildProtectedHostedExecutionContract(plan, { currentHeadSha } =
 
   const stableTestIds = exactStableIds(plan.stableTestIds, 'planned stable IDs');
   const stableTestIdSet = new Set(stableTestIds);
-  const candidateStableIdAdditions = exactStableIds(plan.candidateStableIdAdditions, 'candidate stable-ID additions', { allowEmpty: true });
+  const candidateStableIdAdditions = exactStableIds(plan.candidateStableIdAdditions ?? [], 'candidate stable-ID additions', { allowEmpty: true });
+  const candidateStableIdModifications = exactStableIds(plan.candidateStableIdModifications ?? [], 'candidate stable-ID modifications', { allowEmpty: true });
   for (const id of candidateStableIdAdditions) {
     if (!stableTestIdSet.has(id)) throw new TypeError(`candidate stable-ID addition is not in the exact planned census: ${id}`);
   }
   const candidateAdditionSet = new Set(candidateStableIdAdditions);
+  for (const id of candidateStableIdModifications) {
+    if (!stableTestIdSet.has(id)) throw new TypeError(`candidate stable-ID modification is not in the exact planned census: ${id}`);
+    if (candidateAdditionSet.has(id)) throw new TypeError(`candidate stable-ID modification cannot also be an addition: ${id}`);
+  }
+  const candidateModificationSet = new Set(candidateStableIdModifications);
 
   const hostedStableTestIds = [];
   const specialistStableTestIds = [];
@@ -226,11 +234,15 @@ export function buildProtectedHostedExecutionContract(plan, { currentHeadSha } =
   hostedStableTestIds.sort();
   specialistStableTestIds.sort();
   reviewStableTestIds.sort();
+  const hostedSet = new Set(hostedStableTestIds);
+  const specialistSet = new Set(specialistStableTestIds);
+  const hostedCandidateModifiedStableTestIds = candidateStableIdModifications.filter((id) => hostedSet.has(id));
+  const specialistCandidateModifiedStableTestIds = candidateStableIdModifications.filter((id) => specialistSet.has(id));
   const hostedExpectedStableTestIdsDigest = digest(hostedStableTestIds);
   const specialistExpectedStableTestIdsDigest = digest(specialistStableTestIds);
   const hostedSourcePartition = partitionByCandidateAdditions(hostedStableTestIds, candidateAdditionSet);
   const specialistSourcePartition = partitionByCandidateAdditions(specialistStableTestIds, candidateAdditionSet);
-  const hostedPartitions = partitionHostedByDataCapability(hostedGroups, hostedStableTestIds, candidateAdditionSet);
+  const hostedPartitions = partitionHostedByDataCapability(hostedGroups, hostedStableTestIds, candidateAdditionSet, candidateModificationSet);
 
   return freeze({
     schemaVersion: 1,
@@ -249,12 +261,14 @@ export function buildProtectedHostedExecutionContract(plan, { currentHeadSha } =
       groupIds: hostedGroups.map((group) => group.id).sort(),
       stableTestIds: hostedStableTestIds,
       ...hostedSourcePartition,
+      candidateModifiedStableTestIds: hostedCandidateModifiedStableTestIds,
       partitions: hostedPartitions,
     },
     specialist: {
       groupIds: specialistGroups.map((group) => group.id).sort(),
       stableTestIds: specialistStableTestIds,
       ...specialistSourcePartition,
+      candidateModifiedStableTestIds: specialistCandidateModifiedStableTestIds,
     },
     review: {
       groupIds: reviewGroups.map((group) => group.id).sort(),

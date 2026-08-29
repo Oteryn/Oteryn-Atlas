@@ -5,7 +5,7 @@ const SHA = /^[a-f0-9]{40}$/;
 const SHA256 = /^sha256:[a-f0-9]{64}$/;
 const BROWSER_CONTAINER = 'mcr.microsoft.com/playwright:v1.62.0-noble@sha256:baed2032d533817f3dbe6425de795788430ba345e819a1201337009ba17c9d07';
 const WORKER_POLICY = Object.freeze({ id: 'atlas-protected-hosted-workers-v1', version: 1, hostedShards: 1, workersPerShard: 1 });
-const SOURCE_PLACEMENTS = new Set(['protected', 'candidate-additions']);
+const SOURCE_PLACEMENTS = new Set(['protected', 'candidate-additions', 'candidate-modifications']);
 const HOSTED_DATA_CAPABILITIES = new Set(['qualification_fixture', 'bounded_real_world']);
 
 function exactSha(value, label) {
@@ -29,6 +29,12 @@ function stableIds(value, label, { allowEmpty = false } = {}) {
 
 function same(actual, expected, label) {
   if (actual !== expected) throw new TypeError(`${label} mismatch`);
+}
+
+function sameIds(actual, expected, label) {
+  if (actual.length !== expected.length || actual.some((id, index) => id !== expected[index])) {
+    throw new TypeError(`${label} mismatch`);
+  }
 }
 
 function validatePlan(plan) {
@@ -56,14 +62,16 @@ function validatePlan(plan) {
   return plan;
 }
 
-function validatePartitions(value, hosted, protectedHosted, candidateAdditions) {
+function validatePartitions(value, hosted, protectedHosted, candidateAdditions, candidateModifications) {
   if (value == null) return [];
   if (!Array.isArray(value)) throw new TypeError('protected shard hosted data capability partitions must be an array');
   const hostedSet = new Set(hosted);
   const protectedSet = new Set(protectedHosted);
   const additionsSet = new Set(candidateAdditions);
+  const modificationsSet = new Set(candidateModifications);
   const seenCapabilities = new Set();
   const seenIds = new Set();
+  const seenModifications = new Set();
   const partitions = value.map((partition) => {
     if (!partition || typeof partition !== 'object' || Array.isArray(partition)) {
       throw new TypeError('protected shard data capability partition must be an object');
@@ -77,6 +85,7 @@ function validatePartitions(value, hosted, protectedHosted, candidateAdditions) 
     const stableTestIds = stableIds(partition.stableTestIds, `${dataCapability} stable IDs`);
     const protectedStableTestIds = stableIds(partition.protectedStableTestIds, `${dataCapability} protected stable IDs`, { allowEmpty: true });
     const candidateAdditionalStableTestIds = stableIds(partition.candidateAdditionalStableTestIds, `${dataCapability} candidate-addition stable IDs`, { allowEmpty: true });
+    const candidateModifiedStableTestIds = stableIds(partition.candidateModifiedStableTestIds ?? [], `${dataCapability} candidate-modification stable IDs`, { allowEmpty: true });
     const sourcePartition = [...new Set([...protectedStableTestIds, ...candidateAdditionalStableTestIds])].sort();
     if (sourcePartition.length !== stableTestIds.length || sourcePartition.some((id, index) => id !== stableTestIds[index])) {
       throw new TypeError(`protected shard ${dataCapability} source placement must exactly partition stable IDs`);
@@ -95,12 +104,20 @@ function validatePartitions(value, hosted, protectedHosted, candidateAdditions) 
     if (candidateAdditionalStableTestIds.some((id) => !additionsSet.has(id))) {
       throw new TypeError(`protected shard ${dataCapability} contains a non-candidate-addition source ID`);
     }
-    return Object.freeze({ dataCapability, stableTestIds, protectedStableTestIds, candidateAdditionalStableTestIds });
+    for (const id of candidateModifiedStableTestIds) {
+      if (!protectedSet.has(id) || !modificationsSet.has(id)) {
+        throw new TypeError(`protected shard ${dataCapability} contains a non-candidate-modification source ID`);
+      }
+      if (seenModifications.has(id)) throw new TypeError(`protected shard candidate-modification stable ID appears in duplicate data capability partitions: ${id}`);
+      seenModifications.add(id);
+    }
+    return Object.freeze({ dataCapability, stableTestIds, protectedStableTestIds, candidateAdditionalStableTestIds, candidateModifiedStableTestIds });
   });
   const partitionIds = [...seenIds].sort();
   if (partitionIds.length !== hosted.length || partitionIds.some((id, index) => id !== hosted[index])) {
     throw new TypeError('protected shard data capability partitions must exactly partition hosted stable IDs');
   }
+  sameIds([...seenModifications].sort(), candidateModifications, 'protected shard candidate-modification data capability coverage');
   return partitions;
 }
 
@@ -125,6 +142,7 @@ function validateExecution(execution, plan) {
   const hosted = stableIds(execution.hosted?.stableTestIds, 'hosted stable IDs', { allowEmpty: true });
   const protectedHosted = stableIds(execution.hosted?.protectedStableTestIds, 'protected hosted stable IDs', { allowEmpty: true });
   const candidateAdditions = stableIds(execution.hosted?.candidateAdditionalStableTestIds, 'candidate-addition hosted stable IDs', { allowEmpty: true });
+  const candidateModifications = stableIds(execution.hosted?.candidateModifiedStableTestIds ?? [], 'candidate-modification hosted stable IDs', { allowEmpty: true });
   const specialist = stableIds(execution.specialist?.stableTestIds, 'specialist stable IDs', { allowEmpty: true });
   const specialistSet = new Set(specialist);
   if (hosted.some((id) => specialistSet.has(id))) throw new TypeError('hosted and specialist stable-ID placement overlaps');
@@ -135,15 +153,22 @@ function validateExecution(execution, plan) {
   if (protectedHosted.some((id) => candidateAdditions.includes(id))) {
     throw new TypeError('protected shard hosted source placement overlaps');
   }
-  const partitions = validatePartitions(execution.hosted?.partitions, hosted, protectedHosted, candidateAdditions);
-  return { hosted, protectedHosted, candidateAdditions, specialist, hostedExpectedStableTestIdsDigest, partitions };
+  if (candidateModifications.some((id) => !protectedHosted.includes(id))) {
+    throw new TypeError('protected shard candidate-modification overlay must be a subset of protected hosted stable IDs');
+  }
+  const plannedModifications = stableIds(plan.candidateStableIdModifications ?? [], 'plan candidate-modification stable IDs', { allowEmpty: true });
+  const hostedSet = new Set(hosted);
+  const plannedHostedModifications = plannedModifications.filter((id) => hostedSet.has(id)).sort();
+  sameIds(candidateModifications, plannedHostedModifications, 'protected shard candidate-modification execution overlay');
+  const partitions = validatePartitions(execution.hosted?.partitions, hosted, protectedHosted, candidateAdditions, candidateModifications);
+  return { hosted, protectedHosted, candidateAdditions, candidateModifications, specialist, hostedExpectedStableTestIdsDigest, partitions };
 }
 
 function normalizeSummaries(summary, summaries) {
   if (summary != null && summaries != null) throw new TypeError('protected shard evidence accepts summary or summaries, not both');
   const values = summaries ?? (summary == null ? null : [summary]);
   if (!Array.isArray(values) || values.length === 0 || values.length > 2) {
-    throw new TypeError('protected shard evidence requires one or two source summaries');
+    throw new TypeError('protected shard evidence requires one or two legacy source summaries');
   }
   return values;
 }
@@ -167,7 +192,7 @@ function validateRawSummary(summary, protectedPlan, allowedStableIds, sourceLabe
       throw new TypeError(`protected shard ${sourceLabel} scenario has malformed stable ID`);
     }
     const id = scenario.stableTestId;
-    if (seen.has(id)) throw new TypeError(`protected shard contains duplicate stable ID across source summaries: ${id}`);
+    if (seen.has(id)) throw new TypeError(`protected shard contains duplicate stable ID within ${sourceLabel} proof: ${id}`);
     seen.add(id);
     if (!allowed.has(id)) throw new TypeError(`protected shard ${sourceLabel} contains unexpected stable ID: ${id}`);
     if (scenario.status === 'skipped' || scenario.skipReason != null) throw new TypeError(`protected shard skipped stable ID is forbidden: ${id}`);
@@ -177,15 +202,16 @@ function validateRawSummary(summary, protectedPlan, allowedStableIds, sourceLabe
   }
 }
 
-function validateCapabilitySources(sourceSummaries, partitions, protectedPlan, seen, executed) {
+function validateCapabilitySources(sourceSummaries, partitions, protectedPlan, seenLogical, executedLogical, seenModifications, provenModifications) {
   if (!Array.isArray(sourceSummaries) || sourceSummaries.length === 0) {
     throw new TypeError('protected shard capability source summaries must be a non-empty array');
   }
   if (!partitions.length) throw new TypeError('protected shard capability source summaries require hosted data capability partitions');
   const expected = new Map();
   for (const partition of partitions) {
-    if (partition.protectedStableTestIds.length) expected.set(`protected\0${partition.dataCapability}`, partition.protectedStableTestIds);
-    if (partition.candidateAdditionalStableTestIds.length) expected.set(`candidate-additions\0${partition.dataCapability}`, partition.candidateAdditionalStableTestIds);
+    if (partition.protectedStableTestIds.length) expected.set(`protected\0${partition.dataCapability}`, { ids: partition.protectedStableTestIds, overlay: false });
+    if (partition.candidateAdditionalStableTestIds.length) expected.set(`candidate-additions\0${partition.dataCapability}`, { ids: partition.candidateAdditionalStableTestIds, overlay: false });
+    if (partition.candidateModifiedStableTestIds.length) expected.set(`candidate-modifications\0${partition.dataCapability}`, { ids: partition.candidateModifiedStableTestIds, overlay: true });
   }
   const supplied = new Set();
   for (const source of sourceSummaries) {
@@ -196,11 +222,18 @@ function validateCapabilitySources(sourceSummaries, partitions, protectedPlan, s
       throw new TypeError(`protected shard capability source is unsupported: ${source.dataCapability ?? ''}`);
     }
     const key = `${source.placement}\0${source.dataCapability}`;
-    const allowed = expected.get(key);
-    if (!allowed) throw new TypeError(`protected shard capability source is unexpected: ${source.placement}/${source.dataCapability}`);
+    const expectedSource = expected.get(key);
+    if (!expectedSource) throw new TypeError(`protected shard capability source is unexpected: ${source.placement}/${source.dataCapability}`);
     if (supplied.has(key)) throw new TypeError(`protected shard duplicate capability source: ${source.placement}/${source.dataCapability}`);
     supplied.add(key);
-    validateRawSummary(source.summary, protectedPlan, allowed, `${source.placement}:${source.dataCapability}`, seen, executed);
+    validateRawSummary(
+      source.summary,
+      protectedPlan,
+      expectedSource.ids,
+      `${source.placement}:${source.dataCapability}`,
+      expectedSource.overlay ? seenModifications : seenLogical,
+      expectedSource.overlay ? provenModifications : executedLogical,
+    );
   }
   for (const key of expected.keys()) {
     if (!supplied.has(key)) {
@@ -212,7 +245,7 @@ function validateCapabilitySources(sourceSummaries, partitions, protectedPlan, s
 
 export function buildProtectedHostedShardSummary({ plan, execution, summary, summaries, sourceSummaries, shardIndex, shardCount }) {
   const protectedPlan = validatePlan(plan);
-  const { hosted, protectedHosted, candidateAdditions, hostedExpectedStableTestIdsDigest, partitions } = validateExecution(execution, protectedPlan);
+  const { hosted, protectedHosted, candidateAdditions, candidateModifications, hostedExpectedStableTestIdsDigest, partitions } = validateExecution(execution, protectedPlan);
   if (!Number.isSafeInteger(shardCount) || shardCount !== protectedPlan.workerPolicy.hostedShards
     || !Number.isSafeInteger(shardIndex) || shardIndex < 0 || shardIndex >= shardCount) {
     throw new TypeError('protected shard count/index does not match worker policy');
@@ -220,10 +253,13 @@ export function buildProtectedHostedShardSummary({ plan, execution, summary, sum
 
   const executed = [];
   const seen = new Set();
+  const candidateModifiedStableTestIdsProven = [];
+  const seenModifications = new Set();
   if (sourceSummaries != null) {
     if (summary != null || summaries != null) throw new TypeError('protected shard capability sources cannot be combined with legacy summary arguments');
-    validateCapabilitySources(sourceSummaries, partitions, protectedPlan, seen, executed);
+    validateCapabilitySources(sourceSummaries, partitions, protectedPlan, seen, executed, seenModifications, candidateModifiedStableTestIdsProven);
   } else {
+    if (candidateModifications.length) throw new TypeError('candidate-modification overlay requires capability source summaries');
     const rawSummaries = normalizeSummaries(summary, summaries);
     validateRawSummary(rawSummaries[0], protectedPlan, protectedHosted, 'protected-body', seen, executed);
     if (rawSummaries.length === 2) {
@@ -233,6 +269,7 @@ export function buildProtectedHostedShardSummary({ plan, execution, summary, sum
   }
   const hostedSet = new Set(hosted);
   if (executed.some((id) => !hostedSet.has(id))) throw new TypeError('protected shard source evidence escaped hosted placement');
+  sameIds(candidateModifiedStableTestIdsProven.sort(), candidateModifications, 'protected shard candidate-modification proof');
 
   return Object.freeze({
     schemaVersion: 1,
@@ -251,6 +288,7 @@ export function buildProtectedHostedShardSummary({ plan, execution, summary, sum
     retries: 0,
     skippedStableTestIds: Object.freeze([]),
     executedStableTestIds: Object.freeze(executed.sort()),
+    candidateModifiedStableTestIdsProven: Object.freeze(candidateModifiedStableTestIdsProven),
   });
 }
 

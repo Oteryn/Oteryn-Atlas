@@ -44,6 +44,9 @@ export function validateProtectedHostedFanIn(plan, summaries, {
   const planExpectedDigest = exactDigest(plan.expectedStableTestIdsDigest, 'plan expected stable-ID digest');
   const expectedDigest = exactDigest(expectedStableTestIdsDigest, 'fan-in expected stable-ID digest');
   const expected = stableIds(expectedStableTestIds, 'fan-in expected stable IDs').sort();
+  const expectedSet = new Set(expected);
+  const plannedModifications = stableIds(plan.candidateStableIdModifications ?? [], 'plan candidate-modification stable IDs', true).sort();
+  const expectedModifications = plannedModifications.filter((id) => expectedSet.has(id)).sort();
   exactDigest(plan.productIdentitiesDigest, 'plan product identities digest');
   exactDigest(plan.workerPolicyDigest, 'plan worker policy digest');
   exactDigest(plan.executionPolicyDigest, 'plan execution policy digest');
@@ -55,6 +58,8 @@ export function validateProtectedHostedFanIn(plan, summaries, {
   const shardIndexes = new Set();
   const executed = [];
   const seenStableIds = new Set();
+  const candidateModifiedStableTestIdsProven = [];
+  const seenModifiedStableIds = new Set();
 
   for (const summary of summaries) {
     if (!summary || typeof summary !== 'object' || Array.isArray(summary) || summary.schemaVersion !== 1) {
@@ -92,6 +97,12 @@ export function validateProtectedHostedFanIn(plan, summaries, {
       seenStableIds.add(id);
       executed.push(id);
     }
+    for (const id of stableIds(summary.candidateModifiedStableTestIdsProven ?? [], 'candidate-modification proven stable IDs', true)) {
+      if (seenModifiedStableIds.has(id)) throw new TypeError(`fan-in duplicate candidate-modification stable ID: ${id}`);
+      if (!expectedModifications.includes(id)) throw new TypeError(`fan-in unexpected candidate-modification stable ID: ${id}`);
+      seenModifiedStableIds.add(id);
+      candidateModifiedStableTestIdsProven.push(id);
+    }
   }
 
   if (summaries.length !== shardCount) throw new TypeError(`fan-in partial sibling evidence: expected ${shardCount} shards, received ${summaries.length}`);
@@ -103,6 +114,10 @@ export function validateProtectedHostedFanIn(plan, summaries, {
   if (unexpected.length) throw new TypeError(`fan-in unexpected stable IDs: ${unexpected.join(', ')}`);
   const missing = expected.filter((id) => !seenStableIds.has(id));
   if (missing.length) throw new TypeError(`fan-in missing stable IDs: ${missing.join(', ')}`);
+  const missingModifications = expectedModifications.filter((id) => !seenModifiedStableIds.has(id));
+  if (missingModifications.length) {
+    throw new TypeError(`fan-in missing candidate-modification stable IDs: ${missingModifications.join(', ')}`);
+  }
 
   return Object.freeze({
     status: 'success',
@@ -110,5 +125,6 @@ export function validateProtectedHostedFanIn(plan, summaries, {
     planDigest,
     expectedStableTestIdsDigest: expectedDigest,
     executedStableTestIds: Object.freeze([...executed].sort()),
+    candidateModifiedStableTestIdsProven: Object.freeze([...candidateModifiedStableTestIdsProven].sort()),
   });
 }
