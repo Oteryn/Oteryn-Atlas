@@ -75,3 +75,23 @@ test('PR 234 bootstrap publishes legacy compatibility only after a GitHub-hosted
   assert.match(bootstrap, /context='atlas-local-e2e'|context.*atlas-local-e2e/s);
   assert.doesNotMatch(bootstrap, /\\e2e\\run\.ps1|ATLAS_PUBLICATION_ORIGIN|visual-review\.json/);
 });
+
+test('legacy transition recovers only the approved Molehill Docker engine with bounded readiness polling', () => {
+  const heavyStart = legacyTransition.indexOf('  legacy-qualification:\n');
+  const bootstrapStart = legacyTransition.indexOf('  protected-census-bootstrap:\n');
+  assert.notEqual(heavyStart, -1, 'missing legacy-qualification');
+  assert.notEqual(bootstrapStart, -1, 'missing protected-census-bootstrap');
+  const heavy = legacyTransition.slice(heavyStart, bootstrapStart);
+
+  assert.match(heavy, /function Test-MolehillDockerReady/);
+  assert.match(heavy, /docker version/);
+  assert.match(heavy, /docker desktop start/);
+  assert.match(heavy, /Docker Desktop\.exe/);
+  assert.match(heavy, /for \(\$attempt = 0; \$attempt -lt 60; \$attempt \+= 1\)/);
+  assert.match(heavy, /Start-Sleep -Seconds 2/);
+  assert.match(heavy, /if \(-not \(Test-MolehillDockerReady\)\) \{ throw 'Docker is unavailable\.' \}/);
+  assert.doesNotMatch(heavy, /Stop-Process|Stop-Service|Restart-Service|taskkill|TerminateProcess/);
+
+  assert.match(workflow, /Host recovery remains outside the protected controller/);
+  assert.doesNotMatch(workflow, /docker desktop start|Docker Desktop\.exe|Start-Process|Start-Service|Stop-Process|Stop-Service/);
+});
