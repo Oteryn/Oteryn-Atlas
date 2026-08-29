@@ -20,6 +20,7 @@ const PROTECTED_HOSTED_WORKER_POLICY = Object.freeze({
 const SHA = /^[a-f0-9]{40}$/;
 const SHA256 = /^sha256:[a-f0-9]{64}$/;
 const DATA_CAPABILITIES = new Set(['qualification_fixture', 'bounded_real_world', 'real_fullworld']);
+const PLAYWRIGHT_SPEC = /^e2e\/tests\/[^/]+\.spec\.mjs$/;
 
 function freeze(value) {
   if (value && typeof value === 'object' && !Object.isFrozen(value)) {
@@ -103,6 +104,26 @@ function validateCandidateCensus(candidate, candidateHeadSha, catalogs) {
   });
 }
 
+function candidateStableIdModifications(changedPaths, protectedStableTestIds, candidateStableTestIds) {
+  const candidateSet = new Set(candidateStableTestIds);
+  const shared = protectedStableTestIds.filter((id) => candidateSet.has(id));
+  if (shared.length === 0) return [];
+
+  // The changed-file list comes from the protected controller's GitHub evidence. A
+  // candidate therefore cannot self-declare which protected tests deserve a second
+  // candidate-body proof. If change evidence is unavailable, fail closed by proving
+  // every shared protected stable ID from both bodies.
+  if (!Array.isArray(changedPaths) || changedPaths.length === 0) return [...shared].sort();
+
+  const changedSpecs = new Set(changedPaths.filter((path) => PLAYWRIGHT_SPEC.test(path)));
+  const sharedE2eInfrastructureChanged = changedPaths.some((path) => path.startsWith('e2e/') && !PLAYWRIGHT_SPEC.test(path));
+  if (sharedE2eInfrastructureChanged) return [...shared].sort();
+
+  return shared
+    .filter((id) => changedSpecs.has(stableCoordinates(id).spec))
+    .sort();
+}
+
 function validateProductIdentities(input, requiredCapabilities) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new TypeError('product identities must be an object');
   const selected = {};
@@ -153,6 +174,11 @@ export function buildProtectedHostedPlan(input) {
     candidateVerificationCatalog: candidateCatalog,
     protectedStableTestIds: widenedStableIds,
   });
+  const candidateStableIdModifications = candidateStableIdModifications(
+    basePlan.changedPaths,
+    protectedCensus.stableTestIds,
+    candidateCensus.census.stableTestIds,
+  );
 
   const productIdentities = validateProductIdentities(input.productIdentities, basePlan.requiredDataCapabilities);
   const protectedCensusDigest = protectedCensus.digest;
@@ -198,6 +224,7 @@ export function buildProtectedHostedPlan(input) {
     protectedCensusDigest,
     candidateCensusDigest,
     candidateStableIdAdditions,
+    candidateStableIdModifications,
     profile: basePlan.profile,
     impactDomains: basePlan.impactDomains,
     appliedCrossDomainEscalations: basePlan.appliedCrossDomainEscalations,
