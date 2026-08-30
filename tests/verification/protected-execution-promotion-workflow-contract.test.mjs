@@ -1,0 +1,200 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import test from 'node:test';
+import { fileURLToPath } from 'node:url';
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+const workflowPath = path.join(ROOT, '.github/workflows/protected-execution-promotion-qualification.yml');
+const legacyWorkflowPath = path.join(ROOT, '.github/workflows/legacy-molehill-transition-qualification.yml');
+
+test('protected execution promotion qualification is GitHub-hosted, exact-head, and never Molehill full E2E', () => {
+  assert.equal(fs.existsSync(workflowPath), true, 'promotion qualification workflow must exist');
+  const workflow = fs.readFileSync(workflowPath, 'utf8');
+  const legacy = fs.readFileSync(legacyWorkflowPath, 'utf8');
+  const heavy = legacy.split('  legacy-qualification:')[1]?.split('  protected-census-bootstrap:')[0] ?? '';
+  assert.match(workflow, /pull_request:\s*\n\s*types:\s*\[labeled\]/);
+  assert.match(workflow, /github\.event\.label\.name == 'atlas-legacy-transition-qualification'/);
+  assert.match(workflow, /fix\/issue-179-protected-execution-contract-promotion/);
+  assert.doesNotMatch(heavy, /fix\/issue-179-protected-execution-contract-promotion/);
+  assert.match(workflow, /fix\/issue-179-bounded-real-row-framing/);
+  assert.doesNotMatch(heavy, /fix\/issue-179-bounded-real-row-framing/);
+  assert.match(workflow, /runs-on:\s*ubuntu-24\.04/);
+  assert.doesNotMatch(workflow, /group:\s*atlas-runners|labels:\s*oteryn-atlas-pc/);
+  assert.match(workflow, /\.github\/workflows\/protected-execution-promotion-qualification\.yml/);
+  assert.match(workflow, /tests\/verification\/protected-execution-promotion-workflow-contract\.test\.mjs/);
+  assert.match(workflow, /tests\/verification\/protected-hosted-execution\.test\.mjs/);
+  assert.match(workflow, /tools\/verification\/protected-hosted-execution\.mjs/);
+  assert.match(workflow, /resolveProtectedPromotionQualification/);
+  assert.match(workflow, /tests\/verification\/bounded-real-world\.test\.mjs/);
+  assert.match(workflow, /tests\/verification\/protected-hosted-product-identities\.test\.mjs/);
+  assert.match(workflow, /protected-hosted-product-identities\.json/);
+  assert.match(workflow, /Prove qualification promotion binds protected product identity/);
+  assert.match(workflow, /\/trusted\/tools\/verification\/protected-hosted-product-identities\.json/);
+  assert.match(workflow, /qualification promotion digest does not match protected product registry/);
+  assert.match(workflow, /buildBoundedRealWorld/);
+  assert.match(workflow, /expectedProductDigest/);
+  assert.match(workflow, /assert-current-pr-head\.mjs/);
+  assert.match(workflow, /--network none/);
+  assert.match(workflow, /--read-only/);
+  assert.match(workflow, /--cap-drop ALL/);
+  assert.match(workflow, /no-new-privileges/);
+  assert.match(workflow, /node --test tests\/verification\/protected-hosted-execution\.test\.mjs/);
+  assert.match(workflow, /statuses:\s*write/);
+  assert.match(workflow, /context='atlas-local-e2e'|context.*atlas-local-e2e/s);
+  assert.doesNotMatch(workflow, /\\e2e\\run\.ps1|ATLAS_PUBLICATION_ORIGIN|visual-review\.json|synology/i);
+});
+
+test('protected execution promotion preauthorizes the qualification trust-descriptor repair on exact GitHub-hosted evidence', () => {
+  const workflow = fs.readFileSync(workflowPath, 'utf8');
+  const legacy = fs.readFileSync(legacyWorkflowPath, 'utf8');
+  const heavy = legacy.split('  legacy-qualification:')[1]?.split('  protected-census-bootstrap:')[0] ?? '';
+  assert.match(workflow, /fix\/issue-179-qualification-trust-descriptor/);
+  assert.doesNotMatch(heavy, /fix\/issue-179-qualification-trust-descriptor/);
+  assert.match(workflow, /qualificationTrustDescriptor/);
+  assert.match(workflow, /buildQualificationWorld/);
+  assert.match(workflow, /resolveFullWorldTrust/);
+  assert.match(workflow, /tests\/verification\/qualification-world\.test\.mjs/);
+  assert.match(workflow, /tests\/verification\/protected-hosted-compose-promotion\.test\.mjs/);
+  assert.match(workflow, /tools\/verification\/qualification-world\.mjs/);
+});
+
+test('qualification product-binding proof executes candidate code only in the networkless read-only sandbox', () => {
+  const workflow = fs.readFileSync(workflowPath, 'utf8');
+  const proof = workflow.split('      - name: Prove qualification promotion binds protected product identity')[1]
+    ?.split('      - name: Prove protected hosted execution contract without browser execution')[0] ?? '';
+  assert.match(proof, /docker run --rm/);
+  assert.match(proof, /--network none/);
+  assert.match(proof, /--read-only/);
+  assert.match(proof, /--cap-drop ALL/);
+  assert.match(proof, /--security-opt no-new-privileges/);
+  assert.match(proof, /candidate,dst=\/candidate,readonly/);
+  assert.match(proof, /trusted-base,dst=\/trusted,readonly/);
+  assert.match(proof, /node \/proof\.mjs/);
+  assert.doesNotMatch(proof, /node --input-type=module <<'NODE'/);
+});
+
+test('protected execution promotion preauthorizes candidate-modification overlay on exact GitHub-hosted evidence', () => {
+  const workflow = fs.readFileSync(workflowPath, 'utf8');
+  const legacy = fs.readFileSync(legacyWorkflowPath, 'utf8');
+  const heavy = legacy.split('  legacy-qualification:')[1]?.split('  protected-census-bootstrap:')[0] ?? '';
+  const job = workflow.split('  candidate-modification-overlay:')[1]?.split('  candidate-modification-census-filter:')[0] ?? '';
+  assert.match(job, /fix\/issue-179-protected-candidate-modifications/);
+  assert.doesNotMatch(heavy, /fix\/issue-179-protected-candidate-modifications/);
+  assert.match(job, /runs-on:\s*ubuntu-24\.04/);
+  assert.match(job, /\.github\/workflows\/protected-execution-promotion-qualification\.yml/);
+  assert.match(job, /\.github\/workflows\/protected-hosted-executor\.yml/);
+  assert.match(job, /tests\/verification\/candidate-modification-overlay\.test\.mjs/);
+  assert.match(job, /tests\/verification\/protected-execution-promotion-workflow-contract\.test\.mjs/);
+  assert.match(job, /tests\/verification\/protected-hosted-plan\.test\.mjs/);
+  assert.match(job, /tests\/verification\/protected-hosted-workflow-contract\.test\.mjs/);
+  assert.match(job, /tools\/verification\/protected-hosted-execution\.mjs/);
+  assert.match(job, /tools\/verification\/protected-hosted-fan-in\.mjs/);
+  assert.match(job, /tools\/verification\/protected-hosted-plan\.mjs/);
+  assert.match(job, /tools\/verification\/protected-hosted-shard-summary\.mjs/);
+  assert.match(job, /tools\/verification\/protected-playwright-selection\.mjs/);
+  assert.match(job, /assert-current-pr-head\.mjs/);
+  assert.match(job, /--network none/);
+  assert.match(job, /--read-only/);
+  assert.match(job, /--cap-drop ALL/);
+  assert.match(job, /no-new-privileges/);
+  assert.match(job, /statuses:\s*write/);
+  assert.match(job, /context='atlas-local-e2e'|context.*atlas-local-e2e/s);
+  assert.doesNotMatch(job, /playwright test|group:\s*atlas-runners|labels:\s*oteryn-atlas-pc|ATLAS_PUBLICATION_ORIGIN|visual-review\.json|synology/i);
+});
+
+test('protected execution promotion preauthorizes planned-census filtering plus one exact qualification-navigation browser proof', () => {
+  const workflow = fs.readFileSync(workflowPath, 'utf8');
+  const legacy = fs.readFileSync(legacyWorkflowPath, 'utf8');
+  const heavy = legacy.split('  legacy-qualification:')[1]?.split('  protected-census-bootstrap:')[0] ?? '';
+  const job = workflow.split('  candidate-modification-census-filter:')[1] ?? '';
+  assert.match(job, /fix\/issue-179-protected-modification-census-filter/);
+  assert.doesNotMatch(heavy, /fix\/issue-179-protected-modification-census-filter/);
+  assert.match(job, /runs-on:\s*ubuntu-24\.04/);
+  assert.match(job, /tests\/verification\/protected-hosted-plan\.test\.mjs/);
+  assert.match(job, /tools\/verification\/protected-hosted-plan\.mjs/);
+  assert.match(job, /e2e\/tests\/qualification-navigation\.mjs/);
+  assert.match(job, /e2e\/tests\/runtime\.mjs/);
+  assert.match(job, /e2e\/tests\/race-desktop\.spec\.mjs/);
+  assert.match(job, /e2e\/tests\/state-desktop\.spec\.mjs/);
+  assert.match(job, /qualification-browser-trust\.test\.mjs/);
+  assert.match(job, /qualification-navigation-contract\.test\.mjs/);
+  assert.match(job, /qualification-navigation-input\.test\.mjs/);
+  assert.match(job, /assert-current-pr-head\.mjs/);
+  assert.match(job, /--network none/);
+  assert.match(job, /--read-only/);
+  assert.match(job, /--cap-drop ALL/);
+  assert.match(job, /no-new-privileges/);
+  assert.match(job, /buildQualificationWorld/);
+  assert.match(job, /qualificationTrustDescriptor/);
+  assert.match(job, /compose\.protected-hosted-executor\.yml/);
+  assert.match(job, /compose\.github-hosted\.yml/);
+  assert.match(job, /ATLAS_QUALIFICATION_PUBLICATION_HOST/);
+  assert.match(job, /protected-navigation-bootstrap-desktop\.spec\.mjs/);
+  assert.match(job, /playwright test[\s\S]*protected-navigation-bootstrap-desktop\.spec\.mjs/);
+  assert.match(job, /--project=desktop-chromium/);
+  assert.match(job, /--workers=1/);
+  assert.match(job, /--retries=0/);
+  assert.match(job, /qualificationResult/);
+  assert.match(job, /statuses:\s*write/);
+  assert.match(job, /context='atlas-local-e2e'|context.*atlas-local-e2e/s);
+  assert.doesNotMatch(job, /group:\s*atlas-runners|labels:\s*oteryn-atlas-pc|visual-review\.json|synology|real_fullworld/i);
+});
+
+test('protected execution promotion preauthorizes the functional qualification fixture repair with exact-census full fixture browser proof', () => {
+  const workflow = fs.readFileSync(workflowPath, 'utf8');
+  const legacy = fs.readFileSync(legacyWorkflowPath, 'utf8');
+  const heavy = legacy.split('  legacy-qualification:')[1]?.split('  protected-census-bootstrap:')[0] ?? '';
+  const job = workflow.split('  qualification-functional-fixture:')[1]?.split('  candidate-modification-overlay:')[0] ?? '';
+  assert.match(job, /fix\/issue-179-qualification-functional-fixture/);
+  assert.doesNotMatch(heavy, /fix\/issue-179-qualification-functional-fixture/);
+  assert.match(job, /runs-on:\s*ubuntu-24\.04/);
+  assert.match(job, /resolveProtectedPromotionQualification/);
+  assert.match(job, /parse-playwright-test-list\.mjs/);
+  assert.match(job, /verification-catalog\.json/);
+  assert.match(job, /e2e\.full/);
+  assert.match(job, /buildQualificationWorld/);
+  assert.match(job, /qualificationTrustDescriptor/);
+  assert.match(job, /protected-hosted-product-identities\.json/);
+  assert.match(job, /compose\.protected-hosted-executor\.yml/);
+  assert.match(job, /compose\.github-hosted\.yml/);
+  assert.match(job, /ATLAS_QUALIFICATION_PUBLICATION_HOST/);
+  assert.match(job, /playwright test/);
+  assert.match(job, /--workers=1/);
+  assert.match(job, /--retries=0/);
+  assert.match(job, /assert-current-pr-head\.mjs/);
+  assert.match(job, /statuses:\s*write/);
+  assert.match(job, /context='atlas-local-e2e'|context.*atlas-local-e2e/s);
+  assert.doesNotMatch(job, /group:\s*atlas-runners|labels:\s*oteryn-atlas-pc|visual-review\.json|synology|real_fullworld/i);
+});
+
+test('functional qualification candidate census materializes Node dependency link before the read-only sandbox mount', () => {
+  const workflow = fs.readFileSync(workflowPath, 'utf8');
+  const job = workflow.split('  qualification-functional-fixture:')[1]?.split('  candidate-modification-overlay:')[0] ?? '';
+  const census = job.split('      - name: Prove candidate Playwright stable-ID census exactly matches protected census')[1]
+    ?.split('      - name: Rebuild exact qualification fixture and run deterministic regressions in networkless sandbox')[0] ?? '';
+  assert.match(census, /test ! -e candidate\/e2e\/node_modules/);
+  assert.match(census, /ln -s \/protected-e2e-node-modules\/node_modules candidate\/e2e\/node_modules/);
+  assert.match(census, /--mount "type=bind,src=\$PWD\/candidate,dst=\/candidate,readonly"/);
+  assert.doesNotMatch(census, /bash -lc '[^']*ln -s [^']*e2e\/node_modules/);
+  assert.match(census, /ATLAS_ARTIFACTS_DIR=\/tmp\/artifacts[^']*playwright test[^']*--list/);
+});
+
+test('functional deterministic proof supplies the pinned Python command inside writable tmp only', () => {
+  const workflow = fs.readFileSync(workflowPath, 'utf8');
+  const job = workflow.split('  qualification-functional-fixture:')[1]?.split('  candidate-modification-overlay:')[0] ?? '';
+  const step = job.split('      - name: Rebuild exact qualification fixture and run deterministic regressions in networkless sandbox')[1]
+    ?.split('      - name: Prove complete protected qualification functional safety net in Chromium')[0] ?? '';
+  assert.match(step, /test "\$\(command -v python3\)" = \/usr\/bin\/python3/);
+  assert.match(step, /mkdir -p [^\n]*\/tmp\/atlas-python-bin/);
+  assert.match(step, /mkdir -p [^\n]*\/tmp\/atlas-python-pycache/);
+  assert.match(step, /ln -s \/usr\/bin\/python3 \/tmp\/atlas-python-bin\/python/);
+  assert.match(step, /export PATH="\/tmp\/atlas-python-bin:\$PATH"/);
+  assert.match(step, /test "\$\(command -v python\)" = \/tmp\/atlas-python-bin\/python/);
+  assert.match(step, /export PYTHONPYCACHEPREFIX=\/tmp\/atlas-python-pycache/);
+  assert.match(step, /node --test tests\/verification\/\*\.test\.mjs/);
+  assert.match(step, /--network none/);
+  assert.match(step, /--read-only/);
+  assert.match(step, /--tmpfs \/tmp:rw,nosuid,nodev,size=256m/);
+  assert.doesNotMatch(step, /apt-get|pip install|npm install/);
+});

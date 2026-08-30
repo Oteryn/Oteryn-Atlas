@@ -125,6 +125,7 @@ test('protected hosted plan preserves protected IDs and accepts candidate additi
   assert.equal(plan.workerPolicyId, 'atlas-protected-hosted-workers-v1');
   assert.deepEqual(plan.stableTestIds, [baseId, candidateId].sort());
   assert.deepEqual(plan.candidateStableIdAdditions, [candidateId]);
+  assert.deepEqual(plan.candidateStableIdModifications, []);
   assert.deepEqual(plan.productIdentities, {
     qualification_fixture: { id: 'atlas-qualification-world-v2', digest: productDigest },
   });
@@ -135,6 +136,16 @@ test('protected hosted plan preserves protected IDs and accepts candidate additi
     'workerPolicyDigest', 'productIdentitiesDigest', 'expectedStableTestIdsDigest',
     'executionPolicyDigest', 'planDigest',
   ]) assert.match(plan[field], /^sha256:[a-f0-9]{64}$/, field);
+});
+
+test('changed existing spec IDs are candidate modifications while remaining protected lower-bound work', () => {
+  const plan = build({
+    changedFiles: [{ path: 'e2e/tests/desktop.spec.mjs' }],
+    candidateCensus: candidateCensus([baseId, candidateId]),
+  });
+  assert.deepEqual(plan.candidateStableIdAdditions, [candidateId]);
+  assert.deepEqual(plan.candidateStableIdModifications, [baseId]);
+  assert.ok(plan.stableTestIds.includes(baseId));
 });
 
 test('candidate deletion or replacement cannot remove the protected-base stable ID', () => {
@@ -162,4 +173,31 @@ test('failed or mismatched candidate sandbox census cannot produce an authoritat
 test('every required publication capability must have an exact product identity', () => {
   assert.throws(() => build({ productIdentities: {} }), /product.*qualification_fixture/i);
   assert.throws(() => build({ productIdentities: { qualification_fixture: { id: 'fixture', digest: 'not-a-digest' } } }), /product.*digest/i);
+});
+
+test('shared infrastructure modification overlay stays inside the exact planned stable-ID census', () => {
+  const specialistId = 'desktop-chromium::e2e/tests/specialist.spec.mjs::specialist census';
+  const trustedCatalog = catalog(['e2e/tests/desktop.spec.mjs']);
+  const candidateCatalog = catalog(['e2e/tests/desktop.spec.mjs', 'e2e/tests/candidate-new-desktop.spec.mjs']);
+  for (const current of [trustedCatalog, candidateCatalog]) {
+    current.groups['e2e.specialist'] = {
+      ...group(['e2e/tests/specialist.spec.mjs']),
+      capabilities: {
+        ...group().capabilities,
+        hosted: false,
+        dataCapability: 'real_fullworld',
+        specialistReason: 'real-fullworld-product',
+      },
+      fullSafetyNet: false,
+    };
+  }
+  const plan = build({
+    changedFiles: [{ path: 'e2e/tests/runtime.mjs' }],
+    trustedVerificationCatalog: trustedCatalog,
+    candidateVerificationCatalog: candidateCatalog,
+    protectedCensus: census([baseId, specialistId]),
+    candidateCensus: candidateCensus([baseId, candidateId, specialistId]),
+  });
+  assert.ok(!plan.stableTestIds.includes(specialistId));
+  assert.deepEqual(plan.candidateStableIdModifications, [baseId]);
 });
