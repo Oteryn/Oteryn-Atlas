@@ -39,7 +39,7 @@ function plan() {
 
 function summary(shardIndex, ids, overrides = {}) {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     status: 'success',
     cancelled: false,
     candidateHeadSha: head,

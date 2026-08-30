@@ -65,7 +65,7 @@ export function validateProtectedHostedFanIn(plan, summaries, {
   const seenModifiedStableIds = new Set();
 
   for (const summary of summaries) {
-    if (!summary || typeof summary !== 'object' || Array.isArray(summary) || summary.schemaVersion !== 1) {
+    if (!summary || typeof summary !== 'object' || Array.isArray(summary) || summary.schemaVersion !== 2) {
       throw new TypeError('fan-in summary schema is invalid');
     }
     if (summary.status !== 'success') throw new TypeError('fan-in summary status is not success');
