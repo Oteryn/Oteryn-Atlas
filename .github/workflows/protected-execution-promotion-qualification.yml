@@ -653,7 +653,16 @@ jobs:
             --tmpfs /tmp:rw,nosuid,nodev,size=256m \
             --mount "type=bind,src=$PWD/candidate,dst=/candidate,readonly" \
             "$ATLAS_CANDIDATE_IMAGE" \
-            bash -lc 'cd /candidate && node --test tests/verification/*.test.mjs'
+            bash -lc 'set -euo pipefail
+              cd /candidate
+              test "$(command -v python3)" = /usr/bin/python3
+              mkdir -p /tmp/atlas-python-bin /tmp/atlas-python-pycache
+              ln -s /usr/bin/python3 /tmp/atlas-python-bin/python
+              export PATH="/tmp/atlas-python-bin:$PATH"
+              export PYTHONPYCACHEPREFIX=/tmp/atlas-python-pycache
+              test "$(command -v python)" = /tmp/atlas-python-bin/python
+              python --version
+              node --test tests/verification/*.test.mjs'
 
           printf '%s\n' "$source_root/product" > "$RUNNER_TEMP/atlas-functional-source-root.txt"
           printf '%s\n' "$trust_path" > "$RUNNER_TEMP/atlas-functional-trust-path.txt"

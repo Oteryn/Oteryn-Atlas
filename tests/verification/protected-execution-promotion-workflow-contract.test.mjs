@@ -179,3 +179,22 @@ test('functional qualification candidate census materializes Node dependency lin
   assert.doesNotMatch(census, /bash -lc '[^']*ln -s [^']*e2e\/node_modules/);
   assert.match(census, /ATLAS_ARTIFACTS_DIR=\/tmp\/artifacts[^']*playwright test[^']*--list/);
 });
+
+test('functional deterministic proof supplies the pinned Python command inside writable tmp only', () => {
+  const workflow = fs.readFileSync(workflowPath, 'utf8');
+  const job = workflow.split('  qualification-functional-fixture:')[1]?.split('  candidate-modification-overlay:')[0] ?? '';
+  const step = job.split('      - name: Rebuild exact qualification fixture and run deterministic regressions in networkless sandbox')[1]
+    ?.split('      - name: Prove complete protected qualification functional safety net in Chromium')[0] ?? '';
+  assert.match(step, /test "\$\(command -v python3\)" = \/usr\/bin\/python3/);
+  assert.match(step, /mkdir -p [^\n]*\/tmp\/atlas-python-bin/);
+  assert.match(step, /mkdir -p [^\n]*\/tmp\/atlas-python-pycache/);
+  assert.match(step, /ln -s \/usr\/bin\/python3 \/tmp\/atlas-python-bin\/python/);
+  assert.match(step, /export PATH="\/tmp\/atlas-python-bin:\$PATH"/);
+  assert.match(step, /test "\$\(command -v python\)" = \/tmp\/atlas-python-bin\/python/);
+  assert.match(step, /export PYTHONPYCACHEPREFIX=\/tmp\/atlas-python-pycache/);
+  assert.match(step, /node --test tests\/verification\/\*\.test\.mjs/);
+  assert.match(step, /--network none/);
+  assert.match(step, /--read-only/);
+  assert.match(step, /--tmpfs \/tmp:rw,nosuid,nodev,size=256m/);
+  assert.doesNotMatch(step, /apt-get|pip install|npm install/);
+});
