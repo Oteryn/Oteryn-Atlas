@@ -68,7 +68,10 @@ test('legacy local publisher remains exact while protected Playwright identity u
   for (const field of ['planSemanticDigest', 'planInstanceDigest', 'authorityDigest', 'environmentDigest']) {
     assert.match(playwrightConfig, new RegExp(field));
   }
-  assert.doesNotMatch(playwrightConfig, /verificationPlanSha256/);
+  assert.match(playwrightConfig, /ATLAS_VERIFICATION_PLAN_SHA256/);
+  assert.match(playwrightConfig, /verificationPlanSha256:\s*legacyVerificationPlanSha256/);
+  const executor = readText(new URL('../../.github/workflows/protected-hosted-executor.yml', import.meta.url));
+  assert.doesNotMatch(executor, /ATLAS_VERIFICATION_PLAN_SHA256/);
 });
 
 test('required workflows verify the exact pull-request head rather than a synthetic merge ref', () => {

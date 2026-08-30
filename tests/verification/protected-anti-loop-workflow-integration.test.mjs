@@ -117,7 +117,7 @@ test('Playwright summaries bind semantic, instance, authority and environment id
     'ATLAS_AUTHORITY_DIGEST',
     'ATLAS_ENVIRONMENT_DIGEST',
   ]) assert.match(executor, new RegExp(variable));
-  assert.doesNotMatch(playwright, /verificationPlanSha256/);
+  assert.match(playwright, /legacyVerificationPlanSha256 = process\.env\.ATLAS_VERIFICATION_PLAN_SHA256/);
   assert.doesNotMatch(executor, /ATLAS_VERIFICATION_PLAN_SHA256|\.planDigest/);
 });
 
