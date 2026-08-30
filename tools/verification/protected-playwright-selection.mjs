@@ -77,8 +77,8 @@ function exactPartition(partition, hostedSet, protectedSet, candidateAdditionSet
 }
 
 function validateExecution(execution) {
-  if (!execution || typeof execution !== 'object' || Array.isArray(execution) || execution.schemaVersion !== 1) {
-    throw new TypeError('protected Playwright selection requires execution schemaVersion 1');
+  if (!execution || typeof execution !== 'object' || Array.isArray(execution) || execution.schemaVersion !== 2) {
+    throw new TypeError('protected Playwright selection requires execution schemaVersion 2');
   }
   if (!execution.hosted || !execution.specialist) throw new TypeError('protected Playwright selection requires hosted and specialist placements');
   const hosted = exactStableIds(execution.hosted.stableTestIds, 'hosted stable IDs', { allowEmpty: true });
