@@ -38,191 +38,181 @@ jobs:
           test "$(git rev-parse HEAD)" = "$ATLAS_PROTECTED_BASE_SHA"
           mkdir -p artifacts/protected-controller
           rows="$(mktemp)"
-          trap 'rm -f "$rows"' EXIT
-          gh api --paginate \
-            "repos/$GITHUB_REPOSITORY/pulls/$ATLAS_PR_NUMBER/files?per_page=100" \
-            --jq '.[] | [
-              .filename,
-              (if .status == "renamed" then .previous_filename else "" end)
-            ] | @tsv' > "$rows"
-          jq -R -s '
-            split("\n")
-            | map(select(length > 0) | split("\t"))
-            | map({path: .[0]} + (if .[1] != "" then {previousPath: .[1]} else {} end))
-          ' "$rows" > artifacts/protected-controller/changed-files.json
-          test "$(jq length artifacts/protected-controller/changed-files.json)" = "${{ github.event.pull_request.changed_files }}"
+          git_changes="$(mktemp)"
+          trap 'rm -f "$rows" "$git_changes"' EXIT
+          gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$ATLAS_PR_NUMBER/files?per_page=100" \
+            --jq '.[] | [.filename, (.previous_filename // "")] | @tsv' > "$rows"
+          test -s "$rows"
+          git fetch --no-tags origin "refs/pull/$ATLAS_PR_NUMBER/head"
+          test "$(git rev-parse FETCH_HEAD)" = "$ATLAS_CANDIDATE_HEAD_SHA"
+          merge_base_sha="$(git merge-base "$ATLAS_PROTECTED_BASE_SHA" "$ATLAS_CANDIDATE_HEAD_SHA")"
+          test -n "$merge_base_sha"
+          git diff --check "$merge_base_sha" "$ATLAS_CANDIDATE_HEAD_SHA"
+          git diff --name-status -z --find-renames "$merge_base_sha" "$ATLAS_CANDIDATE_HEAD_SHA" > "$git_changes"
+          node --input-type=module - "$rows" "$git_changes" artifacts/protected-controller/changed-files.json <<'NODE'
+          import fs from 'node:fs';
+          const [rowsPath, gitPath, outputPath] = process.argv.slice(2);
+          const rows = fs.readFileSync(rowsPath, 'utf8').split(/\r?\n/).filter(Boolean);
+          const api = rows.map((row) => {
+            const fields = row.split('\t');
+            if (fields.length !== 2 || !fields[0]) throw new Error('Malformed GitHub changed-file evidence.');
+            return fields[1] ? { path: fields[0], previousPath: fields[1] } : { path: fields[0] };
+          });
+          const fields = fs.readFileSync(gitPath, 'utf8').split('\0');
+          if (fields.at(-1) === '') fields.pop();
+          const git = [];
+          while (fields.length) {
+            const status = fields.shift();
+            if (!status) throw new Error('Malformed protected merge-base diff evidence.');
+            if (status.startsWith('R')) {
+              const previousPath = fields.shift();
+              const path = fields.shift();
+              if (!previousPath || !path) throw new Error('Malformed protected rename evidence.');
+              git.push({ path, previousPath });
+            } else {
+              const path = fields.shift();
+              if (!path) throw new Error('Malformed protected changed path evidence.');
+              git.push({ path });
+            }
+          }
+          const canonical = (items) => JSON.stringify(items.map((item) => ({ path: item.path, previousPath: item.previousPath ?? null }))
+            .sort((a, b) => `${a.path}\0${a.previousPath}`.localeCompare(`${b.path}\0${b.previousPath}`)));
+          if (canonical(api) !== canonical(git)) throw new Error('GitHub changed-file evidence does not match protected merge-base diff.');
+          fs.writeFileSync(outputPath, `${JSON.stringify(api)}\n`);
+          NODE
+          printf '%s\n' "$merge_base_sha" > artifacts/protected-controller/merge-base.txt
 
-      - name: Fetch exact candidate head as data
+      - name: Snapshot protected and candidate policy as inert data
         shell: bash
         run: |
           set -euo pipefail
-          candidate_ref="refs/pull/$ATLAS_PR_NUMBER/head"
-          git fetch --no-tags origin "+$candidate_ref:$candidate_ref"
-          test "$(git rev-parse "$candidate_ref")" = "$ATLAS_CANDIDATE_HEAD_SHA"
-          candidate_tree="$(mktemp -d)"
-          printf '%s\n' "$candidate_tree" > "$RUNNER_TEMP/atlas-candidate-tree-path"
-          git worktree add --detach "$candidate_tree" "$candidate_ref"
-          test "$(git -C "$candidate_tree" rev-parse HEAD)" = "$ATLAS_CANDIDATE_HEAD_SHA"
-          git -C "$candidate_tree" diff --check "$ATLAS_CANDIDATE_HEAD_SHA^" "$ATLAS_CANDIDATE_HEAD_SHA" || \
-            git diff --check "$(git merge-base "$ATLAS_PROTECTED_BASE_SHA" "$ATLAS_CANDIDATE_HEAD_SHA")" "$ATLAS_CANDIDATE_HEAD_SHA"
-
-      - name: Prepare protected Playwright dependency mount
-        shell: bash
-        run: |
-          set -euo pipefail
-          npm ci --prefix e2e --ignore-scripts
-          test -x e2e/node_modules/.bin/playwright
-          test -d e2e/node_modules/playwright
-
-      - name: Collect protected and sandboxed candidate stable-ID censuses
-        shell: bash
-        run: |
-          set -euo pipefail
-          candidate_tree="$(cat "$RUNNER_TEMP/atlas-candidate-tree-path")"
-          protected_raw="$RUNNER_TEMP/atlas-protected-census.txt"
-          candidate_raw="$RUNNER_TEMP/atlas-candidate-census.txt"
-          candidate_out="$RUNNER_TEMP/atlas-candidate-census"
-          mkdir -p "$candidate_out"
-
-          (
-            cd e2e
-            ATLAS_E2E_EXTERNAL_SERVER=1 \
-            ATLAS_SKIP_WORLD_PUBLISH=1 \
-            ATLAS_SKIP_VISUAL=1 \
-            ATLAS_E2E_DEPTH=required \
-            ATLAS_E2E_WORKERS=1 \
-              npx playwright test --list
-          ) > "$protected_raw"
-          node tools/verification/parse-playwright-test-list.mjs \
-            --input "$protected_raw" \
-            > artifacts/protected-controller/protected-census.json
-
-          test ! -e "$candidate_tree/e2e/node_modules"
-          ln -s /protected-e2e-node-modules/node_modules "$candidate_tree/e2e/node_modules"
-          timeout --signal=KILL 150s docker run --rm \
-            --network none \
-            --read-only \
-            --cap-drop ALL \
-            --security-opt no-new-privileges \
-            --pids-limit 192 \
-            --memory 768m \
-            --cpus 2 \
-            --user 1000:1000 \
-            --tmpfs /tmp:rw,nosuid,nodev,size=96m \
-            --env ATLAS_E2E_EXTERNAL_SERVER=1 \
-            --env ATLAS_SKIP_WORLD_PUBLISH=1 \
-            --env ATLAS_SKIP_VISUAL=1 \
-            --env ATLAS_E2E_DEPTH=required \
-            --env ATLAS_E2E_WORKERS=1 \
-            --mount "type=bind,src=$candidate_tree,dst=/candidate,readonly" \
-            --mount "type=bind,src=$PWD/e2e/node_modules,dst=/protected-e2e-node-modules/node_modules,readonly" \
-            --mount "type=bind,src=$candidate_out,dst=/out" \
-            "$ATLAS_CANDIDATE_IMAGE" \
-            bash -lc 'cd /candidate/e2e && npx playwright test --list > /out/list.txt'
-          cp "$candidate_out/list.txt" "$candidate_raw"
-          node tools/verification/parse-playwright-test-list.mjs \
-            --input "$candidate_raw" \
-            > "$RUNNER_TEMP/candidate-census-body.json"
-          jq -n \
-            --arg candidateHeadSha "$ATLAS_CANDIDATE_HEAD_SHA" \
-            --slurpfile census "$RUNNER_TEMP/candidate-census-body.json" \
-            '{
-              schemaVersion: 1,
-              status: "success",
-              candidateHeadSha: $candidateHeadSha,
-              sandboxPolicyId: "atlas-candidate-census-sandbox-v1",
-              census: $census[0]
-            }' > artifacts/protected-controller/candidate-census.json
-
-      - name: Snapshot candidate policy files as inert data
-        shell: bash
-        run: |
-          set -euo pipefail
-          git show "$ATLAS_CANDIDATE_HEAD_SHA:tools/verification/impact-manifest.json" > artifacts/protected-controller/candidate-impact.json
-          git show "$ATLAS_CANDIDATE_HEAD_SHA:tools/verification/verification-catalog.json" > artifacts/protected-controller/candidate-catalog.json
           git show "$ATLAS_PROTECTED_BASE_SHA:tools/verification/impact-manifest.json" > artifacts/protected-controller/trusted-impact.json
           git show "$ATLAS_PROTECTED_BASE_SHA:tools/verification/verification-catalog.json" > artifacts/protected-controller/trusted-catalog.json
-          cp tools/verification/protected-hosted-product-identities.json artifacts/protected-controller/product-identities.json
+          git show "$ATLAS_CANDIDATE_HEAD_SHA:tools/verification/impact-manifest.json" > artifacts/protected-controller/candidate-impact.json
+          git show "$ATLAS_CANDIDATE_HEAD_SHA:tools/verification/verification-catalog.json" > artifacts/protected-controller/candidate-catalog.json
+          git show "$ATLAS_PROTECTED_BASE_SHA:tools/verification/protected-hosted-product-identities.json" > artifacts/protected-controller/product-identities.json
 
-      - name: Restore protected base after candidate data snapshot
+      - name: Derive canonical protected authority and environment identities
         shell: bash
         run: |
           set -euo pipefail
-          git checkout --force "$ATLAS_PROTECTED_BASE_SHA"
-          test "$(git rev-parse HEAD)" = "$ATLAS_PROTECTED_BASE_SHA"
-          test -z "$(git status --porcelain)"
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import { buildProtectedExecutionEnvironmentIdentity } from './tools/verification/protected-execution-environment.mjs';
+          import { buildVerificationAuthorityIdentity } from './tools/verification/verification-authority.mjs';
+          const readJson = (path) => JSON.parse(fs.readFileSync(path, 'utf8'));
+          const authorityIdentity = await buildVerificationAuthorityIdentity({
+            manifest: readJson('tools/verification/verification-authority-manifest.json'),
+            readFile: async (path) => fs.readFileSync(path),
+          });
+          const environmentIdentity = buildProtectedExecutionEnvironmentIdentity(
+            readJson('tools/verification/protected-execution-environment.json'),
+          );
+          fs.writeFileSync('artifacts/protected-controller/verification-authority-identity.json', `${JSON.stringify(authorityIdentity, null, 2)}\n`);
+          fs.writeFileSync('artifacts/protected-controller/protected-execution-environment-identity.json', `${JSON.stringify(environmentIdentity, null, 2)}\n`);
+          NODE
+
+      - name: Enumerate exact protected-base Playwright census
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci --prefix e2e --ignore-scripts --no-audit --no-fund
+          ATLAS_ARTIFACTS_DIR="$PWD/artifacts/protected-controller/playwright-list" \
+            npm exec --prefix e2e -- playwright test --config=e2e/playwright.config.mjs --list \
+            > artifacts/protected-controller/protected-playwright-test-list.txt
+          node tools/verification/parse-playwright-test-list.mjs artifacts/protected-controller/protected-playwright-test-list.txt \
+            > artifacts/protected-controller/protected-stable-test-ids.json
+
+      - name: Enumerate candidate census only inside protected no-network sandbox
+        shell: bash
+        run: |
+          set -euo pipefail
+          candidate_dir="$RUNNER_TEMP/atlas-candidate-census-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          cleanup() { git worktree remove --force "$candidate_dir" >/dev/null 2>&1 || true; }
+          trap cleanup EXIT
+          git worktree add --detach "$candidate_dir" "$ATLAS_CANDIDATE_HEAD_SHA"
+          test ! -L "$candidate_dir/e2e"
+          test -d "$candidate_dir/e2e"
+          if git ls-tree -r --name-only "$ATLAS_CANDIDATE_HEAD_SHA" -- e2e/node_modules | grep -q .; then
+            echo 'Candidate must not supply e2e/node_modules.' >&2
+            exit 1
+          fi
+          test ! -e "$candidate_dir/e2e/node_modules"
+          ln -s /protected-e2e-node-modules/node_modules "$candidate_dir/e2e/node_modules"
+          timeout --signal=KILL 120s docker run --rm \
+            --network none --read-only --cap-drop ALL --security-opt no-new-privileges \
+            --pids-limit 192 --memory 1536m --cpus 2 --user 1000:1000 \
+            --tmpfs /tmp:rw,nosuid,nodev,size=256m \
+            --mount "type=bind,src=$candidate_dir,dst=/candidate,readonly" \
+            --mount "type=bind,src=$PWD/e2e/node_modules,dst=/protected-e2e-node-modules/node_modules,readonly" \
+            "$ATLAS_CANDIDATE_IMAGE" \
+            bash -lc 'cd /candidate && CI=1 ATLAS_ARTIFACTS_DIR=/tmp/artifacts /candidate/e2e/node_modules/.bin/playwright test --config=/candidate/e2e/playwright.config.mjs --list' \
+            > artifacts/protected-controller/candidate-playwright-test-list.txt
+          node tools/verification/parse-playwright-test-list.mjs artifacts/protected-controller/candidate-playwright-test-list.txt \
+            > artifacts/protected-controller/candidate-stable-test-ids.json
 
       - name: Build authoritative protected v3 plan
         shell: bash
         run: |
           set -euo pipefail
-          merge_base_sha="$(git merge-base "$ATLAS_PROTECTED_BASE_SHA" "$ATLAS_CANDIDATE_HEAD_SHA")"
-          node --input-type=module - "$GITHUB_REPOSITORY" "$ATLAS_PR_NUMBER" "$ATLAS_PROTECTED_BASE_SHA" "$ATLAS_CANDIDATE_HEAD_SHA" "$merge_base_sha" <<'NODE'
+          merge_base_sha="$(tr -d '\r\n' < artifacts/protected-controller/merge-base.txt)"
+          node --input-type=module - "$merge_base_sha" <<'NODE'
           import fs from 'node:fs';
-          import { buildProtectedExecutionEnvironmentIdentity } from './tools/verification/protected-execution-environment.mjs';
           import { buildProtectedHostedPlan } from './tools/verification/protected-hosted-plan.mjs';
-          import { buildVerificationAuthorityIdentity } from './tools/verification/verification-authority.mjs';
-          const [repository, prNumber, protectedBaseSha, candidateHeadSha, mergeBaseSha] = process.argv.slice(2);
-          const read = (name) => JSON.parse(fs.readFileSync(`artifacts/protected-controller/${name}`, 'utf8'));
-          const authorityManifest = JSON.parse(fs.readFileSync('tools/verification/verification-authority-manifest.json', 'utf8'));
-          const authorityIdentity = await buildVerificationAuthorityIdentity({
-            manifest: authorityManifest,
-            readFile: async (path) => fs.promises.readFile(path),
-          });
-          const environmentConfig = JSON.parse(fs.readFileSync('tools/verification/protected-execution-environment.json', 'utf8'));
-          const environmentIdentity = buildProtectedExecutionEnvironmentIdentity(environmentConfig);
-          fs.writeFileSync(
-            'artifacts/protected-controller/verification-authority-identity.json',
-            `${JSON.stringify(authorityIdentity, null, 2)}\n`,
-            'utf8',
-          );
-          fs.writeFileSync(
-            'artifacts/protected-controller/protected-execution-environment-identity.json',
-            `${JSON.stringify(environmentIdentity, null, 2)}\n`,
-            'utf8',
-          );
+          import { stableIdAlgorithm } from './tools/verification/stable-id.mjs';
+          const [mergeBaseSha] = process.argv.slice(2);
+          const read = (path) => JSON.parse(fs.readFileSync(path, 'utf8'));
+          const census = (stableTestIds) => ({ schemaVersion: 1, stableIdAlgorithm, stableTestIds });
+          const candidateHeadSha = process.env.ATLAS_CANDIDATE_HEAD_SHA;
+          const authorityIdentity = read('artifacts/protected-controller/verification-authority-identity.json');
+          const environmentIdentity = read('artifacts/protected-controller/protected-execution-environment-identity.json');
           const plan = buildProtectedHostedPlan({
-            repository,
-            prNumber: Number(prNumber),
-            protectedBaseSha,
+            repository: process.env.GITHUB_REPOSITORY,
+            prNumber: Number(process.env.ATLAS_PR_NUMBER),
+            protectedBaseSha: process.env.ATLAS_PROTECTED_BASE_SHA,
             candidateHeadSha,
             mergeBaseSha,
-            changedFiles: read('changed-files.json'),
-            trustedImpactManifest: read('trusted-impact.json'),
-            candidateImpactManifest: read('candidate-impact.json'),
-            trustedVerificationCatalog: read('trusted-catalog.json'),
-            candidateVerificationCatalog: read('candidate-catalog.json'),
-            protectedCensus: read('protected-census.json'),
-            candidateCensus: read('candidate-census.json'),
-            productIdentities: read('product-identities.json'),
+            changedFiles: read('artifacts/protected-controller/changed-files.json'),
+            trustedImpactManifest: read('artifacts/protected-controller/trusted-impact.json'),
+            candidateImpactManifest: read('artifacts/protected-controller/candidate-impact.json'),
+            trustedVerificationCatalog: read('artifacts/protected-controller/trusted-catalog.json'),
+            candidateVerificationCatalog: read('artifacts/protected-controller/candidate-catalog.json'),
+            protectedCensus: census(read('artifacts/protected-controller/protected-stable-test-ids.json')),
+            candidateCensus: {
+              schemaVersion: 1,
+              status: 'success',
+              candidateHeadSha,
+              sandboxPolicyId: 'atlas-candidate-census-sandbox-v1',
+              census: census(read('artifacts/protected-controller/candidate-stable-test-ids.json')),
+            },
+            productIdentities: read('artifacts/protected-controller/product-identities.json'),
             authorityIdentity,
             environmentIdentity,
           });
-          fs.writeFileSync('artifacts/protected-controller/verification-plan.json', `${JSON.stringify(plan, null, 2)}\n`, 'utf8');
+          fs.writeFileSync('artifacts/protected-controller/protected-verification-plan.json', `${JSON.stringify(plan, null, 2)}\n`);
           NODE
 
-      - name: Fence current PR head before plan publication
+      - name: Reject superseded head before plan publication
         shell: bash
         run: |
           set -euo pipefail
-          payload="$RUNNER_TEMP/atlas-controller-head.json"
-          gh api "repos/$GITHUB_REPOSITORY/pulls/$ATLAS_PR_NUMBER" > "$payload"
+          gh api "repos/$GITHUB_REPOSITORY/pulls/$ATLAS_PR_NUMBER" > artifacts/protected-controller/current-pr.json
           node tools/verification/assert-current-pr-head.mjs \
-            --payload "$payload" \
-            --repository "$GITHUB_REPOSITORY" \
-            --pr-number "$ATLAS_PR_NUMBER" \
-            --expected-head-sha "$ATLAS_CANDIDATE_HEAD_SHA"
+            --payload artifacts/protected-controller/current-pr.json \
+            --repository "$GITHUB_REPOSITORY" --pr-number "$ATLAS_PR_NUMBER" --expected-head-sha "$ATLAS_CANDIDATE_HEAD_SHA"
 
-      - name: Publish protected plan artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
+      - name: Publish protected verification plan
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: protected-verification-plan-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
           path: |
-            artifacts/protected-controller/verification-plan.json
+            artifacts/protected-controller/protected-verification-plan.json
+            artifacts/protected-controller/protected-stable-test-ids.json
+            artifacts/protected-controller/candidate-stable-test-ids.json
+            artifacts/protected-controller/changed-files.json
+            artifacts/protected-controller/merge-base.txt
+            artifacts/protected-controller/product-identities.json
             artifacts/protected-controller/verification-authority-identity.json
             artifacts/protected-controller/protected-execution-environment-identity.json
-            artifacts/protected-controller/changed-files.json
-            artifacts/protected-controller/protected-census.json
-            artifacts/protected-controller/candidate-census.json
           if-no-files-found: error
           retention-days: 14

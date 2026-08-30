@@ -2,133 +2,99 @@
   "schemaVersion": 1,
   "authorityId": "atlas-protected-verification-authority-v1",
   "components": [
-    {
-      "id": "anti-loop-common",
-      "path": "tools/verification/anti-loop-common.mjs"
-    },
-    {
-      "id": "assert-current-pr-head",
-      "path": "tools/verification/assert-current-pr-head.mjs"
-    },
-    {
-      "id": "base-advance-compatibility",
-      "path": "tools/verification/base-advance-compatibility.mjs"
-    },
-    {
-      "id": "build-plan",
-      "path": "tools/verification/build-verification-plan.mjs"
-    },
-    {
-      "id": "ci-workflow",
-      "path": ".github/workflows/ci.yml"
-    },
-    {
-      "id": "controller-workflow",
-      "path": ".github/workflows/protected-verification-controller.yml"
-    },
-    {
-      "id": "environment",
-      "path": "tools/verification/protected-execution-environment.mjs"
-    },
-    {
-      "id": "environment-config",
-      "path": "tools/verification/protected-execution-environment.json"
-    },
-    {
-      "id": "environment-probe",
-      "path": "tools/verification/protected-execution-environment-probe.mjs"
-    },
-    {
-      "id": "evidence-manifest",
-      "path": "tools/verification/evidence-manifest.mjs"
-    },
-    {
-      "id": "evidence-reuse",
-      "path": "tools/verification/evidence-reuse.mjs"
-    },
-    {
-      "id": "execution-compose",
-      "path": "e2e/compose.protected-hosted-executor.yml"
-    },
-    {
-      "id": "execution-contract",
-      "path": "tools/verification/protected-hosted-execution.mjs"
-    },
-    {
-      "id": "executor-workflow",
-      "path": ".github/workflows/protected-hosted-executor.yml"
-    },
-    {
-      "id": "failure-classification",
-      "path": "tools/verification/verification-failure-classification.mjs"
-    },
-    {
-      "id": "fan-in",
-      "path": "tools/verification/protected-hosted-fan-in.mjs"
-    },
-    {
-      "id": "github-hosted-compose",
-      "path": "e2e/compose.github-hosted.yml"
-    },
-    {
-      "id": "impact-policy",
-      "path": "tools/verification/impact-manifest.json"
-    },
-    {
-      "id": "parse-playwright-list",
-      "path": "tools/verification/parse-playwright-test-list.mjs"
-    },
-    {
-      "id": "plan-schema",
-      "path": "tools/verification/verification-plan-schema.mjs"
-    },
-    {
-      "id": "planner",
-      "path": "tools/verification/protected-hosted-plan.mjs"
-    },
-    {
-      "id": "playwright-config",
-      "path": "e2e/playwright.config.mjs"
-    },
-    {
-      "id": "playwright-selection",
-      "path": "tools/verification/protected-playwright-selection.mjs"
-    },
-    {
-      "id": "progress-state",
-      "path": "tools/verification/verification-progress-state.mjs"
-    },
-    {
-      "id": "promotion-fan-in-workflow",
-      "path": ".github/workflows/protected-hosted-fan-in-promotion.yml"
-    },
-    {
-      "id": "promotion-qualification-workflow",
-      "path": ".github/workflows/protected-execution-promotion-qualification.yml"
-    },
-    {
-      "id": "semantic-experiment",
-      "path": "tools/verification/semantic-experiment-identity.mjs"
-    },
-    {
-      "id": "shard-summary",
-      "path": "tools/verification/protected-hosted-shard-summary.mjs"
-    },
-    {
-      "id": "stable-id",
-      "path": "tools/verification/stable-id.mjs"
-    },
-    {
-      "id": "stable-id-census",
-      "path": "tools/verification/stable-id-census.mjs"
-    },
-    {
-      "id": "summary-reporter",
-      "path": "e2e/summary-reporter.mjs"
-    },
-    {
-      "id": "verification-catalog",
-      "path": "tools/verification/verification-catalog.json"
-    }
+    { "id": "anti-loop-common", "path": "tools/verification/anti-loop-common.mjs" },
+    { "id": "base-advance-compatibility", "path": "tools/verification/base-advance-compatibility.mjs" },
+    { "id": "bounded-real-world", "path": "tools/verification/bounded-real-world.mjs" },
+    { "id": "build-plan", "path": "tools/verification/build-verification-plan.mjs" },
+    { "id": "ci-workflow", "path": ".github/workflows/ci.yml" },
+    { "id": "controller-workflow", "path": ".github/workflows/protected-verification-controller.yml" },
+    { "id": "e2e-compose-github-hosted", "path": "e2e/compose.github-hosted.yml" },
+    { "id": "e2e-compose-protected-hosted", "path": "e2e/compose.protected-hosted-executor.yml" },
+    { "id": "e2e-dockerfile", "path": "e2e/Dockerfile" },
+    { "id": "e2e-package-lock", "path": "e2e/package-lock.json" },
+    { "id": "e2e-package-manifest", "path": "e2e/package.json" },
+    { "id": "e2e-playwright-config", "path": "e2e/playwright.config.mjs" },
+    { "id": "e2e-summary-reporter", "path": "e2e/summary-reporter.mjs" },
+    { "id": "e2e-support-artifacts-mjs", "path": "e2e/support/artifacts.mjs" },
+    { "id": "e2e-support-creature-animation-coverage-mjs", "path": "e2e/support/creature-animation-coverage.mjs" },
+    { "id": "e2e-support-creature-presentation-fixtures-mjs", "path": "e2e/support/creature-presentation-fixtures.mjs" },
+    { "id": "e2e-support-creature-presentation-verification-mjs", "path": "e2e/support/creature-presentation-verification.mjs" },
+    { "id": "e2e-support-diagnostics-mjs", "path": "e2e/support/diagnostics.mjs" },
+    { "id": "e2e-support-fault-network-mjs", "path": "e2e/support/fault-network.mjs" },
+    { "id": "e2e-support-geometry-oracle-mjs", "path": "e2e/support/geometry-oracle.mjs" },
+    { "id": "e2e-support-live-creature-readiness-cjs", "path": "e2e/support/live-creature-readiness.cjs" },
+    { "id": "e2e-support-performance-mjs", "path": "e2e/support/performance.mjs" },
+    { "id": "e2e-support-seeded-actions-mjs", "path": "e2e/support/seeded-actions.mjs" },
+    { "id": "e2e-support-user-acceptance-mjs", "path": "e2e/support/user-acceptance.mjs" },
+    { "id": "e2e-support-user-journey-actions-mjs", "path": "e2e/support/user-journey-actions.mjs" },
+    { "id": "e2e-support-user-journey-browser-mjs", "path": "e2e/support/user-journey-browser.mjs" },
+    { "id": "e2e-support-visual-oracle-mjs", "path": "e2e/support/visual-oracle.mjs" },
+    { "id": "e2e-test-accessibility-desktop-spec-mjs", "path": "e2e/tests/accessibility-desktop.spec.mjs" },
+    { "id": "e2e-test-accessibility-mobile-spec-mjs", "path": "e2e/tests/accessibility-mobile.spec.mjs" },
+    { "id": "e2e-test-api-contract-desktop-spec-mjs", "path": "e2e/tests/api-contract-desktop.spec.mjs" },
+    { "id": "e2e-test-audit-desktop-spec-mjs", "path": "e2e/tests/audit-desktop.spec.mjs" },
+    { "id": "e2e-test-audit-mobile-spec-mjs", "path": "e2e/tests/audit-mobile.spec.mjs" },
+    { "id": "e2e-test-creature-gameplay-desktop-spec-mjs", "path": "e2e/tests/creature-gameplay-desktop.spec.mjs" },
+    { "id": "e2e-test-creature-gameplay-mobile-spec-mjs", "path": "e2e/tests/creature-gameplay-mobile.spec.mjs" },
+    { "id": "e2e-test-creature-interaction-desktop-spec-mjs", "path": "e2e/tests/creature-interaction-desktop.spec.mjs" },
+    { "id": "e2e-test-creature-interaction-mobile-spec-mjs", "path": "e2e/tests/creature-interaction-mobile.spec.mjs" },
+    { "id": "e2e-test-creature-presentation-desktop-spec-mjs", "path": "e2e/tests/creature-presentation-desktop.spec.mjs" },
+    { "id": "e2e-test-creature-presentation-mobile-spec-mjs", "path": "e2e/tests/creature-presentation-mobile.spec.mjs" },
+    { "id": "e2e-test-creatures-desktop-spec-mjs", "path": "e2e/tests/creatures-desktop.spec.mjs" },
+    { "id": "e2e-test-degraded-search-desktop-spec-mjs", "path": "e2e/tests/degraded-search-desktop.spec.mjs" },
+    { "id": "e2e-test-desktop-spec-mjs", "path": "e2e/tests/desktop.spec.mjs" },
+    { "id": "e2e-test-farm-explorer-desktop-spec-mjs", "path": "e2e/tests/farm-explorer-desktop.spec.mjs" },
+    { "id": "e2e-test-farm-explorer-mobile-spec-mjs", "path": "e2e/tests/farm-explorer-mobile.spec.mjs" },
+    { "id": "e2e-test-fullworld-animation-census-desktop-spec-mjs", "path": "e2e/tests/fullworld-animation-census-desktop.spec.mjs" },
+    { "id": "e2e-test-geometry-desktop-spec-mjs", "path": "e2e/tests/geometry-desktop.spec.mjs" },
+    { "id": "e2e-test-geometry-mobile-spec-mjs", "path": "e2e/tests/geometry-mobile.spec.mjs" },
+    { "id": "e2e-test-layer-audit-desktop-spec-mjs", "path": "e2e/tests/layer-audit-desktop.spec.mjs" },
+    { "id": "e2e-test-live-creature-preview-cjs", "path": "e2e/tests/live-creature-preview.cjs" },
+    { "id": "e2e-test-mobile-spec-mjs", "path": "e2e/tests/mobile.spec.mjs" },
+    { "id": "e2e-test-performance-desktop-spec-mjs", "path": "e2e/tests/performance-desktop.spec.mjs" },
+    { "id": "e2e-test-qualification-navigation-mjs", "path": "e2e/tests/qualification-navigation.mjs" },
+    { "id": "e2e-test-race-desktop-spec-mjs", "path": "e2e/tests/race-desktop.spec.mjs" },
+    { "id": "e2e-test-render-probes-desktop-spec-mjs", "path": "e2e/tests/render-probes-desktop.spec.mjs" },
+    { "id": "e2e-test-resilience-desktop-spec-mjs", "path": "e2e/tests/resilience-desktop.spec.mjs" },
+    { "id": "e2e-test-responsive-mobile-spec-mjs", "path": "e2e/tests/responsive-mobile.spec.mjs" },
+    { "id": "e2e-test-runtime-mjs", "path": "e2e/tests/runtime.mjs" },
+    { "id": "e2e-test-scale-desktop-spec-mjs", "path": "e2e/tests/scale-desktop.spec.mjs" },
+    { "id": "e2e-test-soak-desktop-spec-mjs", "path": "e2e/tests/soak-desktop.spec.mjs" },
+    { "id": "e2e-test-state-desktop-spec-mjs", "path": "e2e/tests/state-desktop.spec.mjs" },
+    { "id": "e2e-test-stress-desktop-spec-mjs", "path": "e2e/tests/stress-desktop.spec.mjs" },
+    { "id": "e2e-test-user-journey-desktop-spec-mjs", "path": "e2e/tests/user-journey-desktop.spec.mjs" },
+    { "id": "e2e-test-user-journey-mobile-spec-mjs", "path": "e2e/tests/user-journey-mobile.spec.mjs" },
+    { "id": "e2e-test-visual-desktop-spec-mjs", "path": "e2e/tests/visual-desktop.spec.mjs" },
+    { "id": "e2e-test-visual-mobile-spec-mjs", "path": "e2e/tests/visual-mobile.spec.mjs" },
+    { "id": "e2e-test-workflows-desktop-spec-mjs", "path": "e2e/tests/workflows-desktop.spec.mjs" },
+    { "id": "environment", "path": "tools/verification/protected-execution-environment.mjs" },
+    { "id": "environment-config", "path": "tools/verification/protected-execution-environment.json" },
+    { "id": "environment-probe", "path": "tools/verification/protected-execution-environment-probe.mjs" },
+    { "id": "evidence-manifest", "path": "tools/verification/evidence-manifest.mjs" },
+    { "id": "evidence-reuse", "path": "tools/verification/evidence-reuse.mjs" },
+    { "id": "execution-contract", "path": "tools/verification/protected-hosted-execution.mjs" },
+    { "id": "executor-workflow", "path": ".github/workflows/protected-hosted-executor.yml" },
+    { "id": "failure-classification", "path": "tools/verification/verification-failure-classification.mjs" },
+    { "id": "fan-in", "path": "tools/verification/protected-hosted-fan-in.mjs" },
+    { "id": "head-fence", "path": "tools/verification/assert-current-pr-head.mjs" },
+    { "id": "impact-policy", "path": "tools/verification/impact-manifest.json" },
+    { "id": "plan-schema", "path": "tools/verification/verification-plan-schema.mjs" },
+    { "id": "planner", "path": "tools/verification/protected-hosted-plan.mjs" },
+    { "id": "playwright-list-parser", "path": "tools/verification/parse-playwright-test-list.mjs" },
+    { "id": "playwright-selection", "path": "tools/verification/protected-playwright-selection.mjs" },
+    { "id": "product-identities", "path": "tools/verification/protected-hosted-product-identities.json" },
+    { "id": "progress-state", "path": "tools/verification/verification-progress-state.mjs" },
+    { "id": "promotion-fan-in-workflow", "path": ".github/workflows/protected-hosted-fan-in-promotion.yml" },
+    { "id": "promotion-qualification-workflow", "path": ".github/workflows/protected-execution-promotion-qualification.yml" },
+    { "id": "publication-readiness", "path": "tools/verification/publication-readiness.mjs" },
+    { "id": "qualification-fixture-definition", "path": "tools/verification/qualification-fixture-definition.mjs" },
+    { "id": "qualification-world", "path": "tools/verification/qualification-world.mjs" },
+    { "id": "semantic-experiment", "path": "tools/verification/semantic-experiment-identity.mjs" },
+    { "id": "shard-summary", "path": "tools/verification/protected-hosted-shard-summary.mjs" },
+    { "id": "stable-id", "path": "tools/verification/stable-id.mjs" },
+    { "id": "stable-id-census", "path": "tools/verification/stable-id-census.mjs" },
+    { "id": "verification-authority", "path": "tools/verification/verification-authority.mjs" },
+    { "id": "verification-authority-manifest", "path": "tools/verification/verification-authority-manifest.json" },
+    { "id": "verification-catalog", "path": "tools/verification/verification-catalog.json" }
   ]
 }

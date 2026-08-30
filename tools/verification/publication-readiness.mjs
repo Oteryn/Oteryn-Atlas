@@ -10,12 +10,37 @@ function digest(value) {
   return `sha256:${crypto.createHash('sha256').update(value).digest('hex')}`;
 }
 
-function requireIdentity({ repository, candidateSha, planDigest, producerRunId, harnessDigest }) {
-  if (repository !== 'Oteryn/Oteryn-Atlas' || !SHA.test(candidateSha) || !SHA256.test(planDigest)
-    || typeof producerRunId !== 'string' || !/^[0-9]+-[1-9][0-9]*$/.test(producerRunId) || !SHA256.test(harnessDigest)) {
+function requireIdentity({
+  repository,
+  candidateSha,
+  planSemanticDigest,
+  planInstanceDigest,
+  authorityDigest,
+  environmentDigest,
+  producerRunId,
+  harnessDigest,
+}) {
+  if (repository !== 'Oteryn/Oteryn-Atlas'
+    || !SHA.test(candidateSha)
+    || !SHA256.test(planSemanticDigest)
+    || !SHA256.test(planInstanceDigest)
+    || !SHA256.test(authorityDigest)
+    || !SHA256.test(environmentDigest)
+    || typeof producerRunId !== 'string'
+    || !/^[0-9]+-[1-9][0-9]*$/.test(producerRunId)
+    || !SHA256.test(harnessDigest)) {
     throw new TypeError('publication readiness identity is invalid');
   }
-  return { repository, candidateSha, planDigest, producerRunId, harnessDigest };
+  return {
+    repository,
+    candidateSha,
+    planSemanticDigest,
+    planInstanceDigest,
+    authorityDigest,
+    environmentDigest,
+    producerRunId,
+    harnessDigest,
+  };
 }
 
 function filesUnder(root) {
@@ -48,14 +73,17 @@ function measure(root) {
 function equalIdentity(manifest, identity) {
   return manifest.repository === identity.repository
     && manifest.candidateSha === identity.candidateSha
-    && manifest.planDigest === identity.planDigest
+    && manifest.planSemanticDigest === identity.planSemanticDigest
+    && manifest.planInstanceDigest === identity.planInstanceDigest
+    && manifest.authorityDigest === identity.authorityDigest
+    && manifest.environmentDigest === identity.environmentDigest
     && manifest.producerRunId === identity.producerRunId
     && manifest.harnessDigest === identity.harnessDigest;
 }
 
 export function validateReadyPublication({ publicationDir, manifest, ...identityInput }) {
   const identity = requireIdentity(identityInput);
-  if (!manifest || manifest.schemaVersion !== 1 || manifest.complete !== true || !equalIdentity(manifest, identity)
+  if (!manifest || manifest.schemaVersion !== 2 || manifest.complete !== true || !equalIdentity(manifest, identity)
     || !Number.isSafeInteger(manifest.fileCount) || manifest.fileCount < 1 || !Number.isSafeInteger(manifest.byteSize)
     || manifest.byteSize < 1 || !SHA256.test(manifest.productDigest)) {
     throw new TypeError('publication readiness manifest is invalid or stale for this candidate');
@@ -82,7 +110,7 @@ export function publishReadyPublication({ sourceDir, destinationDir, ...identity
     fs.cpSync(source, temporary, { recursive: true, errorOnExist: true, force: false });
     const measured = measure(temporary);
     if (measured.fileCount === 0 || measured.byteSize === 0) throw new TypeError('publication source is empty');
-    const manifest = Object.freeze({ schemaVersion: 1, complete: true, ...identity, ...measured });
+    const manifest = Object.freeze({ schemaVersion: 2, complete: true, ...identity, ...measured });
     fs.writeFileSync(path.join(temporary, MANIFEST_NAME), `${JSON.stringify(manifest)}\n`, { flag: 'wx' });
     fs.renameSync(temporary, destination);
     return validateReadyPublication({ publicationDir: destination, manifest, ...identity });
