@@ -1,0 +1,98 @@
+{
+  "schemaVersion": 1,
+  "authorityId": "atlas-protected-verification-authority-v1",
+  "components": [
+    {
+      "id": "anti-loop-common",
+      "path": "tools/verification/anti-loop-common.mjs"
+    },
+    {
+      "id": "base-advance-compatibility",
+      "path": "tools/verification/base-advance-compatibility.mjs"
+    },
+    {
+      "id": "build-plan",
+      "path": "tools/verification/build-verification-plan.mjs"
+    },
+    {
+      "id": "controller-workflow",
+      "path": ".github/workflows/protected-verification-controller.yml"
+    },
+    {
+      "id": "environment",
+      "path": "tools/verification/protected-execution-environment.mjs"
+    },
+    {
+      "id": "environment-config",
+      "path": "tools/verification/protected-execution-environment.json"
+    },
+    {
+      "id": "evidence-manifest",
+      "path": "tools/verification/evidence-manifest.mjs"
+    },
+    {
+      "id": "evidence-reuse",
+      "path": "tools/verification/evidence-reuse.mjs"
+    },
+    {
+      "id": "execution-contract",
+      "path": "tools/verification/protected-hosted-execution.mjs"
+    },
+    {
+      "id": "executor-workflow",
+      "path": ".github/workflows/protected-hosted-executor.yml"
+    },
+    {
+      "id": "failure-classification",
+      "path": "tools/verification/verification-failure-classification.mjs"
+    },
+    {
+      "id": "fan-in",
+      "path": "tools/verification/protected-hosted-fan-in.mjs"
+    },
+    {
+      "id": "impact-policy",
+      "path": "tools/verification/impact-manifest.json"
+    },
+    {
+      "id": "plan-schema",
+      "path": "tools/verification/verification-plan-schema.mjs"
+    },
+    {
+      "id": "planner",
+      "path": "tools/verification/protected-hosted-plan.mjs"
+    },
+    {
+      "id": "progress-state",
+      "path": "tools/verification/verification-progress-state.mjs"
+    },
+    {
+      "id": "promotion-fan-in-workflow",
+      "path": ".github/workflows/protected-hosted-fan-in-promotion.yml"
+    },
+    {
+      "id": "promotion-qualification-workflow",
+      "path": ".github/workflows/protected-execution-promotion-qualification.yml"
+    },
+    {
+      "id": "semantic-experiment",
+      "path": "tools/verification/semantic-experiment-identity.mjs"
+    },
+    {
+      "id": "shard-summary",
+      "path": "tools/verification/protected-hosted-shard-summary.mjs"
+    },
+    {
+      "id": "stable-id",
+      "path": "tools/verification/stable-id.mjs"
+    },
+    {
+      "id": "stable-id-census",
+      "path": "tools/verification/stable-id-census.mjs"
+    },
+    {
+      "id": "verification-catalog",
+      "path": "tools/verification/verification-catalog.json"
+    }
+  ]
+}

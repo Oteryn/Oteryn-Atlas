@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 import {
@@ -139,4 +140,16 @@ test('unpinned images and candidate-controlled sandbox weakening are rejected be
     }),
     /network/i,
   );
+});
+
+
+test('repository environment config is the canonical pinned protected environment identity', async () => {
+  const repositoryConfig = JSON.parse(await readFile(
+    new URL('../../tools/verification/protected-execution-environment.json', import.meta.url),
+    'utf8',
+  ));
+  const identity = buildProtectedExecutionEnvironmentIdentity(repositoryConfig);
+  assert.equal(identity.config.container.image, 'mcr.microsoft.com/playwright:v1.62.0-noble@sha256:baed2032d533817f3dbe6425de795788430ba345e819a1201337009ba17c9d07');
+  assert.equal(identity.config.runtime.python.shimRoot, '/tmp/atlas-python-bin');
+  assert.match(identity.environmentDigest, /^sha256:[a-f0-9]{64}$/);
 });

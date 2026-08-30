@@ -106,3 +106,34 @@ test('third serial closeout environment/control-plane defect requires architectu
   assert.equal(state.status, 'ARCHITECTURE_STABILIZATION_REQUIRED');
   assert.equal(state.nextAttemptAllowed, false);
 });
+
+
+test('full rerun uses an explicit unknown or positive heavy execution count, never a sentinel', () => {
+  const unknown = advanceProgress(
+    { status: 'BASE_COMPATIBILITY', history: [] },
+    { event: 'BASE_COMPATIBILITY_RESOLVED', compatibilityDisposition: 'FULL_RERUN' },
+  );
+  assert.equal(unknown.status, 'EXECUTING');
+  assert.equal(unknown.heavyExecutionsRequired, null);
+
+  const known = advanceProgress(
+    { status: 'BASE_COMPATIBILITY', history: [] },
+    {
+      event: 'BASE_COMPATIBILITY_RESOLVED',
+      compatibilityDisposition: 'FULL_RERUN',
+      heavyExecutionsRequired: 4,
+    },
+  );
+  assert.equal(known.heavyExecutionsRequired, 4);
+  assert.throws(
+    () => advanceProgress(
+      { status: 'BASE_COMPATIBILITY', history: [] },
+      {
+        event: 'BASE_COMPATIBILITY_RESOLVED',
+        compatibilityDisposition: 'FULL_RERUN',
+        heavyExecutionsRequired: -1,
+      },
+    ),
+    /positive integer/i,
+  );
+});

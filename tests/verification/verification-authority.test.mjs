@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 import {
@@ -100,4 +101,20 @@ test('authority identity fails closed when a declared component cannot be read o
     }),
     /authorityDigest|digest mismatch|identity/i,
   );
+});
+
+
+test('repository authority manifest is canonical and independently identifies its declared authority set', async () => {
+  const repositoryManifest = JSON.parse(await readFile(
+    new URL('../../tools/verification/verification-authority-manifest.json', import.meta.url),
+    'utf8',
+  ));
+  const identity = await buildVerificationAuthorityIdentity({
+    manifest: repositoryManifest,
+    readFile: async (path) => `repository authority component:${path}\n`,
+  });
+  assert.equal(identity.authorityId, 'atlas-protected-verification-authority-v1');
+  assert.equal(identity.components.length, repositoryManifest.components.length);
+  assert.match(identity.manifestDigest, /^sha256:[a-f0-9]{64}$/);
+  assert.match(identity.authorityDigest, /^sha256:[a-f0-9]{64}$/);
 });
