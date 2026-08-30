@@ -31,16 +31,19 @@ export function validateProtectedHostedFanIn(plan, summaries, {
   expectedStableTestIds = plan?.stableTestIds,
   expectedStableTestIdsDigest = plan?.expectedStableTestIdsDigest,
 } = {}) {
-  if (!plan || typeof plan !== 'object' || Array.isArray(plan) || plan.schemaVersion !== 2) {
-    throw new TypeError('fan-in requires protected hosted plan schemaVersion 2');
+  if (!plan || typeof plan !== 'object' || Array.isArray(plan) || plan.schemaVersion !== 3) {
+    throw new TypeError('fan-in requires protected hosted plan schemaVersion 3');
   }
-  if (plan.controller?.id !== 'atlas-protected-hosted-controller-v2' || plan.controller?.version !== 2) {
+  if (plan.controller?.id !== 'atlas-protected-hosted-controller-v3' || plan.controller?.version !== 3) {
     throw new TypeError('fan-in controller identity is invalid');
   }
   const controllerSourceSha = exactSha(plan.controller.sourceSha, 'plan controller source SHA');
   const candidateHeadSha = exactSha(plan.candidateHeadSha, 'plan candidate head');
   if (exactSha(currentHeadSha, 'current PR head') !== candidateHeadSha) throw new TypeError('fan-in current PR head is stale');
-  const planDigest = exactDigest(plan.planDigest, 'plan digest');
+  const planSemanticDigest = exactDigest(plan.planSemanticDigest, 'plan semantic digest');
+  const planInstanceDigest = exactDigest(plan.planInstanceDigest, 'plan instance digest');
+  const authorityDigest = exactDigest(plan.authorityDigest, 'plan authority digest');
+  const environmentDigest = exactDigest(plan.environmentDigest, 'plan environment digest');
   const planExpectedDigest = exactDigest(plan.expectedStableTestIdsDigest, 'plan expected stable-ID digest');
   const expectedDigest = exactDigest(expectedStableTestIdsDigest, 'fan-in expected stable-ID digest');
   const expected = stableIds(expectedStableTestIds, 'fan-in expected stable IDs').sort();
@@ -70,7 +73,10 @@ export function validateProtectedHostedFanIn(plan, summaries, {
     if (summary.retries !== 0) throw new TypeError('fan-in retries must be zero');
     if (exactSha(summary.candidateHeadSha, 'summary candidate head') !== candidateHeadSha) throw new TypeError('fan-in candidate head mismatch');
     if (exactSha(summary.controllerSourceSha, 'summary controller source SHA') !== controllerSourceSha) throw new TypeError('fan-in controller identity mismatch');
-    if (exactDigest(summary.planDigest, 'summary plan digest') !== planDigest) throw new TypeError('fan-in plan digest mismatch');
+    if (exactDigest(summary.planSemanticDigest, 'summary plan semantic digest') !== planSemanticDigest) throw new TypeError('fan-in plan semantic digest mismatch');
+    if (exactDigest(summary.planInstanceDigest, 'summary plan instance digest') !== planInstanceDigest) throw new TypeError('fan-in plan instance digest mismatch');
+    if (exactDigest(summary.authorityDigest, 'summary authority digest') !== authorityDigest) throw new TypeError('fan-in authority digest mismatch');
+    if (exactDigest(summary.environmentDigest, 'summary environment digest') !== environmentDigest) throw new TypeError('fan-in environment digest mismatch');
     if (exactDigest(summary.planExpectedStableTestIdsDigest, 'summary full-plan expected stable-ID digest') !== planExpectedDigest) {
       throw new TypeError('fan-in full-plan expected stable-ID digest mismatch');
     }
@@ -122,7 +128,10 @@ export function validateProtectedHostedFanIn(plan, summaries, {
   return Object.freeze({
     status: 'success',
     candidateHeadSha,
-    planDigest,
+    planSemanticDigest,
+    planInstanceDigest,
+    authorityDigest,
+    environmentDigest,
     expectedStableTestIdsDigest: expectedDigest,
     executedStableTestIds: Object.freeze([...executed].sort()),
     candidateModifiedStableTestIdsProven: Object.freeze([...candidateModifiedStableTestIdsProven].sort()),

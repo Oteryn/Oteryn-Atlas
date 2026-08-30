@@ -214,10 +214,10 @@ function partitionHostedByDataCapability(hostedGroups, hostedStableTestIds, cand
 }
 
 export function buildProtectedHostedExecutionContract(plan, { currentHeadSha } = {}) {
-  if (!plan || typeof plan !== 'object' || Array.isArray(plan) || plan.schemaVersion !== 2) {
-    throw new TypeError('protected hosted execution requires plan schemaVersion 2');
+  if (!plan || typeof plan !== 'object' || Array.isArray(plan) || plan.schemaVersion !== 3) {
+    throw new TypeError('protected hosted execution requires plan schemaVersion 3');
   }
-  if (plan.controller?.id !== 'atlas-protected-hosted-controller-v2' || plan.controller?.version !== 2) {
+  if (plan.controller?.id !== 'atlas-protected-hosted-controller-v3' || plan.controller?.version !== 3) {
     throw new TypeError('protected hosted execution controller identity is invalid');
   }
   const controllerSourceSha = exactSha(plan.controller.sourceSha, 'controller source SHA');
@@ -225,7 +225,10 @@ export function buildProtectedHostedExecutionContract(plan, { currentHeadSha } =
   if (exactSha(currentHeadSha, 'current PR head') !== candidateHeadSha) {
     throw new TypeError('protected hosted execution current PR head is stale');
   }
-  const planDigest = exactDigest(plan.planDigest, 'plan digest');
+  const planSemanticDigest = exactDigest(plan.planSemanticDigest, 'plan semantic digest');
+  const planInstanceDigest = exactDigest(plan.planInstanceDigest, 'plan instance digest');
+  const authorityDigest = exactDigest(plan.authorityDigest, 'plan authority digest');
+  const environmentDigest = exactDigest(plan.environmentDigest, 'plan environment digest');
   const expectedStableTestIdsDigest = exactDigest(plan.expectedStableTestIdsDigest, 'expected stable-ID digest');
   const productIdentitiesDigest = exactDigest(plan.productIdentitiesDigest, 'product identities digest');
   const workerPolicyDigest = exactDigest(plan.workerPolicyDigest, 'worker policy digest');
@@ -297,10 +300,13 @@ export function buildProtectedHostedExecutionContract(plan, { currentHeadSha } =
   const hostedPartitions = partitionHostedByDataCapability(hostedGroups, hostedStableTestIds, candidateAdditionSet, candidateModificationSet);
 
   return freeze({
-    schemaVersion: 1,
+    schemaVersion: 2,
     controllerSourceSha,
     candidateHeadSha,
-    planDigest,
+    planSemanticDigest,
+    planInstanceDigest,
+    authorityDigest,
+    environmentDigest,
     expectedStableTestIdsDigest,
     hostedExpectedStableTestIdsDigest,
     specialistExpectedStableTestIdsDigest,

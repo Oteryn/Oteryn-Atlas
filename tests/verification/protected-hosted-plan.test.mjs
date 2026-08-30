@@ -1,13 +1,29 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
+import { buildProtectedExecutionEnvironmentIdentity } from '../../tools/verification/protected-execution-environment.mjs';
 import { stableIdAlgorithm } from '../../tools/verification/stable-id.mjs';
 import { buildProtectedHostedPlan } from '../../tools/verification/protected-hosted-plan.mjs';
+import { buildVerificationAuthorityIdentity } from '../../tools/verification/verification-authority.mjs';
 
 const protectedBaseSha = 'a'.repeat(40);
 const candidateHeadSha = 'b'.repeat(40);
 const mergeBaseSha = 'c'.repeat(40);
 const productDigest = `sha256:${'1'.repeat(64)}`;
+
+const authorityIdentity = await buildVerificationAuthorityIdentity({
+  manifest: {
+    schemaVersion: 1,
+    authorityId: 'atlas-protected-verification-authority-v1',
+    components: [{ id: 'planner', path: 'tools/verification/protected-hosted-plan.mjs' }],
+  },
+  readFile: async () => 'planner-v1\n',
+});
+const environmentIdentity = buildProtectedExecutionEnvironmentIdentity(JSON.parse(await readFile(
+  new URL('../../tools/verification/protected-execution-environment.json', import.meta.url),
+  'utf8',
+)));
 
 const baseId = 'desktop-chromium::e2e/tests/desktop.spec.mjs::base contract survives';
 const candidateId = 'desktop-chromium::e2e/tests/candidate-new-desktop.spec.mjs::candidate adds coverage';
@@ -101,13 +117,16 @@ function build(overrides = {}) {
     productIdentities: {
       qualification_fixture: { id: 'atlas-qualification-world-v2', digest: productDigest },
     },
+    authorityIdentity,
+    environmentIdentity,
     ...overrides,
   });
 }
 
 test('protected hosted plan preserves protected IDs and accepts candidate additions only as widening', () => {
   const plan = build();
-  assert.equal(plan.controller.id, 'atlas-protected-hosted-controller-v2');
+  assert.equal(plan.schemaVersion, 3);
+  assert.equal(plan.controller.id, 'atlas-protected-hosted-controller-v3');
   assert.equal(plan.controller.sourceSha, protectedBaseSha);
   assert.equal(plan.protectedBaseSha, protectedBaseSha);
   assert.equal(plan.candidateHeadSha, candidateHeadSha);
@@ -134,7 +153,8 @@ test('protected hosted plan preserves protected IDs and accepts candidate additi
     'trustedVerificationCatalogDigest', 'candidateVerificationCatalogDigest',
     'stableIdAlgorithmDigest', 'protectedCensusDigest', 'candidateCensusDigest',
     'workerPolicyDigest', 'productIdentitiesDigest', 'expectedStableTestIdsDigest',
-    'executionPolicyDigest', 'planDigest',
+    'executionPolicyDigest', 'candidateDigest', 'changeSetDigest', 'authorityDigest',
+    'authorityManifestDigest', 'environmentDigest', 'planSemanticDigest', 'planInstanceDigest',
   ]) assert.match(plan[field], /^sha256:[a-f0-9]{64}$/, field);
 });
 

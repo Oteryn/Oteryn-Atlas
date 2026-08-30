@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 
 import { buildVerificationPlan } from './build-verification-plan.mjs';
+import { buildProtectedExecutionEnvironmentIdentity } from './protected-execution-environment.mjs';
 import { stableIdAlgorithm, normalizeStableSpecPath } from './stable-id.mjs';
 import { validateStableIdCensus } from './stable-id-census.mjs';
 import {
@@ -8,8 +9,9 @@ import {
   validateImpactManifest,
   validateVerificationCatalog,
 } from './verification-plan-schema.mjs';
+import { validateVerificationAuthorityIdentity } from './verification-authority.mjs';
 
-const CONTROLLER = Object.freeze({ id: 'atlas-protected-hosted-controller-v2', version: 2 });
+const CONTROLLER = Object.freeze({ id: 'atlas-protected-hosted-controller-v3', version: 3 });
 const SANDBOX_POLICY_ID = 'atlas-candidate-census-sandbox-v1';
 const PROTECTED_HOSTED_WORKER_POLICY = Object.freeze({
   id: 'atlas-protected-hosted-workers-v1',
@@ -119,6 +121,19 @@ function deriveCandidateStableIdModifications(changedPaths, protectedStableTestI
     .sort();
 }
 
+function validateEnvironmentIdentity(identity) {
+  if (!identity || typeof identity !== 'object' || Array.isArray(identity) || !identity.config) {
+    throw new TypeError('protected execution environment identity is required');
+  }
+  const canonical = buildProtectedExecutionEnvironmentIdentity(identity.config);
+  if (identity.schemaVersion !== canonical.schemaVersion
+    || identity.environmentId !== canonical.environmentId
+    || exactDigest(identity.environmentDigest, 'environment identity') !== canonical.environmentDigest) {
+    throw new TypeError('protected execution environment identity mismatch');
+  }
+  return canonical;
+}
+
 function validateProductIdentities(input, requiredCapabilities) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new TypeError('product identities must be an object');
   const selected = {};
@@ -145,6 +160,8 @@ export function buildProtectedHostedPlan(input) {
   const protectedBaseSha = exactSha(input.protectedBaseSha, 'protectedBaseSha');
   const candidateHeadSha = exactSha(input.candidateHeadSha, 'candidateHeadSha');
   const mergeBaseSha = exactSha(input.mergeBaseSha, 'mergeBaseSha');
+  const authorityIdentity = validateVerificationAuthorityIdentity(input.authorityIdentity);
+  const environmentIdentity = validateEnvironmentIdentity(input.environmentIdentity);
 
   const trustedCatalog = validateVerificationCatalog(input.trustedVerificationCatalog);
   const candidateCatalog = validateVerificationCatalog(input.candidateVerificationCatalog);
@@ -196,9 +213,37 @@ export function buildProtectedHostedPlan(input) {
     requiresRealFullWorld: basePlan.requiresRealFullWorld,
   };
   const executionPolicyDigest = digest(executionPolicy);
+  const candidateDigest = digest({ repository: input.repository, candidateHeadSha });
+  const changeSetDigest = digest({ changedPaths: basePlan.changedPaths });
+  const authorityDigest = authorityIdentity.authorityDigest;
+  const authorityManifestDigest = authorityIdentity.manifestDigest;
+  const environmentDigest = environmentIdentity.environmentDigest;
+  const semanticIdentity = {
+    schemaVersion: 1,
+    repository: input.repository,
+    candidateDigest,
+    changeSetDigest,
+    authorityDigest,
+    authorityManifestDigest,
+    environmentDigest,
+    trustedImpactManifestDigest,
+    candidateImpactManifestDigest,
+    trustedVerificationCatalogDigest,
+    candidateVerificationCatalogDigest,
+    impactPolicyDigest: basePlan.impactPolicyDigest,
+    verificationCatalogDigest: basePlan.verificationCatalogDigest,
+    stableIdAlgorithmDigest,
+    protectedCensusDigest,
+    candidateCensusDigest,
+    expectedStableTestIdsDigest: basePlan.expectedStableTestIdsDigest,
+    productIdentitiesDigest,
+    workerPolicyDigest,
+    executionPolicyDigest,
+  };
+  const planSemanticDigest = digest(semanticIdentity);
 
   const core = {
-    schemaVersion: 2,
+    schemaVersion: 3,
     controller: { ...CONTROLLER, sourceSha: protectedBaseSha },
     repository: input.repository,
     prNumber: Number(input.prNumber),
@@ -209,6 +254,13 @@ export function buildProtectedHostedPlan(input) {
     diffIdentity: basePlan.diffIdentity,
     changedPaths: basePlan.changedPaths,
     changedPathsDigest: basePlan.changedPathsDigest,
+    changeSetDigest,
+    candidateDigest,
+    authorityIdentity,
+    authorityDigest,
+    authorityManifestDigest,
+    environmentIdentity,
+    environmentDigest,
     trustedImpactManifestDigest,
     candidateImpactManifestDigest,
     trustedVerificationCatalogDigest,
@@ -242,10 +294,11 @@ export function buildProtectedHostedPlan(input) {
     requiresNativeHardware: basePlan.requiresNativeHardware,
     exclusive: basePlan.exclusive,
     selectiveExecution: false,
-    lowerBoundMode: 'protected-v2-widen-only',
+    lowerBoundMode: 'protected-v3-widen-only',
     executionPolicyDigest,
+    planSemanticDigest,
   };
-  return freeze({ ...core, planDigest: digest(core) });
+  return freeze({ ...core, planInstanceDigest: digest(core) });
 }
 
 export const protectedCandidateCensusSandboxPolicy = Object.freeze({
