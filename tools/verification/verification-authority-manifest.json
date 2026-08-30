@@ -7,12 +7,20 @@
       "path": "tools/verification/anti-loop-common.mjs"
     },
     {
+      "id": "assert-current-pr-head",
+      "path": "tools/verification/assert-current-pr-head.mjs"
+    },
+    {
       "id": "base-advance-compatibility",
       "path": "tools/verification/base-advance-compatibility.mjs"
     },
     {
       "id": "build-plan",
       "path": "tools/verification/build-verification-plan.mjs"
+    },
+    {
+      "id": "ci-workflow",
+      "path": ".github/workflows/ci.yml"
     },
     {
       "id": "controller-workflow",
@@ -27,12 +35,20 @@
       "path": "tools/verification/protected-execution-environment.json"
     },
     {
+      "id": "environment-probe",
+      "path": "tools/verification/protected-execution-environment-probe.mjs"
+    },
+    {
       "id": "evidence-manifest",
       "path": "tools/verification/evidence-manifest.mjs"
     },
     {
       "id": "evidence-reuse",
       "path": "tools/verification/evidence-reuse.mjs"
+    },
+    {
+      "id": "execution-compose",
+      "path": "e2e/compose.protected-hosted-executor.yml"
     },
     {
       "id": "execution-contract",
@@ -51,8 +67,16 @@
       "path": "tools/verification/protected-hosted-fan-in.mjs"
     },
     {
+      "id": "github-hosted-compose",
+      "path": "e2e/compose.github-hosted.yml"
+    },
+    {
       "id": "impact-policy",
       "path": "tools/verification/impact-manifest.json"
+    },
+    {
+      "id": "parse-playwright-list",
+      "path": "tools/verification/parse-playwright-test-list.mjs"
     },
     {
       "id": "plan-schema",
@@ -61,6 +85,14 @@
     {
       "id": "planner",
       "path": "tools/verification/protected-hosted-plan.mjs"
+    },
+    {
+      "id": "playwright-config",
+      "path": "e2e/playwright.config.mjs"
+    },
+    {
+      "id": "playwright-selection",
+      "path": "tools/verification/protected-playwright-selection.mjs"
     },
     {
       "id": "progress-state",
@@ -89,6 +121,10 @@
     {
       "id": "stable-id-census",
       "path": "tools/verification/stable-id-census.mjs"
+    },
+    {
+      "id": "summary-reporter",
+      "path": "e2e/summary-reporter.mjs"
     },
     {
       "id": "verification-catalog",

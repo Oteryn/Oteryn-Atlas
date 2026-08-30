@@ -40,7 +40,7 @@
       "command": "/protected-e2e-node-modules/node_modules/.bin/playwright",
       "version": "1.62.0"
     },
-    "chromium": { "command": "chromium" },
+    "chromium": { "command": "playwright.chromium.launch" },
     "python3": { "command": "python3" },
     "python": {
       "command": "python",
