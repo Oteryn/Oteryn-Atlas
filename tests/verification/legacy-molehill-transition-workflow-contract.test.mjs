@@ -87,6 +87,14 @@ test('legacy transition plan binds every stable ID executed by its retained full
   assert.equal(plan.requiresRealFullWorld, true);
 });
 
+test('legacy transition workflow rejects any retained full-run plan census or capability mismatch before capture', () => {
+  const workflow = fs.readFileSync(workflowPath, 'utf8');
+  assert.match(workflow, /Legacy transition plan stable-ID census does not match retained full runner/);
+  assert.match(workflow, /Legacy transition plan data capabilities do not match retained full runner/);
+  assert.match(workflow, /\['bounded_real_world', 'qualification_fixture', 'real_fullworld'\]/);
+  assert.match(workflow, /plan\.requiresRealFullWorld !== true/);
+});
+
 test('PowerShell PR-head fences write JSON as UTF-8 without BOM before Node parses it', () => {
   const workflow = fs.readFileSync(workflowPath, 'utf8');
   assert.match(workflow, /\[Text\.UTF8Encoding\]::new\(\$false\)/);
