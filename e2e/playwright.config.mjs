@@ -6,7 +6,10 @@ const parsedWorkers = Number.parseInt(process.env.ATLAS_E2E_WORKERS || '2', 10);
 const workers = Number.isSafeInteger(parsedWorkers) && parsedWorkers > 0 ? parsedWorkers : 2;
 const baseURL = process.env.ATLAS_BASE_URL || 'http://atlas-web:8080';
 const expectedRevision = process.env.ATLAS_EXPECTED_REVISION?.trim() || null;
-const verificationPlanSha256 = process.env.ATLAS_VERIFICATION_PLAN_SHA256?.trim() || null;
+const planSemanticDigest = process.env.ATLAS_PLAN_SEMANTIC_DIGEST?.trim() || null;
+const planInstanceDigest = process.env.ATLAS_PLAN_INSTANCE_DIGEST?.trim() || null;
+const authorityDigest = process.env.ATLAS_AUTHORITY_DIGEST?.trim() || null;
+const environmentDigest = process.env.ATLAS_ENVIRONMENT_DIGEST?.trim() || null;
 const publicationOrigin = process.env.ATLAS_PUBLICATION_ORIGIN?.trim() || null;
 const depth = process.env.ATLAS_E2E_DEPTH?.trim() || 'required';
 const browserContainer = 'mcr.microsoft.com/playwright:v1.62.0-noble@sha256:baed2032d533817f3dbe6425de795788430ba345e819a1201337009ba17c9d07';
@@ -75,7 +78,10 @@ export default defineConfig({
     targetURL: baseURL,
     publicationOrigin,
     expectedRevision,
-    verificationPlanSha256,
+    planSemanticDigest,
+    planInstanceDigest,
+    authorityDigest,
+    environmentDigest,
     browserContainer,
     workers,
   },

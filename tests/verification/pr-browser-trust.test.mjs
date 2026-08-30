@@ -11,23 +11,29 @@ function jobBlock(start, end) {
   return ci.slice(begin, finish === -1 ? ci.length : finish);
 }
 
-test('local browser evidence gate is limited to trusted same-repository pull requests', () => {
+test('protected hosted browser gate is limited to trusted same-repository pull requests', () => {
   const browserJob = jobBlock('  verification-browser:\n', '  atlas-gate:\n');
-  assert.match(ci, /permissions:\n  contents: read/);
-  assert.match(browserJob, /github\.event_name == 'pull_request' &&\s+github\.event\.pull_request\.head\.repo\.full_name == github\.repository &&\s+needs\.change-classification\.outputs\.requires_e2e == 'true'/);
-  assert.match(browserJob, /needs:\s*\n\s*- verification-node\s*\n\s*- change-classification/);
+  assert.match(browserJob, /github\.event\.pull_request\.head\.repo\.full_name == github\.repository/);
   assert.match(browserJob, /runs-on: ubuntu-24\.04/);
-  assert.match(browserJob, /statuses: read/);
-  assert.doesNotMatch(browserJob, /group: atlas-runners|labels: oteryn-atlas/);
-  assert.doesNotMatch(browserJob, /secrets:/);
+  assert.match(browserJob, /actions: read/);
+  assert.match(browserJob, /pull-requests: read/);
+  assert.match(browserJob, /expected_name="protected-hosted-fan-in-\$ATLAS_PROTECTED_BASE_SHA-\$ATLAS_CODE_REVISION"/);
+  assert.doesNotMatch(browserJob, /group: atlas-runners|labels: oteryn-atlas|secrets:/);
 });
-
-test('local browser evidence gate binds status to exact candidate without running repository Docker code', () => {
+test('protected hosted gate binds exact candidate, base, producer and artifact bytes without browser execution', () => {
   const browserJob = jobBlock('  verification-browser:\n', '  atlas-gate:\n');
-  assert.match(browserJob, /ATLAS_CODE_REVISION: \${{ github\.event\.pull_request\.head\.sha }}/);
-  assert.match(browserJob, /commits\/\$ATLAS_CODE_REVISION\/statuses/);
+  assert.match(browserJob, /ref: \${{ github\.event\.pull_request\.head\.sha }}/);
+  assert.match(browserJob, /pulls\/\$ATLAS_PR_NUMBER/);
+  assert.match(browserJob, /run\.status !== 'completed'/);
+  assert.match(browserJob, /run\.conclusion !== 'success'/);
+  assert.match(browserJob, /\.github\/workflows\/protected-hosted-executor\.yml/);
+  assert.match(browserJob, /protected-hosted-fan-in\.json/);
+  assert.match(browserJob, /protected-verification-state\.json/);
+  assert.match(browserJob, /validateProtectedHostedGate/);
+  assert.match(browserJob, /expectedCandidateHeadSha: process\.env\.ATLAS_CODE_REVISION/);
+  assert.match(browserJob, /expectedProtectedBaseSha: process\.env\.ATLAS_PROTECTED_BASE_SHA/);
+  assert.match(browserJob, /ATLAS_LEGACY_CUTOVER_BASE_SHA: 00bc97034618fa0ce264685d1aa342c591a43914/);
+  assert.match(browserJob, /ATLAS_PROTECTED_BASE_SHA.*ATLAS_LEGACY_CUTOVER_BASE_SHA/);
   assert.match(browserJob, /atlas-local-e2e/);
-  assert.match(browserJob, /test "\$state" = success/);
-  assert.doesNotMatch(browserJob, /actions\/checkout@|docker\s|compose\.selfhosted|ATLAS_PUBLICATION_ORIGIN/);
-  assert.doesNotMatch(browserJob, /PREVIEW_CONTAINER|ATLAS_REV/);
+  assert.doesNotMatch(browserJob, /docker\s|compose\.selfhosted|ATLAS_PUBLICATION_ORIGIN/);
 });

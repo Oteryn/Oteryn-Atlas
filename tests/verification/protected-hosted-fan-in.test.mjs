@@ -7,18 +7,21 @@ const head = 'b'.repeat(40);
 const otherHead = 'c'.repeat(40);
 const idA = 'desktop-chromium::e2e/tests/desktop.spec.mjs::A';
 const idB = 'desktop-chromium::e2e/tests/desktop.spec.mjs::B';
-const planDigest = `sha256:${'1'.repeat(64)}`;
-const expectedDigest = `sha256:${'2'.repeat(64)}`;
-const productDigest = `sha256:${'3'.repeat(64)}`;
-const workerDigest = `sha256:${'4'.repeat(64)}`;
-const executionDigest = `sha256:${'5'.repeat(64)}`;
-const hostedDigest = `sha256:${'6'.repeat(64)}`;
+const planSemanticDigest = `sha256:${'1'.repeat(64)}`;
+const planInstanceDigest = `sha256:${'2'.repeat(64)}`;
+const authorityDigest = `sha256:${'3'.repeat(64)}`;
+const environmentDigest = `sha256:${'4'.repeat(64)}`;
+const expectedDigest = `sha256:${'5'.repeat(64)}`;
+const productDigest = `sha256:${'6'.repeat(64)}`;
+const workerDigest = `sha256:${'7'.repeat(64)}`;
+const executionDigest = `sha256:${'8'.repeat(64)}`;
+const hostedDigest = `sha256:${'9'.repeat(64)}`;
 const controllerSha = 'a'.repeat(40);
 
 function plan() {
   return {
-    schemaVersion: 2,
-    controller: { id: 'atlas-protected-hosted-controller-v2', version: 2, sourceSha: controllerSha },
+    schemaVersion: 3,
+    controller: { id: 'atlas-protected-hosted-controller-v3', version: 3, sourceSha: controllerSha },
     candidateHeadSha: head,
     stableTestIds: [idA, idB],
     expectedStableTestIdsDigest: expectedDigest,
@@ -27,18 +30,24 @@ function plan() {
     executionPolicyDigest: executionDigest,
     retryPolicy: { retries: 0 },
     selectiveExecution: false,
-    planDigest,
+    planSemanticDigest,
+    planInstanceDigest,
+    authorityDigest,
+    environmentDigest,
   };
 }
 
 function summary(shardIndex, ids, overrides = {}) {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     status: 'success',
     cancelled: false,
     candidateHeadSha: head,
     controllerSourceSha: controllerSha,
-    planDigest,
+    planSemanticDigest,
+    planInstanceDigest,
+    authorityDigest,
+    environmentDigest,
     planExpectedStableTestIdsDigest: expectedDigest,
     expectedStableTestIdsDigest: expectedDigest,
     productIdentitiesDigest: productDigest,
@@ -57,7 +66,10 @@ test('fan-in accepts only complete exact-head exact-ID zero-retry sibling eviden
   const result = validateProtectedHostedFanIn(plan(), [summary(0, [idA]), summary(1, [idB])], { currentHeadSha: head });
   assert.equal(result.status, 'success');
   assert.equal(result.candidateHeadSha, head);
-  assert.equal(result.planDigest, planDigest);
+  assert.equal(result.planSemanticDigest, planSemanticDigest);
+  assert.equal(result.planInstanceDigest, planInstanceDigest);
+  assert.equal(result.authorityDigest, authorityDigest);
+  assert.equal(result.environmentDigest, environmentDigest);
   assert.deepEqual(result.executedStableTestIds, [idA, idB]);
 });
 
@@ -100,10 +112,13 @@ test('fan-in rejects partial or duplicate sibling shard evidence', () => {
 
 test('fan-in rejects wrong plan controller product worker execution and placement identities', () => {
   const cases = [
-    { planDigest: `sha256:${'7'.repeat(64)}` },
+    { planSemanticDigest: `sha256:${'a'.repeat(64)}` },
+    { planInstanceDigest: `sha256:${'b'.repeat(64)}` },
+    { authorityDigest: `sha256:${'c'.repeat(64)}` },
+    { environmentDigest: `sha256:${'d'.repeat(64)}` },
     { controllerSourceSha: 'd'.repeat(40) },
-    { expectedStableTestIdsDigest: `sha256:${'8'.repeat(64)}` },
-    { productIdentitiesDigest: `sha256:${'9'.repeat(64)}` },
+    { expectedStableTestIdsDigest: `sha256:${'e'.repeat(64)}` },
+    { productIdentitiesDigest: `sha256:${'f'.repeat(64)}` },
     { workerPolicyDigest: `sha256:${'0'.repeat(64)}` },
     { executionPolicyDigest: `sha256:${'a'.repeat(64)}` },
   ];

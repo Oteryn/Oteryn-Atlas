@@ -11,11 +11,14 @@ const head = 'b'.repeat(40);
 const controllerSha = 'a'.repeat(40);
 const idA = 'desktop-chromium::e2e/tests/desktop.spec.mjs::suite › A';
 const idB = 'desktop-chromium::e2e/tests/desktop.spec.mjs::suite › B';
-const planDigest = `sha256:${'1'.repeat(64)}`;
-const expectedDigest = `sha256:${'2'.repeat(64)}`;
-const productDigest = `sha256:${'3'.repeat(64)}`;
-const workerDigest = `sha256:${'4'.repeat(64)}`;
-const executionDigest = `sha256:${'5'.repeat(64)}`;
+const planSemanticDigest = `sha256:${'1'.repeat(64)}`;
+const planInstanceDigest = `sha256:${'2'.repeat(64)}`;
+const authorityDigest = `sha256:${'3'.repeat(64)}`;
+const environmentDigest = `sha256:${'4'.repeat(64)}`;
+const expectedDigest = `sha256:${'5'.repeat(64)}`;
+const productDigest = `sha256:${'6'.repeat(64)}`;
+const workerDigest = `sha256:${'7'.repeat(64)}`;
+const executionDigest = `sha256:${'8'.repeat(64)}`;
 const browserContainer = 'mcr.microsoft.com/playwright:v1.62.0-noble@sha256:baed2032d533817f3dbe6425de795788430ba345e819a1201337009ba17c9d07';
 
 function digest(value) {
@@ -41,10 +44,13 @@ function group() {
 
 function plan(overrides = {}) {
   return {
-    schemaVersion: 2,
-    controller: { id: 'atlas-protected-hosted-controller-v2', version: 2, sourceSha: controllerSha },
+    schemaVersion: 3,
+    controller: { id: 'atlas-protected-hosted-controller-v3', version: 3, sourceSha: controllerSha },
     candidateHeadSha: head,
-    planDigest,
+    planSemanticDigest,
+    planInstanceDigest,
+    authorityDigest,
+    environmentDigest,
     expectedStableTestIdsDigest: expectedDigest,
     productIdentitiesDigest: productDigest,
     workerPolicyDigest: workerDigest,
@@ -69,7 +75,10 @@ function summaryFor(id) {
     metadata: {
       targetMode: 'checkout-overlay',
       expectedRevision: head,
-      verificationPlanSha256: planDigest,
+      planSemanticDigest,
+      planInstanceDigest,
+      authorityDigest,
+      environmentDigest,
       browserContainer,
       workers: 1,
     },
@@ -121,6 +130,11 @@ test('shard evidence proves candidate modifications separately without duplicati
     shardIndex: 0,
     shardCount: 1,
   });
+  assert.equal(result.schemaVersion, 2);
+  assert.equal(result.planSemanticDigest, planSemanticDigest);
+  assert.equal(result.planInstanceDigest, planInstanceDigest);
+  assert.equal(result.authorityDigest, authorityDigest);
+  assert.equal(result.environmentDigest, environmentDigest);
   assert.deepEqual(result.executedStableTestIds, [idA, idB].sort());
   assert.deepEqual(result.candidateModifiedStableTestIdsProven, [idA]);
 });
