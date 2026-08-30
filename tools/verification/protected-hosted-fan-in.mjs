@@ -1,3 +1,6 @@
+import { canonicalJson } from './verification-plan-schema.mjs';
+import { validateEvidenceManifest, validateEvidenceStableIdUnion } from './evidence-manifest.mjs';
+
 const SHA = /^[a-f0-9]{40}$/;
 const SHA256 = /^sha256:[a-f0-9]{64}$/;
 
@@ -135,5 +138,102 @@ export function validateProtectedHostedFanIn(plan, summaries, {
     expectedStableTestIdsDigest: expectedDigest,
     executedStableTestIds: Object.freeze([...executed].sort()),
     candidateModifiedStableTestIdsProven: Object.freeze([...candidateModifiedStableTestIdsProven].sort()),
+  });
+}
+
+export function validateProtectedHostedEvidenceFanIn(plan, execution, lifecycle, evidenceManifests, {
+  currentHeadSha,
+} = {}) {
+  if (!plan || typeof plan !== 'object' || Array.isArray(plan) || plan.schemaVersion !== 3) {
+    throw new TypeError('evidence fan-in requires protected hosted plan schemaVersion 3');
+  }
+  if (!execution || typeof execution !== 'object' || Array.isArray(execution) || execution.schemaVersion !== 2) {
+    throw new TypeError('evidence fan-in requires protected hosted execution schemaVersion 2');
+  }
+  if (!lifecycle || typeof lifecycle !== 'object' || Array.isArray(lifecycle) || lifecycle.schemaVersion !== 1
+    || !Array.isArray(lifecycle.expectedEvidence) || ['BLOCKED', 'REINTEGRATE'].includes(lifecycle.disposition)) {
+    throw new TypeError('evidence fan-in lifecycle decision is invalid');
+  }
+  const candidateHeadSha = exactSha(plan.candidateHeadSha, 'evidence fan-in candidate head');
+  if (exactSha(currentHeadSha, 'evidence fan-in current head') !== candidateHeadSha) {
+    throw new TypeError('evidence fan-in current PR head is stale');
+  }
+  if (lifecycle.candidateHeadSha !== candidateHeadSha || lifecycle.candidateMutationRequired !== false) {
+    throw new TypeError('evidence fan-in lifecycle candidate identity is invalid');
+  }
+  const expectedById = new Map();
+  for (const expected of lifecycle.expectedEvidence) {
+    if (!expected || typeof expected !== 'object' || typeof expected.evidenceId !== 'string'
+      || expectedById.has(expected.evidenceId)) throw new TypeError('evidence fan-in expected evidence set is invalid');
+    expectedById.set(expected.evidenceId, expected);
+  }
+  const manifests = evidenceManifests.map(validateEvidenceManifest);
+  const actualById = new Map();
+  for (const manifest of manifests) {
+    if (actualById.has(manifest.evidenceId)) throw new TypeError(`evidence fan-in duplicate evidence ID: ${manifest.evidenceId}`);
+    actualById.set(manifest.evidenceId, manifest);
+  }
+  const expectedIds = [...expectedById.keys()].sort();
+  const actualIds = [...actualById.keys()].sort();
+  if (canonicalJson(expectedIds) !== canonicalJson(actualIds)) {
+    throw new TypeError(`evidence fan-in exact evidence set mismatch; expected=${expectedIds.join(',')}; actual=${actualIds.join(',')}`);
+  }
+
+  const planSemanticDigest = exactDigest(plan.planSemanticDigest, 'evidence fan-in plan semantic digest');
+  const planInstanceDigest = exactDigest(plan.planInstanceDigest, 'evidence fan-in plan instance digest');
+  const authorityDigest = exactDigest(plan.authorityDigest, 'evidence fan-in authority digest');
+  const environmentDigest = exactDigest(plan.environmentDigest, 'evidence fan-in environment digest');
+  const executionPolicyDigest = exactDigest(plan.executionPolicyDigest, 'evidence fan-in execution policy digest');
+  const environment = actualById.get('ENVIRONMENT_QUALIFICATION');
+  if (!environment) throw new TypeError('evidence fan-in environment evidence is missing');
+
+  for (const evidenceId of expectedIds) {
+    const expected = expectedById.get(evidenceId);
+    const manifest = actualById.get(evidenceId);
+    if (manifest.result !== 'SUCCESS' || !['EXECUTED', 'REUSED'].includes(manifest.disposition)) {
+      throw new TypeError(`evidence fan-in unsuccessful disposition: ${evidenceId}`);
+    }
+    if (manifest.candidateHeadSha !== candidateHeadSha
+      || manifest.planSemanticDigest !== planSemanticDigest
+      || manifest.planInstanceDigest !== planInstanceDigest
+      || manifest.authorityDigest !== authorityDigest
+      || manifest.environmentDigest !== expected.environmentDigest
+      || manifest.executionPolicyDigest !== executionPolicyDigest
+      || manifest.evidenceSemanticDigest !== expected.evidenceSemanticDigest) {
+      throw new TypeError(`evidence fan-in identity mismatch: ${evidenceId}`);
+    }
+    if (canonicalJson(manifest.productIdentities) !== canonicalJson(expected.productIdentities)
+      || canonicalJson(manifest.stableTestIds) !== canonicalJson(expected.stableTestIds)
+      || canonicalJson(manifest.dependencies.paths) !== canonicalJson(expected.dependencies.paths)
+      || canonicalJson(manifest.dependencies.dataCapabilities) !== canonicalJson(expected.dependencies.dataCapabilities)
+      || canonicalJson(manifest.dependencies.evidenceSemanticDigests)
+        !== canonicalJson(expected.dependencies.evidenceSemanticDigests)) {
+      throw new TypeError(`evidence fan-in dependency or test-set mismatch: ${evidenceId}`);
+    }
+    if (evidenceId === 'ENVIRONMENT_QUALIFICATION') {
+      if (manifest.environmentDigest !== environmentDigest
+        || manifest.dependencies.evidenceDigests.length !== 0
+        || manifest.dependencies.evidenceSemanticDigests.length !== 0) {
+        throw new TypeError('evidence fan-in environment dependency closure is invalid');
+      }
+    } else if (canonicalJson(manifest.dependencies.evidenceDigests) !== canonicalJson([environment.evidenceDigest])
+      || canonicalJson(manifest.dependencies.evidenceSemanticDigests) !== canonicalJson([environment.evidenceSemanticDigest])) {
+      throw new TypeError(`evidence fan-in hosted environment dependency mismatch: ${evidenceId}`);
+    }
+  }
+
+  const hosted = manifests.filter(({ evidenceId }) => evidenceId !== 'ENVIRONMENT_QUALIFICATION');
+  validateEvidenceStableIdUnion(execution.hosted.stableTestIds, hosted);
+  return Object.freeze({
+    schemaVersion: 1,
+    status: 'success',
+    candidateHeadSha,
+    planSemanticDigest,
+    planInstanceDigest,
+    authorityDigest,
+    environmentDigest,
+    executedStableTestIds: Object.freeze([...execution.hosted.stableTestIds].sort()),
+    executedEvidenceIds: Object.freeze(hosted.filter(({ disposition }) => disposition === 'EXECUTED').map(({ evidenceId }) => evidenceId).sort()),
+    reusedEvidenceIds: Object.freeze(manifests.filter(({ disposition }) => disposition === 'REUSED').map(({ evidenceId }) => evidenceId).sort()),
   });
 }

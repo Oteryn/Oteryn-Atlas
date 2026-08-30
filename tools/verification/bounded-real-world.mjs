@@ -209,8 +209,13 @@ async function buildCreatures(root, selected, catalog, semanticRoot, animation) 
   const source = { contract_id: BOUNDED_REAL_SOURCE_CONTRACT, capability: BOUNDED_REAL_CREATURE_CAPABILITY, semantic_digest: catalog.source.semantic_digest, npc_role_schema_version: catalog.source.npc_role_schema_version, fixture_id: BOUNDED_REAL_WORLD_ID, appearance_product_root: animation.source.appearance_product_root, outfit_spatial_product_root: animation.source.outfit_spatial_product_root, coordinate_profile: catalog.source.coordinate_profile, semantic_revision: catalog.source.semantic_revision };
   const index = { schema_version: 1, source, chunk_size: 64, counts: { chunks: chunks.length, records: selected.length, search_records: selected.length }, search_path: 'search.json', search_bytes: searchBytes.length, search_digest: sha(searchBytes), chunks }; writeJson(root, 'data/creatures/index.json', index); return { index, search };
 }
+function repositoryTextBytes(sourceRoot, relative) {
+  return Buffer.from(fs.readFileSync(path.join(sourceRoot, relative), 'utf8').replace(/\r\n/g, '\n'));
+}
 function copyRealAncillary(root, sourceRoot) {
-  for (const relative of ['web/semantic-search/index.json', 'web/semantic-search/creatures.json']) writeBytes(root, relative, fs.readFileSync(path.join(sourceRoot, relative)));
+  for (const relative of ['web/semantic-search/index.json', 'web/semantic-search/creatures.json']) {
+    writeBytes(root, relative, repositoryTextBytes(sourceRoot, relative));
+  }
   fs.cpSync(path.join(sourceRoot, 'web/creature-gameplay'), path.join(root, 'web/creature-gameplay'), { recursive: true, errorOnExist: true });
 }
 function boundedTrustDescriptor(manifest) {
@@ -220,7 +225,7 @@ export async function buildBoundedRealWorld(destination, { sourceRoot } = {}) {
   if (!sourceRoot) throw new TypeError('bounded-real sourceRoot is required');
   const source = path.resolve(sourceRoot); const root = path.resolve(destination); if (fs.existsSync(root)) throw new TypeError('bounded-real destination already exists'); fs.mkdirSync(root, { recursive: true });
   const { catalog, selected, anchors } = stableAnchors(source); const pixel = await buildPixelPublication(root); const map = await buildMap(root, anchors, pixel); const pixelBuckets = await buildRuntimePixelBuckets(root, map.publication.rootContentId, pixel.manifest.rootContentId, pixel.pixelContentId, pixel.pixels); const overview = await buildOverview(root, map.publication.rootContentId, map); const minimap = await buildMinimap(root, map.publication.rootContentId, pixel.manifest.rootContentId, anchors, map); const animation = await buildAnimation(root, map.semanticWorld.rootContentId, pixel.manifest.rootContentId, pixel.pixelContentId, pixel.pixels); await buildCreatures(root, selected, catalog, map.semanticWorld.rootContentId, animation); copyRealAncillary(root, source);
-  const realSemantic = fs.readFileSync(path.join(source, 'web/semantic-search/index.json')); const realCreatures = fs.readFileSync(path.join(source, 'web/semantic-search/creatures.json')); const realGameplay = fs.readFileSync(path.join(source, 'web/creature-gameplay/manifest.json'));
+  const realSemantic = repositoryTextBytes(source, 'web/semantic-search/index.json'); const realCreatures = repositoryTextBytes(source, 'web/semantic-search/creatures.json'); const realGameplay = fs.readFileSync(path.join(source, 'web/creature-gameplay/manifest.json'));
   const files = productEntries(root); const result = Object.freeze({ fixtureId: BOUNDED_REAL_WORLD_ID, dataCapability: 'bounded_real_world', mapAuthority: false, targetEntityIds: [...TARGET_ENTITY_IDS], publicationRoot: map.publication.rootContentId, semanticRoot: map.semanticWorld.rootContentId, pixelRoot: pixel.manifest.rootContentId, runtimeIndexRoot: map.runtimeWorld.rootContentId, pixelBucketRoot: pixelBuckets.rootContentId, overviewRoot: overview.rootContentId, minimapRoot: minimap.rootContentId, sourceFingerprint: map.sourceFingerprint, sourceDigests: { semanticSearch: sha(realSemantic), creatureCatalog: sha(realCreatures), creatureGameplay: sha(realGameplay), creatureSemantic: catalog.source.semantic_digest }, productDigest: canonicalDigest(files), files }); writeJson(root, 'bounded-real-manifest.json', result); return result;
 }
 function filesystemFetcher(root) {

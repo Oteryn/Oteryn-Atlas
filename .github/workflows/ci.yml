@@ -407,87 +407,127 @@ jobs:
     permissions:
       contents: read
       actions: read
+      pull-requests: read
+      statuses: read
     env:
       GH_TOKEN: ${{ github.token }}
       ATLAS_CODE_REVISION: ${{ github.event.pull_request.head.sha }}
       ATLAS_PROTECTED_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      ATLAS_PR_NUMBER: ${{ github.event.pull_request.number }}
+      ATLAS_LEGACY_CUTOVER_BASE_SHA: 00bc97034618fa0ce264685d1aa342c591a43914
     steps:
-      - name: Require exact protected hosted fan-in artifact
+      - name: Check out exact Atlas candidate gate authority
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Require exact protected hosted fan-in and lifecycle state bytes
+        id: validate
         shell: bash
         run: |
           set -euo pipefail
           test "$GITHUB_REPOSITORY" = Oteryn/Oteryn-Atlas
-          mkdir -p artifacts/protected-hosted-fan-in
-          artifact_id=''
-          artifact_name=''
-          producer_run_id=''
+          test "$(git rev-parse HEAD)" = "$ATLAS_CODE_REVISION"
+          if [[ "$ATLAS_PROTECTED_BASE_SHA" == "$ATLAS_LEGACY_CUTOVER_BASE_SHA" ]]; then
+            state="$(gh api "repos/$GITHUB_REPOSITORY/commits/$ATLAS_CODE_REVISION/statuses" --jq '[.[] | select(.context == "atlas-local-e2e")][0].state // ""')"
+            test "$state" = success
+            mkdir -p artifacts/protected-hosted-fan-in
+            node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          fs.writeFileSync('artifacts/protected-hosted-fan-in/protected-hosted-gate-validation.json', `${JSON.stringify({
+            schemaVersion: 1, status: 'success', mode: 'legacy-cutover-exact-base-only',
+            candidateHeadSha: process.env.ATLAS_CODE_REVISION, protectedBaseSha: process.env.ATLAS_PROTECTED_BASE_SHA,
+          }, null, 2)}\n`);
+          NODE
+            exit 0
+          fi
+          expected_name="protected-hosted-fan-in-$ATLAS_PROTECTED_BASE_SHA-$ATLAS_CODE_REVISION"
+          work=artifacts/protected-hosted-fan-in
+          mkdir -p "$work"
+          live_pr="$work/live-pr.json"
+          gh api "repos/$GITHUB_REPOSITORY/pulls/$ATLAS_PR_NUMBER" > "$live_pr"
+
+          selected_artifact_id=''
+          selected_run_id=''
+          selected_run_json=''
           for attempt in {1..60}; do
             payload="$RUNNER_TEMP/protected-hosted-artifacts.json"
-            gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?per_page=100" > "$payload"
-            read -r artifact_id artifact_name producer_run_id < <(node --input-type=module - "$payload" "$ATLAS_CODE_REVISION" <<'NODE'
+            gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?name=$expected_name&per_page=100" > "$payload"
+            mapfile -t candidates < <(node --input-type=module - "$payload" "$expected_name" <<'NODE'
           import fs from 'node:fs';
-          const [payloadPath, candidateHeadSha] = process.argv.slice(2);
-          const payload = JSON.parse(fs.readFileSync(payloadPath, 'utf8'));
-          const match = (payload.artifacts ?? [])
+          const [payloadPath, expectedName] = process.argv.slice(2);
+          const artifacts = (JSON.parse(fs.readFileSync(payloadPath, 'utf8')).artifacts ?? [])
             .filter((artifact) => artifact.expired === false
-              && artifact.name?.startsWith('protected-hosted-fan-in-')
-              && artifact.workflow_run?.head_sha === candidateHeadSha)
-            .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))[0];
-          if (match) process.stdout.write(`${match.id} ${match.name} ${match.workflow_run.id}`);
+              && artifact.name === expectedName
+              && Number.isSafeInteger(artifact.id)
+              && Number.isSafeInteger(artifact.workflow_run?.id))
+            .sort((left, right) => Date.parse(right.created_at) - Date.parse(left.created_at));
+          for (const artifact of artifacts) process.stdout.write(`${artifact.id}\t${artifact.workflow_run.id}\n`);
           NODE
             )
-            [[ "$artifact_id" =~ ^[0-9]+$ && "$producer_run_id" =~ ^[0-9]+$ ]] && break
+            for candidate in "${candidates[@]}"; do
+              IFS=$'\t' read -r artifact_id producer_run_id <<< "$candidate"
+              run_json="$RUNNER_TEMP/protected-hosted-run-$producer_run_id.json"
+              gh api "repos/$GITHUB_REPOSITORY/actions/runs/$producer_run_id" > "$run_json"
+              if node --input-type=module - "$run_json" <<'NODE'
+          import fs from 'node:fs';
+          const run = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+          if (run.status !== 'completed' || run.conclusion !== 'success'
+            || run.path !== '.github/workflows/protected-hosted-executor.yml'
+            || run.event !== 'workflow_run'
+            || run.repository?.full_name !== process.env.GITHUB_REPOSITORY) process.exit(1);
+          NODE
+              then
+                selected_artifact_id="$artifact_id"
+                selected_run_id="$producer_run_id"
+                selected_run_json="$run_json"
+                break 2
+              fi
+            done
             (( attempt < 60 )) && sleep 10
           done
-          [[ "$artifact_id" =~ ^[0-9]+$ ]]
-          gh run download "$producer_run_id" --repo "$GITHUB_REPOSITORY" --name "$artifact_name" --dir artifacts/protected-hosted-fan-in
-          mapfile -t evidence_files < <(find artifacts/protected-hosted-fan-in -name protected-hosted-fan-in.json -type f)
-          test "${#evidence_files[@]}" -eq 1
-          node --input-type=module - "${evidence_files[0]}" "$ATLAS_CODE_REVISION" "$ATLAS_PROTECTED_BASE_SHA" <<'NODE'
-          import crypto from 'node:crypto';
+          [[ "$selected_artifact_id" =~ ^[0-9]+$ && "$selected_run_id" =~ ^[0-9]+$ ]]
+          cp "$selected_run_json" "$work/producer-run.json"
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$selected_artifact_id/zip" > "$work/artifact.zip"
+          unzip -q "$work/artifact.zip" -d "$work/unpacked"
+          mapfile -t fan_in_files < <(find "$work/unpacked" -type f -name protected-hosted-fan-in.json -print)
+          mapfile -t state_files < <(find "$work/unpacked" -type f -name protected-verification-state.json -print)
+          test "${#fan_in_files[@]}" -eq 1
+          test "${#state_files[@]}" -eq 1
+
+          node --input-type=module - \
+            "${fan_in_files[0]}" "${state_files[0]}" "$live_pr" "$work/producer-run.json" \
+            "$expected_name" "$work/protected-hosted-gate-validation.json" <<'NODE'
           import fs from 'node:fs';
-          const [path, candidateHeadSha, protectedBaseSha] = process.argv.slice(2);
-          const payload = JSON.parse(fs.readFileSync(path, 'utf8'));
-          const digestPattern = /^sha256:[a-f0-9]{64}$/;
-          if (payload.status !== 'success'
-            || payload.candidateHeadSha !== candidateHeadSha
-            || payload.controllerSourceSha !== protectedBaseSha
-            || !digestPattern.test(payload.planSemanticDigest)
-            || !digestPattern.test(payload.planInstanceDigest)
-            || !digestPattern.test(payload.authorityDigest)
-            || !digestPattern.test(payload.environmentDigest)) {
-            throw new Error('Protected hosted fan-in identity is stale or invalid.');
-          }
-          const evidence = payload.evidenceManifest;
-          if (!evidence || evidence.schemaVersion !== 1
-            || evidence.evidenceId !== 'FANIN:HOSTED'
-            || evidence.evidenceType !== 'FANIN'
-            || evidence.result !== 'SUCCESS'
-            || !['EXECUTED', 'REUSED'].includes(evidence.disposition)
-            || evidence.candidateHeadSha !== candidateHeadSha
-            || evidence.planSemanticDigest !== payload.planSemanticDigest
-            || evidence.planInstanceDigest !== payload.planInstanceDigest
-            || evidence.authorityDigest !== payload.authorityDigest
-            || evidence.environmentDigest !== payload.environmentDigest
-            || evidence.availability?.revoked !== false
-            || Date.parse(evidence.availability?.expiresAt) <= Date.now()
-            || !Array.isArray(evidence.dependencies?.evidenceDigests)
-            || evidence.dependencies.evidenceDigests.length < 2
-            || !digestPattern.test(evidence.evidenceDigest)) {
-            throw new Error('Protected hosted fan-in evidence manifest is invalid.');
-          }
-          const canonical = (value) => {
-            if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
-            if (value && typeof value === 'object') {
-              return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonical(value[key])}`).join(',')}}`;
-            }
-            return JSON.stringify(value);
-          };
-          const core = { ...evidence };
-          delete core.evidenceDigest;
-          const observed = `sha256:${crypto.createHash('sha256').update(canonical(core)).digest('hex')}`;
-          if (observed !== evidence.evidenceDigest) throw new Error('Protected hosted fan-in evidence digest mismatch.');
+          import { validateProtectedHostedGate } from './tools/verification/protected-hosted-gate.mjs';
+          const [payloadPath, statePath, livePrPath, runPath, artifactName, outputPath] = process.argv.slice(2);
+          const read = (path) => JSON.parse(fs.readFileSync(path, 'utf8'));
+          const result = validateProtectedHostedGate({
+            payload: read(payloadPath),
+            state: read(statePath),
+            livePr: read(livePrPath),
+            producerRun: read(runPath),
+            expectedRepository: process.env.GITHUB_REPOSITORY,
+            expectedPrNumber: Number(process.env.ATLAS_PR_NUMBER),
+            expectedCandidateHeadSha: process.env.ATLAS_CODE_REVISION,
+            expectedProtectedBaseSha: process.env.ATLAS_PROTECTED_BASE_SHA,
+            expectedArtifactName: artifactName,
+            now: new Date().toISOString(),
+          });
+          fs.writeFileSync(outputPath, `${JSON.stringify(result, null, 2)}\n`);
           NODE
+          printf 'producer_run_id=%s\nartifact_id=%s\nartifact_name=%s\n' \
+            "$selected_run_id" "$selected_artifact_id" "$expected_name" >> "$GITHUB_OUTPUT"
+
+      - name: Publish independently validated current-head hosted gate evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: protected-hosted-gate-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/protected-hosted-fan-in/protected-hosted-gate-validation.json
+          if-no-files-found: error
+          retention-days: 14
 
   atlas-gate:
     name: atlas-gate

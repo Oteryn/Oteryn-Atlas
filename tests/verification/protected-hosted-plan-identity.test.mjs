@@ -88,9 +88,9 @@ function census(ids) {
   return { schemaVersion: 1, stableIdAlgorithm, stableTestIds: ids };
 }
 
-function build(overrides = {}) {
+function input(overrides = {}) {
   const candidateHeadSha = overrides.candidateHeadSha ?? 'b'.repeat(40);
-  return buildProtectedHostedPlan({
+  return {
     repository: 'Oteryn/Oteryn-Atlas',
     prNumber: 272,
     protectedBaseSha: 'a'.repeat(40),
@@ -115,7 +115,11 @@ function build(overrides = {}) {
     authorityIdentity,
     environmentIdentity,
     ...overrides,
-  });
+  };
+}
+
+function build(overrides = {}) {
+  return buildProtectedHostedPlan(input(overrides));
 }
 
 test('protected plan emits distinct semantic and forensic instance identities', () => {
@@ -156,4 +160,10 @@ test('missing or tampered authority/environment identity fails closed', () => {
     () => build({ authorityIdentity: { ...authorityIdentity, authorityDigest: `sha256:${'0'.repeat(64)}` } }),
     /authority/i,
   );
+});
+
+test('protected plan controller source is always the protected base', () => {
+  const baseline = build();
+  assert.equal(baseline.controller.sourceSha, baseline.protectedBaseSha);
+  assert.throws(() => build({ controllerSourceSha: 'b'.repeat(40) }), /controller.*protected base/i);
 });

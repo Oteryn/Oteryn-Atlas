@@ -117,3 +117,9 @@ test('merge conflict or candidate-required source movement is the only normal ba
   assert.equal(requiredSource.disposition, 'REINTEGRATE');
   assert.ok(requiredSource.reasons.some((reason) => /candidate-required/i.test(reason)));
 });
+
+test('authority-scoped movement without an authority digest change fails closed', () => {
+  assert.throws(() => classifyBaseAdvance(input({
+    changedPaths: ['tools/verification/unlisted-controller-helper.mjs'],
+  })), /authority closure escaped/i);
+});

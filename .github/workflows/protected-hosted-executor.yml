@@ -4,8 +4,6 @@ on:
   workflow_run:
     workflows: ["Protected Verification Controller"]
     types: [completed]
-  pull_request:
-    types: [opened, synchronize, reopened]
 
 permissions:
   contents: read
@@ -13,16 +11,15 @@ permissions:
   pull-requests: read
 
 concurrency:
-  group: atlas-protected-hosted-pr-${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.head_branch }}
+  group: atlas-protected-hosted-${{ github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.id }}
   cancel-in-progress: true
 
 jobs:
   preflight:
     if: >-
-      (github.event_name == 'workflow_run' &&
-       github.event.workflow_run.conclusion == 'success' &&
-       github.event.workflow_run.event == 'pull_request_target') ||
-      (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main')
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      (github.event.workflow_run.event == 'pull_request_target' || github.event.workflow_run.event == 'workflow_dispatch')
     runs-on: ubuntu-24.04
     timeout-minutes: 12
     outputs:
@@ -30,10 +27,18 @@ jobs:
       controller_run_id: ${{ steps.controller.outputs.controller_run_id }}
       bundle_name: ${{ steps.contract.outputs.bundle_name }}
       candidate_head_sha: ${{ steps.contract.outputs.candidate_head_sha }}
+      protected_base_sha: ${{ steps.contract.outputs.protected_base_sha }}
       controller_source_sha: ${{ steps.contract.outputs.controller_source_sha }}
       pr_number: ${{ steps.contract.outputs.pr_number }}
       hosted_count: ${{ steps.contract.outputs.hosted_count }}
       specialist_count: ${{ steps.contract.outputs.specialist_count }}
+      disposition: ${{ steps.lifecycle.outputs.disposition }}
+      execute_environment: ${{ steps.lifecycle.outputs.execute_environment }}
+      execute_hosted: ${{ steps.lifecycle.outputs.execute_hosted }}
+      heavy_executions_required: ${{ steps.lifecycle.outputs.heavy_executions_required }}
+      reuse_count: ${{ steps.lifecycle.outputs.reuse_count }}
+      state_artifact_name: ${{ steps.lifecycle.outputs.state_artifact_name }}
+      previous_state_present: ${{ steps.previous.outputs.previous_state_present }}
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
@@ -41,53 +46,11 @@ jobs:
         id: controller
         shell: bash
         env:
-          EVENT_NAME: ${{ github.event_name }}
           WORKFLOW_RUN_ID: ${{ github.event.workflow_run.id }}
-          PROTECTED_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          BOOTSTRAP_PR_NUMBER: ${{ github.event.pull_request.number }}
-          BOOTSTRAP_CANDIDATE_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
-          if [[ "$EVENT_NAME" == workflow_run ]]; then
-            [[ "$WORKFLOW_RUN_ID" =~ ^[0-9]+$ ]]
-            printf 'bootstrap_active=true\ncontroller_run_id=%s\n' "$WORKFLOW_RUN_ID" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          test "$EVENT_NAME" = pull_request
-          [[ "$PROTECTED_BASE_SHA" =~ ^[a-f0-9]{40}$ ]]
-          [[ "$BOOTSTRAP_CANDIDATE_HEAD_SHA" =~ ^[a-f0-9]{40}$ ]]
-          [[ "$BOOTSTRAP_PR_NUMBER" =~ ^[0-9]+$ ]]
-          set +e
-          base_probe="$(gh api "repos/$GITHUB_REPOSITORY/contents/.github/workflows/protected-hosted-executor.yml?ref=$PROTECTED_BASE_SHA" 2>&1)"
-          base_probe_rc=$?
-          set -e
-          if (( base_probe_rc == 0 )); then
-            printf 'bootstrap_active=false\ncontroller_run_id=\n' >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          grep -Eq 'HTTP 404|Not Found' <<<"$base_probe"
-          runs_json="$RUNNER_TEMP/protected-controller-runs.json"
-          controller_run_id=''
-          for attempt in {1..30}; do
-            gh api "repos/$GITHUB_REPOSITORY/actions/workflows/protected-verification-controller.yml/runs?event=pull_request_target&per_page=100" > "$runs_json"
-            controller_run_id="$(node --input-type=module - "$runs_json" "$BOOTSTRAP_PR_NUMBER" "$BOOTSTRAP_CANDIDATE_HEAD_SHA" "$PROTECTED_BASE_SHA" <<'NODE'
-          import fs from 'node:fs';
-          const [runsPath, prValue, candidateHeadSha, protectedBaseSha] = process.argv.slice(2);
-          const prNumber = Number(prValue);
-          const matches = (JSON.parse(fs.readFileSync(runsPath, 'utf8')).workflow_runs ?? [])
-            .filter((run) => run.event === 'pull_request_target'
-              && run.status === 'completed' && run.conclusion === 'success'
-              && run.head_sha === candidateHeadSha
-              && (run.pull_requests ?? []).some((pr) => Number(pr.number) === prNumber && pr.base?.sha === protectedBaseSha))
-            .sort((a, b) => Number(b.id) - Number(a.id));
-          if (matches.length) process.stdout.write(String(matches[0].id));
-          NODE
-            )"
-            [[ -n "$controller_run_id" ]] && break
-            (( attempt < 30 )) && sleep 10
-          done
-          [[ "$controller_run_id" =~ ^[0-9]+$ ]]
-          printf 'bootstrap_active=true\ncontroller_run_id=%s\n' "$controller_run_id" >> "$GITHUB_OUTPUT"
+          [[ "$WORKFLOW_RUN_ID" =~ ^[0-9]+$ ]]
+          printf 'bootstrap_active=true\ncontroller_run_id=%s\n' "$WORKFLOW_RUN_ID" >> "$GITHUB_OUTPUT"
 
       - name: Download the unique protected-verification-plan artifact
         if: steps.controller.outputs.bootstrap_active == 'true'
@@ -113,15 +76,11 @@ jobs:
           import fs from 'node:fs';
           const [planPath, outputPath] = process.argv.slice(2);
           const plan = JSON.parse(fs.readFileSync(planPath, 'utf8'));
-          if (plan.schemaVersion !== 3 || plan.controller?.id !== 'atlas-protected-hosted-controller-v3' || plan.controller?.version !== 3) {
-            throw new Error('Protected hosted plan controller identity is invalid.');
-          }
-          for (const [name, value] of [['controller_source_sha', plan.controller.sourceSha], ['candidate_head_sha', plan.candidateHeadSha]]) {
+          if (plan.schemaVersion !== 3 || plan.controller?.id !== 'atlas-protected-hosted-controller-v3' || plan.controller?.version !== 3) throw new Error('Protected hosted plan controller identity is invalid.');
+          if (plan.controller.sourceSha !== plan.protectedBaseSha) throw new Error('Protected hosted controller source must be the protected base.');
+          for (const [name, value] of [['controller_source_sha', plan.controller.sourceSha], ['candidate_head_sha', plan.candidateHeadSha], ['protected_base_sha', plan.protectedBaseSha]]) {
             if (!/^[a-f0-9]{40}$/.test(value)) throw new Error(`${name} is not an exact SHA.`);
             fs.appendFileSync(outputPath, `${name}=${value}\n`);
-          }
-          for (const field of ['planSemanticDigest', 'planInstanceDigest', 'authorityDigest', 'environmentDigest']) {
-            if (!/^sha256:[a-f0-9]{64}$/.test(plan[field])) throw new Error(`${field} is invalid.`);
           }
           if (!Number.isSafeInteger(plan.prNumber) || plan.prNumber < 1) throw new Error('Protected hosted plan PR number is invalid.');
           fs.appendFileSync(outputPath, `pr_number=${plan.prNumber}\n`);
@@ -168,9 +127,152 @@ jobs:
           const bundleName = `protected-hosted-execution-${process.env.GITHUB_RUN_ID}-${process.env.GITHUB_RUN_ATTEMPT}`;
           for (const [name, value] of [
             ['bundle_name', bundleName], ['candidate_head_sha', contract.candidateHeadSha],
-            ['controller_source_sha', contract.controllerSourceSha], ['pr_number', process.env.PR_NUMBER],
+            ['controller_source_sha', contract.controllerSourceSha], ['protected_base_sha', plan.protectedBaseSha],
+            ['pr_number', process.env.PR_NUMBER],
             ['hosted_count', contract.hosted.stableTestIds.length], ['specialist_count', contract.specialist.stableTestIds.length],
           ]) fs.appendFileSync(githubOutput, `${name}=${value}\n`);
+          NODE
+
+      - name: Restore latest authoritative exact-candidate lifecycle state
+        if: steps.controller.outputs.bootstrap_active == 'true'
+        id: previous
+        shell: bash
+        env:
+          PR_NUMBER: ${{ steps.identity.outputs.pr_number }}
+          CANDIDATE_HEAD_SHA: ${{ steps.identity.outputs.candidate_head_sha }}
+        run: |
+          set -euo pipefail
+          state_name="protected-verification-state-pr-$PR_NUMBER-$CANDIDATE_HEAD_SHA"
+          printf 'state_artifact_name=%s\nprevious_state_present=false\n' "$state_name" >> "$GITHUB_OUTPUT"
+          list="$RUNNER_TEMP/protected-state-artifacts.json"
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?name=$state_name&per_page=100" > "$list"
+          mapfile -t candidates < <(node --input-type=module - "$list" <<'NODE'
+          import fs from 'node:fs';
+          const artifacts = (JSON.parse(fs.readFileSync(process.argv[2], 'utf8')).artifacts ?? [])
+            .filter((artifact) => !artifact.expired && artifact.workflow_run?.id)
+            .sort((left, right) => Date.parse(right.created_at) - Date.parse(left.created_at));
+          for (const artifact of artifacts) process.stdout.write(`${artifact.id}\t${artifact.workflow_run.id}\n`);
+          NODE
+          )
+          for candidate in "${candidates[@]}"; do
+            IFS=$'\t' read -r artifact_id producer_run_id <<< "$candidate"
+            [[ "$artifact_id" =~ ^[0-9]+$ && "$producer_run_id" =~ ^[0-9]+$ ]] || continue
+            (( producer_run_id < GITHUB_RUN_ID )) || continue
+            run_json="$RUNNER_TEMP/protected-state-run-$producer_run_id.json"
+            gh api "repos/$GITHUB_REPOSITORY/actions/runs/$producer_run_id" > "$run_json"
+            if ! node --input-type=module - "$run_json" <<'NODE'
+          import fs from 'node:fs';
+          const run = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+          if (run.status !== 'completed'
+            || run.path !== '.github/workflows/protected-hosted-executor.yml'
+            || run.event !== 'workflow_run'
+            || run.repository?.full_name !== process.env.GITHUB_REPOSITORY) process.exit(1);
+          NODE
+            then
+              continue
+            fi
+            candidate_dir="$RUNNER_TEMP/protected-state-$artifact_id"
+            rm -rf "$candidate_dir"
+            mkdir -p "$candidate_dir"
+            if ! gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$artifact_id/zip" > "$candidate_dir/state.zip"; then
+              continue
+            fi
+            if ! unzip -q "$candidate_dir/state.zip" -d "$candidate_dir/unpacked"; then
+              continue
+            fi
+            mapfile -t states < <(find "$candidate_dir/unpacked" -type f -name protected-verification-state.json -print)
+            [[ "${#states[@]}" -eq 1 ]] || continue
+            if node --input-type=module - "${states[0]}" "$run_json" "$PR_NUMBER" "$CANDIDATE_HEAD_SHA" <<'NODE'
+          import fs from 'node:fs';
+          import { validateProtectedVerificationState } from './protected-control/tools/verification/protected-verification-state.mjs';
+          const [statePath, runPath, prValue, candidateHeadSha] = process.argv.slice(2);
+          const state = validateProtectedVerificationState(JSON.parse(fs.readFileSync(statePath, 'utf8')));
+          const run = JSON.parse(fs.readFileSync(runPath, 'utf8'));
+          if (state.repository !== process.env.GITHUB_REPOSITORY || state.prNumber !== Number(prValue)
+            || state.candidateHeadSha !== candidateHeadSha
+            || state.producer.runId !== Number(run.id) || state.producer.runAttempt !== Number(run.run_attempt)
+            || state.producer.workflowPath !== run.path || state.producer.event !== run.event) process.exit(1);
+          NODE
+            then
+              cp "${states[0]}" artifacts/controller/previous-protected-verification-state.json
+              cp "$run_json" artifacts/controller/previous-state-run.json
+              printf 'previous_state_present=true\nprevious_state_run_id=%s\n' "$producer_run_id" >> "$GITHUB_OUTPUT"
+              break
+            fi
+          done
+
+      - name: Decide active base compatibility, evidence reuse and circuit breakers
+        if: steps.controller.outputs.bootstrap_active == 'true'
+        id: lifecycle
+        shell: bash
+        env:
+          PREVIOUS_STATE_PRESENT: ${{ steps.previous.outputs.previous_state_present }}
+        run: |
+          set -euo pipefail
+          plan=artifacts/controller/protected-verification-plan.json
+          execution=artifacts/controller/protected-hosted-execution.json
+          previous=artifacts/controller/previous-protected-verification-state.json
+          changed=artifacts/controller/base-advance-changed-paths.json
+          merge_status=clean
+          if [[ "$PREVIOUS_STATE_PRESENT" == true ]]; then
+            read -r old_base current_base candidate_head < <(node --input-type=module - "$previous" "$plan" <<'NODE'
+          import fs from 'node:fs';
+          const previous = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+          const current = JSON.parse(fs.readFileSync(process.argv[3], 'utf8'));
+          process.stdout.write(`${previous.plan.protectedBaseSha} ${current.protectedBaseSha} ${current.candidateHeadSha}`);
+          NODE
+            )
+            git -C protected-control fetch --no-tags origin "$old_base" "$current_base" "$candidate_head"
+            git -C protected-control diff --name-only --diff-filter=ACDMRTUXB "$old_base" "$current_base" \
+              | node --input-type=module - "$changed" <<'NODE'
+          import fs from 'node:fs';
+          const chunks = [];
+          for await (const chunk of process.stdin) chunks.push(chunk);
+          const paths = chunks.join('').split(/\r?\n/).filter(Boolean).sort();
+          fs.writeFileSync(process.argv[2], `${JSON.stringify(paths, null, 2)}\n`);
+          NODE
+            set +e
+            git -C protected-control merge-tree --write-tree "$current_base" "$candidate_head" > "$RUNNER_TEMP/merge-tree.txt" 2>&1
+            merge_rc=$?
+            set -e
+            if [[ "$merge_rc" -eq 1 ]]; then merge_status=conflict
+            elif [[ "$merge_rc" -ne 0 ]]; then cat "$RUNNER_TEMP/merge-tree.txt" >&2; exit "$merge_rc"
+            fi
+          else
+            printf '[]\n' > "$changed"
+          fi
+          node --input-type=module - "$plan" "$execution" "$previous" "$changed" "$merge_status" artifacts/controller/protected-verification-lifecycle.json "$GITHUB_OUTPUT" <<'NODE'
+          import fs from 'node:fs';
+          import { decideProtectedWorkflowLifecycle } from './protected-control/tools/verification/protected-verification-workflow.mjs';
+          import { verificationStateArtifactName } from './protected-control/tools/verification/protected-verification-state.mjs';
+          const [planPath, executionPath, previousPath, changedPath, mergeStatus, outputPath, githubOutput] = process.argv.slice(2);
+          const read = (path) => JSON.parse(fs.readFileSync(path, 'utf8'));
+          const plan = read(planPath);
+          const execution = read(executionPath);
+          const previousState = fs.existsSync(previousPath) ? read(previousPath) : null;
+          const authorityManifest = read('protected-control/tools/verification/verification-authority-manifest.json');
+          const lifecycle = decideProtectedWorkflowLifecycle({
+            currentPlan: plan,
+            currentExecution: execution,
+            previousState,
+            baseAdvance: {
+              changedPaths: read(changedPath),
+              mergeStatus,
+              authorityPaths: authorityManifest.components.map(({ path }) => path),
+              candidateRequiredPaths: ['src/', 'web/', 'package.json', 'package-lock.json'],
+            },
+            now: new Date().toISOString(),
+          });
+          fs.writeFileSync(outputPath, `${JSON.stringify(lifecycle, null, 2)}\n`);
+          const values = {
+            disposition: lifecycle.disposition,
+            execute_environment: String(lifecycle.executeEnvironment),
+            execute_hosted: String(lifecycle.executeHostedEvidenceIds.length > 0),
+            heavy_executions_required: String(lifecycle.heavyExecutionsRequired),
+            reuse_count: String(lifecycle.reuseEvidenceIds.length),
+            state_artifact_name: verificationStateArtifactName(plan.prNumber, plan.candidateHeadSha),
+          };
+          for (const [name, value] of Object.entries(values)) fs.appendFileSync(githubOutput, `${name}=${value}\n`);
           NODE
 
       - name: Publish protected execution contract
@@ -184,12 +286,103 @@ jobs:
             artifacts/controller/product-identities.json
             artifacts/controller/verification-authority-identity.json
             artifacts/controller/protected-execution-environment-identity.json
+            artifacts/controller/protected-verification-lifecycle.json
+            artifacts/controller/base-advance-changed-paths.json
+            artifacts/controller/previous-protected-verification-state.json
+            artifacts/controller/previous-state-run.json
+          if-no-files-found: error
+          retention-days: 14
+
+  reuse-evidence:
+    if: needs.preflight.outputs.bootstrap_active == 'true' && needs.preflight.outputs.reuse_count != '0'
+    needs: [preflight]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    env:
+      GH_TOKEN: ${{ github.token }}
+      BUNDLE_NAME: ${{ needs.preflight.outputs.bundle_name }}
+      CANDIDATE_HEAD_SHA: ${{ needs.preflight.outputs.candidate_head_sha }}
+      CONTROLLER_SOURCE_SHA: ${{ needs.preflight.outputs.controller_source_sha }}
+    steps:
+      - name: Download exact lifecycle bundle
+        id: download
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/controller artifacts/reuse/manifests
+          gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --name "$BUNDLE_NAME" --dir artifacts/controller
+          test -s artifacts/controller/protected-verification-plan.json
+          test -s artifacts/controller/protected-verification-lifecycle.json
+          test -s artifacts/controller/previous-protected-verification-state.json
+
+      - name: Check out exact protected controller source
+        id: checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.preflight.outputs.controller_source_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+          path: protected-control
+
+      - name: Rebind reusable evidence to the current forensic plan instance
+        id: materialize
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import path from 'node:path';
+          import { materializeProtectedWorkflowReuse } from './protected-control/tools/verification/protected-verification-workflow.mjs';
+          const read = (file) => JSON.parse(fs.readFileSync(file, 'utf8'));
+          const plan = read('artifacts/controller/protected-verification-plan.json');
+          const lifecycle = read('artifacts/controller/protected-verification-lifecycle.json');
+          const previousState = read('artifacts/controller/previous-protected-verification-state.json');
+          const artifactName = `protected-reused-evidence-${process.env.GITHUB_RUN_ID}-${process.env.GITHUB_RUN_ATTEMPT}`;
+          const reused = materializeProtectedWorkflowReuse({
+            currentPlan: plan,
+            lifecycle,
+            previousState,
+            runProvenance: {
+              repository: process.env.GITHUB_REPOSITORY,
+              runId: Number(process.env.GITHUB_RUN_ID),
+              runAttempt: Number(process.env.GITHUB_RUN_ATTEMPT),
+              jobName: 'reuse-evidence',
+              artifactName,
+            },
+          });
+          const safe = (value) => value.replace(/[^A-Za-z0-9_.-]/g, '_');
+          for (const manifest of reused.evidenceManifests) {
+            fs.writeFileSync(path.join('artifacts/reuse/manifests', `${safe(manifest.evidenceId)}.evidence.json`), `${JSON.stringify(manifest, null, 2)}\n`);
+          }
+          if (reused.environmentQualification) {
+            fs.writeFileSync('artifacts/reuse/protected-environment-qualification.json', `${JSON.stringify(reused.environmentQualification, null, 2)}\n`);
+          }
+          fs.writeFileSync('artifacts/reuse/reuse-summary.json', `${JSON.stringify({
+            schemaVersion: 1,
+            candidateHeadSha: plan.candidateHeadSha,
+            planSemanticDigest: plan.planSemanticDigest,
+            planInstanceDigest: plan.planInstanceDigest,
+            disposition: lifecycle.disposition,
+            evidenceIds: reused.evidenceManifests.map(({ evidenceId }) => evidenceId).sort(),
+          }, null, 2)}\n`);
+          NODE
+
+      - name: Publish digest-bound reused evidence
+        id: publish
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: protected-reused-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/reuse
           if-no-files-found: error
           retention-days: 14
 
   environment-qualification:
-    if: needs.preflight.outputs.bootstrap_active == 'true' && needs.preflight.outputs.hosted_count != '0'
+    if: needs.preflight.outputs.bootstrap_active == 'true' && needs.preflight.outputs.execute_environment == 'true'
     needs: [preflight]
+    outputs:
+      failure_stage: ${{ steps.failure.outputs.failure_stage }}
+      failure_code: ${{ steps.failure.outputs.failure_code }}
+      failure_ownership: ${{ steps.failure.outputs.failure_ownership }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
@@ -201,6 +394,7 @@ jobs:
       ATLAS_CANDIDATE_IMAGE: mcr.microsoft.com/playwright:v1.62.0-noble@sha256:baed2032d533817f3dbe6425de795788430ba345e819a1201337009ba17c9d07
     steps:
       - name: Download protected plan and execution contract
+        id: download
         shell: bash
         run: |
           set -euo pipefail
@@ -210,6 +404,7 @@ jobs:
           test -s artifacts/controller/protected-hosted-execution.json
 
       - name: Check out exact protected controller source
+        id: checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.preflight.outputs.controller_source_sha }}
@@ -218,6 +413,7 @@ jobs:
           path: protected-control
 
       - name: Fence exact head and materialize protected dependencies
+        id: fence
         shell: bash
         run: |
           set -euo pipefail
@@ -235,6 +431,7 @@ jobs:
           printf '%s\n' "$candidate_dir" > artifacts/environment/candidate-dir.txt
 
       - name: Qualify exact protected environment once
+        id: probe
         shell: bash
         run: |
           set -euo pipefail
@@ -269,6 +466,7 @@ jobs:
           test -s artifacts/environment/protected-environment-qualification.json
 
       - name: Bind environment qualification into dependency evidence
+        id: bind
         shell: bash
         run: |
           set -euo pipefail
@@ -294,6 +492,7 @@ jobs:
             },
             dependencies: {
               evidenceDigests: [],
+              evidenceSemanticDigests: [],
               paths: ['tools/verification/protected-execution-environment-probe.mjs', 'tools/verification/protected-execution-environment.json'],
               dataCapabilities: [],
             },
@@ -304,6 +503,7 @@ jobs:
           NODE
 
       - name: Publish protected environment qualification
+        id: publish
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: protected-environment-qualification-${{ needs.preflight.outputs.controller_run_id }}-${{ needs.preflight.outputs.candidate_head_sha }}
@@ -313,9 +513,41 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      - name: Classify environment workflow outcome
+        if: always()
+        id: failure
+        shell: bash
+        env:
+          DOWNLOAD: ${{ steps.download.outcome }}
+          CHECKOUT: ${{ steps.checkout.outcome }}
+          FENCE: ${{ steps.fence.outcome }}
+          PROBE: ${{ steps.probe.outcome }}
+          BIND: ${{ steps.bind.outcome }}
+          PUBLISH: ${{ steps.publish.outcome }}
+        run: |
+          set -euo pipefail
+          if [[ "$PROBE" == failure ]]; then
+            printf 'failure_stage=ENVIRONMENT_QUALIFICATION\nfailure_code=ENVIRONMENT_PROBE_FAILED\nfailure_ownership=environment\n' >> "$GITHUB_OUTPUT"
+          elif [[ "$PUBLISH" == failure ]]; then
+            printf 'failure_stage=ENVIRONMENT_QUALIFICATION\nfailure_code=ENVIRONMENT_ARTIFACT_PUBLICATION_FAILED\nfailure_ownership=external\n' >> "$GITHUB_OUTPUT"
+          elif [[ "$DOWNLOAD" == failure || "$CHECKOUT" == failure || "$FENCE" == failure || "$BIND" == failure ]]; then
+            printf 'failure_stage=AUTHORITY_PREFLIGHT\nfailure_code=ENVIRONMENT_AUTHORITY_WIRING_FAILED\nfailure_ownership=authority\n' >> "$GITHUB_OUTPUT"
+          fi
+
   hosted-shards:
-    if: needs.preflight.outputs.bootstrap_active == 'true' && needs.preflight.outputs.hosted_count != '0'
-    needs: [preflight, environment-qualification]
+    if: >-
+      always() &&
+      needs.preflight.result == 'success' &&
+      needs.preflight.outputs.bootstrap_active == 'true' &&
+      needs.preflight.outputs.execute_hosted == 'true' &&
+      (needs.environment-qualification.result == 'success' || needs.environment-qualification.result == 'skipped') &&
+      (needs.reuse-evidence.result == 'success' || needs.reuse-evidence.result == 'skipped')
+    needs: [preflight, reuse-evidence, environment-qualification]
+    outputs:
+      failure_stage: ${{ steps.failure.outputs.failure_stage }}
+      failure_code: ${{ steps.failure.outputs.failure_code }}
+      failure_ownership: ${{ steps.failure.outputs.failure_ownership }}
+
     strategy:
       fail-fast: false
       matrix:
@@ -334,19 +566,34 @@ jobs:
       ATLAS_E2E_SHARD: ${{ matrix.shard }}/1
     steps:
       - name: Download protected execution and environment contracts
+        id: download
         shell: bash
+        env:
+          EXECUTE_ENVIRONMENT: ${{ needs.preflight.outputs.execute_environment }}
         run: |
           set -euo pipefail
-          mkdir -p artifacts/controller artifacts/environment
+          mkdir -p artifacts/controller artifacts/environment artifacts/reused
           gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --name "$BUNDLE_NAME" --dir artifacts/controller
-          gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" \
-            --name "protected-environment-qualification-$CONTROLLER_RUN_ID-$CANDIDATE_HEAD_SHA" --dir artifacts/environment
+          if [[ "$EXECUTE_ENVIRONMENT" == true ]]; then
+            gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" \
+              --name "protected-environment-qualification-$CONTROLLER_RUN_ID-$CANDIDATE_HEAD_SHA" --dir artifacts/environment
+          else
+            gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" \
+              --name "protected-reused-evidence-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" --dir artifacts/reused
+            mapfile -t environment_manifests < <(find artifacts/reused -type f -name 'ENVIRONMENT_QUALIFICATION.evidence.json')
+            mapfile -t qualifications < <(find artifacts/reused -type f -name protected-environment-qualification.json)
+            test "${#environment_manifests[@]}" -eq 1
+            test "${#qualifications[@]}" -eq 1
+            cp "${environment_manifests[0]}" artifacts/environment/environment-evidence-manifest.json
+            cp "${qualifications[0]}" artifacts/environment/protected-environment-qualification.json
+          fi
           test -s artifacts/controller/protected-verification-plan.json
           test -s artifacts/controller/protected-hosted-execution.json
           test -s artifacts/environment/protected-environment-qualification.json
           test -s artifacts/environment/environment-evidence-manifest.json
 
       - name: Check out exact protected controller source
+        id: checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.preflight.outputs.controller_source_sha }}
@@ -355,6 +602,7 @@ jobs:
           path: protected-control
 
       - name: Validate environment dependency and fence current head
+        id: validate
         shell: bash
         run: |
           set -euo pipefail
@@ -379,6 +627,7 @@ jobs:
           NODE
 
       - name: Materialize exact candidate and enumerate capability source lists
+        id: select
         shell: bash
         run: |
           set -euo pipefail
@@ -425,6 +674,7 @@ jobs:
           done
 
       - name: Build exact protected products required by hosted partitions
+        id: product
         shell: bash
         run: |
           set -euo pipefail
@@ -469,6 +719,7 @@ jobs:
           NODE
 
       - name: Build separate protected-body and candidate execution contexts
+        id: context
         shell: bash
         run: |
           set -euo pipefail
@@ -498,6 +749,7 @@ jobs:
           printf '%s\n' "$candidate_context" > artifacts/controller/candidate-additions-execution-context.txt
 
       - name: Run each hosted data-capability partition against only its exact product
+        id: browser
         shell: bash
         run: |
           set -euo pipefail
@@ -568,6 +820,7 @@ jobs:
           done
 
       - name: Convert shard result into protected machine evidence
+        id: summary
         if: always()
         shell: bash
         run: |
@@ -580,6 +833,7 @@ jobs:
             > artifacts/hosted-shard-${{ matrix.shard }}/protected-shard-summary.json
 
       - name: Build dependency-bound hosted shard manifest
+        id: manifest
         shell: bash
         run: |
           set -euo pipefail
@@ -605,13 +859,18 @@ jobs:
               runAttempt: Number(process.env.GITHUB_RUN_ATTEMPT), jobName: 'hosted-shards',
               artifactName: `protected-hosted-shard-${process.env.CONTROLLER_RUN_ID}-${{ matrix.shard }}`,
             },
-            dependencies: { evidenceDigests: [environment.evidenceDigest], paths: [], dataCapabilities: capabilities },
+            dependencies: {
+              evidenceDigests: [environment.evidenceDigest],
+              evidenceSemanticDigests: [environment.evidenceSemanticDigest],
+              paths: [], dataCapabilities: capabilities,
+            },
             availability: { expiresAt: new Date(Date.now() + 14 * 86400000).toISOString(), revoked: false },
           });
           fs.writeFileSync('artifacts/hosted-shard-${{ matrix.shard }}/protected-shard-evidence.json', `${JSON.stringify(manifest, null, 2)}\n`);
           NODE
 
       - name: Publish protected shard evidence
+        id: publish
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -622,28 +881,286 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      - name: Classify hosted workflow outcome
+        if: always()
+        id: failure
+        shell: bash
+        env:
+          DOWNLOAD: ${{ steps.download.outcome }}
+          CHECKOUT: ${{ steps.checkout.outcome }}
+          VALIDATE: ${{ steps.validate.outcome }}
+          SELECT: ${{ steps.select.outcome }}
+          PRODUCT: ${{ steps.product.outcome }}
+          CONTEXT: ${{ steps.context.outcome }}
+          BROWSER: ${{ steps.browser.outcome }}
+          SUMMARY: ${{ steps.summary.outcome }}
+          MANIFEST: ${{ steps.manifest.outcome }}
+          PUBLISH: ${{ steps.publish.outcome }}
+        run: |
+          set -euo pipefail
+          if [[ "$PRODUCT" == failure ]]; then
+            printf 'failure_stage=EXECUTING\nfailure_code=PROTECTED_PRODUCT_BUILD_FAILED\nfailure_ownership=product\n' >> "$GITHUB_OUTPUT"
+          elif [[ "$BROWSER" == failure ]]; then
+            printf 'failure_stage=EXECUTING\nfailure_code=HOSTED_BROWSER_ASSERTION_FAILED\nfailure_ownership=candidate\n' >> "$GITHUB_OUTPUT"
+          elif [[ "$PUBLISH" == failure ]]; then
+            printf 'failure_stage=EXECUTING\nfailure_code=HOSTED_ARTIFACT_PUBLICATION_FAILED\nfailure_ownership=external\n' >> "$GITHUB_OUTPUT"
+          elif [[ "$DOWNLOAD" == failure || "$CHECKOUT" == failure || "$VALIDATE" == failure || "$SELECT" == failure || "$CONTEXT" == failure || "$SUMMARY" == failure || "$MANIFEST" == failure ]]; then
+            printf 'failure_stage=AUTHORITY_PREFLIGHT\nfailure_code=HOSTED_AUTHORITY_WIRING_FAILED\nfailure_ownership=authority\n' >> "$GITHUB_OUTPUT"
+          fi
+
   fan-in:
-    if: always() && needs.preflight.result == 'success' && needs.environment-qualification.result == 'success' && needs.hosted-shards.result == 'success' && needs.preflight.outputs.bootstrap_active == 'true' && needs.preflight.outputs.hosted_count != '0'
-    needs: [preflight, environment-qualification, hosted-shards]
+    if: >-
+      always() &&
+      needs.preflight.result == 'success' &&
+      needs.preflight.outputs.bootstrap_active == 'true' &&
+      needs.preflight.outputs.hosted_count != '0' &&
+      needs.preflight.outputs.disposition != 'BLOCKED' &&
+      needs.preflight.outputs.disposition != 'REINTEGRATE' &&
+      (needs.reuse-evidence.result == 'success' || needs.reuse-evidence.result == 'skipped') &&
+      (needs.environment-qualification.result == 'success' || needs.environment-qualification.result == 'skipped') &&
+      (needs.hosted-shards.result == 'success' || needs.hosted-shards.result == 'skipped')
+    needs: [preflight, reuse-evidence, environment-qualification, hosted-shards]
+    outputs:
+      failure_stage: ${{ steps.failure.outputs.failure_stage }}
+      failure_code: ${{ steps.failure.outputs.failure_code }}
+      failure_ownership: ${{ steps.failure.outputs.failure_ownership }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 8
+    timeout-minutes: 10
     env:
       GH_TOKEN: ${{ github.token }}
       CANDIDATE_HEAD_SHA: ${{ needs.preflight.outputs.candidate_head_sha }}
       CONTROLLER_RUN_ID: ${{ needs.preflight.outputs.controller_run_id }}
       PR_NUMBER: ${{ needs.preflight.outputs.pr_number }}
       BUNDLE_NAME: ${{ needs.preflight.outputs.bundle_name }}
+      REUSE_COUNT: ${{ needs.preflight.outputs.reuse_count }}
+      EXECUTE_ENVIRONMENT: ${{ needs.preflight.outputs.execute_environment }}
+      EXECUTE_HOSTED: ${{ needs.preflight.outputs.execute_hosted }}
     steps:
-      - name: Download protected plan and all dependency evidence
+      - name: Download exact plan and all executed or reused evidence
+        id: download
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p artifacts/controller artifacts/environment artifacts/shards
+          mkdir -p artifacts/controller artifacts/environment artifacts/reused artifacts/shards
           gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --name "$BUNDLE_NAME" --dir artifacts/controller
-          gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --name "protected-environment-qualification-$CONTROLLER_RUN_ID-$CANDIDATE_HEAD_SHA" --dir artifacts/environment
-          gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --pattern 'protected-hosted-shard-*' --dir artifacts/shards
-          test "$(find artifacts/shards -name protected-shard-summary.json -type f | wc -l)" -eq 1
-          test "$(find artifacts/shards -name protected-shard-evidence.json -type f | wc -l)" -eq 1
+          if [[ "$REUSE_COUNT" != 0 ]]; then
+            gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" \
+              --name "protected-reused-evidence-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" --dir artifacts/reused
+          fi
+          if [[ "$EXECUTE_ENVIRONMENT" == true ]]; then
+            gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" \
+              --name "protected-environment-qualification-$CONTROLLER_RUN_ID-$CANDIDATE_HEAD_SHA" --dir artifacts/environment
+          fi
+          if [[ "$EXECUTE_HOSTED" == true ]]; then
+            gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" \
+              --pattern 'protected-hosted-shard-*' --dir artifacts/shards
+          fi
+          test -s artifacts/controller/protected-verification-plan.json
+          test -s artifacts/controller/protected-hosted-execution.json
+          test -s artifacts/controller/protected-verification-lifecycle.json
+
+      - name: Check out exact protected controller source
+        id: checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.preflight.outputs.controller_source_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+          path: protected-control
+
+      - name: Reject stale head before evidence acceptance
+        id: fence
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" > artifacts/controller/current-pr.json
+          node protected-control/tools/verification/assert-current-pr-head.mjs \
+            --payload artifacts/controller/current-pr.json --repository "$GITHUB_REPOSITORY" \
+            --pr-number "$PR_NUMBER" --expected-head-sha "$CANDIDATE_HEAD_SHA"
+
+      - name: Validate one exact mixed EXECUTED and REUSED fan-in and build lifecycle state
+        id: validate
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import path from 'node:path';
+          import { buildEvidenceManifest } from './protected-control/tools/verification/evidence-manifest.mjs';
+          import { buildProtectedWorkflowSuccessState } from './protected-control/tools/verification/protected-verification-workflow.mjs';
+          const read = (file) => JSON.parse(fs.readFileSync(file, 'utf8'));
+          const walk = (dir, predicate) => {
+            if (!fs.existsSync(dir)) return [];
+            const values = [];
+            for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+              const full = path.join(dir, entry.name);
+              if (entry.isDirectory()) values.push(...walk(full, predicate));
+              else if (predicate(entry.name)) values.push(full);
+            }
+            return values.sort();
+          };
+          const plan = read('artifacts/controller/protected-verification-plan.json');
+          const execution = read('artifacts/controller/protected-hosted-execution.json');
+          const lifecycle = read('artifacts/controller/protected-verification-lifecycle.json');
+          const previousState = fs.existsSync('artifacts/controller/previous-protected-verification-state.json')
+            ? read('artifacts/controller/previous-protected-verification-state.json') : null;
+          const manifestFiles = [
+            ...walk('artifacts/reused', (name) => name.endsWith('.evidence.json')),
+            ...walk('artifacts/environment', (name) => name === 'environment-evidence-manifest.json'),
+            ...walk('artifacts/shards', (name) => name === 'protected-shard-evidence.json'),
+          ];
+          const manifests = manifestFiles.map(read);
+          const qualificationFiles = [
+            ...walk('artifacts/environment', (name) => name === 'protected-environment-qualification.json'),
+            ...walk('artifacts/reused', (name) => name === 'protected-environment-qualification.json'),
+          ];
+          if (qualificationFiles.length !== 1) throw new Error(`Expected exactly one environment qualification, got ${qualificationFiles.length}.`);
+          const producer = {
+            repository: process.env.GITHUB_REPOSITORY,
+            runId: Number(process.env.GITHUB_RUN_ID),
+            runAttempt: Number(process.env.GITHUB_RUN_ATTEMPT),
+            workflowPath: '.github/workflows/protected-hosted-executor.yml',
+            event: process.env.GITHUB_EVENT_NAME,
+          };
+          const success = buildProtectedWorkflowSuccessState({
+            currentPlan: plan,
+            currentExecution: execution,
+            lifecycle,
+            evidenceManifests: manifests,
+            environmentQualification: read(qualificationFiles[0]),
+            previousState,
+            currentHeadSha: process.env.CANDIDATE_HEAD_SHA,
+            producer,
+          });
+          const capabilities = [...new Set(execution.hosted.partitions.map(({ dataCapability }) => dataCapability))].sort();
+          const products = Object.fromEntries(capabilities.map((capability) => [capability, plan.productIdentities[capability]]));
+          const fanInEvidence = buildEvidenceManifest({
+            evidenceId: 'FANIN:HOSTED',
+            evidenceType: 'FANIN',
+            result: 'SUCCESS',
+            disposition: 'EXECUTED',
+            candidateHeadSha: plan.candidateHeadSha,
+            planSemanticDigest: plan.planSemanticDigest,
+            planInstanceDigest: plan.planInstanceDigest,
+            authorityDigest: plan.authorityDigest,
+            environmentDigest: plan.environmentDigest,
+            productIdentities: products,
+            stableTestIds: execution.hosted.stableTestIds,
+            executionPolicyDigest: plan.executionPolicyDigest,
+            runProvenance: {
+              repository: process.env.GITHUB_REPOSITORY,
+              runId: Number(process.env.GITHUB_RUN_ID),
+              runAttempt: Number(process.env.GITHUB_RUN_ATTEMPT),
+              jobName: 'fan-in',
+              artifactName: `protected-hosted-fan-in-${plan.protectedBaseSha}-${plan.candidateHeadSha}`,
+            },
+            dependencies: {
+              evidenceDigests: success.state.evidenceManifests.map(({ evidenceDigest }) => evidenceDigest).sort(),
+              evidenceSemanticDigests: success.state.evidenceManifests.map(({ evidenceSemanticDigest }) => evidenceSemanticDigest).sort(),
+              paths: [],
+              dataCapabilities: capabilities,
+            },
+            availability: { expiresAt: new Date(Date.now() + 14 * 86400000).toISOString(), revoked: false },
+          });
+          const payload = {
+            ...success.result,
+            schemaVersion: 2,
+            protectedBaseSha: plan.protectedBaseSha,
+            controllerSourceSha: plan.controller.sourceSha,
+            disposition: lifecycle.disposition,
+            heavyExecutionsRequired: lifecycle.heavyExecutionsRequired,
+            evidenceManifest: fanInEvidence,
+            stateDigest: success.state.stateDigest,
+            stateArtifactName: `protected-verification-state-pr-${plan.prNumber}-${plan.candidateHeadSha}`,
+            specialistStableTestIds: execution.specialist.stableTestIds,
+            reviewGroupIds: execution.review.groupIds,
+          };
+          fs.writeFileSync('artifacts/controller/protected-hosted-fan-in.json', `${JSON.stringify(payload, null, 2)}\n`);
+          fs.writeFileSync('artifacts/controller/protected-verification-state.json', `${JSON.stringify(success.state, null, 2)}\n`);
+          NODE
+
+      - name: Publish protected hosted fan-in evidence
+        id: publish_fan_in
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: protected-hosted-fan-in-${{ needs.preflight.outputs.protected_base_sha }}-${{ needs.preflight.outputs.candidate_head_sha }}
+          path: |
+            artifacts/controller/protected-hosted-fan-in.json
+            artifacts/controller/protected-verification-state.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Publish exact-candidate verification lifecycle state
+        id: publish_state
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ needs.preflight.outputs.state_artifact_name }}
+          path: artifacts/controller/protected-verification-state.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Classify fan-in workflow outcome
+        if: always()
+        id: failure
+        shell: bash
+        env:
+          DOWNLOAD: ${{ steps.download.outcome }}
+          CHECKOUT: ${{ steps.checkout.outcome }}
+          FENCE: ${{ steps.fence.outcome }}
+          VALIDATE: ${{ steps.validate.outcome }}
+          PUBLISH_FAN_IN: ${{ steps.publish_fan_in.outcome }}
+          PUBLISH_STATE: ${{ steps.publish_state.outcome }}
+        run: |
+          set -euo pipefail
+          if [[ "$PUBLISH_FAN_IN" == failure || "$PUBLISH_STATE" == failure ]]; then
+            printf 'failure_stage=FANIN\nfailure_code=FANIN_ARTIFACT_PUBLICATION_FAILED\nfailure_ownership=external\n' >> "$GITHUB_OUTPUT"
+          elif [[ "$DOWNLOAD" == failure || "$CHECKOUT" == failure || "$FENCE" == failure || "$VALIDATE" == failure ]]; then
+            printf 'failure_stage=FANIN\nfailure_code=FANIN_AUTHORITY_VALIDATION_FAILED\nfailure_ownership=authority\n' >> "$GITHUB_OUTPUT"
+          fi
+
+  failure-closeout:
+    if: >-
+      always() &&
+      needs.preflight.result == 'success' &&
+      needs.preflight.outputs.bootstrap_active == 'true' &&
+      (needs.preflight.outputs.disposition == 'BLOCKED' ||
+       needs.preflight.outputs.disposition == 'REINTEGRATE' ||
+       needs.reuse-evidence.result == 'failure' ||
+       needs.environment-qualification.result == 'failure' ||
+       needs.hosted-shards.result == 'failure' ||
+       needs.fan-in.result == 'failure')
+    needs: [preflight, reuse-evidence, environment-qualification, hosted-shards, fan-in]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    env:
+      GH_TOKEN: ${{ github.token }}
+      BUNDLE_NAME: ${{ needs.preflight.outputs.bundle_name }}
+      CANDIDATE_HEAD_SHA: ${{ needs.preflight.outputs.candidate_head_sha }}
+      PR_NUMBER: ${{ needs.preflight.outputs.pr_number }}
+      DISPOSITION: ${{ needs.preflight.outputs.disposition }}
+      REUSE_RESULT: ${{ needs.reuse-evidence.result }}
+      ENVIRONMENT_RESULT: ${{ needs.environment-qualification.result }}
+      HOSTED_RESULT: ${{ needs.hosted-shards.result }}
+      FAN_IN_RESULT: ${{ needs.fan-in.result }}
+      ENVIRONMENT_STAGE: ${{ needs.environment-qualification.outputs.failure_stage }}
+      ENVIRONMENT_CODE: ${{ needs.environment-qualification.outputs.failure_code }}
+      ENVIRONMENT_OWNERSHIP: ${{ needs.environment-qualification.outputs.failure_ownership }}
+      HOSTED_STAGE: ${{ needs.hosted-shards.outputs.failure_stage }}
+      HOSTED_CODE: ${{ needs.hosted-shards.outputs.failure_code }}
+      HOSTED_OWNERSHIP: ${{ needs.hosted-shards.outputs.failure_ownership }}
+      FAN_IN_STAGE: ${{ needs.fan-in.outputs.failure_stage }}
+      FAN_IN_CODE: ${{ needs.fan-in.outputs.failure_code }}
+      FAN_IN_OWNERSHIP: ${{ needs.fan-in.outputs.failure_ownership }}
+    steps:
+      - name: Download exact failed lifecycle bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/controller
+          gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --name "$BUNDLE_NAME" --dir artifacts/controller
+          test -s artifacts/controller/protected-verification-plan.json
+          test -s artifacts/controller/protected-hosted-execution.json
+          test -s artifacts/controller/protected-verification-lifecycle.json
 
       - name: Check out exact protected controller source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -653,86 +1170,118 @@ jobs:
           persist-credentials: false
           path: protected-control
 
-      - name: Reject stale head before evidence acceptance
+      - name: Classify real workflow failure and persist executable progress state
+        id: classify
         shell: bash
         run: |
           set -euo pipefail
-          gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" > artifacts/controller/current-pr.json
-          node protected-control/tools/verification/assert-current-pr-head.mjs \
-            --payload artifacts/controller/current-pr.json --repository "$GITHUB_REPOSITORY" \
-            --pr-number "$PR_NUMBER" --expected-head-sha "$CANDIDATE_HEAD_SHA"
-
-      - name: Require exact dependency-bound sibling fan-in
-        shell: bash
-        run: |
-          set -euo pipefail
-          node --input-type=module <<'NODE'
+          current_pr=artifacts/controller/current-pr.json
+          api_available=true
+          if ! gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" > "$current_pr"; then
+            api_available=false
+            printf '{"head":{"sha":"%s"}}\n' "$CANDIDATE_HEAD_SHA" > "$current_pr"
+          fi
+          node --input-type=module - "$current_pr" "$api_available" <<'NODE'
           import fs from 'node:fs';
-          import path from 'node:path';
-          import { buildEvidenceManifest, validateEvidenceManifest, validateEvidenceStableIdUnion } from './protected-control/tools/verification/evidence-manifest.mjs';
-          import { validateProtectedHostedFanIn } from './protected-control/tools/verification/protected-hosted-fan-in.mjs';
-          const read = (path) => JSON.parse(fs.readFileSync(path, 'utf8'));
+          import { buildProtectedVerificationState } from './protected-control/tools/verification/protected-verification-state.mjs';
+          import {
+            buildProtectedWorkflowFailureState,
+          } from './protected-control/tools/verification/protected-verification-workflow.mjs';
+          const [currentPrPath, apiAvailableValue] = process.argv.slice(2);
+          const read = (file) => JSON.parse(fs.readFileSync(file, 'utf8'));
           const plan = read('artifacts/controller/protected-verification-plan.json');
           const execution = read('artifacts/controller/protected-hosted-execution.json');
-          const environment = validateEvidenceManifest(read('artifacts/environment/environment-evidence-manifest.json'));
-          const summaryFiles = [];
-          const evidenceFiles = [];
-          const walk = (dir) => {
-            for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-              const full = path.join(dir, entry.name);
-              if (entry.isDirectory()) walk(full);
-              else if (entry.name === 'protected-shard-summary.json') summaryFiles.push(full);
-              else if (entry.name === 'protected-shard-evidence.json') evidenceFiles.push(full);
-            }
+          const lifecycle = read('artifacts/controller/protected-verification-lifecycle.json');
+          const previousState = fs.existsSync('artifacts/controller/previous-protected-verification-state.json')
+            ? read('artifacts/controller/previous-protected-verification-state.json') : null;
+          const currentHeadSha = read(currentPrPath).head?.sha ?? plan.candidateHeadSha;
+          const producer = {
+            repository: process.env.GITHUB_REPOSITORY,
+            runId: Number(process.env.GITHUB_RUN_ID),
+            runAttempt: Number(process.env.GITHUB_RUN_ATTEMPT),
+            workflowPath: '.github/workflows/protected-hosted-executor.yml',
+            event: process.env.GITHUB_EVENT_NAME,
           };
-          walk('artifacts/shards');
-          const summaries = summaryFiles.sort().map(read);
-          const manifests = evidenceFiles.sort().map((file) => validateEvidenceManifest(read(file)));
-          const result = validateProtectedHostedFanIn(plan, summaries, {
-            currentHeadSha: process.env.CANDIDATE_HEAD_SHA,
-            expectedStableTestIds: execution.hosted.stableTestIds,
-            expectedStableTestIdsDigest: execution.hostedExpectedStableTestIdsDigest,
-          });
-          validateEvidenceStableIdUnion(execution.hosted.stableTestIds, manifests);
-          for (const manifest of manifests) {
-            if (manifest.result !== 'SUCCESS' || manifest.candidateHeadSha !== plan.candidateHeadSha
-              || manifest.planSemanticDigest !== plan.planSemanticDigest || manifest.planInstanceDigest !== plan.planInstanceDigest
-              || manifest.authorityDigest !== plan.authorityDigest || manifest.environmentDigest !== plan.environmentDigest
-              || !manifest.dependencies.evidenceDigests.includes(environment.evidenceDigest)) throw new Error('Hosted evidence dependency identity mismatch.');
+          let state;
+          if (lifecycle.disposition === 'BLOCKED') {
+            if (!previousState) throw new Error('Blocked lifecycle has no durable prior state.');
+            state = buildProtectedVerificationState({
+              repository: plan.repository,
+              prNumber: plan.prNumber,
+              candidateHeadSha: plan.candidateHeadSha,
+              plan,
+              execution,
+              lifecycle,
+              progress: lifecycle.progress,
+              evidenceManifests: previousState.evidenceManifests,
+              evidenceArchive: previousState.evidenceArchive,
+              environmentQualification: previousState.environmentQualification,
+              producer,
+            });
+          } else {
+            let stage = 'AUTHORITY_PREFLIGHT';
+            let code = 'UNCLASSIFIED_PROTECTED_WORKFLOW_FAILURE';
+            let sourceOwnership = 'authority';
+            let integrationCompatible;
+            if (apiAvailableValue !== 'true') {
+              stage = 'AUTHORITY_PREFLIGHT'; code = 'GITHUB_PR_IDENTITY_API_UNAVAILABLE'; sourceOwnership = 'external';
+            } else if (lifecycle.disposition === 'REINTEGRATE') {
+              stage = 'BASE_COMPATIBILITY'; code = 'CANDIDATE_BASE_MERGE_CONFLICT'; sourceOwnership = 'candidate'; integrationCompatible = false;
+            } else if (process.env.ENVIRONMENT_RESULT === 'failure') {
+              stage = process.env.ENVIRONMENT_STAGE || 'ENVIRONMENT_QUALIFICATION';
+              code = process.env.ENVIRONMENT_CODE || 'ENVIRONMENT_JOB_FAILED';
+              sourceOwnership = process.env.ENVIRONMENT_OWNERSHIP || 'environment';
+            } else if (process.env.HOSTED_RESULT === 'failure') {
+              stage = process.env.HOSTED_STAGE || 'EXECUTING';
+              code = process.env.HOSTED_CODE || 'HOSTED_JOB_FAILED';
+              sourceOwnership = process.env.HOSTED_OWNERSHIP || 'candidate';
+            } else if (process.env.REUSE_RESULT === 'failure') {
+              stage = 'BASE_COMPATIBILITY'; code = 'EVIDENCE_REUSE_VALIDATION_FAILED'; sourceOwnership = 'authority';
+            } else if (process.env.FAN_IN_RESULT === 'failure') {
+              stage = process.env.FAN_IN_STAGE || 'FANIN';
+              code = process.env.FAN_IN_CODE || 'FANIN_JOB_FAILED';
+              sourceOwnership = process.env.FAN_IN_OWNERSHIP || 'authority';
+            }
+            state = buildProtectedWorkflowFailureState({
+              currentPlan: plan,
+              currentExecution: execution,
+              lifecycle,
+              previousState,
+              stage,
+              code,
+              sourceOwnership,
+              currentCandidateHeadSha: currentHeadSha,
+              integrationCompatible,
+              producer,
+            });
           }
-          const capabilities = [...new Set(execution.hosted.partitions.map(({ dataCapability }) => dataCapability))].sort();
-          const products = Object.fromEntries(capabilities.map((capability) => [capability, plan.productIdentities[capability]]));
-          const fanInEvidence = buildEvidenceManifest({
-            evidenceId: 'FANIN:HOSTED', evidenceType: 'FANIN', result: 'SUCCESS', disposition: 'EXECUTED',
-            candidateHeadSha: plan.candidateHeadSha, planSemanticDigest: plan.planSemanticDigest,
-            planInstanceDigest: plan.planInstanceDigest, authorityDigest: plan.authorityDigest,
-            environmentDigest: plan.environmentDigest, productIdentities: products,
-            stableTestIds: execution.hosted.stableTestIds, executionPolicyDigest: plan.executionPolicyDigest,
-            runProvenance: {
-              repository: process.env.GITHUB_REPOSITORY, runId: Number(process.env.GITHUB_RUN_ID),
-              runAttempt: Number(process.env.GITHUB_RUN_ATTEMPT), jobName: 'fan-in',
-              artifactName: `protected-hosted-fan-in-${process.env.CONTROLLER_RUN_ID}-${plan.candidateHeadSha}`,
-            },
-            dependencies: {
-              evidenceDigests: [environment.evidenceDigest, ...manifests.map(({ evidenceDigest }) => evidenceDigest)].sort(),
-              paths: [], dataCapabilities: capabilities,
-            },
-            availability: { expiresAt: new Date(Date.now() + 14 * 86400000).toISOString(), revoked: false },
-          });
-          fs.writeFileSync('artifacts/controller/protected-hosted-fan-in.json', `${JSON.stringify({
-            ...result,
-            controllerSourceSha: plan.controller.sourceSha,
-            evidenceScope: 'hosted-placement',
-            specialistStableTestIds: execution.specialist.stableTestIds,
-            reviewGroupIds: execution.review.groupIds,
-            evidenceManifest: fanInEvidence,
+          fs.writeFileSync('artifacts/controller/protected-verification-state.json', `${JSON.stringify(state, null, 2)}\n`);
+          fs.writeFileSync('artifacts/controller/failure-summary.json', `${JSON.stringify({
+            schemaVersion: 1,
+            candidateHeadSha: plan.candidateHeadSha,
+            disposition: lifecycle.disposition,
+            status: state.progress.status,
+            failureClass: state.progress.failureClass ?? null,
+            owner: state.progress.owner ?? null,
+            candidateMutationAllowed: state.progress.candidateMutationAllowed ?? false,
+            nextAttemptAllowed: state.progress.nextAttemptAllowed ?? false,
+            circuitBreaker: state.progress.circuitBreaker ?? null,
           }, null, 2)}\n`);
           NODE
 
-      - name: Publish protected hosted fan-in evidence
+      - name: Publish failed or blocked exact-candidate lifecycle state
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: protected-hosted-fan-in-${{ needs.preflight.outputs.controller_run_id }}-${{ needs.preflight.outputs.candidate_head_sha }}
-          path: artifacts/controller/protected-hosted-fan-in.json
+          name: ${{ needs.preflight.outputs.state_artifact_name }}
+          path: |
+            artifacts/controller/protected-verification-state.json
+            artifacts/controller/failure-summary.json
           if-no-files-found: error
           retention-days: 14
+
+      - name: Stop protected execution after durable failure classification
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat artifacts/controller/failure-summary.json >&2
+          exit 1

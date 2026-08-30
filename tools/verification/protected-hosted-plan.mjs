@@ -158,6 +158,9 @@ export function buildProtectedHostedPlan(input) {
   }
   if (!Number.isSafeInteger(Number(input.prNumber)) || Number(input.prNumber) < 1) throw new TypeError('prNumber must be a positive integer');
   const protectedBaseSha = exactSha(input.protectedBaseSha, 'protectedBaseSha');
+  if (input.controllerSourceSha !== undefined && input.controllerSourceSha !== protectedBaseSha) throw new TypeError('controller source must remain the protected base');
+  if (input.authorityPromotion !== undefined && input.authorityPromotion !== null) throw new TypeError('candidate authority promotion is forbidden');
+  const controllerSourceSha = protectedBaseSha;
   const candidateHeadSha = exactSha(input.candidateHeadSha, 'candidateHeadSha');
   const mergeBaseSha = exactSha(input.mergeBaseSha, 'mergeBaseSha');
   const authorityIdentity = validateVerificationAuthorityIdentity(input.authorityIdentity);
@@ -244,7 +247,7 @@ export function buildProtectedHostedPlan(input) {
 
   const core = {
     schemaVersion: 3,
-    controller: { ...CONTROLLER, sourceSha: protectedBaseSha },
+    controller: { ...CONTROLLER, sourceSha: controllerSourceSha },
     repository: input.repository,
     prNumber: Number(input.prNumber),
     protectedBaseSha,

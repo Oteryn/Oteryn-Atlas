@@ -1,4 +1,4 @@
-import {
+﻿import {
   canonicalDigest,
   deepFreeze,
   exactDigest,
@@ -48,6 +48,11 @@ function normalizeDependencies(value) {
     evidenceDigests: sortedUniqueStrings(value.evidenceDigests ?? [], 'evidence dependency digests', {
       validate: (candidate) => /^sha256:[a-f0-9]{64}$/.test(candidate),
     }),
+    evidenceSemanticDigests: sortedUniqueStrings(
+      value.evidenceSemanticDigests ?? [],
+      'evidence dependency semantic digests',
+      { validate: (candidate) => /^sha256:[a-f0-9]{64}$/.test(candidate) },
+    ),
     paths: sortedUniqueStrings(value.paths ?? [], 'evidence dependency paths', {
       validate: (candidate) => safeRepositoryPath(candidate),
     }),
@@ -63,6 +68,56 @@ function normalizeAvailability(value) {
   const canonicalTime = new Date(value.expiresAt).toISOString();
   if (canonicalTime !== value.expiresAt) throw new TypeError('evidence availability expiresAt must be canonical ISO-8601');
   return { expiresAt: canonicalTime, revoked: value.revoked };
+}
+
+function semanticCore({
+  evidenceId,
+  evidenceType,
+  candidateHeadSha,
+  authorityDigest,
+  environmentDigest,
+  productIdentities,
+  stableTestIdsDigest,
+  executionPolicyDigest,
+  dependencies,
+}) {
+  return {
+    schemaVersion: 1,
+    evidenceId,
+    evidenceType,
+    candidateHeadSha,
+    authorityDigest,
+    environmentDigest,
+    productIdentities,
+    stableTestIdsDigest,
+    executionPolicyDigest,
+    dependencySemanticDigests: dependencies.evidenceSemanticDigests,
+    dependencyPaths: dependencies.paths,
+    dataCapabilities: dependencies.dataCapabilities,
+  };
+}
+
+export function buildEvidenceSemanticDigest(input) {
+  if (!isPlainObject(input)
+    || typeof input.evidenceId !== 'string' || input.evidenceId.length === 0
+    || typeof input.evidenceType !== 'string' || !EVIDENCE_TYPE.test(input.evidenceType)) {
+    throw new TypeError('evidence semantic identity/type is invalid');
+  }
+  const stableTestIds = sortedUniqueStrings(input.stableTestIds ?? [], 'evidence stable test IDs', { validate: stableId });
+  const dependencies = normalizeDependencies(input.dependencies ?? {});
+  return canonicalDigest(semanticCore({
+    evidenceId: input.evidenceId,
+    evidenceType: input.evidenceType,
+    candidateHeadSha: exactSha(input.candidateHeadSha, 'evidence candidate head SHA'),
+    authorityDigest: exactDigest(input.authorityDigest, 'evidence authority digest'),
+    environmentDigest: input.environmentDigest === null
+      ? null
+      : exactDigest(input.environmentDigest, 'evidence environment digest'),
+    productIdentities: normalizeProductIdentities(input.productIdentities ?? {}),
+    stableTestIdsDigest: canonicalDigest(stableTestIds),
+    executionPolicyDigest: exactDigest(input.executionPolicyDigest, 'evidence execution policy digest'),
+    dependencies,
+  }));
 }
 
 function normalizeCore(input) {
@@ -87,25 +142,44 @@ function normalizeCore(input) {
   }
 
   const stableTestIds = sortedUniqueStrings(input.stableTestIds ?? [], 'evidence stable test IDs', { validate: stableId });
+  const stableTestIdsDigest = canonicalDigest(stableTestIds);
+  const dependencies = normalizeDependencies(input.dependencies);
+  const candidateHeadSha = exactSha(input.candidateHeadSha, 'evidence candidate head SHA');
+  const authorityDigest = exactDigest(input.authorityDigest, 'evidence authority digest');
+  const environmentDigest = input.environmentDigest === null
+    ? null
+    : exactDigest(input.environmentDigest, 'evidence environment digest');
+  const productIdentities = normalizeProductIdentities(input.productIdentities ?? {});
+  const executionPolicyDigest = exactDigest(input.executionPolicyDigest, 'evidence execution policy digest');
+  const evidenceSemanticDigest = canonicalDigest(semanticCore({
+    evidenceId: input.evidenceId,
+    evidenceType: input.evidenceType,
+    candidateHeadSha,
+    authorityDigest,
+    environmentDigest,
+    productIdentities,
+    stableTestIdsDigest,
+    executionPolicyDigest,
+    dependencies,
+  }));
   const core = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     evidenceId: input.evidenceId,
     evidenceType: input.evidenceType,
     result,
     disposition: input.disposition,
-    candidateHeadSha: exactSha(input.candidateHeadSha, 'evidence candidate head SHA'),
+    candidateHeadSha,
     planSemanticDigest: exactDigest(input.planSemanticDigest, 'evidence semantic plan digest'),
     planInstanceDigest: exactDigest(input.planInstanceDigest, 'evidence instance plan digest'),
-    authorityDigest: exactDigest(input.authorityDigest, 'evidence authority digest'),
-    environmentDigest: input.environmentDigest === null
-      ? null
-      : exactDigest(input.environmentDigest, 'evidence environment digest'),
-    productIdentities: normalizeProductIdentities(input.productIdentities ?? {}),
+    authorityDigest,
+    environmentDigest,
+    productIdentities,
     stableTestIds,
-    stableTestIdsDigest: canonicalDigest(stableTestIds),
-    executionPolicyDigest: exactDigest(input.executionPolicyDigest, 'evidence execution policy digest'),
+    stableTestIdsDigest,
+    executionPolicyDigest,
+    evidenceSemanticDigest,
     runProvenance: normalizeRunProvenance(input.runProvenance),
-    dependencies: normalizeDependencies(input.dependencies),
+    dependencies,
     availability: normalizeAvailability(input.availability),
     ...(result === 'FAILURE' ? { failureClass: input.failureClass } : {}),
     ...(input.disposition === 'REUSED' ? {
@@ -122,10 +196,12 @@ export function buildEvidenceManifest(input) {
 }
 
 export function validateEvidenceManifest(candidate) {
-  if (!isPlainObject(candidate) || candidate.schemaVersion !== 1) throw new TypeError('evidence manifest schema is invalid');
+  if (!isPlainObject(candidate) || candidate.schemaVersion !== 2) throw new TypeError('evidence manifest schema is invalid');
   const rebuilt = buildEvidenceManifest(candidate);
   const evidenceDigest = exactDigest(candidate.evidenceDigest, 'evidenceDigest');
+  const evidenceSemanticDigest = exactDigest(candidate.evidenceSemanticDigest, 'evidenceSemanticDigest');
   if (rebuilt.evidenceDigest !== evidenceDigest) throw new TypeError('evidenceDigest mismatch');
+  if (rebuilt.evidenceSemanticDigest !== evidenceSemanticDigest) throw new TypeError('evidenceSemanticDigest mismatch');
   if (candidate.stableTestIdsDigest !== rebuilt.stableTestIdsDigest) throw new TypeError('evidence stable test-set digest mismatch');
   return rebuilt;
 }

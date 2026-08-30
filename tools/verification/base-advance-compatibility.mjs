@@ -124,8 +124,8 @@ export function classifyBaseAdvance(input) {
     const dependencyChanges = changedPaths.filter((path) => evidence.some((node) => node.dependencyPaths.some((dependency) => pathMatches(dependency, path))));
     if (dependencyChanges.length > 0) reasons.push(`evidence dependency paths changed: ${dependencyChanges.join(', ')}`);
     const changedAuthorityPaths = changedPaths.filter((path) => authorityPaths.some((prefix) => pathMatches(prefix, path)));
-    if (changedAuthorityPaths.length > 0 && !authorityChanged) {
-      reasons.push(`authority-scoped paths changed without changing canonical authority bytes: ${changedAuthorityPaths.join(', ')}`);
+    if (changedAuthorityPaths.length > 0 && !authorityChanged && !environmentChanged && changedProducts.length === 0) {
+      throw new TypeError(`authority closure escaped canonical identity: ${changedAuthorityPaths.join(', ')}`);
     }
 
     if (authorityChanged || environmentChanged) disposition = 'FULL_RERUN';

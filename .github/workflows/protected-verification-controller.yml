@@ -4,13 +4,24 @@ name: Protected Verification Controller
 on:
   pull_request_target:
     types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Open main-targeting PR to re-evaluate after protected base movement
+        required: true
+        type: number
+      trigger:
+        description: Auditable lifecycle trigger
+        required: false
+        default: base_advance
+        type: string
 
 permissions:
   contents: read
   pull-requests: read
 
 concurrency:
-  group: atlas-protected-controller-pr-${{ github.event.pull_request.number }}
+  group: atlas-protected-controller-pr-${{ inputs.pr_number || github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
@@ -19,15 +30,42 @@ jobs:
     timeout-minutes: 12
     env:
       GH_TOKEN: ${{ github.token }}
-      ATLAS_PR_NUMBER: ${{ github.event.pull_request.number }}
-      ATLAS_PROTECTED_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-      ATLAS_CANDIDATE_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
       ATLAS_CANDIDATE_IMAGE: mcr.microsoft.com/playwright:v1.62.0-noble@sha256:baed2032d533817f3dbe6425de795788430ba345e819a1201337009ba17c9d07
     steps:
+      - name: Resolve exact PR lifecycle identity
+        id: identity
+        shell: bash
+        env:
+          ATLAS_REQUESTED_PR_NUMBER: ${{ inputs.pr_number || github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          [[ "$ATLAS_REQUESTED_PR_NUMBER" =~ ^[0-9]+$ ]]
+          mkdir -p artifacts/protected-controller
+          gh api "repos/$GITHUB_REPOSITORY/pulls/$ATLAS_REQUESTED_PR_NUMBER" > artifacts/protected-controller/requested-pr.json
+          node --input-type=module - artifacts/protected-controller/requested-pr.json "$GITHUB_OUTPUT" "$GITHUB_ENV" <<'NODE'
+          import fs from 'node:fs';
+          const [payloadPath, outputPath, envPath] = process.argv.slice(2);
+          const pr = JSON.parse(fs.readFileSync(payloadPath, 'utf8'));
+          if (pr.state !== 'open' || pr.base?.ref !== 'main' || pr.base?.repo?.full_name !== process.env.GITHUB_REPOSITORY
+            || pr.head?.repo?.full_name !== process.env.GITHUB_REPOSITORY) {
+            throw new Error('Requested lifecycle PR is not an open same-repository main-targeting PR.');
+          }
+          const values = { pr_number: String(pr.number), base_sha: pr.base.sha, candidate_head_sha: pr.head.sha };
+          if (!Number.isSafeInteger(pr.number) || pr.number < 1
+            || !/^[a-f0-9]{40}$/.test(values.base_sha)
+            || !/^[a-f0-9]{40}$/.test(values.candidate_head_sha)) {
+            throw new Error('Requested lifecycle PR identity is malformed.');
+          }
+          for (const [name, value] of Object.entries(values)) fs.appendFileSync(outputPath, `${name}=${value}\n`);
+          fs.appendFileSync(envPath, `ATLAS_PR_NUMBER=${values.pr_number}\n`);
+          fs.appendFileSync(envPath, `ATLAS_PROTECTED_BASE_SHA=${values.base_sha}\n`);
+          fs.appendFileSync(envPath, `ATLAS_CANDIDATE_HEAD_SHA=${values.candidate_head_sha}\n`);
+          NODE
+
       - name: Check out protected controller source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.pull_request.base.sha }}
+          ref: ${{ steps.identity.outputs.base_sha }}
           fetch-depth: 0
           persist-credentials: false
 
@@ -204,7 +242,7 @@ jobs:
       - name: Publish protected verification plan
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: protected-verification-plan-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+          name: protected-verification-plan-${{ steps.identity.outputs.pr_number }}-${{ steps.identity.outputs.candidate_head_sha }}
           path: |
             artifacts/protected-controller/protected-verification-plan.json
             artifacts/protected-controller/protected-stable-test-ids.json

@@ -36,9 +36,9 @@ test('bounded-real product is deterministic and binds exact real ancillary bytes
   assert.deepEqual(first.files, second.files);
   assert.deepEqual(new Set(first.targetEntityIds), EXPECTED_TARGETS);
 
-  const sourceSemantic = fs.readFileSync(path.join(ROOT, 'web/semantic-search/index.json'));
+  const sourceSemantic = Buffer.from(fs.readFileSync(path.join(ROOT, 'web/semantic-search/index.json'), 'utf8').replace(/\r\n/g, '\n'));
   const productSemantic = fs.readFileSync(path.join(firstRoot, 'web/semantic-search/index.json'));
-  const sourceCreatures = fs.readFileSync(path.join(ROOT, 'web/semantic-search/creatures.json'));
+  const sourceCreatures = Buffer.from(fs.readFileSync(path.join(ROOT, 'web/semantic-search/creatures.json'), 'utf8').replace(/\r\n/g, '\n'));
   const productCreatures = fs.readFileSync(path.join(firstRoot, 'web/semantic-search/creatures.json'));
   assert.deepEqual(productSemantic, sourceSemantic);
   assert.deepEqual(productCreatures, sourceCreatures);

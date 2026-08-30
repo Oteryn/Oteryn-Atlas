@@ -45,6 +45,7 @@ function manifest(overrides = {}) {
     },
     dependencies: {
       evidenceDigests: [],
+      evidenceSemanticDigests: [],
       paths: ['e2e/', 'src/browser/'],
       dataCapabilities: ['qualification_fixture'],
     },
@@ -55,10 +56,11 @@ function manifest(overrides = {}) {
 
 test('executed evidence binds semantic, authority, environment, product, test-set and policy identities', () => {
   const evidence = manifest();
-  assert.equal(evidence.schemaVersion, 1);
+  assert.equal(evidence.schemaVersion, 2);
   assert.equal(evidence.disposition, 'EXECUTED');
   assert.equal(evidence.result, 'SUCCESS');
   assert.match(evidence.stableTestIdsDigest, /^sha256:[a-f0-9]{64}$/);
+  assert.match(evidence.evidenceSemanticDigest, /^sha256:[a-f0-9]{64}$/);
   assert.match(evidence.evidenceDigest, /^sha256:[a-f0-9]{64}$/);
   assert.deepEqual(evidence, validateEvidenceManifest(evidence));
   assert.ok(Object.isFrozen(evidence));

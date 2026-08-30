@@ -6,6 +6,7 @@ const parsedWorkers = Number.parseInt(process.env.ATLAS_E2E_WORKERS || '2', 10);
 const workers = Number.isSafeInteger(parsedWorkers) && parsedWorkers > 0 ? parsedWorkers : 2;
 const baseURL = process.env.ATLAS_BASE_URL || 'http://atlas-web:8080';
 const expectedRevision = process.env.ATLAS_EXPECTED_REVISION?.trim() || null;
+const legacyVerificationPlanSha256 = process.env.ATLAS_VERIFICATION_PLAN_SHA256?.trim() || null;
 const planSemanticDigest = process.env.ATLAS_PLAN_SEMANTIC_DIGEST?.trim() || null;
 const planInstanceDigest = process.env.ATLAS_PLAN_INSTANCE_DIGEST?.trim() || null;
 const authorityDigest = process.env.ATLAS_AUTHORITY_DIGEST?.trim() || null;
@@ -78,6 +79,7 @@ export default defineConfig({
     targetURL: baseURL,
     publicationOrigin,
     expectedRevision,
+    verificationPlanSha256: legacyVerificationPlanSha256,
     planSemanticDigest,
     planInstanceDigest,
     authorityDigest,

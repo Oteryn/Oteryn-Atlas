@@ -1,6 +1,6 @@
 # Atlas E2E Verification Anti-Loop Hardening Design
 
-**Lifecycle:** Oteryn/Oteryn-Atlas#179  
+**Lifecycle:** Oteryn/Oteryn-Atlas#179
 **Scope:** systemic elimination of verification closeout/requalification loops without weakening protected verification, provenance, exact candidate identity, retries=0, data-capability separation, or fail-closed behavior.
 
 ## Problem statement

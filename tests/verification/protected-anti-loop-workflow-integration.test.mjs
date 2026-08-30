@@ -102,8 +102,9 @@ test('executor qualifies the exact protected environment once before any hosted 
   assert.match(executor, /protected-environment-qualification\.json/);
   assert.match(executor, /buildEvidenceManifest/);
   assert.match(executor, /ENVIRONMENT_QUALIFICATION/);
-  assert.match(executor, /hosted-shards:[\s\S]*needs:\s*\[preflight, environment-qualification\]/);
-  assert.match(executor, /fan-in:[\s\S]*needs:\s*\[preflight, environment-qualification, hosted-shards\]/);
+  assert.match(executor, /hosted-shards:[\s\S]*needs:\s*\[preflight, reuse-evidence, environment-qualification\]/);
+  assert.match(executor, /hosted-shards:[\s\S]*execute_environment[\s\S]*environment-qualification\.result == 'success' \|\| needs\.environment-qualification\.result == 'skipped'/);
+  assert.match(executor, /fan-in:[\s\S]*needs:\s*\[preflight, reuse-evidence, environment-qualification, hosted-shards\]/);
 });
 
 test('Playwright summaries bind semantic, instance, authority and environment identities without the ambiguous planDigest alias', () => {
@@ -116,15 +117,17 @@ test('Playwright summaries bind semantic, instance, authority and environment id
     'ATLAS_AUTHORITY_DIGEST',
     'ATLAS_ENVIRONMENT_DIGEST',
   ]) assert.match(executor, new RegExp(variable));
-  assert.doesNotMatch(playwright, /verificationPlanSha256/);
+  assert.match(playwright, /legacyVerificationPlanSha256 = process\.env\.ATLAS_VERIFICATION_PLAN_SHA256/);
   assert.doesNotMatch(executor, /ATLAS_VERIFICATION_PLAN_SHA256|\.planDigest/);
 });
 
-test('atlas-gate consumes exact protected hosted fan-in evidence instead of the legacy local status', () => {
+test('atlas-gate independently validates exact hosted fan-in and lifecycle state instead of the legacy local status', () => {
   assert.match(ci, /name:\s*Protected Hosted Playwright evidence/);
   assert.match(ci, /protected-hosted-fan-in/);
-  assert.match(ci, /candidateHeadSha/);
-  assert.match(ci, /planSemanticDigest/);
-  assert.match(ci, /planInstanceDigest/);
-  assert.doesNotMatch(ci, /atlas-local-e2e/);
+  assert.match(ci, /protected-verification-state/);
+  assert.match(ci, /validateProtectedHostedGate/);
+  assert.match(ci, /expectedCandidateHeadSha: process\.env\.ATLAS_CODE_REVISION/);
+  assert.match(ci, /expectedProtectedBaseSha: process\.env\.ATLAS_PROTECTED_BASE_SHA/);
+  assert.match(ci, /ATLAS_LEGACY_CUTOVER_BASE_SHA: 00bc97034618fa0ce264685d1aa342c591a43914/);
+  assert.match(ci, /legacy-cutover-exact-base-only/);
 });
