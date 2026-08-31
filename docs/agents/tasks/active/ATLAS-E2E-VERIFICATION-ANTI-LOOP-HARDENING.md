@@ -12,7 +12,9 @@ implementation_branch: feat/issue-272-e2e-verification-anti-loop-hardening
 primary_pull_request: 273
 protected_cutover_pull_request: 274
 protected_cutover_main_sha: b285c4d57d48cbc70bca54619849b7f7cfd423f6
-status: TERMINAL_CLOSEOUT_PENDING_PRIMARY_PR
+protected_stabilization_pull_request: 276
+protected_stabilized_main_sha: f8de8e42ca57112cf71100aa19322ef22527b168
+status: PRIMARY_PR_EXACT_HEAD_VERIFICATION_PENDING
 normative_design: docs/superpowers/specs/2026-08-30-atlas-e2e-verification-anti-loop-hardening-design.md
 implementation_plan: docs/superpowers/plans/2026-08-30-atlas-e2e-verification-anti-loop-hardening.md
 ```
@@ -32,6 +34,12 @@ Protected cutover PR #274 was merged normally through branch protection as:
 `main@b285c4d57d48cbc70bca54619849b7f7cfd423f6`
 
 No admin bypass, force-push or no-op commit was used.
+
+A final protected environment/control-plane correction was then consolidated into PR #276 and normally squash-merged through the same protection as:
+
+`main@f8de8e42ca57112cf71100aa19322ef22527b168`
+
+The correction fixed the one-shot environment artifact ownership handoff, completed strict `profile=none` zero-work lifecycle/fan-in semantics, and bound the retained transition widening to an independently built protected lower-bound plan. Its exact candidate head `5cc3c467c07119cad9bd3098b28aba4a312a02d0` passed 468/468 deterministic tests, provenance 144/144, CodeQL Actions/JavaScript/Python, 77/77 zero-retry transition scenarios, 17/17 reviewed canonical frames, `Protected Hosted Playwright evidence` and `atlas-gate`.
 
 The protected cutover contains the active anti-loop architecture:
 
@@ -109,7 +117,7 @@ The detailed inventory is preserved at:
 
 `docs/testing/ATLAS-E2E-ANTI-LOOP-PROMOTION-PHASE-EF-AUDIT-2026-08-30.md`
 
-Historical promotion workflows are not deleted merely because their original caller merged. `protected-execution-promotion-qualification.yml` still has a live parent-programme caller (#268), so it remains protected until that responsibility is retired. The exact-old-base `ci.yml` cutover tombstone is bound to pre-cutover SHA `00bc97034618fa0ce264685d1aa342c591a43914`; after #274 advanced main it is functionally unreachable without forbidden history rewriting and is not widened by #273.
+Historical promotion workflows are not deleted merely because their original caller merged. `protected-execution-promotion-qualification.yml` still has a live parent-programme caller (#268), so it remains protected until that responsibility is retired. The exact-base `ci.yml` compatibility tombstone was repinned once to pre-correction protected SHA `b285c4d57d48cbc70bca54619849b7f7cfd423f6` for #276. After #276 advanced `main` to `f8de8e42ca57112cf71100aa19322ef22527b168`, that fallback is again functionally unreachable without forbidden history rewriting and is not widened by #273.
 
 ## Phase E / Phase F adoption
 
@@ -123,18 +131,18 @@ Phase F contract:
 - any new/removed required stable ID or specialist obligation invalidates reuse;
 - `force-full` and `SELECTOR_ESCAPE` remain widening-only.
 
-PR #217 and PR #219 remain preparation lanes. This task supplies the semantic safety model; it does not claim Phase E calibration or enable Phase F selective savings. Parent programme #179 therefore remains open.
+PR #217 and PR #219 remain Draft preparation lanes. This task supplies the semantic safety model; it does not claim Phase E calibration or enable Phase F selective savings. GitHub live state shows parent programme #179 already closed/completed at 2026-08-31T05:56:40Z; this task did not close or reopen it.
 
 ## Primary PR #273 closeout boundary
 
-After integrating protected `main@b285c4d57d48cbc70bca54619849b7f7cfd423f6`, the primary branch has no delta in `verification-authority-manifest.json` authority paths. Its remaining net delta is documentation/audit only.
+After integrating protected `main@f8de8e42ca57112cf71100aa19322ef22527b168`, the primary branch has no delta in `verification-authority-manifest.json` authority paths. Its remaining net delta is documentation/audit only. GitHub live state also shows Issue #272 already closed/completed at 2026-08-31T08:35:01Z; terminal closeout must verify that state after #273 merge rather than assuming it from this checkpoint.
 
 Before #273 merge, GitHub must still prove on the exact published head:
 
 1. deterministic repository verification GREEN;
 2. protected controller plan GREEN;
-3. one-shot environment qualification GREEN;
-4. hosted executor / shard evidence / fan-in state GREEN or safely reused under the protected lifecycle;
+3. the protected lifecycle independently proves zero executable evidence obligations for the final documentation-only delta, so environment/browser work is skipped rather than rerun;
+4. hosted executor fan-in/state GREEN with `REUSE`, exact empty evidence set and heavy executions = 0;
 5. `Protected Hosted Playwright evidence` GREEN;
 6. `atlas-gate` and `provenance-gate` GREEN;
 7. applicable CodeQL/security GREEN;

@@ -1,6 +1,6 @@
 # Atlas E2E anti-loop promotion and Phase E/F audit — 2026-08-30
 
-GitHub live state is the source of truth. This record supports Issue #272 / PR #273 and parent programme #179; it does not close #179.
+GitHub live state is the source of truth. This record supports Issue #272 / PR #273 and parent programme #179. GitHub shows #179 already closed/completed; this task does not mutate that lifecycle state.
 
 ## Consolidated protected replacement
 
@@ -30,16 +30,16 @@ The replacement safety contracts are implemented by:
 | `protected-publication-readiness-promotion.yml` | Historical publication-readiness promotion | protected product/environment identity + fan-in evidence | none; #243 merged | No while parent legacy lanes remain open; re-audit after protected cutover |
 | `protected-qualification-product-promotion.yml` | Historical qualification-product builder promotion | immutable product identity + protected hosted product checks | none; #238 merged | No while parent legacy lanes remain open; re-audit after protected cutover |
 | `protected-bounded-real-identity-repin.yml` | Historical bounded-real deterministic repin | canonical Git-byte bounded-real product identity + deterministic product test | none; #240 merged | No while parent legacy lanes remain open; re-audit after protected cutover |
-| `legacy-molehill-transition-qualification.yml` | One final old-protection admission requiring exact-head 77-scenario evidence and independent visual review | protected v3 controller/executor after the cutover | #274 during this closeout | **No until #274 is protected and its exact-base fallback is unreachable** |
+| `legacy-molehill-transition-qualification.yml` | Bounded old-protection admission requiring exact-head 77-scenario evidence and independent visual review | protected v3 controller/executor after stabilization | none after #276 merged | **Do not delete from docs-only #273; re-audit on a future protected-authority change** |
 
 No workflow above is deleted merely because its historical caller merged. The deletion gate is stricter: the replacement must be protected, live-proven, and must not strand any still-open parent-programme PR. In particular #268 keeps `protected-execution-promotion-qualification.yml` live.
 
 
 ### Exact-base cutover tombstone
 
-PR #274 needs one old-protection compatibility branch in `ci.yml` only while its protected base is exactly `00bc97034618fa0ce264685d1aa342c591a43914`. The branch is bound to that full SHA. After #274 changes `main`, no subsequent main-targeting PR can satisfy that equality without forbidden history rewriting. The fallback is therefore functionally unreachable after the cutover.
+The compatibility branch in `ci.yml` is now bound only to pre-correction protected SHA `b285c4d57d48cbc70bca54619849b7f7cfd423f6`. PR #276 used that exact equality for one consolidated environment/control-plane correction and then advanced protected `main` to `f8de8e42ca57112cf71100aa19322ef22527b168`. No later main-targeting PR can satisfy the equality without forbidden history rewriting.
 
-#273 deliberately keeps `ci.yml` byte-identical to protected cutover `main` rather than creating a new candidate-controlled authority delta merely to delete unreachable code. This avoids a new micro-bootstrap in direct accordance with the stabilization plan. Physical tombstone deletion is deferred to a future independently protected authority change; it is not a live gating dependency and must never be widened to a branch name, moving SHA or ambient status.
+#273 keeps the now-inert tombstone byte-identical to protected `main` rather than creating a fresh authority delta merely to delete unreachable code. Physical deletion remains a future independently protected authority cleanup, not a live gating dependency.
 
 ## Phase E semantic-identity adoption
 
@@ -60,7 +60,7 @@ Selector identity binds exact planner, catalog and census digests plus required 
 
 The same deterministic contract proves a new hosted stable ID or `real_fullworld` specialist obligation invalidates prior Phase F evidence.
 
-PR #219 remains a Draft preparation lane and selective execution remains disabled. #273 supplies the semantic/reuse safety contract; it does not authorize Phase F savings or close #179.
+PR #219 remains a Draft preparation lane and selective execution remains disabled. #273 supplies the semantic/reuse safety contract; it does not authorize Phase F savings. GitHub live state shows #179 already closed/completed independently of this docs-only closeout.
 
 ## Verification authority for this audit
 
@@ -75,3 +75,10 @@ The Actions status-publication job validated the exact plan/evidence/review succ
 The protected controller was also hardened during final review after CodeQL identified a high-severity privileged candidate checkout pattern: candidate census now materializes inert bytes with `git archive` and executes them only inside the no-network/read-only/cap-dropped sandbox. Final CodeQL for Actions, JavaScript/TypeScript and Python is GREEN.
 
 The post-cutover deletion inventory remains conservative. In particular #268 still owns a live legacy promotion responsibility, so its required protected promotion workflow is retained. Parent programme #179 remains open.
+## Protected stabilization correction #276
+
+PR #276 was squash-merged normally as `main@f8de8e42ca57112cf71100aa19322ef22527b168`. Its final candidate head `5cc3c467c07119cad9bd3098b28aba4a312a02d0` passed 468/468 deterministic tests, provenance 144/144, CodeQL for Actions/JavaScript/Python, and a single exact 77-ID retained transition run with workers=1/retries=0. All 17 required canonical frames were opened and review-bound; final CI consumed the exact status and produced `Protected Hosted Playwright evidence=SUCCESS` and `atlas-gate=SUCCESS`.
+
+The environment repair preserves sandbox UID/GID `1000:1000`: only the host artifact bind is temporarily handed to that identity for the one-shot probe, with an EXIT trap restoring runner ownership. The transition planner now carries an explicit `requiredGroupFloor` that is widening-only and is independently checked against a trusted-base lower-bound plan before any heavy execution.
+
+At the final #273 integration audit, #217 and #219 remain Draft/open and #268 remains open. GitHub reports #179 closed/completed at 2026-08-31T05:56:40Z and #272 closed/completed at 2026-08-31T08:35:01Z. These issue states are recorded, not changed, by this audit.
