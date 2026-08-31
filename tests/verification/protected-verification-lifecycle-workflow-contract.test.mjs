@@ -74,4 +74,9 @@ test('protected authority cannot be promoted by candidate-controlled executor co
 test('authority closure includes the active lifecycle and base-advance dispatcher', () => {
   assert.equal(authorityPaths.has('tools/verification/protected-verification-lifecycle.mjs'), true);
   assert.equal(authorityPaths.has('.github/workflows/protected-base-advance-dispatcher.yml'), true);
+});test('zero-work fan-in permits no environment qualification while preserving exact state publication', () => {
+  assert.match(executor, /lifecycle\.expectedEvidence\.length === 0/);
+  assert.match(executor, /environmentQualification:\s*zeroWork\s*\?\s*null/);
+  assert.match(executor, /qualificationFiles\.length !== \(zeroWork \? 0 : 1\)/);
+  assert.match(executor, /protected-hosted-fan-in-\$\{\{ needs\.preflight\.outputs\.protected_base_sha \}\}-\$\{\{ needs\.preflight\.outputs\.candidate_head_sha \}\}/);
 });

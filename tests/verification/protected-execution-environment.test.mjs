@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
@@ -152,4 +153,20 @@ test('repository environment config is the canonical pinned protected environmen
   assert.equal(identity.config.container.image, 'mcr.microsoft.com/playwright:v1.62.0-noble@sha256:baed2032d533817f3dbe6425de795788430ba345e819a1201337009ba17c9d07');
   assert.equal(identity.config.runtime.python.shimRoot, '/tmp/atlas-python-bin');
   assert.match(identity.environmentDigest, /^sha256:[a-f0-9]{64}$/);
+});
+
+
+test('environment artifact bind ownership is handed to sandbox uid and restored', () => {
+  const workflow = fs.readFileSync(new URL('../../.github/workflows/protected-hosted-executor.yml', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
+  const start = workflow.indexOf('      - name: Qualify exact protected environment once');
+  const end = workflow.indexOf('      - name: Bind environment qualification into dependency evidence', start);
+  assert.notEqual(start, -1);
+  assert.notEqual(end, -1);
+  const probe = workflow.slice(start, end);
+  assert.match(probe, /host_uid="\$\(id -u\)"/);
+  assert.match(probe, /host_gid="\$\(id -g\)"/);
+  assert.match(probe, /sudo chown 1000:1000 artifacts\/environment/);
+  assert.match(probe, /trap restore_artifact_ownership EXIT/);
+  assert.match(probe, /restore_artifact_ownership\n\s+trap - EXIT/);
+  assert.ok(probe.indexOf('sudo chown 1000:1000 artifacts/environment') < probe.indexOf('docker run --rm'));
 });

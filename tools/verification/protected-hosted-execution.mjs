@@ -235,8 +235,12 @@ export function buildProtectedHostedExecutionContract(plan, { currentHeadSha } =
   const executionPolicyDigest = exactDigest(plan.executionPolicyDigest, 'execution policy digest');
   if (plan.retryPolicy?.retries !== 0) throw new TypeError('protected hosted execution retries must be zero');
   if (plan.selectiveExecution !== false) throw new TypeError('protected hosted execution selective execution must remain disabled');
-  if (!Array.isArray(plan.requiredGroupIds) || plan.requiredGroupIds.length === 0 || new Set(plan.requiredGroupIds).size !== plan.requiredGroupIds.length) {
+  if (!Array.isArray(plan.requiredGroupIds) || new Set(plan.requiredGroupIds).size !== plan.requiredGroupIds.length) {
     throw new TypeError('protected hosted execution required group IDs are invalid');
+  }
+  const zeroWork = plan.requiredGroupIds.length === 0;
+  if (zeroWork && plan.profile !== 'none') {
+    throw new TypeError('protected hosted execution zero-work plan must be profile none');
   }
   if (!Array.isArray(plan.groups) || plan.groups.length !== plan.requiredGroupIds.length) {
     throw new TypeError('protected hosted execution selected groups must exactly match required group IDs');
@@ -258,7 +262,14 @@ export function buildProtectedHostedExecutionContract(plan, { currentHeadSha } =
     throw new TypeError('protected hosted execution real_fullworld placement conflicts with plan');
   }
 
-  const stableTestIds = exactStableIds(plan.stableTestIds, 'planned stable IDs');
+  const stableTestIds = exactStableIds(plan.stableTestIds, 'planned stable IDs', { allowEmpty: zeroWork });
+  if (zeroWork && (stableTestIds.length !== 0
+    || (plan.candidateStableIdAdditions ?? []).length !== 0
+    || (plan.candidateStableIdModifications ?? []).length !== 0
+    || (plan.requiredDataCapabilities ?? []).length !== 0
+    || Boolean(plan.requiresRealFullWorld))) {
+    throw new TypeError('protected hosted execution zero-work plan contains executable obligations');
+  }
   const stableTestIdSet = new Set(stableTestIds);
   const candidateStableIdAdditions = exactStableIds(plan.candidateStableIdAdditions ?? [], 'candidate stable-ID additions', { allowEmpty: true });
   const candidateStableIdModifications = exactStableIds(plan.candidateStableIdModifications ?? [], 'candidate stable-ID modifications', { allowEmpty: true });

@@ -81,3 +81,18 @@ test('workflow failure state preserves history and activates deterministic circu
     baseAdvance: { changedPaths: [], mergeStatus: 'clean' }, now: '2026-08-30T00:00:00.000Z' });
   assert.equal(blocked.disposition, 'BLOCKED'); assert.equal(blocked.heavyExecutionsRequired, 0);
 });
+
+test('zero-work workflow publishes merge-ready state without environment qualification', () => {
+  const currentPlan = plan({ stableTestIds: [], profile: 'none' });
+  const currentExecution = { schemaVersion: 2, candidateHeadSha: sha('c'), hosted: { stableTestIds: [], partitions: [] }, specialist: { stableTestIds: [] }, review: { groupIds: [] } };
+  const lifecycle = decideProtectedWorkflowLifecycle({ currentPlan, currentExecution, previousState: null,
+    baseAdvance: { changedPaths: [], mergeStatus: 'clean' }, now: '2026-08-30T00:00:00.000Z' });
+  const success = buildProtectedWorkflowSuccessState({ currentPlan, currentExecution, lifecycle,
+    evidenceManifests: [], environmentQualification: null, previousState: null,
+    currentHeadSha: sha('c'), producer: producer(300) });
+  assert.equal(success.result.status, 'success');
+  assert.deepEqual(success.result.executedStableTestIds, []);
+  assert.equal(success.state.progress.status, 'MERGE_READY');
+  assert.deepEqual(success.state.evidenceManifests, []);
+  assert.equal(success.state.environmentQualification, null);
+});

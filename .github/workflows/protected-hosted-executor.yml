@@ -436,6 +436,13 @@ jobs:
         run: |
           set -euo pipefail
           candidate_dir="$(cat artifacts/environment/candidate-dir.txt)"
+          host_uid="$(id -u)"
+          host_gid="$(id -g)"
+          restore_artifact_ownership() {
+            sudo chown -R "$host_uid:$host_gid" artifacts/environment
+          }
+          trap restore_artifact_ownership EXIT
+          sudo chown 1000:1000 artifacts/environment
           timeout --signal=KILL 180s docker run --rm \
             --network none \
             --read-only \
@@ -463,6 +470,8 @@ jobs:
               node tools/verification/protected-execution-environment-probe.mjs \
                 --config tools/verification/protected-execution-environment.json \
                 --output /tmp/artifacts/protected-environment-qualification.json'
+          restore_artifact_ownership
+          trap - EXIT
           test -s artifacts/environment/protected-environment-qualification.json
 
       - name: Bind environment qualification into dependency evidence
@@ -1014,7 +1023,8 @@ jobs:
             ...walk('artifacts/environment', (name) => name === 'protected-environment-qualification.json'),
             ...walk('artifacts/reused', (name) => name === 'protected-environment-qualification.json'),
           ];
-          if (qualificationFiles.length !== 1) throw new Error(`Expected exactly one environment qualification, got ${qualificationFiles.length}.`);
+          const zeroWork = lifecycle.expectedEvidence.length === 0;
+          if (qualificationFiles.length !== (zeroWork ? 0 : 1)) throw new Error(`Expected ${zeroWork ? 'no' : 'exactly one'} environment qualification, got ${qualificationFiles.length}.`);
           const producer = {
             repository: process.env.GITHUB_REPOSITORY,
             runId: Number(process.env.GITHUB_RUN_ID),
@@ -1027,7 +1037,7 @@ jobs:
             currentExecution: execution,
             lifecycle,
             evidenceManifests: manifests,
-            environmentQualification: read(qualificationFiles[0]),
+            environmentQualification: zeroWork ? null : read(qualificationFiles[0]),
             previousState,
             currentHeadSha: process.env.CANDIDATE_HEAD_SHA,
             producer,
