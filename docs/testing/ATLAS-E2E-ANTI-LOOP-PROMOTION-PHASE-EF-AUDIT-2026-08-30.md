@@ -34,6 +34,13 @@ The replacement safety contracts are implemented by:
 
 No workflow above is deleted merely because its historical caller merged. The deletion gate is stricter: the replacement must be protected, live-proven, and must not strand any still-open parent-programme PR. In particular #268 keeps `protected-execution-promotion-qualification.yml` live.
 
+
+### Exact-base cutover tombstone
+
+PR #274 needs one old-protection compatibility branch in `ci.yml` only while its protected base is exactly `00bc97034618fa0ce264685d1aa342c591a43914`. The branch is bound to that full SHA. After #274 changes `main`, no subsequent main-targeting PR can satisfy that equality without forbidden history rewriting. The fallback is therefore functionally unreachable after the cutover.
+
+#273 deliberately keeps `ci.yml` byte-identical to protected cutover `main` rather than creating a new candidate-controlled authority delta merely to delete unreachable code. This avoids a new micro-bootstrap in direct accordance with the stabilization plan. Physical tombstone deletion is deferred to a future independently protected authority change; it is not a live gating dependency and must never be widened to a branch name, moving SHA or ambient status.
+
 ## Phase E semantic-identity adoption
 
 `buildSemanticExperimentIdentity()` binds candidate head, authority, environment, product identities, execution policy, workload, harness and selector identity. It deliberately does **not** bind unrelated protected-base SHA movement.
