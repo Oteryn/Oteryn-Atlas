@@ -14,7 +14,8 @@ test('protected controller obtains candidate census only inside a no-network no-
   assert.match(controller, /pull_request_target:/);
   assert.match(controller, /refs\/pull\/\$ATLAS_PR_NUMBER\/head/);
   assert.match(controller, /rev-parse FETCH_HEAD/);
-  assert.match(controller, /git\s+(?:-C\s+\S+\s+)?worktree\s+add\s+--detach/);
+  assert.match(controller, /git archive "\$ATLAS_CANDIDATE_HEAD_SHA" \| tar -x -C "\$candidate_dir"/);
+  assert.doesNotMatch(controller, /git\s+(?:-C\s+\S+\s+)?worktree\s+add\s+--detach/);
   assert.match(controller, /--network\s+none/);
   assert.match(controller, /--read-only/);
   assert.match(controller, /--cap-drop(?:=|\s+)ALL/);
