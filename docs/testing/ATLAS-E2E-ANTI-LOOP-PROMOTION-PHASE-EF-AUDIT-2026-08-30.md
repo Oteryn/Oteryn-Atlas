@@ -65,3 +65,13 @@ PR #219 remains a Draft preparation lane and selective execution remains disable
 ## Verification authority for this audit
 
 The inventory was reconstructed from live GitHub PR state and exact workflow branch predicates on 2026-08-30. Terminal deletion decisions must be re-read after #274 and #273 merge; this record must not be treated as permission to delete a path whose live caller state later changes.
+
+## Protected cutover completion
+
+PR #274 was protected and squash-merged normally as `main@b285c4d57d48cbc70bca54619849b7f7cfd423f6`. Final candidate head `4eb9b886b57dbe0e5b1e51014ba12bc1afd83c69` had deterministic 459/459 PASS, provenance PASS, CodeQL PASS, 77/77 zero-retry transition scenarios, 17/17 reviewed canonical frames and final `atlas-gate` PASS. No admin bypass or force-push was used.
+
+The Actions status-publication job validated the exact plan/evidence/review successfully and then hit a Windows workflow-token `gh api --input -` HTTP 400 at the final POST. The unchanged protected repository publisher was run on the repository-approved Molehill runner from the exact clean remote head; it repeated remote-head, merge-base, 77-ID, summary, review and screenshot-digest validation and published `atlas-local-e2e=success`. The existing exact-head CI rerun then consumed that status and produced `Protected Hosted Playwright evidence=SUCCESS` and `atlas-gate=SUCCESS`.
+
+The protected controller was also hardened during final review after CodeQL identified a high-severity privileged candidate checkout pattern: candidate census now materializes inert bytes with `git archive` and executes them only inside the no-network/read-only/cap-dropped sandbox. Final CodeQL for Actions, JavaScript/TypeScript and Python is GREEN.
+
+The post-cutover deletion inventory remains conservative. In particular #268 still owns a live legacy promotion responsibility, so its required protected promotion workflow is retained. Parent programme #179 remains open.

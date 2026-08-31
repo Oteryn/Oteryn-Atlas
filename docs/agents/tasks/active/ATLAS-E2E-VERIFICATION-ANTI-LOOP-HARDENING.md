@@ -9,141 +9,137 @@ parent_programme_issue: 179
 repository: Oteryn/Oteryn-Atlas
 base_branch: main
 implementation_branch: feat/issue-272-e2e-verification-anti-loop-hardening
-pull_request: 273
-admission_base_sha: 00bc97034618fa0ce264685d1aa342c591a43914
-checkpoint_head_sha: 07982112a0b6442fa9ab19a2ea20e91049d11958
-checkpoint_date: 2026-08-30
-status: INCOMPLETE_LIVE_AUDIT_CHECKPOINT
+primary_pull_request: 273
+protected_cutover_pull_request: 274
+protected_cutover_main_sha: b285c4d57d48cbc70bca54619849b7f7cfd423f6
+status: TERMINAL_CLOSEOUT_PENDING_PRIMARY_PR
 normative_design: docs/superpowers/specs/2026-08-30-atlas-e2e-verification-anti-loop-hardening-design.md
 implementation_plan: docs/superpowers/plans/2026-08-30-atlas-e2e-verification-anti-loop-hardening.md
-owned_paths:
-  - docs/agents/tasks/active/ATLAS-E2E-VERIFICATION-ANTI-LOOP-HARDENING.md
 ```
 
-> GitHub live state is the source of truth. Historical chat/handoff reports claiming terminal success are non-authoritative and must not be used to skip verification. This checkpoint was written after a fresh live-state audit.
+> GitHub live state is the source of truth. This checkpoint replaces the earlier incomplete audit. Never use this document to override a newer GitHub head, check, review, issue or branch-protection state.
 
 ## Objective
 
-Eliminate the serial verification loop in which a non-candidate authority/environment defect causes candidate churn, a bootstrap/main advance, reintegration and another full exact-head E2E cycle. Preserve exact-head fencing, protected lower-bound planning, retries=0, exact stable-ID equality, immutable product identity, profile/data-capability separation, `atlas-gate`, `provenance-gate`, GitHub-hosted ordinary E2E, specialist-only Molehill and deployment-only Synology.
+Eliminate the serial verification loop in which authority/environment defects caused candidate churn, one-off bootstrap PRs, repeated main reintegration and repeated full E2E. Preserve exact-head fencing, protected lower-bound planning, retries=0, exact stable-ID equality, immutable product identity, verification-profile/data-capability separation, GitHub-hosted ordinary E2E, specialist-only Molehill, deployment-only Synology, `atlas-gate` and `provenance-gate`.
 
-## Live checkpoint
+## Protected implementation state
 
 ### FACT
 
-- `main` is still `00bc97034618fa0ce264685d1aa342c591a43914` and is protected.
-- Required branch checks on `main` are `provenance-gate` and `atlas-gate` from GitHub Actions.
-- PR #273 is `open`, `draft=true`, `merged=false`, mergeable, with head `07982112a0b6442fa9ab19a2ea20e91049d11958`.
-- Issue #272 is `open`.
-- The PR is therefore not deployed to protected `main` and the lifecycle is not terminal.
-- On exact head `07982112a0b6442fa9ab19a2ea20e91049d11958`, CodeQL is GREEN, while `atlas-gate`, `provenance-gate`, `Deterministic verification contracts`, `repository-contract` and `protected-plan` are RED.
-- `environment-qualification`, `hosted-shards`, `fan-in` and `Protected Hosted Playwright evidence` are skipped on that head, so the required exact protected controller -> executor -> fan-in proof has not completed.
+Protected cutover PR #274 was merged normally through branch protection as:
 
-## What is genuinely implemented on PR #273
+`main@b285c4d57d48cbc70bca54619849b7f7cfd423f6`
 
-The branch contains substantive anti-loop foundations, including:
+No admin bypass, force-push or no-op commit was used.
 
-- canonical protected authority identity and authority manifest;
-- canonical protected execution environment identity/config;
-- split `planSemanticDigest` and `planInstanceDigest` with protected plan/controller v3 work;
-- `base-advance-compatibility.mjs` and deterministic classification tests;
-- `verification-failure-classification.mjs` and failure-owner tests;
-- `verification-progress-state.mjs` and circuit-breaker/state tests;
-- versioned `evidence-manifest.mjs` and `evidence-reuse.mjs` with focused tests;
-- `semantic-experiment-identity.mjs` with selector-obligation protections;
-- protected executor work for one-shot `environment-qualification` before hosted browser execution;
-- semantic/instance/authority/environment identity propagation into protected execution/evidence paths;
-- expanded authority closure and protected environment probe work.
+The protected cutover contains the active anti-loop architecture:
 
-These are real implementation pieces, but file/module existence is not completion authority.
+- canonical content-derived verification authority identity;
+- canonical protected execution-environment identity and bounded qualification;
+- distinct `planSemanticDigest` and forensic `planInstanceDigest`;
+- executable `REUSE`, `PARTIAL_RERUN`, `FULL_RERUN`, `REINTEGRATE` dispositions;
+- machine-readable failure ownership;
+- persisted progress and circuit-breaker state;
+- versioned evidence manifests with semantic and instance digests;
+- dependency-bound evidence reuse with byte-availability checks;
+- one validator path for `EXECUTED` and `REUSED` evidence;
+- protected lifecycle/state fan-in and hosted gate;
+- active base-advance dispatcher;
+- protected controller -> executor trust boundary with no candidate self-promotion;
+- candidate census materialized as inert `git archive` bytes and executed only in a no-network/read-only/cap-drop sandbox;
+- Phase E semantic experiment identity;
+- Phase F selector/specialist-obligation reuse safety.
 
-## Missing or not yet proven in the active control plane
+## Exact cutover verification evidence
 
-### P0 — must finish before merge
+Final cutover head before squash merge:
 
-1. **Restore exact-head deterministic/control-plane GREEN**
-   - fix the current `protected-plan`, deterministic-contract and repository-contract failures;
-   - restore `provenance-gate` and `atlas-gate` GREEN on the same exact head;
-   - do not use a no-op/retrigger commit.
+`4eb9b886b57dbe0e5b1e51014ba12bc1afd83c69`
 
-2. **Wire Base Advance Compatibility into the real lifecycle**
-   - invoke protected `classifyBaseAdvance()` at the base-advance boundary;
-   - make `REUSE`, `PARTIAL_RERUN`, `FULL_RERUN`, `REINTEGRATE` executable dispositions rather than unit-only behavior;
-   - prove unrelated `main` movement causes zero heavy reruns and no candidate mutation.
+Fresh evidence on that exact head:
 
-3. **Wire failure ownership and circuit breakers into authoritative execution/coordinator evidence**
-   - failed authoritative nodes must emit a primary failure class;
-   - `AUTHORITY_FAILURE` and `ENVIRONMENT_FAILURE` must not recommend/mutate candidate code;
-   - unchanged semantic inputs + identical deterministic failure must reach `STALLED`/no-retrigger behavior;
-   - serial control-plane defects must reach `ARCHITECTURE_STABILIZATION_REQUIRED` per the plan.
+- local deterministic verification: `459/459 PASS`;
+- extraction provenance: `144/144 PASS`;
+- `git diff --check`: PASS;
+- GitHub deterministic verification job: SUCCESS;
+- Extraction Provenance workflow: SUCCESS;
+- CodeQL: SUCCESS for Actions, JavaScript/TypeScript and Python;
+- Docker E2E Harness: SUCCESS;
+- protected legacy transition plan: exactly 77 stable IDs;
+- retained transition capabilities: `qualification_fixture`, `bounded_real_world`, `real_fullworld`;
+- `requiresRealFullWorld=true` only because the retained transition includes the explicit specialist animation census;
+- heavy transition capture: 77/77 scenarios PASS, workers=1, retries=0;
+- exact verification-plan SHA: `sha256:8d56ed3f45a0e1d2d8b5da21e3128641605d3ff25ba6b72ae3063338d7c49f4f`;
+- 17/17 canonical visual frames independently opened and reviewed;
+- reviewed summary SHA: `sha256:ccf1b705320e61bbf3a3bd8363cbec5e80bb3aa4ee33bcc6f4267a173cf16a11`;
+- repository-native protected publisher revalidated the exact head, plan, merge-base, 77-ID census, review and screenshot digests and published `atlas-local-e2e=success`;
+- CI rerun consumed that exact evidence: `Protected Hosted Playwright evidence` SUCCESS and `atlas-gate` SUCCESS;
+- review threads: none;
+- required branch checks at merge: `provenance-gate` and `atlas-gate`, both satisfied.
 
-4. **Wire safe evidence reuse through executor/fan-in**
-   - `resolveReusableEvidence()` must participate in the authoritative reuse decision;
-   - `EXECUTED` and `REUSED` evidence must pass the same digest/schema validation;
-   - fan-in must independently reject stale/mismatched/revoked/unavailable evidence;
-   - exact stable-ID union/no-duplicate guarantees must remain intact.
+The GitHub Actions publication job itself recorded a transport-level `gh api --input -` HTTP 400 after all evidence validation had succeeded. The same protected repository publisher was then executed on the repository-approved Molehill runner from the exact clean remote head; it repeated all validation and published the status successfully. This was not a branch-protection or admin bypass.
 
-5. **Prove one-shot environment qualification end-to-end**
-   - the job exists, but the current exact head skips it because earlier protected-plan/control-plane gates fail;
-   - obtain successful exact-head environment qualification followed by hosted execution and fan-in.
+## Trust-boundary correction discovered during closeout
 
-### P1 — required by the normative Definition of Done
+CodeQL detected a high-severity candidate-checkout pattern in the `pull_request_target` controller. The controller was hardened before cutover:
 
-6. **Consolidate obsolete promotion/bootstrap machinery**
-   - inventory every `protected-*-promotion*.yml` workflow;
-   - record continuing responsibility, replacement owner/evidence and callers;
-   - delete only paths proven superseded;
-   - retain any promotion path that still owns a unique safety property.
+- privileged `git worktree add` candidate checkout was removed;
+- candidate bytes are materialized with `git archive "$ATLAS_CANDIDATE_HEAD_SHA" | tar -x ...`;
+- candidate Playwright census still executes only in the protected no-network, read-only, cap-dropped sandbox;
+- deterministic regression contracts explicitly forbid privileged candidate worktree checkout;
+- final CodeQL on the corrected exact head is GREEN.
 
-7. **Phase E semantic identity adoption**
-   - PR #217 remains a draft preparation lane, not final Phase E;
-   - rebuild/adopt the semantic experiment identity on the final protected Phase D/anti-loop state;
-   - unrelated main movement must not invalidate otherwise identical benchmark repetitions.
+## Base-advance / evidence behavior now executable
 
-8. **Phase F semantic evidence/selective-safety adoption**
-   - PR #219 remains a draft preparation lane and selective execution is intentionally not cut over;
-   - bind shadow/full-safety evidence to exact current planner/catalog/census/semantic identities;
-   - prove changed selector/specialist obligations invalidate reuse;
-   - keep `force-full` / `SELECTOR_ESCAPE` widening-only.
+Deterministic integration contracts prove:
 
-9. **Terminal exact-head and post-merge verification**
-   - `node --test tests/verification/*.test.mjs` GREEN on the exact final head;
-   - diff/format/repository contracts GREEN;
-   - exact protected controller -> environment qualification -> executor -> shard evidence -> fan-in path GREEN;
-   - `atlas-gate`, `provenance-gate`, applicable CodeQL/security GREEN;
-   - no unresolved review threads;
-   - final trust-boundary/diff audit and branch-protection readback;
-   - merge only if the expected head is still current;
-   - post-merge `main` readback and required checks before closing #272.
+- unrelated protected-base movement can `REUSE` valid evidence with zero heavy rerun;
+- product-only movement reruns only evidence that consumes the changed product;
+- authority/environment changes invalidate dependent evidence fail-closed;
+- merge conflict / candidate integration incompatibility produces `REINTEGRATE`;
+- revoked, expired, unavailable, dependency-missing or digest-mismatched evidence cannot be reused;
+- repeated identical deterministic failures with unchanged semantic inputs enter `STALLED` rather than retriggering;
+- repeated serial control-plane defects reach `ARCHITECTURE_STABILIZATION_REQUIRED`;
+- authority/environment failures cannot recommend candidate mutation.
 
-## Remaining effort assessment
+## Promotion/bootstrap inventory
 
-### FACTUAL scope assessment
+The detailed inventory is preserved at:
 
-The implementation plan has eight major tasks. Tasks 1 and 3 are substantially implemented; Task 2 is materially implemented but not yet proven end-to-end. Tasks 4, 5 and 6 have core modules/tests but still require authoritative workflow/control-plane integration. Task 7 remains an audit/consolidation exercise. Task 8 remains materially open because Phase E/F are still draft preparation lanes and terminal exact-head/merge proof has not occurred.
+`docs/testing/ATLAS-E2E-ANTI-LOOP-PROMOTION-PHASE-EF-AUDIT-2026-08-30.md`
 
-### ESTIMATE
+Historical promotion workflows are not deleted merely because their original caller merged. `protected-execution-promotion-qualification.yml` still has a live parent-programme caller (#268), so it remains protected until that responsibility is retired. The exact-old-base `ci.yml` cutover tombstone is bound to pre-cutover SHA `00bc97034618fa0ce264685d1aa342c591a43914`; after #274 advanced main it is functionally unreachable without forbidden history rewriting and is not widened by #273.
 
-- **Remaining implementation/verification effort: approximately 45–55% of the terminal task.**
-- The code foundations are more than half present, but the remaining half carries disproportionate integration risk because it touches controller/executor/fan-in authority, reuse decisions, bootstrap retirement, Phase E/F adoption and exact-head protected gates.
-- Treat the task as **HIGH remaining effort**, not as a small CI cleanup.
-- Remaining work is best viewed as **five major closeout lanes**:
-  1. exact-head CI/control-plane repair;
-  2. compatibility + failure/circuit-breaker runtime wiring;
-  3. evidence reuse + fan-in enforcement;
-  4. promotion cleanup + Phase E/F adoption;
-  5. exact-head protected proof, review, merge and post-merge readback.
+## Phase E / Phase F adoption
 
-## Required next execution order
+Phase E contract:
 
-1. Re-read live PR/head/main/check state.
-2. Fix only the current deterministic/protected-plan/repository/provenance root causes until the same exact head can enter environment qualification.
-3. Add RED integration contracts proving base-advance, failure-owner and evidence-reuse modules are actually invoked by the protected control plane.
-4. Implement those integrations with a single writer for controller/executor/fan-in paths.
-5. Run exact-head protected environment -> hosted execution -> fan-in and negative stale/reuse proofs.
-6. Inventory/remove only superseded promotion machinery.
-7. Rebuild/adopt Phase E then Phase F identities against the final protected state.
-8. Perform complete Definition-of-Done audit, mark PR ready only when justified, merge through protection, then verify merged `main` and close #272.
+- benchmark repetition identity depends on candidate/harness/authority/environment/product/policy/workload/selector semantic inputs, not unrelated whole-main SHA movement.
 
-## Completion rule
+Phase F contract:
 
-Do not report this alias as complete merely because the core modules or unit tests exist. It is DONE only when all ten Definition-of-Done conditions in the normative prompt are executable/proven and the implementation is merged into protected `main` with exact-head gates GREEN.
+- planner/catalog/census identity and exact stable-ID/specialist obligations are reuse inputs;
+- any new/removed required stable ID or specialist obligation invalidates reuse;
+- `force-full` and `SELECTOR_ESCAPE` remain widening-only.
+
+PR #217 and PR #219 remain preparation lanes. This task supplies the semantic safety model; it does not claim Phase E calibration or enable Phase F selective savings. Parent programme #179 therefore remains open.
+
+## Primary PR #273 closeout boundary
+
+After integrating protected `main@b285c4d57d48cbc70bca54619849b7f7cfd423f6`, the primary branch has no delta in `verification-authority-manifest.json` authority paths. Its remaining net delta is documentation/audit only.
+
+Before #273 merge, GitHub must still prove on the exact published head:
+
+1. deterministic repository verification GREEN;
+2. protected controller plan GREEN;
+3. one-shot environment qualification GREEN;
+4. hosted executor / shard evidence / fan-in state GREEN or safely reused under the protected lifecycle;
+5. `Protected Hosted Playwright evidence` GREEN;
+6. `atlas-gate` and `provenance-gate` GREEN;
+7. applicable CodeQL/security GREEN;
+8. no unresolved review threads;
+9. exact-head expected-head normal merge;
+10. post-merge `main` readback and required-check verification.
+
+Issue #272 may close only after those terminal steps. Issue #179 must not be closed by this task.
