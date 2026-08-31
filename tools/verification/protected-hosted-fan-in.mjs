@@ -185,6 +185,28 @@ export function validateProtectedHostedEvidenceFanIn(plan, execution, lifecycle,
   const environmentDigest = exactDigest(plan.environmentDigest, 'evidence fan-in environment digest');
   const executionPolicyDigest = exactDigest(plan.executionPolicyDigest, 'evidence fan-in execution policy digest');
   const environment = actualById.get('ENVIRONMENT_QUALIFICATION');
+  const zeroWork = expectedIds.length === 0;
+  if (zeroWork) {
+    const hostedStableTestIds = stableIds(execution.hosted?.stableTestIds ?? [], 'zero-work hosted stable IDs', true);
+    const specialistStableTestIds = stableIds(execution.specialist?.stableTestIds ?? [], 'zero-work specialist stable IDs', true);
+    const reviewGroupIds = Array.isArray(execution.review?.groupIds) ? execution.review.groupIds : [];
+    if (plan.profile !== 'none' || hostedStableTestIds.length !== 0 || specialistStableTestIds.length !== 0
+      || reviewGroupIds.length !== 0 || actualIds.length !== 0 || environment) {
+      throw new TypeError('evidence fan-in zero-work contract contains executable obligations');
+    }
+    return Object.freeze({
+      schemaVersion: 1,
+      status: 'success',
+      candidateHeadSha,
+      planSemanticDigest,
+      planInstanceDigest,
+      authorityDigest,
+      environmentDigest,
+      executedStableTestIds: Object.freeze([]),
+      executedEvidenceIds: Object.freeze([]),
+      reusedEvidenceIds: Object.freeze([]),
+    });
+  }
   if (!environment) throw new TypeError('evidence fan-in environment evidence is missing');
 
   for (const evidenceId of expectedIds) {

@@ -265,3 +265,21 @@ test('actual workflow failures feed ownership and executable circuit breakers', 
   assert.equal(blocked.heavyExecutionsRequired, 0);
   assert.equal(blocked.circuitBreaker, 'UNCHANGED_DETERMINISTIC_FAILURE');
 });
+
+test('profile-none execution becomes merge-ready with zero evidence and zero heavy work', () => {
+  const currentPlan = plan();
+  currentPlan.profile = 'none';
+  currentPlan.stableTestIds = [];
+  const currentExecution = { schemaVersion: 2, hosted: { stableTestIds: [], partitions: [] }, specialist: { stableTestIds: [] }, review: { groupIds: [] } };
+  const decision = planProtectedVerificationLifecycle({
+    currentPlan, currentExecution, previousState: null,
+    baseAdvance: { changedPaths: [], mergeStatus: 'clean' }, now: NOW,
+  });
+  assert.equal(decision.disposition, 'REUSE');
+  assert.equal(decision.executeEnvironment, false);
+  assert.deepEqual(decision.executeHostedEvidenceIds, []);
+  assert.deepEqual(decision.reuseEvidenceIds, []);
+  assert.deepEqual(decision.expectedEvidence, []);
+  assert.equal(decision.heavyExecutionsRequired, 0);
+  assert.equal(decision.progress.status, 'MERGE_READY');
+});

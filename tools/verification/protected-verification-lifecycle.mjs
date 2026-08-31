@@ -194,6 +194,32 @@ export function planProtectedVerificationLifecycle(input) {
     });
   }
 
+  if (expectedEvidence.length === 0) {
+    const compatibility = syntheticCompatibility(
+      isPlainObject(previousState?.plan) ? previousState.plan : null,
+      currentPlan,
+      'REUSE',
+      'protected plan has no executable evidence obligations',
+      [],
+    );
+    return deepFreeze({
+      schemaVersion: 1,
+      disposition: 'REUSE',
+      candidateHeadSha: currentPlan.candidateHeadSha,
+      executeEnvironment: false,
+      executeHostedEvidenceIds: [],
+      reuseEvidenceIds: [],
+      heavyExecutionsRequired: 0,
+      candidateMutationRequired: false,
+      compatibilityDigest: compatibility.compatibilityDigest,
+      affectedEvidenceIds: [],
+      reasons: compatibility.reasons,
+      progress: decisionProgress(previousProgress, 'REUSE', [], 0),
+      expectedEvidence: [],
+      reuseSources: [],
+    });
+  }
+
   let compatibility;
   const previousPlan = isPlainObject(previousState?.plan) ? previousState.plan : null;
   const previousExecution = isPlainObject(previousState?.execution) ? previousState.execution : null;

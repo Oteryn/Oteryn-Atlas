@@ -367,3 +367,35 @@ test('functional qualification registry pins the deterministic Python compatibil
   });
   assert.equal(Object.isFrozen(spec.deterministicRuntimeShim), true);
 });
+
+test('strict profile-none plan produces an exact zero-work execution contract', () => {
+  const zero = plan({
+    profile: 'none',
+    requiredGroupIds: [],
+    groups: [],
+    stableTestIds: [],
+    candidateStableIdAdditions: [],
+    candidateStableIdModifications: [],
+    requiredDataCapabilities: [],
+    requiresRealFullWorld: false,
+  });
+  const result = buildProtectedHostedExecutionContract(zero, { currentHeadSha: head });
+  assert.deepEqual(result.hosted.groupIds, []);
+  assert.deepEqual(result.hosted.stableTestIds, []);
+  assert.deepEqual(result.hosted.partitions, []);
+  assert.deepEqual(result.specialist.groupIds, []);
+  assert.deepEqual(result.specialist.stableTestIds, []);
+  assert.deepEqual(result.review.groupIds, []);
+  assert.equal(result.hostedExpectedStableTestIdsDigest, digest([]));
+  assert.equal(result.specialistExpectedStableTestIdsDigest, digest([]));
+});
+
+test('empty required groups fail closed unless the protected plan is exactly profile none', () => {
+  for (const overrides of [
+    { requiredGroupIds: [], groups: [], stableTestIds: [] },
+    { profile: 'none', requiredGroupIds: [], groups: [], stableTestIds: [hostedId] },
+    { profile: 'none', requiredGroupIds: [], groups: [hostedGroup()], stableTestIds: [] },
+  ]) {
+    assert.throws(() => buildProtectedHostedExecutionContract(plan(overrides), { currentHeadSha: head }), /zero.work|profile.none|required group|selected group|stable/i);
+  }
+});

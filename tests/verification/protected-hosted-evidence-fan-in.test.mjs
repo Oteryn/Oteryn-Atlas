@@ -135,3 +135,31 @@ test('missing, duplicate, stale-instance or broken dependency evidence fails clo
   const broken = buildEvidenceManifest({ ...manifests[1], dependencies: { ...manifests[1].dependencies, evidenceDigests: [] } });
   assert.throws(() => validateProtectedHostedEvidenceFanIn(currentPlan, currentExecution, lifecycle, [manifests[0], broken], { currentHeadSha: currentPlan.candidateHeadSha }), /dependency/i);
 });
+
+test('zero-work lifecycle fan-in succeeds only with an exact empty evidence set', () => {
+  const currentPlan = plan({ stableTestIds: [], profile: 'none' });
+  const currentExecution = {
+    schemaVersion: 2,
+    candidateHeadSha: sha('c'),
+    hosted: { stableTestIds: [], partitions: [] },
+    specialist: { stableTestIds: [] },
+    review: { groupIds: [] },
+  };
+  const lifecycle = planProtectedVerificationLifecycle({
+    currentPlan, currentExecution, previousState: null,
+    baseAdvance: { changedPaths: [], mergeStatus: 'clean' }, now: '2026-08-30T00:00:00.000Z',
+  });
+  const result = validateProtectedHostedEvidenceFanIn(
+    currentPlan, currentExecution, lifecycle, [], { currentHeadSha: currentPlan.candidateHeadSha },
+  );
+  assert.equal(result.status, 'success');
+  assert.deepEqual(result.executedStableTestIds, []);
+  assert.deepEqual(result.executedEvidenceIds, []);
+  assert.deepEqual(result.reusedEvidenceIds, []);
+  assert.throws(() => validateProtectedHostedEvidenceFanIn(
+    currentPlan, currentExecution, lifecycle, executedEvidence(plan(), planProtectedVerificationLifecycle({
+      currentPlan: plan(), currentExecution: execution(), previousState: null,
+      baseAdvance: { changedPaths: [], mergeStatus: 'clean' }, now: '2026-08-30T00:00:00.000Z',
+    })), { currentHeadSha: currentPlan.candidateHeadSha },
+  ), /exact evidence set|zero.work/i);
+});
