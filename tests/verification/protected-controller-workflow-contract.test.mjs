@@ -41,6 +41,12 @@ test('protected controller binds protected and candidate censuses and rejects st
   assert.match(workflow, /product-identities\.json/);
 });
 
+test('candidate census materializes inert candidate bytes without privileged worktree checkout', () => {
+  assert.match(workflow, /git archive "\$ATLAS_CANDIDATE_HEAD_SHA" \| tar -x -C "\$candidate_dir"/);
+  assert.doesNotMatch(workflow, /git worktree add/);
+  assert.doesNotMatch(workflow, /git checkout[^\n]*\$ATLAS_CANDIDATE_HEAD_SHA/);
+});
+
 test('candidate census mounts protected dependencies outside the read-only candidate tree', () => {
   assert.match(workflow, /--mount "type=bind,src=\$candidate_dir,dst=\/candidate,readonly"/);
   assert.match(workflow, /ln -s \/protected-e2e-node-modules\/node_modules "\$candidate_dir\/e2e\/node_modules"/);
