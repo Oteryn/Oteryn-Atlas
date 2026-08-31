@@ -135,14 +135,14 @@ PR #217 and PR #219 remain Draft preparation lanes. This task supplies the seman
 
 ## Primary PR #273 closeout boundary
 
-After integrating protected `main@f8de8e42ca57112cf71100aa19322ef22527b168`, the primary branch has no delta in `verification-authority-manifest.json` authority paths. Its remaining net delta is documentation/audit only. GitHub live state also shows Issue #272 already closed/completed at 2026-08-31T08:35:01Z; terminal closeout must verify that state after #273 merge rather than assuming it from this checkpoint.
+After integrating protected `main@f8de8e42ca57112cf71100aa19322ef22527b168`, the primary branch initially had documentation/audit-only delta. Its first live zero-work executor run correctly produced `profile=none`, zero groups/IDs/capabilities and lifecycle `REUSE` with heavy executions = 0, but exposed one remaining workflow-condition defect: `fan-in` was still gated on `hosted_count != 0`. PR #273 therefore carries the final protected-authority correction removing only that obsolete guard, with a regression contract that forbids reintroducing it. GitHub live state also shows Issue #272 already closed/completed at 2026-08-31T08:35:01Z; terminal closeout must verify that state after #273 merge rather than assuming it from this checkpoint.
 
 Before #273 merge, GitHub must still prove on the exact published head:
 
 1. deterministic repository verification GREEN;
 2. protected controller plan GREEN;
-3. the protected lifecycle independently proves zero executable evidence obligations for the final documentation-only delta, so environment/browser work is skipped rather than rerun;
-4. hosted executor fan-in/state GREEN with `REUSE`, exact empty evidence set and heavy executions = 0;
+3. one-shot environment qualification and the protected hosted lower-bound selected for the final authority-changing #273 head complete successfully;
+4. hosted executor / shard evidence / fan-in state are GREEN on that exact head;
 5. `Protected Hosted Playwright evidence` GREEN;
 6. `atlas-gate` and `provenance-gate` GREEN;
 7. applicable CodeQL/security GREEN;
@@ -150,4 +150,7 @@ Before #273 merge, GitHub must still prove on the exact published head:
 9. exact-head expected-head normal merge;
 10. post-merge `main` readback and required-check verification.
 
-Issue #272 may close only after those terminal steps. Issue #179 must not be closed by this task.
+
+After #273 merges, the protected zero-work path must also be exercised live without creating a new bootstrap PR. Existing PR #136 is the bounded probe: its current GitHub diff is exactly one Markdown file, `docs/agents/prompts/ATLAS-STATIC-CREATURE-RESTORE-CLOSEOUT.md`. The post-merge proof requires its base-owned controller/executor to emit `profile=none`, zero executable IDs, `REUSE`, heavy executions = 0, skip environment/browser work, and still publish exact fan-in/state.
+
+Issue #272 may close only after those terminal steps. Issue #179 must not be changed by this task.

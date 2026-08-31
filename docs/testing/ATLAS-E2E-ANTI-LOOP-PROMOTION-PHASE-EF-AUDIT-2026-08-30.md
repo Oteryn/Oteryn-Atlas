@@ -82,3 +82,9 @@ PR #276 was squash-merged normally as `main@f8de8e42ca57112cf71100aa19322ef22527
 The environment repair preserves sandbox UID/GID `1000:1000`: only the host artifact bind is temporarily handed to that identity for the one-shot probe, with an EXIT trap restoring runner ownership. The transition planner now carries an explicit `requiredGroupFloor` that is widening-only and is independently checked against a trusted-base lower-bound plan before any heavy execution.
 
 At the final #273 integration audit, #217 and #219 remain Draft/open and #268 remains open. GitHub reports #179 closed/completed at 2026-08-31T05:56:40Z and #272 closed/completed at 2026-08-31T08:35:01Z. These issue states are recorded, not changed, by this audit.
+
+## Final primary fan-in guard correction
+
+The first exact protected run of #273 after `main@f8de8e42ca57112cf71100aa19322ef22527b168` proved the planner and lifecycle zero-work semantics live: `profile=none`, zero groups, zero stable IDs, zero capabilities, `REUSE`, `expectedEvidence=[]`, and heavy executions = 0. It also exposed an obsolete YAML guard, `needs.preflight.outputs.hosted_count != '0'`, which prevented the otherwise-valid zero-work fan-in job from publishing state.
+
+PR #273 removes only that guard and adds a workflow contract that rejects its reintroduction. Because this changes protected executor authority, #273 must receive the normal protected lower-bound exact-head qualification before merge. After merge, existing docs-only PR #136 (one Markdown-file diff) is the live post-merge probe for the zero-work executor/fan-in path; no new bootstrap PR is required.

@@ -78,5 +78,7 @@ test('authority closure includes the active lifecycle and base-advance dispatche
   assert.match(executor, /lifecycle\.expectedEvidence\.length === 0/);
   assert.match(executor, /environmentQualification:\s*zeroWork\s*\?\s*null/);
   assert.match(executor, /qualificationFiles\.length !== \(zeroWork \? 0 : 1\)/);
+  const fanInCondition = executor.split('  fan-in:')[1]?.split('    needs:')[0] ?? '';
+  assert.doesNotMatch(fanInCondition, /hosted_count\s*!=\s*'0'/, 'zero-work fan-in must not be gated on hosted stable-ID count');
   assert.match(executor, /protected-hosted-fan-in-\$\{\{ needs\.preflight\.outputs\.protected_base_sha \}\}-\$\{\{ needs\.preflight\.outputs\.candidate_head_sha \}\}/);
 });
