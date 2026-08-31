@@ -178,7 +178,13 @@ jobs:
           $changedFilesExitCode = $LASTEXITCODE
           Remove-Item -LiteralPath $changedFilesScriptPath -Force -ErrorAction SilentlyContinue
           if ($changedFilesExitCode -ne 0) { throw 'Changed-file evidence generation failed.' }
-          $planOutput = @(
+          $groupFloorPath = Join-Path $PWD 'artifacts/verification/transition-required-group-floor.json'
+          [IO.File]::WriteAllText(
+            $groupFloorPath,
+            '["deterministic.core","e2e.full","fullworld.animation-census","integration.source-contract"]' + "`n",
+            [Text.UTF8Encoding]::new($false)
+          )
+          $protectedPlanOutput = @(
             & node ..\trusted-base\tools\verification\build-verification-plan.mjs `
               --changed-files artifacts/verification/changed-files.json `
               --trusted-impact ..\trusted-base\tools\verification\impact-manifest.json `
@@ -191,8 +197,30 @@ jobs:
               --merge-base-sha $mergeBase `
               --stable-test-ids artifacts/verification/stable-test-ids.json
           )
+          $protectedPlanExitCode = $LASTEXITCODE
+          if ($protectedPlanExitCode -ne 0) { throw 'Protected lower-bound plan construction failed.' }
+          $protectedPlanPath = Join-Path $PWD 'artifacts/verification/protected-lower-bound-plan.json'
+          [IO.File]::WriteAllText(
+            $protectedPlanPath,
+            (($protectedPlanOutput -join "`n") + "`n"),
+            [Text.UTF8Encoding]::new($false)
+          )
+          $planOutput = @(
+            & node tools\verification\build-verification-plan.mjs `
+              --changed-files artifacts/verification/changed-files.json `
+              --trusted-impact ..\trusted-base\tools\verification\impact-manifest.json `
+              --candidate-impact tools/verification/impact-manifest.json `
+              --trusted-catalog ..\trusted-base\tools\verification\verification-catalog.json `
+              --candidate-catalog tools/verification/verification-catalog.json `
+              --repository $env:GITHUB_REPOSITORY `
+              --head-sha $env:ATLAS_CODE_REVISION `
+              --integration-base-sha $env:ATLAS_BASE_SHA `
+              --merge-base-sha $mergeBase `
+              --required-group-floor artifacts/verification/transition-required-group-floor.json `
+              --stable-test-ids artifacts/verification/stable-test-ids.json
+          )
           $planExitCode = $LASTEXITCODE
-          if ($planExitCode -ne 0) { throw 'Protected lower-bound plan construction failed.' }
+          if ($planExitCode -ne 0) { throw 'Transition widening plan construction failed.' }
           $planPath = Join-Path $PWD 'artifacts/verification/pr-verification-plan.json'
           [IO.File]::WriteAllText(
             $planPath,
@@ -201,7 +229,7 @@ jobs:
           )
           $planFenceScript = @'
           import fs from 'node:fs';
-          const [planPath, retainedIdsPath] = process.argv.slice(2);
+          const [planPath, protectedPlanPath, retainedIdsPath] = process.argv.slice(2);
           const read = (path) => JSON.parse(fs.readFileSync(path, 'utf8'));
           const exactStableIds = (value, label) => {
             if (!Array.isArray(value) || value.length === 0
@@ -219,6 +247,25 @@ jobs:
             return [...value].sort();
           };
           const plan = read(planPath);
+          const protectedPlan = read(protectedPlanPath);
+          const requiredGroupFloor = ['deterministic.core', 'e2e.full', 'fullworld.animation-census', 'integration.source-contract'];
+          if (JSON.stringify(plan.requiredGroupFloor) !== JSON.stringify(requiredGroupFloor)) {
+            throw new Error('Legacy transition widening floor is not exact');
+          }
+          for (const field of ['repository', 'headSha', 'integrationBaseSha', 'mergeBaseSha', 'diffIdentity', 'changedPathsDigest', 'verificationCatalogDigest']) {
+            if (JSON.stringify(plan[field]) !== JSON.stringify(protectedPlan[field])) {
+              throw new Error(`Legacy transition widening changed protected identity field: ${field}`);
+            }
+          }
+          if (JSON.stringify(plan.changedPaths) !== JSON.stringify(protectedPlan.changedPaths)) {
+            throw new Error('Legacy transition widening fabricated changed paths');
+          }
+          for (const group of protectedPlan.requiredGroupIds) {
+            if (!plan.requiredGroupIds.includes(group)) throw new Error(`Legacy transition widening narrowed protected group: ${group}`);
+          }
+          for (const id of protectedPlan.stableTestIds) {
+            if (!plan.stableTestIds.includes(id)) throw new Error(`Legacy transition widening narrowed protected stable ID: ${id}`);
+          }
           const retainedStableTestIds = exactStableIds(read(retainedIdsPath), 'retained full runner stable IDs');
           const plannedStableTestIds = exactStableIds(plan.stableTestIds, 'legacy transition plan stable IDs');
           if (JSON.stringify(plannedStableTestIds) !== JSON.stringify(retainedStableTestIds)) {
@@ -238,7 +285,7 @@ jobs:
           '@
           $planFenceScriptPath = Join-Path $env:RUNNER_TEMP "atlas-transition-plan-fence-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT.mjs"
           [IO.File]::WriteAllText($planFenceScriptPath, $planFenceScript, [Text.UTF8Encoding]::new($false))
-          node $planFenceScriptPath $planPath artifacts/verification/stable-test-ids.json
+          node $planFenceScriptPath $planPath $protectedPlanPath artifacts/verification/stable-test-ids.json
           $planFenceExitCode = $LASTEXITCODE
           Remove-Item -LiteralPath $planFenceScriptPath -Force -ErrorAction SilentlyContinue
           if ($planFenceExitCode -ne 0) { throw 'Retained full-run verification plan fence failed.' }
