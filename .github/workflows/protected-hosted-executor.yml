@@ -922,7 +922,6 @@ jobs:
       always() &&
       needs.preflight.result == 'success' &&
       needs.preflight.outputs.bootstrap_active == 'true' &&
-      needs.preflight.outputs.hosted_count != '0' &&
       needs.preflight.outputs.disposition != 'BLOCKED' &&
       needs.preflight.outputs.disposition != 'REINTEGRATE' &&
       (needs.reuse-evidence.result == 'success' || needs.reuse-evidence.result == 'skipped') &&
