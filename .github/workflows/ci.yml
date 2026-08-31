@@ -414,7 +414,7 @@ jobs:
       ATLAS_CODE_REVISION: ${{ github.event.pull_request.head.sha }}
       ATLAS_PROTECTED_BASE_SHA: ${{ github.event.pull_request.base.sha }}
       ATLAS_PR_NUMBER: ${{ github.event.pull_request.number }}
-      ATLAS_LEGACY_CUTOVER_BASE_SHA: b285c4d57d48cbc70bca54619849b7f7cfd423f6
+      ATLAS_LEGACY_CUTOVER_BASE_SHA: f8de8e42ca57112cf71100aa19322ef22527b168
     steps:
       - name: Check out exact Atlas candidate gate authority
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
