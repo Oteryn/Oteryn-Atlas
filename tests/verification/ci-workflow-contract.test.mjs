@@ -41,7 +41,7 @@ test('atlas-gate consumes exact hosted lifecycle evidence without executing repo
   assert.match(browserJob, /protected-hosted-fan-in\.json/);
   assert.match(browserJob, /protected-verification-state\.json/);
   assert.match(browserJob, /validateProtectedHostedGate/);
-  assert.match(browserJob, /ATLAS_LEGACY_CUTOVER_BASE_SHA: 00bc97034618fa0ce264685d1aa342c591a43914/);
+  assert.match(browserJob, /ATLAS_LEGACY_CUTOVER_BASE_SHA: b285c4d57d48cbc70bca54619849b7f7cfd423f6/);
   assert.match(browserJob, /ATLAS_PROTECTED_BASE_SHA.*ATLAS_LEGACY_CUTOVER_BASE_SHA/);
   assert.match(browserJob, /commits\/\$ATLAS_CODE_REVISION\/statuses/);
   assert.match(browserJob, /atlas-local-e2e/);
