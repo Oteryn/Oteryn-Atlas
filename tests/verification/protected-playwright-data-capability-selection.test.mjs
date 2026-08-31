@@ -15,7 +15,7 @@ const list = [
 ].join('\n');
 
 const execution = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   hosted: {
     groupIds: ['e2e.full', 'integration.bounded'],
     stableTestIds: [fixtureId, boundedId, additionId],

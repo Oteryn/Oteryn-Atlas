@@ -14,7 +14,8 @@ test('protected controller obtains candidate census only inside a no-network no-
   assert.match(controller, /pull_request_target:/);
   assert.match(controller, /refs\/pull\/\$ATLAS_PR_NUMBER\/head/);
   assert.match(controller, /rev-parse FETCH_HEAD/);
-  assert.match(controller, /git\s+(?:-C\s+\S+\s+)?worktree\s+add\s+--detach/);
+  assert.match(controller, /git archive "\$ATLAS_CANDIDATE_HEAD_SHA" \| tar -x -C "\$candidate_dir"/);
+  assert.doesNotMatch(controller, /git\s+(?:-C\s+\S+\s+)?worktree\s+add\s+--detach/);
   assert.match(controller, /--network\s+none/);
   assert.match(controller, /--read-only/);
   assert.match(controller, /--cap-drop(?:=|\s+)ALL/);
@@ -41,23 +42,24 @@ test('hosted executor consumes a published protected plan under read-only GitHub
   assert.match(executor, /protected-verification-plan/);
   assert.match(executor, /protected-hosted-execution\.mjs/);
   assert.match(executor, /e2e\/compose\.github-hosted\.yml/);
-  assert.match(executor, /protected-hosted-fan-in\.mjs/);
-  assert.match(executor, /expectedStableTestIds:\s*execution\.hosted\.stableTestIds/);
-  assert.match(executor, /expectedStableTestIdsDigest:\s*execution\.hostedExpectedStableTestIdsDigest/);
+  assert.match(executor, /buildProtectedWorkflowSuccessState/);
+  assert.match(executor, /protected-verification-workflow\.mjs/);
+  assert.match(executor, /stableTestIds:\s*execution\.hosted\.stableTestIds/);
+  assert.match(executor, /evidenceSemanticDigests/);
   assert.doesNotMatch(executor, /const hostedPlan = \{ \.\.\.plan/);
   assert.ok(occurrences(executor, /assert-current-pr-head\.mjs/g) >= 2, 'executor must fence the PR head before expensive execution and before fan-in');
   assert.match(executor, /cancel-in-progress:\s*true/);
   assert.doesNotMatch(executor, /pull_request_target:|atlas-local-e2e|192\.168\.|molehill|synology|secrets:/i);
 });
 
-test('pre-merge hosted proof bootstraps from pull_request isolation and self-disables once protected', () => {
-  assert.match(executor, /pull_request:\n\s+types:\s*\[opened, synchronize, reopened\]/);
-  assert.match(executor, /github\.event_name\s*==\s*'pull_request'/);
-  assert.match(executor, /PROTECTED_BASE_SHA/);
-  assert.match(executor, /contents\/\.github\/workflows\/protected-hosted-executor\.yml\?ref=\$PROTECTED_BASE_SHA/);
-  assert.match(executor, /actions\/workflows\/protected-verification-controller\.yml\/runs\?event=pull_request_target/);
-  assert.match(executor, /controller_run_id/);
-  assert.match(executor, /bootstrap_active=false/);
+test('hosted executor is activated only by the protected controller workflow_run', () => {
+  assert.match(executor, /workflow_run:/);
+  assert.match(executor, /Protected Verification Controller/);
+  assert.match(executor, /github\.event\.workflow_run\.conclusion == 'success'/);
+  assert.match(executor, /github\.event\.workflow_run\.event == 'pull_request_target'/);
+  assert.match(executor, /github\.event\.workflow_run\.event == 'workflow_dispatch'/);
+  assert.doesNotMatch(executor, /^  pull_request:/m);
+  assert.doesNotMatch(executor, /atlas-protected-authority-promotion|authority_promotion/);
 });
 
 test('hosted artifact downloads bind the repository explicitly outside git worktrees', () => {

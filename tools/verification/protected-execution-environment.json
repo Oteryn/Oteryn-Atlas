@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "environmentId": "atlas-protected-hosted-environment-v1",
+  "runner": {
+    "os": "ubuntu-24.04"
+  },
+  "container": {
+    "image": "mcr.microsoft.com/playwright:v1.62.0-noble@sha256:baed2032d533817f3dbe6425de795788430ba345e819a1201337009ba17c9d07",
+    "network": "none",
+    "rootFilesystem": "read-only",
+    "user": "1000:1000",
+    "capDrop": ["ALL"],
+    "noNewPrivileges": true,
+    "pidsLimit": 192,
+    "memoryBytes": 1610612736,
+    "cpus": 2,
+    "tmpfs": [
+      {
+        "path": "/tmp",
+        "options": ["nodev", "nosuid", "rw", "size=256m"]
+      }
+    ]
+  },
+  "mounts": {
+    "candidate": {
+      "source": "exact-candidate-checkout",
+      "target": "/candidate",
+      "readOnly": true
+    },
+    "dependencies": {
+      "source": "protected-control/e2e/node_modules",
+      "target": "/protected-e2e-node-modules/node_modules",
+      "readOnly": true
+    }
+  },
+  "runtime": {
+    "node": { "command": "node" },
+    "npm": { "command": "npm" },
+    "playwright": {
+      "command": "/protected-e2e-node-modules/node_modules/.bin/playwright",
+      "version": "1.62.0"
+    },
+    "chromium": { "command": "playwright.chromium.launch" },
+    "python3": { "command": "python3" },
+    "python": {
+      "command": "python",
+      "target": "/usr/bin/python3",
+      "shimRoot": "/tmp/atlas-python-bin",
+      "pycacheRoot": "/tmp/atlas-python-pycache"
+    }
+  },
+  "artifacts": {
+    "root": "/tmp/artifacts",
+    "writable": true
+  },
+  "execution": {
+    "retries": 0,
+    "hostedShards": 1,
+    "workersPerShard": 1,
+    "timeoutSeconds": 120
+  }
+}

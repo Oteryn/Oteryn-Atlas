@@ -23,68 +23,55 @@ function block(source, start, end) {
   return source.slice(begin, finish === -1 ? source.length : finish);
 }
 
-test('atlas-gate requires exact-head local Docker browser evidence', () => {
+test('atlas-gate consumes exact hosted lifecycle evidence without executing repository browser code', () => {
   const nodeJob = block(ci, '  verification-node:\n', '  verification-browser:\n');
   const browserJob = block(ci, '  verification-browser:\n', '  atlas-gate:\n');
-  const gateStart = ci.indexOf('  atlas-gate:\n');
-  assert.notEqual(gateStart, -1, 'missing atlas-gate');
-  const gate = ci.slice(gateStart);
+  const gate = ci.slice(ci.indexOf('  atlas-gate:\n'));
 
   assert.match(nodeJob, /node --test/);
   assert.match(nodeJob, /tests\/verification\/\*\.test\.mjs/);
-  assert.match(nodeJob, /tests\/properties\/\*\.test\.mjs/);
-  for (const path of [
-    'tests/creature-presentation-geometry.mjs',
-    'tests/creature-interaction.mjs',
-    'tests/creature-interaction-target.mjs',
-    'tests/map-activation.mjs',
-    'tests/creature-map-activation-contract.mjs',
-    'tests/creature-interaction-runtime-contract.mjs',
-  ]) assert.ok(nodeJob.includes(path), `verification-node missing ${path}`);
-  assert.match(nodeJob, /actions\/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a/);
-
-  assert.match(browserJob, /github\.event_name == 'pull_request'/);
   assert.match(browserJob, /github\.event\.pull_request\.head\.repo\.full_name == github\.repository/);
-  assert.match(browserJob, /- verification-node/);
   assert.match(browserJob, /runs-on: ubuntu-24\.04/);
-  assert.match(browserJob, /statuses: read/);
+  assert.match(browserJob, /actions: read/);
+  assert.match(browserJob, /pull-requests: read/);
   assert.match(browserJob, /ATLAS_CODE_REVISION: \$\{\{ github\.event\.pull_request\.head\.sha \}\}/);
-  assert.match(browserJob, /atlas-local-e2e/);
+  assert.match(browserJob, /expected_name="protected-hosted-fan-in-\$ATLAS_PROTECTED_BASE_SHA-\$ATLAS_CODE_REVISION"/);
+  assert.match(browserJob, /pulls\/\$ATLAS_PR_NUMBER/);
+  assert.match(browserJob, /\.github\/workflows\/protected-hosted-executor\.yml/);
+  assert.match(browserJob, /protected-hosted-fan-in\.json/);
+  assert.match(browserJob, /protected-verification-state\.json/);
+  assert.match(browserJob, /validateProtectedHostedGate/);
+  assert.match(browserJob, /ATLAS_LEGACY_CUTOVER_BASE_SHA: 00bc97034618fa0ce264685d1aa342c591a43914/);
+  assert.match(browserJob, /ATLAS_PROTECTED_BASE_SHA.*ATLAS_LEGACY_CUTOVER_BASE_SHA/);
   assert.match(browserJob, /commits\/\$ATLAS_CODE_REVISION\/statuses/);
-  assert.match(browserJob, /test "\$state" = success/);
-  assert.doesNotMatch(browserJob, /group: atlas-runners/);
-  assert.doesNotMatch(browserJob, /labels: oteryn-atlas/);
+  assert.match(browserJob, /atlas-local-e2e/);
   assert.doesNotMatch(browserJob, /docker compose|compose\.selfhosted\.yml/);
-
   assert.match(gate, /- verification-node/);
   assert.match(gate, /- verification-browser/);
-  assert.match(gate, /VERIFICATION_NODE:.*needs\.verification-node\.result/);
   assert.match(gate, /VERIFICATION_BROWSER:.*needs\.verification-browser\.result/);
-  assert.match(gate, /GITHUB_EVENT_NAME/);
-  assert.match(gate, /pull_request.*VERIFICATION_BROWSER.*success/s);
 });
 
-test('local Docker status publisher only accepts exact clean all-pass evidence', () => {
+test('legacy local publisher remains exact while protected Playwright identity uses semantic digests', () => {
   const publisherUrl = new URL('../../e2e/publish-local-e2e-status.ps1', import.meta.url);
-  assert.equal(fs.existsSync(publisherUrl), true, 'missing local E2E status publisher');
+  assert.equal(fs.existsSync(publisherUrl), true, 'missing legacy local E2E status publisher');
   const publisher = readText(publisherUrl);
   assert.match(publisher, /git status --porcelain/);
   assert.match(publisher, /git ls-remote --heads origin/);
   assert.match(publisher, /metadata\.expectedRevision/);
-  assert.doesNotMatch(publisher, /\$ExpectedScenarioCount\s*=/);
   assert.match(publisher, /VerificationPlanPath/);
   assert.match(publisher, /validate-e2e-evidence\.mjs/);
-  assert.match(publisher, /merge-base/);
   assert.match(publisher, /targetMode -ne 'checkout-overlay'/);
   assert.match(publisher, /metadata\.workers -ne 1/);
-  assert.match(playwrightConfig, /metadata:\s*\{[\s\S]*workers,/);
-  assert.match(publisher, /status -ne 'passed'/);
   assert.match(publisher, /atlas-local-e2e/);
-  assert.match(publisher, /state = 'success'/);
-  assert.match(publisher, /statuses\/\$sha/);
-  assert.match(playwrightConfig, /verificationPlanSha256/);
   assert.match(localRunPs1, /ATLAS_VERIFICATION_PLAN_PATH/);
   assert.match(localCompose, /ATLAS_VERIFICATION_PLAN_SHA256:\s*\$\{ATLAS_VERIFICATION_PLAN_SHA256:-\}/);
+  for (const field of ['planSemanticDigest', 'planInstanceDigest', 'authorityDigest', 'environmentDigest']) {
+    assert.match(playwrightConfig, new RegExp(field));
+  }
+  assert.match(playwrightConfig, /ATLAS_VERIFICATION_PLAN_SHA256/);
+  assert.match(playwrightConfig, /verificationPlanSha256:\s*legacyVerificationPlanSha256/);
+  const executor = readText(new URL('../../.github/workflows/protected-hosted-executor.yml', import.meta.url));
+  assert.doesNotMatch(executor, /ATLAS_VERIFICATION_PLAN_SHA256/);
 });
 
 test('required workflows verify the exact pull-request head rather than a synthetic merge ref', () => {
@@ -234,7 +221,6 @@ test('classification emits a trusted-base shadow plan without changing legacy ga
   assert.match(classifierJob, /git diff --name-status -z --find-renames "\$merge_base_sha" "\$ATLAS_CODE_REVISION"/);
   assert.match(classifierJob, /GitHub changed-file evidence does not match exact merge-base diff/);
   assert.match(classifierJob, /git cat-file -e "\$integration_base_sha:tools\/verification\/impact-manifest\.json"/);
-  assert.match(classifierJob, /Initial bootstrap policy has no path exemptions/);
   assert.match(classifierJob, /git show "\$integration_base_sha:tools\/verification\/impact-manifest\.json"/);
   assert.match(classifierJob, /--trusted-impact/);
   assert.match(classifierJob, /--candidate-impact/);

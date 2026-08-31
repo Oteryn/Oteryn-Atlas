@@ -7,10 +7,13 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const workflow = fs.readFileSync(path.join(ROOT, '.github/workflows/protected-verification-controller.yml'), 'utf8');
 const legacyTransition = fs.readFileSync(path.join(ROOT, '.github/workflows/legacy-molehill-transition-qualification.yml'), 'utf8').replace(/\r\n/g, '\n');
-test('protected controller runs from pull_request_target protected base with PR-scoped cancellation', () => {
+test('protected controller resolves the live PR and checks out its protected base with PR-scoped cancellation', () => {
   assert.match(workflow, /pull_request_target:/);
+  assert.match(workflow, /workflow_dispatch:/);
+  assert.match(workflow, /pulls\/\$GITHUB_REPOSITORY\/|repos\/\$GITHUB_REPOSITORY\/pulls\/\$ATLAS_REQUESTED_PR_NUMBER/);
+  assert.match(workflow, /Requested lifecycle PR is not an open same-repository main-targeting PR/);
   assert.match(workflow, /cancel-in-progress:\s*true/);
-  assert.match(workflow, /ref:\s*\$\{\{ github\.event\.pull_request\.base\.sha \}\}/);
+  assert.match(workflow, /ref:\s*\$\{\{ steps\.identity\.outputs\.base_sha \}\}/);
   assert.doesNotMatch(workflow, /ref:\s*\$\{\{ github\.event\.pull_request\.head\.sha \}\}/);
 });
 
@@ -36,6 +39,12 @@ test('protected controller binds protected and candidate censuses and rejects st
   assert.match(workflow, /assert-current-pr-head\.mjs/);
   assert.match(workflow, /protected-verification-plan/);
   assert.match(workflow, /product-identities\.json/);
+});
+
+test('candidate census materializes inert candidate bytes without privileged worktree checkout', () => {
+  assert.match(workflow, /git archive "\$ATLAS_CANDIDATE_HEAD_SHA" \| tar -x -C "\$candidate_dir"/);
+  assert.doesNotMatch(workflow, /git worktree add/);
+  assert.doesNotMatch(workflow, /git checkout[^\n]*\$ATLAS_CANDIDATE_HEAD_SHA/);
 });
 
 test('candidate census mounts protected dependencies outside the read-only candidate tree', () => {
