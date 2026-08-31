@@ -436,6 +436,13 @@ jobs:
         run: |
           set -euo pipefail
           candidate_dir="$(cat artifacts/environment/candidate-dir.txt)"
+          host_uid="$(id -u)"
+          host_gid="$(id -g)"
+          restore_artifact_ownership() {
+            sudo chown -R "$host_uid:$host_gid" artifacts/environment
+          }
+          trap restore_artifact_ownership EXIT
+          sudo chown 1000:1000 artifacts/environment
           timeout --signal=KILL 180s docker run --rm \
             --network none \
             --read-only \
@@ -463,6 +470,8 @@ jobs:
               node tools/verification/protected-execution-environment-probe.mjs \
                 --config tools/verification/protected-execution-environment.json \
                 --output /tmp/artifacts/protected-environment-qualification.json'
+          restore_artifact_ownership
+          trap - EXIT
           test -s artifacts/environment/protected-environment-qualification.json
 
       - name: Bind environment qualification into dependency evidence

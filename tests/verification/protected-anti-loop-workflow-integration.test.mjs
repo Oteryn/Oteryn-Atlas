@@ -128,6 +128,6 @@ test('atlas-gate independently validates exact hosted fan-in and lifecycle state
   assert.match(ci, /validateProtectedHostedGate/);
   assert.match(ci, /expectedCandidateHeadSha: process\.env\.ATLAS_CODE_REVISION/);
   assert.match(ci, /expectedProtectedBaseSha: process\.env\.ATLAS_PROTECTED_BASE_SHA/);
-  assert.match(ci, /ATLAS_LEGACY_CUTOVER_BASE_SHA: 00bc97034618fa0ce264685d1aa342c591a43914/);
+  assert.match(ci, /ATLAS_LEGACY_CUTOVER_BASE_SHA: b285c4d57d48cbc70bca54619849b7f7cfd423f6/);
   assert.match(ci, /legacy-cutover-exact-base-only/);
 });

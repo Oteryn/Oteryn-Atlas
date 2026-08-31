@@ -167,6 +167,34 @@ test('candidate catalog cannot narrow a trusted stable group definition', () => 
   assert.deepEqual(full.projects, ['desktop-chromium', 'mobile-chromium']);
 });
 
+test('explicit required group floor is widening-only and identity-bound', () => {
+  const base = build([{ path: 'docs/readme.md' }]);
+  const widened = buildVerificationPlan({
+    repository: 'Oteryn/Oteryn-Atlas',
+    headSha: 'a'.repeat(40), integrationBaseSha: 'b'.repeat(40), mergeBaseSha: 'c'.repeat(40),
+    changedFiles: [{ path: 'docs/readme.md' }],
+    trustedImpactManifest, candidateImpactManifest: trustedImpactManifest,
+    verificationCatalog: catalog,
+    requiredGroupFloor: ['deterministic.core', 'e2e.full'],
+  });
+  assert.equal(base.profile, 'none');
+  assert.equal(widened.profile, 'full');
+  assert.deepEqual(widened.requiredGroupFloor, ['deterministic.core', 'e2e.full']);
+  assert.deepEqual(widened.requiredGroupIds, ['deterministic.core', 'e2e.full']);
+  assert.notEqual(widened.impactPolicyDigest, base.impactPolicyDigest);
+  assert.deepEqual(widened.changedPaths, base.changedPaths, 'widening must not fabricate changed paths');
+});
+
+test('required group floor fails closed on duplicates and unknown groups', () => {
+  const args = {
+    repository: 'Oteryn/Oteryn-Atlas', headSha: 'a'.repeat(40), integrationBaseSha: 'b'.repeat(40), mergeBaseSha: 'c'.repeat(40),
+    changedFiles: [{ path: 'docs/readme.md' }], trustedImpactManifest, candidateImpactManifest: trustedImpactManifest,
+    verificationCatalog: catalog,
+  };
+  assert.throws(() => buildVerificationPlan({ ...args, requiredGroupFloor: ['e2e.full', 'e2e.full'] }), /floor|duplicate/i);
+  assert.throws(() => buildVerificationPlan({ ...args, requiredGroupFloor: ['not.catalogued'] }), /catalog|group/i);
+});
+
 test('planner output is byte-stable for equivalent ordered changed-file evidence', () => {
   const first = JSON.stringify(build([{ path: 'src/browser/creature-interaction.mjs' }]));
   const second = JSON.stringify(build([{ path: 'src/browser/creature-interaction.mjs' }]));

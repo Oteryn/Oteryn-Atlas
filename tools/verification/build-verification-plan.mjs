@@ -145,6 +145,15 @@ function unionStrings(...values) {
   return [...new Set(values.flat())].sort();
 }
 
+function normalizeRequiredGroupFloor(value) {
+  if (value == null) return [];
+  if (!Array.isArray(value) || value.some((id) => typeof id !== 'string' || id.length === 0)) {
+    throw new TypeError('requiredGroupFloor must be an array of non-empty group IDs');
+  }
+  if (new Set(value).size !== value.length) throw new TypeError('requiredGroupFloor must not contain duplicates');
+  return [...value].sort();
+}
+
 function suppliedStableTestIds(value) {
   if (value == null) return null;
   if (!Array.isArray(value) || value.length === 0 || value.some((id) => typeof id !== 'string' || !id.includes('::'))) {
@@ -258,6 +267,12 @@ export function buildVerificationPlan(input) {
   const candidate = classify(changedPaths, candidateImpactManifest);
   const baseClassification = unionClassification(trusted, candidate, bootstrapChanged(changedPaths));
   const result = applyCrossDomainEscalations(baseClassification, [trustedImpactManifest, candidateImpactManifest]);
+  const requiredGroupFloor = normalizeRequiredGroupFloor(input.requiredGroupFloor);
+  if (requiredGroupFloor.length) {
+    result.profile = 'full';
+    result.groups = unionStrings(result.groups, requiredGroupFloor);
+    result.domains = unionStrings(result.domains, ['explicit-verification-widening']);
+  }
   const groups = selectedGroups(result.groups, verificationCatalog);
   result.groups = groups.map((group) => group.id);
   const visualGroupIds = groups.filter((group) => group.evidence === 'restricted-visual-review').map((group) => group.id);
@@ -276,8 +291,9 @@ export function buildVerificationPlan(input) {
     diffIdentity: digest({ mergeBaseSha, integrationBaseSha, headSha, changedPaths: changedPaths ?? { invalid: true } }),
     changedPaths: changedPaths ?? [],
     changedPathsDigest: digest(changedPaths ?? { invalid: true }),
-    impactPolicyDigest: digest({ trustedImpactManifest, candidateImpactManifest }),
+    impactPolicyDigest: digest({ trustedImpactManifest, candidateImpactManifest, requiredGroupFloor }),
     verificationCatalogDigest: digest({ trustedVerificationCatalog, candidateVerificationCatalog }),
+    requiredGroupFloor,
     profile: result.profile,
     impactDomains: result.domains,
     appliedCrossDomainEscalations: result.applied,
@@ -335,6 +351,7 @@ function runCli() {
     integrationBaseSha: args['--integration-base-sha'],
     mergeBaseSha: args['--merge-base-sha'],
     stableTestIds: Object.hasOwn(args, '--stable-test-ids') ? readJson(args['--stable-test-ids'], 'stable test IDs') : undefined,
+    requiredGroupFloor: Object.hasOwn(args, '--required-group-floor') ? readJson(args['--required-group-floor'], 'required group floor') : undefined,
     changedFiles: readJson(args['--changed-files'], 'changed files'),
     trustedImpactManifest: readJson(args['--trusted-impact'], 'trusted impact manifest'),
     candidateImpactManifest: readJson(args['--candidate-impact'], 'candidate impact manifest'),

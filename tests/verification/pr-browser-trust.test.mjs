@@ -32,7 +32,7 @@ test('protected hosted gate binds exact candidate, base, producer and artifact b
   assert.match(browserJob, /validateProtectedHostedGate/);
   assert.match(browserJob, /expectedCandidateHeadSha: process\.env\.ATLAS_CODE_REVISION/);
   assert.match(browserJob, /expectedProtectedBaseSha: process\.env\.ATLAS_PROTECTED_BASE_SHA/);
-  assert.match(browserJob, /ATLAS_LEGACY_CUTOVER_BASE_SHA: 00bc97034618fa0ce264685d1aa342c591a43914/);
+  assert.match(browserJob, /ATLAS_LEGACY_CUTOVER_BASE_SHA: b285c4d57d48cbc70bca54619849b7f7cfd423f6/);
   assert.match(browserJob, /ATLAS_PROTECTED_BASE_SHA.*ATLAS_LEGACY_CUTOVER_BASE_SHA/);
   assert.match(browserJob, /atlas-local-e2e/);
   assert.doesNotMatch(browserJob, /docker\s|compose\.selfhosted|ATLAS_PUBLICATION_ORIGIN/);
