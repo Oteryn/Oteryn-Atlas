@@ -166,15 +166,17 @@ jobs:
         run: |
           set -euo pipefail
           candidate_dir="$RUNNER_TEMP/atlas-candidate-census-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
-          cleanup() { git worktree remove --force "$candidate_dir" >/dev/null 2>&1 || true; }
+          cleanup() { rm -rf "$candidate_dir"; }
           trap cleanup EXIT
-          git worktree add --detach "$candidate_dir" "$ATLAS_CANDIDATE_HEAD_SHA"
-          test ! -L "$candidate_dir/e2e"
-          test -d "$candidate_dir/e2e"
+          rm -rf "$candidate_dir"
+          mkdir -p "$candidate_dir"
           if git ls-tree -r --name-only "$ATLAS_CANDIDATE_HEAD_SHA" -- e2e/node_modules | grep -q .; then
             echo 'Candidate must not supply e2e/node_modules.' >&2
             exit 1
           fi
+          git archive "$ATLAS_CANDIDATE_HEAD_SHA" | tar -x -C "$candidate_dir"
+          test ! -L "$candidate_dir/e2e"
+          test -d "$candidate_dir/e2e"
           test ! -e "$candidate_dir/e2e/node_modules"
           ln -s /protected-e2e-node-modules/node_modules "$candidate_dir/e2e/node_modules"
           timeout --signal=KILL 120s docker run --rm \
