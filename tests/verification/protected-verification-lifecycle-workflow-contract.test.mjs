@@ -26,6 +26,12 @@ test('main advances actively dispatch bounded compatibility evaluation for every
   assert.match(controller, /pulls\/\$ATLAS_REQUESTED_PR_NUMBER/);
 });
 
+test('base-advance workflow dispatch resolves current protected main instead of a stale PR base snapshot', () => {
+  assert.match(controller, /branches\/main/, 'controller must read the current protected main identity');
+  assert.doesNotMatch(controller, /base_sha:\s*pr\.base\.sha/, 'stale pull-request base SHA must not be semantic protected-base authority');
+  assert.match(controller, /candidate_head_sha:\s*pr\.head\.sha/, 'candidate identity must remain bound to the live PR head');
+});
+
 test('executor makes lifecycle decisions before expensive work and persists a stable exact-candidate state artifact', () => {
   assert.match(executor, /protected-verification-workflow\.mjs/);
   assert.match(executor, /decideProtectedWorkflowLifecycle/);
