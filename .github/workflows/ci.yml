@@ -449,6 +449,51 @@ jobs:
           live_pr="$work/live-pr.json"
           gh api "repos/$GITHUB_REPOSITORY/pulls/$ATLAS_PR_NUMBER" > "$live_pr"
 
+          promotion_status="$work/protected-product-qualification-status.json"
+          gh api "repos/$GITHUB_REPOSITORY/commits/$ATLAS_CODE_REVISION/statuses?per_page=100" \
+            --jq '[.[] | select(.context == "atlas-protected-product-qualification")][0] // empty' > "$promotion_status"
+          if [[ -s "$promotion_status" ]]; then
+            promotion_run_id="$(node --input-type=module - "$promotion_status" "$GITHUB_REPOSITORY" <<'NODE'
+          import fs from 'node:fs';
+          const [statusPath, repository] = process.argv.slice(2);
+          const status = JSON.parse(fs.readFileSync(statusPath, 'utf8'));
+          const escaped = repository.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const match = String(status.target_url ?? '').match(new RegExp(`^https://github\\.com/${escaped}/actions/runs/([1-9][0-9]*)$`));
+          if (match) process.stdout.write(match[1]);
+          NODE
+            )"
+            if [[ "$promotion_run_id" =~ ^[1-9][0-9]*$ ]]; then
+              promotion_run="$work/protected-product-qualification-run.json"
+              promotion_jobs="$work/protected-product-qualification-jobs.json"
+              gh api "repos/$GITHUB_REPOSITORY/actions/runs/$promotion_run_id" > "$promotion_run"
+              gh api "repos/$GITHUB_REPOSITORY/actions/runs/$promotion_run_id/jobs?per_page=100" > "$promotion_jobs"
+              if node --input-type=module - \
+                "$promotion_status" "$promotion_run" "$promotion_jobs" "$live_pr" \
+                "$work/protected-hosted-gate-validation.json" <<'NODE'
+          import fs from 'node:fs';
+          import { validateProtectedProductQualificationGate } from './tools/verification/protected-hosted-gate.mjs';
+          const [statusPath, runPath, jobsPath, livePrPath, outputPath] = process.argv.slice(2);
+          const read = (path) => JSON.parse(fs.readFileSync(path, 'utf8'));
+          const result = validateProtectedProductQualificationGate({
+            status: read(statusPath),
+            producerRun: read(runPath),
+            producerJobs: read(jobsPath),
+            livePr: read(livePrPath),
+            expectedRepository: process.env.GITHUB_REPOSITORY,
+            expectedPrNumber: Number(process.env.ATLAS_PR_NUMBER),
+            expectedCandidateHeadSha: process.env.ATLAS_CODE_REVISION,
+            expectedProtectedBaseSha: process.env.ATLAS_PROTECTED_BASE_SHA,
+          });
+          fs.writeFileSync(outputPath, `${JSON.stringify(result, null, 2)}\n`);
+          NODE
+              then
+                printf 'producer_run_id=%s\nartifact_name=%s\n' \
+                  "$promotion_run_id" 'protected-product-qualification' >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+            fi
+          fi
+
           selected_artifact_id=''
           selected_run_id=''
           selected_run_json=''

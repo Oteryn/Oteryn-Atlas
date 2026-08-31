@@ -101,6 +101,14 @@ const PROTECTED_PROMOTION_QUALIFICATIONS = freeze({
       network: 'none',
       rootFilesystem: 'read-only',
     },
+    gateProof: {
+      kind: 'complete-hosted-browser-v1',
+      workflowPath: '.github/workflows/protected-execution-promotion-qualification.yml',
+      event: 'pull_request_target',
+      jobName: 'Publish functional qualification fixture compatibility evidence',
+      statusContext: 'atlas-protected-product-qualification',
+      statusDescription: 'Protected GitHub-hosted complete qualification functional safety net',
+    },
   },
 });
 

@@ -1,7 +1,7 @@
 name: Protected execution promotion qualification
 
 on:
-  pull_request:
+  pull_request_target:
     types: [labeled]
 
 permissions:
@@ -801,7 +801,7 @@ jobs:
           gh api --method POST \
             "repos/$GITHUB_REPOSITORY/statuses/$ATLAS_CODE_REVISION" \
             -f state='success' \
-            -f context='atlas-local-e2e' \
+            -f context='atlas-protected-product-qualification' \
             -f description='Protected GitHub-hosted complete qualification functional safety net' \
             -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
 

@@ -45,6 +45,9 @@ test('atlas-gate consumes exact hosted lifecycle evidence without executing repo
   assert.match(browserJob, /ATLAS_PROTECTED_BASE_SHA.*ATLAS_LEGACY_CUTOVER_BASE_SHA/);
   assert.match(browserJob, /commits\/\$ATLAS_CODE_REVISION\/statuses/);
   assert.match(browserJob, /atlas-local-e2e/);
+  assert.match(browserJob, /atlas-protected-product-qualification/);
+  assert.match(browserJob, /validateProtectedProductQualificationGate/);
+  assert.match(browserJob, /protected-execution-promotion-qualification\.yml|protected-product-qualification/);
   assert.doesNotMatch(browserJob, /docker compose|compose\.selfhosted\.yml/);
   assert.match(gate, /- verification-node/);
   assert.match(gate, /- verification-browser/);
