@@ -41,9 +41,13 @@ The organization baseline is META ADR 0004 plus the central agent execution/cont
 - One active mutating worker owns one canonical task branch and one writable worktree. Do not share a writable branch/worktree between active agents.
 - If protected `main` advances after admission, classify it as `UPSTREAM_ADVANCED`; that movement alone does not invalidate implementation and is not a reason to restart, reset, recreate, rebase, force-push or discard still-applicable work.
 - If the upstream delta changes an applicable instruction, safety/security/provenance rule, architecture authority, compatibility contract or invariant, reload and reconcile that governing authority before further mutation while preserving unaffected work.
-- Preserve published task history by default. When entering final integration, refresh to current `integration_main_sha` with a normal non-force merge-up, resolve only authorized conflicts, review the resulting diff and rerun every validation/review layer invalidated by the new `task_head_sha`.
+- Preserve published task history by default. GitHub Merge Queue integrates unchanged reviewed PR content with current protected `main`; an upstream advance alone is never a reason to merge-up, rebase, recreate a branch or request fresh review. Only a material repair or conflict resolution starts a new review/qualification generation.
 - A lost merge race returns the task to integration/reconciliation, not to implementation from scratch.
 - Invalidate affected work only when verified task cancellation/supersession/rescope, incompatible governing authority, semantic contract/API/schema/invariant conflict, an unresolvable authorized reconciliation, or required tests prove prior assumptions no longer hold. Textual overlap or a changed filename alone is not sufficient proof.
+- Before final qualification, freeze the exact candidate head. Do not change it solely to retrigger CI, review, mergeability, polling or checkpoints; only material repair, a required conflict resolution or changed governing authority may create a new generation.
+- If CI, review or an external dependency is the only thing that can change material state, record `WAITING_EXTERNAL` and release the worker rather than poll or mutate Git history.
+- Empty commits, semantic no-op edits and checkpoint-only churn to wake external systems are forbidden. Re-evaluate the same head where GitHub supports it; otherwise remain `WAITING_EXTERNAL` or `BLOCKED`.
+- Repeated unchanged failures are bounded: after the retry budget is exhausted without new material evidence, record `STALLED`. `WAITING_EXTERNAL` and `STALLED` never satisfy merge readiness.
 
 ## META execution-routing policy
 

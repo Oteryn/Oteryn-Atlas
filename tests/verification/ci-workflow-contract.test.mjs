@@ -76,10 +76,12 @@ test('legacy local publisher remains exact while protected Playwright identity u
 
 test('required workflows verify the exact pull-request head rather than a synthetic merge ref', () => {
   const checkoutCount = (ci.match(/uses: actions\/checkout@/g) ?? []).length;
+  const pinnedLegacySourceCheckoutCount = (ci.match(/repository: blakinio\/Otheryn/g) ?? []).length;
   const generalExactHeadCount = (ci.match(/ref: \${{ github\.event\.pull_request\.head\.sha \|\| github\.sha }}/g) ?? []).length;
   const prOnlyExactHeadCount = (ci.match(/ref: \${{ github\.event\.pull_request\.head\.sha }}/g) ?? []).length;
   const exactHeadCount = generalExactHeadCount + prOnlyExactHeadCount;
-  assert.equal(exactHeadCount, checkoutCount);
+  assert.equal(pinnedLegacySourceCheckoutCount, 1);
+  assert.equal(exactHeadCount, checkoutCount - pinnedLegacySourceCheckoutCount);
 
   const candidate = block(provenance, '      - name: Check out exact Atlas candidate\n', '      - name: Check out pinned legacy Atlas source as inert Git data\n');
   assert.match(candidate, /ref: \${{ github\.event\.pull_request\.head\.sha \|\| github\.sha }}/);
@@ -234,4 +236,18 @@ test('classification emits a trusted-base shadow plan without changing legacy ga
   assert.match(classifierJob, /--stable-test-ids artifacts\/verification\/stable-test-ids\.json/);
   assert.match(classifierJob, /shadow_plan_digest=/);
   assert.match(classifierJob, /node tools\/verification\/classify-pr-changes\.mjs < "\$paths"/);
+});
+
+test('aggregate and provenance gates qualify the actual merge-queue candidate', () => {
+  const provenanceJob = block(ci, '  provenance:\n', '  semantic-proof:\n');
+  const gate = ci.slice(ci.indexOf('  atlas-gate:\n'));
+
+  assert.match(ci, /merge_group:\s*\n\s*types:\s*\[checks_requested\]/);
+  assert.match(provenance, /merge_group:\s*\n\s*types:\s*\[checks_requested\]/);
+  assert.match(provenanceJob, /ref: \$\{\{ github\.event\.pull_request\.head\.sha \|\| github\.sha \}\}/);
+  assert.match(provenanceJob, /test_verify_extraction_provenance\.py/);
+  assert.match(provenanceJob, /verify_extraction_provenance\.py --source-root legacy-source/);
+  assert.match(gate, /- provenance/);
+  assert.match(gate, /PROVENANCE: \$\{\{ needs\.provenance\.result \}\}/);
+  assert.match(gate, /"\$PROVENANCE"/);
 });

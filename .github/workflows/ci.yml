@@ -2,6 +2,8 @@ name: CI
 
 on:
   pull_request:
+  merge_group:
+    types: [checks_requested]
   push:
     branches: [main]
 
@@ -44,8 +46,35 @@ jobs:
       - name: Verify main-only deployment policy
         run: node --test tests/deployment-policy.mjs
 
-      - name: Verify selective-extraction provenance
-        run: python tools/governance/verify_extraction_provenance.py
+  provenance:
+    name: Atlas provenance verification
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out exact Atlas candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Check out pinned legacy Atlas source as inert Git data
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: blakinio/Otheryn
+          ref: e417c5e7c22986bf4acef0495eb47f7b72c97cce
+          path: legacy-source
+          fetch-depth: 1
+          persist-credentials: false
+          submodules: false
+          lfs: false
+
+      - name: Compile provenance verifier
+        run: python -m py_compile tools/governance/verify_extraction_provenance.py tools/governance/test_verify_extraction_provenance.py
+
+      - name: Run negative source-provenance tests
+        run: python tools/governance/test_verify_extraction_provenance.py
+
+      - name: Verify exact source and target provenance
+        run: python tools/governance/verify_extraction_provenance.py --source-root legacy-source
 
   semantic-proof:
     runs-on: ubuntu-24.04
@@ -534,6 +563,7 @@ jobs:
     if: ${{ always() }}
     needs:
       - repository-contract
+      - provenance
       - semantic-proof
       - browser-semantic
       - browser-webgl-proof
@@ -547,6 +577,7 @@ jobs:
         shell: bash
         env:
           REPOSITORY_CONTRACT: ${{ needs.repository-contract.result }}
+          PROVENANCE: ${{ needs.provenance.result }}
           SEMANTIC_PROOF: ${{ needs.semantic-proof.result }}
           BROWSER_SEMANTIC: ${{ needs.browser-semantic.result }}
           BROWSER_WEBGL_PROOF: ${{ needs.browser-webgl-proof.result }}
@@ -559,7 +590,7 @@ jobs:
           GITHUB_EVENT_NAME: ${{ github.event_name }}
         run: |
           set -euo pipefail
-          for result in "$REPOSITORY_CONTRACT" "$SEMANTIC_PROOF" "$BROWSER_SEMANTIC" "$BROWSER_WEBGL_PROOF" "$PROJECT" "$VERIFICATION_NODE"; do
+          for result in "$REPOSITORY_CONTRACT" "$PROVENANCE" "$SEMANTIC_PROOF" "$BROWSER_SEMANTIC" "$BROWSER_WEBGL_PROOF" "$PROJECT" "$VERIFICATION_NODE"; do
             test "$result" = success
           done
           if [[ "$GITHUB_EVENT_NAME" == pull_request ]]; then
