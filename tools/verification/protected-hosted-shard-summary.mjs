@@ -7,6 +7,19 @@ const BROWSER_CONTAINER = 'mcr.microsoft.com/playwright:v1.62.0-noble@sha256:bae
 const WORKER_POLICY = Object.freeze({ id: 'atlas-protected-hosted-workers-v1', version: 1, hostedShards: 1, workersPerShard: 1 });
 const SOURCE_PLACEMENTS = new Set(['protected', 'candidate-additions', 'candidate-modifications']);
 const HOSTED_DATA_CAPABILITIES = new Set(['qualification_fixture', 'bounded_real_world']);
+const PLAN_IDENTITY_FIELDS = Object.freeze([
+  ['planSemanticDigest', 'plan semantic digest'],
+  ['planInstanceDigest', 'plan instance digest'],
+  ['authorityDigest', 'authority digest'],
+  ['environmentDigest', 'environment digest'],
+]);
+const EXECUTION_IDENTITY_FIELDS = Object.freeze([
+  ...PLAN_IDENTITY_FIELDS,
+  ['expectedStableTestIdsDigest', 'expected stable-ID digest'],
+  ['productIdentitiesDigest', 'product identities digest'],
+  ['workerPolicyDigest', 'worker policy digest'],
+  ['executionPolicyDigest', 'execution policy digest'],
+]);
 
 function exactSha(value, label) {
   if (typeof value !== 'string' || !SHA.test(value)) throw new TypeError(`${label} must be an exact lowercase SHA`);
@@ -38,18 +51,14 @@ function sameIds(actual, expected, label) {
 }
 
 function validatePlan(plan) {
-  if (!plan || typeof plan !== 'object' || Array.isArray(plan) || plan.schemaVersion !== 2
-    || plan.controller?.id !== 'atlas-protected-hosted-controller-v2' || plan.controller?.version !== 2) {
-    throw new TypeError('protected shard evidence requires protected hosted plan v2');
+  if (!plan || typeof plan !== 'object' || Array.isArray(plan) || plan.schemaVersion !== 3
+    || plan.controller?.id !== 'atlas-protected-hosted-controller-v3' || plan.controller?.version !== 3) {
+    throw new TypeError('protected shard evidence requires protected hosted plan v3');
   }
   exactSha(plan.controller.sourceSha, 'controller source SHA');
   exactSha(plan.candidateHeadSha, 'candidate head SHA');
   for (const [field, label] of [
-    ['planDigest', 'plan digest'],
-    ['expectedStableTestIdsDigest', 'expected stable-ID digest'],
-    ['productIdentitiesDigest', 'product identities digest'],
-    ['workerPolicyDigest', 'worker policy digest'],
-    ['executionPolicyDigest', 'execution policy digest'],
+    ...EXECUTION_IDENTITY_FIELDS,
   ]) exactDigest(plan[field], label);
   if (plan.retryPolicy?.retries !== 0 || plan.selectiveExecution !== false) {
     throw new TypeError('protected shard plan must bind zero retries and disabled selective execution');
@@ -122,18 +131,14 @@ function validatePartitions(value, hosted, protectedHosted, candidateAdditions, 
 }
 
 function validateExecution(execution, plan) {
-  if (!execution || typeof execution !== 'object' || Array.isArray(execution) || execution.schemaVersion !== 1) {
-    throw new TypeError('protected shard evidence requires execution schemaVersion 1');
+  if (!execution || typeof execution !== 'object' || Array.isArray(execution) || execution.schemaVersion !== 2) {
+    throw new TypeError('protected shard evidence requires execution schemaVersion 2');
   }
   same(exactSha(execution.controllerSourceSha, 'execution controller source SHA'), plan.controller.sourceSha, 'controller source SHA');
   same(exactSha(execution.candidateHeadSha, 'execution candidate head SHA'), plan.candidateHeadSha, 'candidate head SHA');
-  for (const [field, label] of [
-    ['planDigest', 'plan digest'],
-    ['expectedStableTestIdsDigest', 'expected stable-ID digest'],
-    ['productIdentitiesDigest', 'product identities digest'],
-    ['workerPolicyDigest', 'worker policy digest'],
-    ['executionPolicyDigest', 'execution policy digest'],
-  ]) same(exactDigest(execution[field], `execution ${label}`), plan[field], label);
+  for (const [field, label] of EXECUTION_IDENTITY_FIELDS) {
+    same(exactDigest(execution[field], `execution ${label}`), plan[field], label);
+  }
   const hostedExpectedStableTestIdsDigest = exactDigest(execution.hostedExpectedStableTestIdsDigest, 'execution hosted stable-ID digest');
   exactDigest(execution.specialistExpectedStableTestIdsDigest, 'execution specialist stable-ID digest');
   if (execution.retries !== 0 || execution.selectiveExecution !== false) {
@@ -181,7 +186,9 @@ function validateRawSummary(summary, protectedPlan, allowedStableIds, sourceLabe
   if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) throw new TypeError(`protected shard ${sourceLabel} metadata is required`);
   same(metadata.targetMode, 'checkout-overlay', `${sourceLabel} target mode`);
   same(exactSha(metadata.expectedRevision, `${sourceLabel} summary expected revision`), protectedPlan.candidateHeadSha, `${sourceLabel} revision`);
-  same(exactDigest(metadata.verificationPlanSha256, `${sourceLabel} summary verification plan digest`), protectedPlan.planDigest, `${sourceLabel} plan digest`);
+  for (const [field, label] of PLAN_IDENTITY_FIELDS) {
+    same(exactDigest(metadata[field], `${sourceLabel} summary ${label}`), protectedPlan[field], `${sourceLabel} ${label}`);
+  }
   same(metadata.browserContainer, BROWSER_CONTAINER, `${sourceLabel} browser container`);
   same(metadata.workers, protectedPlan.workerPolicy.workersPerShard, `${sourceLabel} worker count`);
   if (!Array.isArray(summary.scenarios)) throw new TypeError(`protected shard ${sourceLabel} scenarios must be an array`);
@@ -272,12 +279,15 @@ export function buildProtectedHostedShardSummary({ plan, execution, summary, sum
   sameIds(candidateModifiedStableTestIdsProven.sort(), candidateModifications, 'protected shard candidate-modification proof');
 
   return Object.freeze({
-    schemaVersion: 1,
+    schemaVersion: 2,
     status: 'success',
     cancelled: false,
     candidateHeadSha: protectedPlan.candidateHeadSha,
     controllerSourceSha: protectedPlan.controller.sourceSha,
-    planDigest: protectedPlan.planDigest,
+    planSemanticDigest: protectedPlan.planSemanticDigest,
+    planInstanceDigest: protectedPlan.planInstanceDigest,
+    authorityDigest: protectedPlan.authorityDigest,
+    environmentDigest: protectedPlan.environmentDigest,
     planExpectedStableTestIdsDigest: protectedPlan.expectedStableTestIdsDigest,
     expectedStableTestIdsDigest: hostedExpectedStableTestIdsDigest,
     productIdentitiesDigest: protectedPlan.productIdentitiesDigest,

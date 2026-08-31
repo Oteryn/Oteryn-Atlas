@@ -9,11 +9,14 @@ import {
 
 const head = 'b'.repeat(40);
 const controllerSha = 'a'.repeat(40);
-const planDigest = `sha256:${'1'.repeat(64)}`;
-const stableDigest = `sha256:${'2'.repeat(64)}`;
-const productDigest = `sha256:${'3'.repeat(64)}`;
-const workerDigest = `sha256:${'4'.repeat(64)}`;
-const executionDigest = `sha256:${'5'.repeat(64)}`;
+const planSemanticDigest = `sha256:${'1'.repeat(64)}`;
+const planInstanceDigest = `sha256:${'2'.repeat(64)}`;
+const authorityDigest = `sha256:${'3'.repeat(64)}`;
+const environmentDigest = `sha256:${'4'.repeat(64)}`;
+const stableDigest = `sha256:${'5'.repeat(64)}`;
+const productDigest = `sha256:${'6'.repeat(64)}`;
+const workerDigest = `sha256:${'7'.repeat(64)}`;
+const executionDigest = `sha256:${'8'.repeat(64)}`;
 const hostedId = 'desktop-chromium::e2e/tests/desktop.spec.mjs::hosted';
 const boundedHostedId = 'desktop-chromium::e2e/tests/creature-gameplay-real-desktop.spec.mjs::bounded real';
 const candidateAdditionalId = 'desktop-chromium::e2e/tests/desktop.spec.mjs::candidate addition';
@@ -72,10 +75,13 @@ function reviewGroup() {
 
 function plan(overrides = {}) {
   return {
-    schemaVersion: 2,
-    controller: { id: 'atlas-protected-hosted-controller-v2', version: 2, sourceSha: controllerSha },
+    schemaVersion: 3,
+    controller: { id: 'atlas-protected-hosted-controller-v3', version: 3, sourceSha: controllerSha },
     candidateHeadSha: head,
-    planDigest,
+    planSemanticDigest,
+    planInstanceDigest,
+    authorityDigest,
+    environmentDigest,
     expectedStableTestIdsDigest: stableDigest,
     productIdentitiesDigest: productDigest,
     workerPolicyDigest: workerDigest,
@@ -95,7 +101,11 @@ function plan(overrides = {}) {
 test('hosted execution contract copies exact protected selection and binds the hosted placement digest', () => {
   const result = buildProtectedHostedExecutionContract(plan(), { currentHeadSha: head });
   assert.equal(result.candidateHeadSha, head);
-  assert.equal(result.planDigest, planDigest);
+  assert.equal(result.schemaVersion, 2);
+  assert.equal(result.planSemanticDigest, planSemanticDigest);
+  assert.equal(result.planInstanceDigest, planInstanceDigest);
+  assert.equal(result.authorityDigest, authorityDigest);
+  assert.equal(result.environmentDigest, environmentDigest);
   assert.equal(result.expectedStableTestIdsDigest, stableDigest);
   assert.equal(result.hostedExpectedStableTestIdsDigest, digest([hostedId]));
   assert.equal(result.specialistExpectedStableTestIdsDigest, digest([]));
@@ -108,6 +118,15 @@ test('hosted execution contract copies exact protected selection and binds the h
   assert.deepEqual(result.specialist.groupIds, []);
   assert.deepEqual(result.specialist.stableTestIds, []);
   assert.deepEqual(result.review.groupIds, []);
+});
+
+test('hosted execution requires semantic, instance, authority and environment identities', () => {
+  for (const field of ['planSemanticDigest', 'planInstanceDigest', 'authorityDigest', 'environmentDigest']) {
+    assert.throws(
+      () => buildProtectedHostedExecutionContract(plan({ [field]: undefined }), { currentHeadSha: head }),
+      new RegExp(field.replace(/[A-Z]/g, (letter) => `.*${letter.toLowerCase()}`), 'i'),
+    );
+  }
 });
 
 test('candidate test bodies can widen only through new stable IDs; protected IDs stay protected-body work', () => {
@@ -310,6 +329,14 @@ test('protected promotion qualification registry binds exact functional qualific
       dependencyTarget: 'e2e/node_modules',
       dependencyLinkPhase: 'host-before-readonly-mount',
     },
+    deterministicRuntimeShim: {
+      command: 'python',
+      target: '/usr/bin/python3',
+      shimRoot: '/tmp/atlas-python-bin',
+      pycacheRoot: '/tmp/atlas-python-pycache',
+      network: 'none',
+      rootFilesystem: 'read-only',
+    },
   });
   assert.equal(Object.isFrozen(spec), true);
   assert.equal(Object.isFrozen(spec.changedFiles), true);
@@ -326,4 +353,49 @@ test('functional qualification registry binds protected dependencies before the 
     dependencyLinkPhase: 'host-before-readonly-mount',
   });
   assert.equal(Object.isFrozen(spec.candidateCensusMount), true);
+});
+
+test('functional qualification registry pins the deterministic Python compatibility shim', () => {
+  const spec = resolveProtectedPromotionQualification('fix/issue-179-qualification-functional-fixture');
+  assert.deepEqual(spec.deterministicRuntimeShim, {
+    command: 'python',
+    target: '/usr/bin/python3',
+    shimRoot: '/tmp/atlas-python-bin',
+    pycacheRoot: '/tmp/atlas-python-pycache',
+    network: 'none',
+    rootFilesystem: 'read-only',
+  });
+  assert.equal(Object.isFrozen(spec.deterministicRuntimeShim), true);
+});
+
+test('strict profile-none plan produces an exact zero-work execution contract', () => {
+  const zero = plan({
+    profile: 'none',
+    requiredGroupIds: [],
+    groups: [],
+    stableTestIds: [],
+    candidateStableIdAdditions: [],
+    candidateStableIdModifications: [],
+    requiredDataCapabilities: [],
+    requiresRealFullWorld: false,
+  });
+  const result = buildProtectedHostedExecutionContract(zero, { currentHeadSha: head });
+  assert.deepEqual(result.hosted.groupIds, []);
+  assert.deepEqual(result.hosted.stableTestIds, []);
+  assert.deepEqual(result.hosted.partitions, []);
+  assert.deepEqual(result.specialist.groupIds, []);
+  assert.deepEqual(result.specialist.stableTestIds, []);
+  assert.deepEqual(result.review.groupIds, []);
+  assert.equal(result.hostedExpectedStableTestIdsDigest, digest([]));
+  assert.equal(result.specialistExpectedStableTestIdsDigest, digest([]));
+});
+
+test('empty required groups fail closed unless the protected plan is exactly profile none', () => {
+  for (const overrides of [
+    { requiredGroupIds: [], groups: [], stableTestIds: [] },
+    { profile: 'none', requiredGroupIds: [], groups: [], stableTestIds: [hostedId] },
+    { profile: 'none', requiredGroupIds: [], groups: [hostedGroup()], stableTestIds: [] },
+  ]) {
+    assert.throws(() => buildProtectedHostedExecutionContract(plan(overrides), { currentHeadSha: head }), /zero.work|profile.none|required group|selected group|stable/i);
+  }
 });

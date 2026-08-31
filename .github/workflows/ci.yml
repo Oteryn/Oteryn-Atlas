@@ -242,7 +242,6 @@ jobs:
           import os
           import sys
           from pathlib import Path
-
           rc = int(sys.argv[1])
           evidence = {
               'version': 1,
@@ -303,17 +302,14 @@ jobs:
           trusted_impact="$(mktemp)"
           trusted_catalog="$(mktemp)"
           trap 'rm -f "$rows" "$paths" "$changes" "$git_changes" "$trusted_impact" "$trusted_catalog"' EXIT
-          gh api --paginate \
-            "repos/$GITHUB_REPOSITORY/pulls/$ATLAS_PR_NUMBER/files?per_page=100" \
+          gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$ATLAS_PR_NUMBER/files?per_page=100" \
             --jq '.[] | [.filename, (.previous_filename // "")] | @tsv' > "$rows"
           actual_count="$(wc -l < "$rows" | tr -d '[:space:]')"
           test "$actual_count" = "$ATLAS_CHANGED_FILE_COUNT"
           while IFS=$'\t' read -r filename previous_filename; do
             test -n "$filename"
             printf '%s\n' "$filename" >> "$paths"
-            if [[ -n "$previous_filename" ]]; then
-              printf '%s\n' "$previous_filename" >> "$paths"
-            fi
+            [[ -n "$previous_filename" ]] && printf '%s\n' "$previous_filename" >> "$paths"
           done < "$rows"
           git fetch --no-tags origin "$ATLAS_INTEGRATION_BASE_REF"
           integration_base_sha="$(git rev-parse "origin/$ATLAS_INTEGRATION_BASE_REF")"
@@ -325,7 +321,6 @@ jobs:
             git show "$integration_base_sha:tools/verification/impact-manifest.json" > "$trusted_impact"
             git show "$integration_base_sha:tools/verification/verification-catalog.json" > "$trusted_catalog"
           else
-            # Initial bootstrap policy has no path exemptions and therefore cannot narrow legacy full E2E.
             printf '%s\n' '{"schemaVersion":1,"entries":[]}' > "$trusted_impact"
             printf '%s\n' '{"schemaVersion":1,"groups":{"deterministic.core":{"specs":["tests/verification/*.test.mjs"],"projects":[],"resourceClass":"cpu-light","evidence":"machine-summary"},"e2e.full":{"specs":["e2e/tests/*.spec.mjs"],"projects":["desktop-chromium","mobile-chromium"],"resourceClass":"browser-full","evidence":"restricted-visual-review"}}}' > "$trusted_catalog"
           fi
@@ -358,9 +353,7 @@ jobs:
           const canonical = (items) => JSON.stringify(items
             .map((item) => ({ path: item.path, previousPath: item.previousPath ?? null }))
             .sort((left, right) => `${left.path}\0${left.previousPath}`.localeCompare(`${right.path}\0${right.previousPath}`)));
-          if (canonical(changes) !== canonical(gitChanges)) {
-            throw new Error('GitHub changed-file evidence does not match exact merge-base diff.');
-          }
+          if (canonical(changes) !== canonical(gitChanges)) throw new Error('GitHub changed-file evidence does not match exact merge-base diff.');
           fs.writeFileSync(changesPath, `${JSON.stringify(changes)}\n`);
           NODE
           mkdir -p artifacts/verification
@@ -401,7 +394,7 @@ jobs:
           retention-days: 14
 
   verification-browser:
-    name: Local Docker Playwright evidence
+    name: Protected Hosted Playwright evidence
     if: >-
       github.event_name == 'pull_request' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
@@ -410,21 +403,131 @@ jobs:
       - verification-node
       - change-classification
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 12
     permissions:
       contents: read
+      actions: read
+      pull-requests: read
       statuses: read
     env:
       GH_TOKEN: ${{ github.token }}
       ATLAS_CODE_REVISION: ${{ github.event.pull_request.head.sha }}
+      ATLAS_PROTECTED_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      ATLAS_PR_NUMBER: ${{ github.event.pull_request.number }}
+      ATLAS_LEGACY_CUTOVER_BASE_SHA: b285c4d57d48cbc70bca54619849b7f7cfd423f6
     steps:
-      - name: Require exact-head local Docker Playwright status
+      - name: Check out exact Atlas candidate gate authority
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Require exact protected hosted fan-in and lifecycle state bytes
+        id: validate
         shell: bash
         run: |
           set -euo pipefail
-          test "$GITHUB_REPOSITORY" = 'Oteryn/Oteryn-Atlas'
-          state="$(gh api "repos/$GITHUB_REPOSITORY/commits/$ATLAS_CODE_REVISION/statuses" --jq '[.[] | select(.context == "atlas-local-e2e")][0].state // ""')"
-          test "$state" = success
+          test "$GITHUB_REPOSITORY" = Oteryn/Oteryn-Atlas
+          test "$(git rev-parse HEAD)" = "$ATLAS_CODE_REVISION"
+          if [[ "$ATLAS_PROTECTED_BASE_SHA" == "$ATLAS_LEGACY_CUTOVER_BASE_SHA" ]]; then
+            state="$(gh api "repos/$GITHUB_REPOSITORY/commits/$ATLAS_CODE_REVISION/statuses" --jq '[.[] | select(.context == "atlas-local-e2e")][0].state // ""')"
+            test "$state" = success
+            mkdir -p artifacts/protected-hosted-fan-in
+            node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          fs.writeFileSync('artifacts/protected-hosted-fan-in/protected-hosted-gate-validation.json', `${JSON.stringify({
+            schemaVersion: 1, status: 'success', mode: 'legacy-cutover-exact-base-only',
+            candidateHeadSha: process.env.ATLAS_CODE_REVISION, protectedBaseSha: process.env.ATLAS_PROTECTED_BASE_SHA,
+          }, null, 2)}\n`);
+          NODE
+            exit 0
+          fi
+          expected_name="protected-hosted-fan-in-$ATLAS_PROTECTED_BASE_SHA-$ATLAS_CODE_REVISION"
+          work=artifacts/protected-hosted-fan-in
+          mkdir -p "$work"
+          live_pr="$work/live-pr.json"
+          gh api "repos/$GITHUB_REPOSITORY/pulls/$ATLAS_PR_NUMBER" > "$live_pr"
+
+          selected_artifact_id=''
+          selected_run_id=''
+          selected_run_json=''
+          for attempt in {1..60}; do
+            payload="$RUNNER_TEMP/protected-hosted-artifacts.json"
+            gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?name=$expected_name&per_page=100" > "$payload"
+            mapfile -t candidates < <(node --input-type=module - "$payload" "$expected_name" <<'NODE'
+          import fs from 'node:fs';
+          const [payloadPath, expectedName] = process.argv.slice(2);
+          const artifacts = (JSON.parse(fs.readFileSync(payloadPath, 'utf8')).artifacts ?? [])
+            .filter((artifact) => artifact.expired === false
+              && artifact.name === expectedName
+              && Number.isSafeInteger(artifact.id)
+              && Number.isSafeInteger(artifact.workflow_run?.id))
+            .sort((left, right) => Date.parse(right.created_at) - Date.parse(left.created_at));
+          for (const artifact of artifacts) process.stdout.write(`${artifact.id}\t${artifact.workflow_run.id}\n`);
+          NODE
+            )
+            for candidate in "${candidates[@]}"; do
+              IFS=$'\t' read -r artifact_id producer_run_id <<< "$candidate"
+              run_json="$RUNNER_TEMP/protected-hosted-run-$producer_run_id.json"
+              gh api "repos/$GITHUB_REPOSITORY/actions/runs/$producer_run_id" > "$run_json"
+              if node --input-type=module - "$run_json" <<'NODE'
+          import fs from 'node:fs';
+          const run = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+          if (run.status !== 'completed' || run.conclusion !== 'success'
+            || run.path !== '.github/workflows/protected-hosted-executor.yml'
+            || run.event !== 'workflow_run'
+            || run.repository?.full_name !== process.env.GITHUB_REPOSITORY) process.exit(1);
+          NODE
+              then
+                selected_artifact_id="$artifact_id"
+                selected_run_id="$producer_run_id"
+                selected_run_json="$run_json"
+                break 2
+              fi
+            done
+            (( attempt < 60 )) && sleep 10
+          done
+          [[ "$selected_artifact_id" =~ ^[0-9]+$ && "$selected_run_id" =~ ^[0-9]+$ ]]
+          cp "$selected_run_json" "$work/producer-run.json"
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$selected_artifact_id/zip" > "$work/artifact.zip"
+          unzip -q "$work/artifact.zip" -d "$work/unpacked"
+          mapfile -t fan_in_files < <(find "$work/unpacked" -type f -name protected-hosted-fan-in.json -print)
+          mapfile -t state_files < <(find "$work/unpacked" -type f -name protected-verification-state.json -print)
+          test "${#fan_in_files[@]}" -eq 1
+          test "${#state_files[@]}" -eq 1
+
+          node --input-type=module - \
+            "${fan_in_files[0]}" "${state_files[0]}" "$live_pr" "$work/producer-run.json" \
+            "$expected_name" "$work/protected-hosted-gate-validation.json" <<'NODE'
+          import fs from 'node:fs';
+          import { validateProtectedHostedGate } from './tools/verification/protected-hosted-gate.mjs';
+          const [payloadPath, statePath, livePrPath, runPath, artifactName, outputPath] = process.argv.slice(2);
+          const read = (path) => JSON.parse(fs.readFileSync(path, 'utf8'));
+          const result = validateProtectedHostedGate({
+            payload: read(payloadPath),
+            state: read(statePath),
+            livePr: read(livePrPath),
+            producerRun: read(runPath),
+            expectedRepository: process.env.GITHUB_REPOSITORY,
+            expectedPrNumber: Number(process.env.ATLAS_PR_NUMBER),
+            expectedCandidateHeadSha: process.env.ATLAS_CODE_REVISION,
+            expectedProtectedBaseSha: process.env.ATLAS_PROTECTED_BASE_SHA,
+            expectedArtifactName: artifactName,
+            now: new Date().toISOString(),
+          });
+          fs.writeFileSync(outputPath, `${JSON.stringify(result, null, 2)}\n`);
+          NODE
+          printf 'producer_run_id=%s\nartifact_id=%s\nartifact_name=%s\n' \
+            "$selected_run_id" "$selected_artifact_id" "$expected_name" >> "$GITHUB_OUTPUT"
+
+      - name: Publish independently validated current-head hosted gate evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: protected-hosted-gate-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/protected-hosted-fan-in/protected-hosted-gate-validation.json
+          if-no-files-found: error
+          retention-days: 14
 
   atlas-gate:
     name: atlas-gate
@@ -462,12 +565,8 @@ jobs:
           if [[ "$GITHUB_EVENT_NAME" == pull_request ]]; then
             test "$CHANGE_CLASSIFICATION" = success
             case "$REQUIRES_E2E:$DOCS_ONLY" in
-              false:true)
-                test "$VERIFICATION_BROWSER" = skipped
-                ;;
-              true:false)
-                test "$VERIFICATION_BROWSER" = success
-                ;;
+              false:true) test "$VERIFICATION_BROWSER" = skipped ;;
+              true:false) test "$VERIFICATION_BROWSER" = success ;;
               *)
                 echo "Invalid PR verification classification: requires_e2e=$REQUIRES_E2E docs_only=$DOCS_ONLY" >&2
                 exit 1

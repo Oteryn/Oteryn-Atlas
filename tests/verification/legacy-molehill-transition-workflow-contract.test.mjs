@@ -78,13 +78,32 @@ test('legacy transition plan binds every stable ID executed by its retained full
     trustedVerificationCatalog: catalog,
     candidateVerificationCatalog: catalog,
     stableTestIds,
+    requiredGroupFloor: ['deterministic.core', 'e2e.full', 'fullworld.animation-census', 'integration.source-contract'],
   });
 
+  assert.deepEqual(plan.requiredGroupFloor, ['deterministic.core', 'e2e.full', 'fullworld.animation-census', 'integration.source-contract']);
   assert.deepEqual(plan.stableTestIds, stableTestIds,
     'the status validator requires an exact plan-to-summary census, not a lower bound');
   assert.deepEqual(plan.requiredDataCapabilities,
     ['bounded_real_world', 'qualification_fixture', 'real_fullworld']);
   assert.equal(plan.requiresRealFullWorld, true);
+});
+
+test('legacy transition workflow rejects any retained full-run plan census or capability mismatch before capture', () => {
+  const workflow = fs.readFileSync(workflowPath, 'utf8');
+  assert.match(workflow, /Legacy transition plan stable-ID census does not match retained full runner/);
+  assert.match(workflow, /Legacy transition plan data capabilities do not match retained full runner/);
+  assert.match(workflow, /\['bounded_real_world', 'qualification_fixture', 'real_fullworld'\]/);
+  assert.match(workflow, /plan\.requiresRealFullWorld !== true/);
+  assert.match(workflow, /protected-lower-bound-plan\.json/);
+  assert.match(workflow, /& node \.\.\\trusted-base\\tools\\verification\\build-verification-plan\.mjs/);
+  assert.match(workflow, /& node tools\\verification\\build-verification-plan\.mjs/);
+  assert.match(workflow, /--required-group-floor artifacts\/verification\/transition-required-group-floor\.json/);
+  assert.match(workflow, /Legacy transition widening narrowed protected group/);
+  assert.match(workflow, /Legacy transition widening narrowed protected stable ID/);
+  assert.match(workflow, /Legacy transition widening fabricated changed paths/);
+  assert.match(workflow, /fullworld\.animation-census/);
+  assert.match(workflow, /integration\.source-contract/);
 });
 
 test('PowerShell PR-head fences write JSON as UTF-8 without BOM before Node parses it', () => {
@@ -96,7 +115,8 @@ test('PowerShell PR-head fences write JSON as UTF-8 without BOM before Node pars
 test('PowerShell transition planner writes its plan JSON as UTF-8 without BOM', () => {
   const workflow = fs.readFileSync(workflowPath, 'utf8');
 
-  assert.match(workflow, /\$planOutput = @\(\s*& node \.\.\\trusted-base\\tools\\verification\\build-verification-plan\.mjs/s);
+  assert.match(workflow, /\$protectedPlanOutput = @\(\s*& node \.\.\\trusted-base\\tools\\verification\\build-verification-plan\.mjs/s);
+  assert.match(workflow, /\$planOutput = @\(\s*& node tools\\verification\\build-verification-plan\.mjs/s);
   assert.match(workflow, /\[IO\.File\]::WriteAllText\(\s*\$planPath,\s*\(\(\$planOutput -join "`n"\) \+ "`n"\),\s*\[Text\.UTF8Encoding\]::new\(\$false\)\s*\)/s);
   assert.doesNotMatch(workflow, /--stable-test-ids artifacts\/verification\/stable-test-ids\.json\s*`?\s*> artifacts\/verification\/pr-verification-plan\.json/);
 });

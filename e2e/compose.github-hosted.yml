@@ -12,7 +12,10 @@ services:
     cpus: 1.0
     environment:
       ATLAS_CODE_REVISION: ${ATLAS_CODE_REVISION:?ATLAS_CODE_REVISION is required}
-      ATLAS_VERIFICATION_PLAN_SHA256: ${ATLAS_VERIFICATION_PLAN_SHA256:?ATLAS_VERIFICATION_PLAN_SHA256 is required}
+      ATLAS_PLAN_SEMANTIC_DIGEST: ${ATLAS_PLAN_SEMANTIC_DIGEST:?ATLAS_PLAN_SEMANTIC_DIGEST is required}
+      ATLAS_PLAN_INSTANCE_DIGEST: ${ATLAS_PLAN_INSTANCE_DIGEST:?ATLAS_PLAN_INSTANCE_DIGEST is required}
+      ATLAS_AUTHORITY_DIGEST: ${ATLAS_AUTHORITY_DIGEST:?ATLAS_AUTHORITY_DIGEST is required}
+      ATLAS_ENVIRONMENT_DIGEST: ${ATLAS_ENVIRONMENT_DIGEST:?ATLAS_ENVIRONMENT_DIGEST is required}
       ATLAS_E2E_SHARD: ${ATLAS_E2E_SHARD:?ATLAS_E2E_SHARD is required}
       GITHUB_RUN_ID: ${GITHUB_RUN_ID:?GITHUB_RUN_ID is required}
     volumes:
@@ -49,7 +52,10 @@ services:
         const identity = {
           repository: 'Oteryn/Oteryn-Atlas',
           candidateSha: process.env.ATLAS_CODE_REVISION,
-          planDigest: process.env.ATLAS_VERIFICATION_PLAN_SHA256,
+          planSemanticDigest: process.env.ATLAS_PLAN_SEMANTIC_DIGEST,
+          planInstanceDigest: process.env.ATLAS_PLAN_INSTANCE_DIGEST,
+          authorityDigest: process.env.ATLAS_AUTHORITY_DIGEST,
+          environmentDigest: process.env.ATLAS_ENVIRONMENT_DIGEST,
           producerRunId: process.env.GITHUB_RUN_ID + '-' + shardOrdinal,
           harnessDigest: 'sha256:' + hash.digest('hex'),
         };

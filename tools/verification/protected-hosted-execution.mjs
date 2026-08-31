@@ -93,6 +93,14 @@ const PROTECTED_PROMOTION_QUALIFICATIONS = freeze({
       dependencyTarget: 'e2e/node_modules',
       dependencyLinkPhase: 'host-before-readonly-mount',
     },
+    deterministicRuntimeShim: {
+      command: 'python',
+      target: '/usr/bin/python3',
+      shimRoot: '/tmp/atlas-python-bin',
+      pycacheRoot: '/tmp/atlas-python-pycache',
+      network: 'none',
+      rootFilesystem: 'read-only',
+    },
   },
 });
 
@@ -206,10 +214,10 @@ function partitionHostedByDataCapability(hostedGroups, hostedStableTestIds, cand
 }
 
 export function buildProtectedHostedExecutionContract(plan, { currentHeadSha } = {}) {
-  if (!plan || typeof plan !== 'object' || Array.isArray(plan) || plan.schemaVersion !== 2) {
-    throw new TypeError('protected hosted execution requires plan schemaVersion 2');
+  if (!plan || typeof plan !== 'object' || Array.isArray(plan) || plan.schemaVersion !== 3) {
+    throw new TypeError('protected hosted execution requires plan schemaVersion 3');
   }
-  if (plan.controller?.id !== 'atlas-protected-hosted-controller-v2' || plan.controller?.version !== 2) {
+  if (plan.controller?.id !== 'atlas-protected-hosted-controller-v3' || plan.controller?.version !== 3) {
     throw new TypeError('protected hosted execution controller identity is invalid');
   }
   const controllerSourceSha = exactSha(plan.controller.sourceSha, 'controller source SHA');
@@ -217,15 +225,22 @@ export function buildProtectedHostedExecutionContract(plan, { currentHeadSha } =
   if (exactSha(currentHeadSha, 'current PR head') !== candidateHeadSha) {
     throw new TypeError('protected hosted execution current PR head is stale');
   }
-  const planDigest = exactDigest(plan.planDigest, 'plan digest');
+  const planSemanticDigest = exactDigest(plan.planSemanticDigest, 'plan semantic digest');
+  const planInstanceDigest = exactDigest(plan.planInstanceDigest, 'plan instance digest');
+  const authorityDigest = exactDigest(plan.authorityDigest, 'plan authority digest');
+  const environmentDigest = exactDigest(plan.environmentDigest, 'plan environment digest');
   const expectedStableTestIdsDigest = exactDigest(plan.expectedStableTestIdsDigest, 'expected stable-ID digest');
   const productIdentitiesDigest = exactDigest(plan.productIdentitiesDigest, 'product identities digest');
   const workerPolicyDigest = exactDigest(plan.workerPolicyDigest, 'worker policy digest');
   const executionPolicyDigest = exactDigest(plan.executionPolicyDigest, 'execution policy digest');
   if (plan.retryPolicy?.retries !== 0) throw new TypeError('protected hosted execution retries must be zero');
   if (plan.selectiveExecution !== false) throw new TypeError('protected hosted execution selective execution must remain disabled');
-  if (!Array.isArray(plan.requiredGroupIds) || plan.requiredGroupIds.length === 0 || new Set(plan.requiredGroupIds).size !== plan.requiredGroupIds.length) {
+  if (!Array.isArray(plan.requiredGroupIds) || new Set(plan.requiredGroupIds).size !== plan.requiredGroupIds.length) {
     throw new TypeError('protected hosted execution required group IDs are invalid');
+  }
+  const zeroWork = plan.requiredGroupIds.length === 0;
+  if (zeroWork && plan.profile !== 'none') {
+    throw new TypeError('protected hosted execution zero-work plan must be profile none');
   }
   if (!Array.isArray(plan.groups) || plan.groups.length !== plan.requiredGroupIds.length) {
     throw new TypeError('protected hosted execution selected groups must exactly match required group IDs');
@@ -247,7 +262,14 @@ export function buildProtectedHostedExecutionContract(plan, { currentHeadSha } =
     throw new TypeError('protected hosted execution real_fullworld placement conflicts with plan');
   }
 
-  const stableTestIds = exactStableIds(plan.stableTestIds, 'planned stable IDs');
+  const stableTestIds = exactStableIds(plan.stableTestIds, 'planned stable IDs', { allowEmpty: zeroWork });
+  if (zeroWork && (stableTestIds.length !== 0
+    || (plan.candidateStableIdAdditions ?? []).length !== 0
+    || (plan.candidateStableIdModifications ?? []).length !== 0
+    || (plan.requiredDataCapabilities ?? []).length !== 0
+    || Boolean(plan.requiresRealFullWorld))) {
+    throw new TypeError('protected hosted execution zero-work plan contains executable obligations');
+  }
   const stableTestIdSet = new Set(stableTestIds);
   const candidateStableIdAdditions = exactStableIds(plan.candidateStableIdAdditions ?? [], 'candidate stable-ID additions', { allowEmpty: true });
   const candidateStableIdModifications = exactStableIds(plan.candidateStableIdModifications ?? [], 'candidate stable-ID modifications', { allowEmpty: true });
@@ -289,10 +311,13 @@ export function buildProtectedHostedExecutionContract(plan, { currentHeadSha } =
   const hostedPartitions = partitionHostedByDataCapability(hostedGroups, hostedStableTestIds, candidateAdditionSet, candidateModificationSet);
 
   return freeze({
-    schemaVersion: 1,
+    schemaVersion: 2,
     controllerSourceSha,
     candidateHeadSha,
-    planDigest,
+    planSemanticDigest,
+    planInstanceDigest,
+    authorityDigest,
+    environmentDigest,
     expectedStableTestIdsDigest,
     hostedExpectedStableTestIdsDigest,
     specialistExpectedStableTestIdsDigest,

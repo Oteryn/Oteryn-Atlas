@@ -17,10 +17,14 @@ test('self-hosted Compose sends checkout into images instead of bind mounting ru
   assert.doesNotMatch(compose, /\.\.\/web:|\.\.\/src:|ATLAS_E2E_ARTIFACTS_HOST/);
 });
 
-test('required PR gate is status-only while nightly keeps the no-bind self-hosted Compose path', () => {
+test('required PR gate validates hosted lifecycle artifacts while nightly keeps the no-bind self-hosted Compose path', () => {
+  assert.match(ci, /Protected Hosted Playwright evidence/);
+  assert.match(ci, /protected-hosted-fan-in/);
+  assert.match(ci, /protected-verification-state/);
+  assert.match(ci, /validateProtectedHostedGate/);
+  assert.match(ci, /ATLAS_LEGACY_CUTOVER_BASE_SHA: b285c4d57d48cbc70bca54619849b7f7cfd423f6/);
   assert.match(ci, /atlas-local-e2e/);
-  assert.doesNotMatch(ci, /compose\.selfhosted\.yml/);
-  assert.doesNotMatch(ci, /docker cp/);
+  assert.doesNotMatch(ci, /compose\.selfhosted\.yml|docker cp/);
   assert.match(nightly, /compose\.selfhosted\.yml/);
   assert.match(nightly, /docker cp/);
 });
