@@ -4,6 +4,7 @@ import { canonicalJson } from './verification-plan-schema.mjs';
 
 const SHA = /^[a-f0-9]{40}$/;
 const SHA256 = /^sha256:[a-f0-9]{64}$/;
+const PINNED_IMAGE = /@sha256:[a-f0-9]{64}$/;
 
 function freeze(value) {
   if (value && typeof value === 'object' && !Object.isFrozen(value)) {
@@ -25,6 +26,12 @@ function exactSha(value, label) {
 function exactDigest(value, label) {
   if (typeof value !== 'string' || !SHA256.test(value)) throw new TypeError(`${label} must be sha256:<64 lowercase hex>`);
   return value;
+}
+
+function positiveInteger(value, label) {
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed <= 0) throw new TypeError(`${label} must be a positive safe integer`);
+  return parsed;
 }
 
 const PROTECTED_PROMOTION_QUALIFICATIONS = freeze({
@@ -112,6 +119,65 @@ export function resolveProtectedPromotionQualification(headRef) {
   if (!qualification) throw new TypeError(`unsupported protected promotion qualification: ${headRef}`);
   exactDigest(qualification.expectedProductDigest, 'protected promotion product digest');
   return qualification;
+}
+
+export function buildProtectedPromotionBrowserIdentity({
+  headRef,
+  candidateHeadSha,
+  protectedBaseSha,
+  prNumber,
+  runId,
+  runAttempt,
+  environmentImage,
+} = {}) {
+  const qualification = resolveProtectedPromotionQualification(headRef);
+  const candidateSha = exactSha(candidateHeadSha, 'promotion candidate SHA');
+  const baseSha = exactSha(protectedBaseSha, 'promotion protected-base SHA');
+  const exactPrNumber = positiveInteger(prNumber, 'promotion PR number');
+  const exactRunId = positiveInteger(runId, 'promotion workflow run ID');
+  const exactRunAttempt = positiveInteger(runAttempt, 'promotion workflow run attempt');
+  if (typeof environmentImage !== 'string' || !PINNED_IMAGE.test(environmentImage)) {
+    throw new TypeError('promotion environment image must be pinned by sha256 digest');
+  }
+
+  const planSemanticDigest = digest({
+    schemaVersion: 1,
+    kind: 'atlas-protected-promotion-browser-proof',
+    repository: 'Oteryn/Oteryn-Atlas',
+    qualificationId: qualification.id,
+    headRef: qualification.headRef,
+    candidateHeadSha: candidateSha,
+    expectedProductDigest: qualification.expectedProductDigest,
+  });
+  const authorityDigest = digest({
+    schemaVersion: 1,
+    kind: 'atlas-protected-promotion-authority',
+    repository: 'Oteryn/Oteryn-Atlas',
+    protectedBaseSha: baseSha,
+  });
+  const environmentDigest = digest({
+    schemaVersion: 1,
+    kind: 'atlas-protected-promotion-environment',
+    protectedBaseSha: baseSha,
+    environmentImage,
+  });
+  const planInstanceDigest = digest({
+    schemaVersion: 1,
+    kind: 'atlas-protected-promotion-browser-proof-instance',
+    planSemanticDigest,
+    authorityDigest,
+    environmentDigest,
+    prNumber: exactPrNumber,
+    runId: exactRunId,
+    runAttempt: exactRunAttempt,
+  });
+
+  return freeze({
+    planSemanticDigest,
+    planInstanceDigest,
+    authorityDigest,
+    environmentDigest,
+  });
 }
 
 function exactStableIds(value, label, { allowEmpty = false } = {}) {
