@@ -14,6 +14,7 @@ This is an `AUTHORITY_FAILURE` in orchestration, not candidate failure and not a
 - Preserve exact candidate-head fencing before expensive work and evidence acceptance.
 - Continue a successful `base_advance:*` controller into the existing protected hosted executor and fan-in path.
 - Preserve semantic evidence reuse and bounded `REUSE`, `PARTIAL_RERUN`, `FULL_RERUN`, or `REINTEGRATE` disposition.
+- Preserve per-PR cancellation/concurrency so repeated base advances cannot create parallel heavy work for one PR.
 - Preserve `retries=0`, exact stable-ID equality, immutable product identities, data-capability separation, `atlas-gate`, and `provenance-gate`.
 - Keep ordinary browser work GitHub-hosted, Molehill specialist-only, and Synology deployment-only.
 - Avoid PAT/service-token dependencies, no-op retriggers, new bootstrap PRs, and candidate self-certification.
@@ -24,6 +25,7 @@ This is an `AUTHORITY_FAILURE` in orchestration, not candidate failure and not a
 - Do not change the heavy browser test set or broaden `real_fullworld` routing.
 - Do not make arbitrary `workflow_dispatch` executor runs authoritative.
 - Do not accept historical green status without exact protected producer validation.
+- Do not require protected `main` to remain globally unchanged between controller completion and executor admission; a newer base advance is handled by the normal per-PR supersession/concurrency path.
 
 ## Selected architecture: protected explicit handoff
 
@@ -37,25 +39,39 @@ The handoff job has only the permission needed to dispatch Actions. It does not 
 4. the controller run is on `main` and the protected plan artifact exists exactly once;
 5. the target PR is still open, same-repository, main-targeting, and its current head equals the plan candidate head.
 
-After those checks it dispatches the existing protected hosted executor with one explicit input: the authoritative `controller_run_id`. The executor gains a narrow `workflow_dispatch` entry point while retaining the existing `workflow_run` entry point.
+After those checks it dispatches the existing protected hosted executor with two inputs:
+
+- `controller_run_id`: authoritative producer locator;
+- `pr_number`: untrusted routing/concurrency key only.
+
+The executor gains a narrow `workflow_dispatch` entry point while retaining the existing `workflow_run` entry point. `pr_number` is never accepted as evidence by itself: executor preflight must prove it equals `plan.prNumber` before lifecycle work can continue.
 
 ## Executor admission
 
 The executor treats `workflow_dispatch` as authoritative only when all of these are true:
 
-- `controller_run_id` is a positive integer;
+- `controller_run_id` and `pr_number` are positive integers;
 - GitHub API resolves that run as `.github/workflows/protected-verification-controller.yml`;
 - producer event is `workflow_dispatch`;
 - producer status/conclusion are `completed/success`;
 - producer run attempt is exactly `1`;
 - producer head branch is `main`;
-- producer head SHA is a currently protected `main` commit and equals the plan's `controller.sourceSha` and `protectedBaseSha`;
-- producer actor/triggering actor is `github-actions[bot]` for the dispatcher path;
+- producer head SHA equals the plan's `controller.sourceSha` and `protectedBaseSha`;
+- producer actor and triggering actor are `github-actions[bot]` for the dispatcher path;
 - exactly one protected plan artifact exists for that run;
 - the plan is schema v3 and passes the existing controller/candidate/base identity checks;
-- live PR head still equals the plan's candidate head before any expensive execution.
+- input `pr_number` equals `plan.prNumber`;
+- live PR is still open, same-repository and main-targeting, and its head still equals the plan candidate head before any expensive execution.
 
-A manually invoked executor that cannot prove this chain fails closed before environment qualification, evidence reuse, browser execution, or fan-in.
+The executor does **not** require the repository's current `main` head to still equal the producer's protected base. Doing so would turn a subsequent unrelated main advance into a stale-base rejection and recreate the loop #272 is designed to eliminate. Instead, a newer base advance is handled by the dispatcher/controller lifecycle and the executor's per-PR `cancel-in-progress` concurrency.
+
+A manually invoked executor that cannot prove the protected producer chain fails closed before environment qualification, evidence reuse, browser execution, or fan-in.
+
+## Concurrency and supersession
+
+For normal `workflow_run`, executor concurrency keeps using the PR association from the event when present. For protected `workflow_dispatch` handoff, workflow-level concurrency uses the supplied `pr_number` routing key so a newer executor for the same PR cancels older in-progress work.
+
+Because the routing key is available before jobs start, it may be used only for concurrency selection. Every job that relies on PR identity must use the validated `plan.prNumber` after preflight. A mismatch between input and plan fails closed.
 
 ## Trust boundary
 
@@ -72,10 +88,10 @@ The transport repair itself must not trigger Molehill or FullWorld qualification
 ## Files expected to change
 
 - `.github/workflows/protected-verification-controller.yml` — add the protected base-advance handoff job.
-- `.github/workflows/protected-hosted-executor.yml` — add narrow `workflow_dispatch` input and shared producer resolution.
+- `.github/workflows/protected-hosted-executor.yml` — add narrow `workflow_dispatch` inputs, preserve per-PR concurrency, and share protected producer resolution.
 - `tools/verification/protected-verification-state.mjs` — admit the new executor producer event only where the protected dispatch chain is validated, if required by current state validation.
 - `tools/verification/protected-hosted-gate.mjs` — admit the new executor event only where the protected producer chain is validated, if required by current gate validation.
-- `tests/verification/protected-verification-lifecycle-workflow-contract.test.mjs` and/or `tests/verification/protected-hosted-workflow-contract.test.mjs` — regression for controller handoff and fail-closed dispatch admission.
+- `tests/verification/protected-verification-lifecycle-workflow-contract.test.mjs` and/or `tests/verification/protected-hosted-workflow-contract.test.mjs` — regression for controller handoff, per-PR concurrency, and fail-closed dispatch admission.
 - `tests/verification/protected-hosted-gate.test.mjs` and state tests — exact producer-event negative and positive cases as needed.
 
 No unrelated runtime or product files are in scope.
@@ -83,13 +99,15 @@ No unrelated runtime or product files are in scope.
 ## Required TDD proofs
 
 1. RED: a successful bot-dispatched `base_advance:*` controller currently has no authoritative executor continuation.
-2. GREEN: controller contains an exact protected handoff to the executor using the current controller run ID.
+2. GREEN: controller contains an exact protected handoff to the executor using the current controller run ID and PR routing key.
 3. Negative: arbitrary/manual executor dispatch without a successful protected controller run is rejected.
-4. Negative: stale/failed/attempt>1/wrong-workflow/wrong-repository/wrong-main producer is rejected.
-5. Negative: current PR head differing from the plan candidate head is rejected before expensive work.
-6. Positive: ordinary `workflow_run` controller execution remains accepted unchanged.
-7. Positive: `workflow_dispatch` base-advance execution reaches the existing lifecycle classifier and can produce bounded reuse/partial/full/reintegrate behavior without changing candidate identity.
-8. Full deterministic verification contracts remain green.
+4. Negative: stale/failed/attempt>1/wrong-workflow/wrong-repository/wrong-producer-branch producer is rejected.
+5. Negative: input `pr_number` differing from the protected plan is rejected.
+6. Negative: current PR head differing from the plan candidate head is rejected before expensive work.
+7. Positive: ordinary `workflow_run` controller execution remains accepted unchanged.
+8. Positive: a later unrelated `main` advance does not invalidate an already admitted semantic plan solely because global main moved; per-PR concurrency/supersession handles the newer lifecycle.
+9. Positive: `workflow_dispatch` base-advance execution reaches the existing lifecycle classifier and can produce bounded reuse/partial/full/reintegrate behavior without changing candidate identity.
+10. Full deterministic verification contracts remain green.
 
 ## Terminal live proof
 
