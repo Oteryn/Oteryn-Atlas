@@ -4,6 +4,7 @@ import test from 'node:test';
 
 import {
   buildProtectedHostedExecutionContract,
+  buildProtectedPromotionBrowserIdentity,
   resolveProtectedPromotionQualification,
 } from '../../tools/verification/protected-hosted-execution.mjs';
 
@@ -340,6 +341,50 @@ test('protected promotion qualification registry binds exact functional qualific
   });
   assert.equal(Object.isFrozen(spec), true);
   assert.equal(Object.isFrozen(spec.changedFiles), true);
+});
+
+test('functional qualification promotion browser proof binds exact candidate, protected base, run and pinned environment', () => {
+  const identity = buildProtectedPromotionBrowserIdentity({
+    headRef: 'fix/issue-179-qualification-functional-fixture',
+    candidateHeadSha: 'c'.repeat(40),
+    protectedBaseSha: 'd'.repeat(40),
+    prNumber: 268,
+    runId: 123456,
+    runAttempt: 2,
+    environmentImage: `mcr.microsoft.com/playwright:v1.62.0-noble@sha256:${'e'.repeat(64)}`,
+  });
+  assert.deepEqual(Object.keys(identity).sort(), [
+    'authorityDigest',
+    'environmentDigest',
+    'planInstanceDigest',
+    'planSemanticDigest',
+  ]);
+  for (const value of Object.values(identity)) assert.match(value, /^sha256:[a-f0-9]{64}$/);
+  assert.equal(Object.isFrozen(identity), true);
+
+  const rerun = buildProtectedPromotionBrowserIdentity({
+    headRef: 'fix/issue-179-qualification-functional-fixture',
+    candidateHeadSha: 'c'.repeat(40),
+    protectedBaseSha: 'd'.repeat(40),
+    prNumber: 268,
+    runId: 123456,
+    runAttempt: 3,
+    environmentImage: `mcr.microsoft.com/playwright:v1.62.0-noble@sha256:${'e'.repeat(64)}`,
+  });
+  assert.equal(rerun.planSemanticDigest, identity.planSemanticDigest);
+  assert.equal(rerun.authorityDigest, identity.authorityDigest);
+  assert.equal(rerun.environmentDigest, identity.environmentDigest);
+  assert.notEqual(rerun.planInstanceDigest, identity.planInstanceDigest);
+
+  assert.throws(() => buildProtectedPromotionBrowserIdentity({
+    headRef: 'fix/issue-179-qualification-functional-fixture',
+    candidateHeadSha: 'c'.repeat(40),
+    protectedBaseSha: 'd'.repeat(40),
+    prNumber: 268,
+    runId: 123456,
+    runAttempt: 1,
+    environmentImage: 'mcr.microsoft.com/playwright:v1.62.0-noble',
+  }), /pinned.*sha256/i);
 });
 
 test('functional qualification registry binds protected dependencies before the read-only candidate mount', () => {
