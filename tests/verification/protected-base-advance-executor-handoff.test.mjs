@@ -50,8 +50,37 @@ test('heavy jobs execute only protected default-branch source and never checkout
   }
 });
 
-test('executor preserves per-PR supersession and accepts dispatch-produced lifecycle state', () => {
-  assert.match(executor, /group:\s*atlas-protected-hosted-\$\{\{[^\n]*inputs\.pr_number/);
+test('executor uses the same candidate-ref concurrency key for normal and base-advance entry points', () => {
+  const concurrencyGroupLine = executor
+    .split('\n')
+    .find((line) => line.trimStart().startsWith('group: atlas-protected-hosted-'))
+    ?.trim();
+  assert.equal(
+    concurrencyGroupLine,
+    'group: atlas-protected-hosted-${{ inputs.candidate_head_ref || github.event.workflow_run.head_branch }}',
+    'normal workflow_run and explicit base-advance dispatch must converge on stable candidate branch identity',
+  );
+
+  assert.match(executor, /candidate_head_ref:\s*\n[\s\S]*?required:\s*true/);
+  assert.match(
+    controller,
+    /candidate_head_ref="\$\(jq -r '\.head\.ref \/\/ empty' artifacts\/base-advance-handoff\/current-pr\.json\)"/,
+    'explicit handoff must derive the candidate ref from the same live PR payload whose head SHA is fenced',
+  );
+  assert.match(controller, /inputs\[candidate_head_ref\]=\$candidate_head_ref/);
+  assert.match(controller, /inputs\[pr_number\]=\$EXPECTED_PR_NUMBER/);
+
+  const executorKey = ({ dispatchCandidateRef, producerHeadBranch }) =>
+    `atlas-protected-hosted-${dispatchCandidateRef || producerHeadBranch}`;
+  const candidateRef = 'fix/example-pr';
+  const normalFirstHead = executorKey({ producerHeadBranch: candidateRef });
+  const normalSuccessiveHead = executorKey({ producerHeadBranch: candidateRef });
+  const explicitBaseAdvance = executorKey({ dispatchCandidateRef: candidateRef });
+  const differentPr = executorKey({ producerHeadBranch: 'fix/another-pr' });
+  assert.equal(normalFirstHead, normalSuccessiveHead, 'successive heads on one PR branch must share one concurrency key');
+  assert.equal(normalFirstHead, explicitBaseAdvance, 'normal and base-advance entries for one PR must share one concurrency key');
+  assert.notEqual(normalFirstHead, differentPr, 'different PR branches must not collide');
+
   assert.match(executor, /cancel-in-progress:\s*true/);
   assert.match(executor, /run\.event[^\n]*workflow_run[^\n]*workflow_dispatch|\['workflow_run',\s*'workflow_dispatch'\]/);
   assert.match(state, /EVENTS = new Set\(\[[^\]]*'workflow_run'[^\]]*'workflow_dispatch'/);
