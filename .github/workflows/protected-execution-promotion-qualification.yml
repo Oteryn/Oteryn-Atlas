@@ -694,7 +694,25 @@ jobs:
 
           export COMPOSE_PROJECT_NAME="atlas-functional-qualification-${GITHUB_RUN_ID}"
           export ATLAS_CODE_REVISION="$ATLAS_CODE_REVISION"
-          export ATLAS_VERIFICATION_PLAN_SHA256="sha256:$(printf '%s' "$ATLAS_CODE_REVISION" | sha256sum | awk '{print $1}')"
+          identity_json="$(
+            node --input-type=module <<'NODE'
+          import { buildProtectedPromotionBrowserIdentity } from './trusted-base/tools/verification/protected-hosted-execution.mjs';
+          const identity = buildProtectedPromotionBrowserIdentity({
+            headRef: process.env.ATLAS_HEAD_REF,
+            candidateHeadSha: process.env.ATLAS_CODE_REVISION,
+            protectedBaseSha: process.env.ATLAS_BASE_SHA,
+            prNumber: process.env.ATLAS_PR_NUMBER,
+            runId: process.env.GITHUB_RUN_ID,
+            runAttempt: process.env.GITHUB_RUN_ATTEMPT,
+            environmentImage: process.env.ATLAS_CANDIDATE_IMAGE,
+          });
+          process.stdout.write(JSON.stringify(identity));
+          NODE
+          )"
+          export ATLAS_PLAN_SEMANTIC_DIGEST="$(jq -er .planSemanticDigest <<<"$identity_json")"
+          export ATLAS_PLAN_INSTANCE_DIGEST="$(jq -er .planInstanceDigest <<<"$identity_json")"
+          export ATLAS_AUTHORITY_DIGEST="$(jq -er .authorityDigest <<<"$identity_json")"
+          export ATLAS_ENVIRONMENT_DIGEST="$(jq -er .environmentDigest <<<"$identity_json")"
           export ATLAS_E2E_SHARD='1/1'
           export ATLAS_E2E_WORKERS='1'
           export ATLAS_QUALIFICATION_PUBLICATION_HOST="$source_root"
