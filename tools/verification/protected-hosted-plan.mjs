@@ -174,8 +174,8 @@ export function buildProtectedHostedPlan(input) {
   const candidateCensus = validateCandidateCensus(input.candidateCensus, candidateHeadSha, [trustedCatalog, candidateCatalog]);
 
   const protectedSet = new Set(protectedCensus.stableTestIds);
-  const candidateStableIdAdditions = candidateCensus.census.stableTestIds.filter((id) => !protectedSet.has(id));
-  const widenedStableIds = [...new Set([...protectedCensus.stableTestIds, ...candidateStableIdAdditions])].sort();
+  const candidateStableIdWidening = candidateCensus.census.stableTestIds.filter((id) => !protectedSet.has(id));
+  const widenedStableIds = [...new Set([...protectedCensus.stableTestIds, ...candidateStableIdWidening])].sort();
 
   const basePlan = buildVerificationPlan({
     repository: input.repository,
@@ -190,6 +190,7 @@ export function buildProtectedHostedPlan(input) {
     protectedStableTestIds: widenedStableIds,
   });
   const plannedStableIdSet = new Set(basePlan.stableTestIds);
+  const candidateStableIdAdditions = candidateStableIdWidening.filter((id) => plannedStableIdSet.has(id));
   const candidateStableIdModifications = deriveCandidateStableIdModifications(
     basePlan.changedPaths,
     protectedCensus.stableTestIds,
