@@ -57,3 +57,10 @@ test('executor preserves per-PR supersession and accepts dispatch-produced lifec
   assert.match(state, /EVENTS = new Set\(\[[^\]]*'workflow_run'[^\]]*'workflow_dispatch'/);
   assert.match(gate, /PRODUCER_EVENTS = new Set\(\[[^\]]*'workflow_run'[^\]]*'workflow_dispatch'/);
 });
+
+test('executor terminates the restored base-state tuple before bash read reaches EOF', () => {
+  assert.ok(
+    executor.includes('process.stdout.write(`${previous.plan.protectedBaseSha} ${current.protectedBaseSha} ${current.candidateHeadSha}\\n`);'),
+    'base-advance tuple must end with a newline so bash read succeeds under set -e',
+  );
+});
