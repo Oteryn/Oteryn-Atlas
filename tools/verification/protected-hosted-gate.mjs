@@ -16,7 +16,7 @@ import {
 import { canonicalJson } from './verification-plan-schema.mjs';
 
 const EXECUTOR_WORKFLOW_PATH = '.github/workflows/protected-hosted-executor.yml';
-const PRODUCER_EVENTS = new Set(['workflow_run']);
+const PRODUCER_EVENTS = new Set(['workflow_run', 'workflow_dispatch']);
 const SUCCESS_PROGRESS = new Set(['QUALIFIED', 'MERGE_READY']);
 
 function exactPositiveInteger(value, label) {
@@ -39,6 +39,7 @@ function validateLivePr(pr, {
   prNumber,
   candidateHeadSha,
   protectedBaseSha,
+  requireBaseSha = true,
 }) {
   if (!isPlainObject(pr)
     || pr.number !== prNumber
@@ -52,7 +53,7 @@ function validateLivePr(pr, {
   if (exactSha(pr.head.sha, 'protected hosted gate live PR head') !== candidateHeadSha) {
     throw new TypeError('protected hosted gate live PR head is stale');
   }
-  if (exactSha(pr.base.sha, 'protected hosted gate live PR base') !== protectedBaseSha) {
+  if (requireBaseSha && exactSha(pr.base.sha, 'protected hosted gate live PR base') !== protectedBaseSha) {
     throw new TypeError('protected hosted gate live PR base is stale');
   }
   return undefined;
@@ -161,7 +162,7 @@ export function validateProtectedHostedGate(input) {
     throw new TypeError('protected hosted gate state is not qualified or merge-ready');
   }
   validateLivePr(input.livePr, {
-    repository, prNumber, candidateHeadSha, protectedBaseSha,
+    repository, prNumber, candidateHeadSha, protectedBaseSha, requireBaseSha: false,
   });
   validateProducerRun(input.producerRun, state, repository);
   if (state.plan.controller?.sourceSha !== protectedBaseSha) throw new TypeError('protected hosted gate controller authority is not the protected base');

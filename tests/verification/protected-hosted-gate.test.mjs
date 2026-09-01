@@ -99,12 +99,13 @@ function fixture(overrides = {}) {
     now: NOW,
   });
   const manifests = evidence(currentPlan, lifecycle);
+  const producerEvent = overrides.producerEvent ?? 'workflow_run';
   const producer = {
     repository: REPOSITORY,
     runId: 100,
     runAttempt: 1,
     workflowPath: '.github/workflows/protected-hosted-executor.yml',
-    event: 'workflow_run',
+    event: producerEvent,
   };
   const success = buildProtectedWorkflowSuccessState({
     currentPlan,
@@ -162,7 +163,7 @@ function fixture(overrides = {}) {
   };
   const producerRun = {
     id: 100, run_attempt: 1, path: '.github/workflows/protected-hosted-executor.yml',
-    event: 'workflow_run', status: 'completed', conclusion: 'success',
+    event: producerEvent, status: 'completed', conclusion: 'success',
     repository: { full_name: REPOSITORY },
   };
   return {
@@ -183,14 +184,24 @@ test('accepts exact live PR, successful producer, state bytes and mixed fan-in i
   assert.deepEqual(result.reusedEvidenceIds, []);
 });
 
-test('rejects stale PR base/head and non-authoritative producer state', () => {
+test('accepts authoritative protected executor workflow_dispatch producer', () => {
+  const result = validateProtectedHostedGate(fixture({ producerEvent: 'workflow_dispatch' }));
+  assert.equal(result.status, 'success');
+});
+
+test('accepts stale PR base snapshot when protected plan binds current controller base', () => {
+  const valid = fixture();
+  const result = validateProtectedHostedGate(fixture({
+    livePr: { ...valid.livePr, base: { ...valid.livePr.base, sha: sha('b') } },
+  }));
+  assert.equal(result.protectedBaseSha, sha('a'));
+});
+
+test('rejects stale PR head and non-authoritative producer state', () => {
   const valid = fixture();
   assert.throws(() => validateProtectedHostedGate(fixture({
     livePr: { ...valid.livePr, head: { ...valid.livePr.head, sha: sha('d') } },
   })), /head|stale/i);
-  assert.throws(() => validateProtectedHostedGate(fixture({
-    livePr: { ...valid.livePr, base: { ...valid.livePr.base, sha: sha('b') } },
-  })), /base|stale/i);
   assert.throws(() => validateProtectedHostedGate(fixture({
     producerRun: { ...valid.producerRun, conclusion: 'failure' },
   })), /producer/i);

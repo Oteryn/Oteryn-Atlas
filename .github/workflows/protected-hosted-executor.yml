@@ -4,6 +4,16 @@ on:
   workflow_run:
     workflows: ["Protected Verification Controller"]
     types: [completed]
+  workflow_dispatch:
+    inputs:
+      controller_run_id:
+        description: Exact successful protected controller run to consume
+        required: true
+        type: string
+      pr_number:
+        description: Untrusted PR routing key validated against protected plan
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -11,15 +21,16 @@ permissions:
   pull-requests: read
 
 concurrency:
-  group: atlas-protected-hosted-${{ github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.id }}
+  group: atlas-protected-hosted-${{ inputs.pr_number || github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.id }}
   cancel-in-progress: true
 
 jobs:
   preflight:
     if: >-
-      github.event_name == 'workflow_run' &&
-      github.event.workflow_run.conclusion == 'success' &&
-      (github.event.workflow_run.event == 'pull_request_target' || github.event.workflow_run.event == 'workflow_dispatch')
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       (github.event.workflow_run.event == 'pull_request_target' || github.event.workflow_run.event == 'workflow_dispatch'))
     runs-on: ubuntu-24.04
     timeout-minutes: 12
     outputs:
@@ -46,10 +57,32 @@ jobs:
         id: controller
         shell: bash
         env:
-          WORKFLOW_RUN_ID: ${{ github.event.workflow_run.id }}
+          WORKFLOW_RUN_ID: ${{ inputs.controller_run_id || github.event.workflow_run.id }}
+          DISPATCH_PR_NUMBER: ${{ inputs.pr_number }}
         run: |
           set -euo pipefail
-          [[ "$WORKFLOW_RUN_ID" =~ ^[0-9]+$ ]]
+          [[ "$WORKFLOW_RUN_ID" =~ ^[1-9][0-9]*$ ]]
+          if [[ "$GITHUB_EVENT_NAME" == workflow_dispatch ]]; then
+            [[ "$DISPATCH_PR_NUMBER" =~ ^[1-9][0-9]*$ ]]
+            mkdir -p artifacts/controller
+            gh api "repos/$GITHUB_REPOSITORY/actions/runs/$WORKFLOW_RUN_ID" > artifacts/controller/controller-producer-run.json
+            producer_head_sha="$(node --input-type=module - artifacts/controller/controller-producer-run.json <<'NODE'
+          import fs from 'node:fs';
+          const run = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+          if (run.repository?.full_name !== process.env.GITHUB_REPOSITORY
+            || run.path !== '.github/workflows/protected-verification-controller.yml'
+            || run.event !== 'workflow_dispatch'
+            || run.status !== 'completed' || run.conclusion !== 'success'
+            || Number(run.run_attempt) !== 1 || run.head_branch !== 'main'
+            || run.actor?.login !== 'github-actions[bot]' || run.triggering_actor?.login !== 'github-actions[bot]'
+            || !/^[a-f0-9]{40}$/.test(run.head_sha ?? '')) {
+            throw new Error('workflow_dispatch producer is not an authoritative protected controller run.');
+          }
+          process.stdout.write(run.head_sha);
+          NODE
+            )"
+            printf 'producer_head_sha=%s\n' "$producer_head_sha" >> "$GITHUB_OUTPUT"
+          fi
           printf 'bootstrap_active=true\ncontroller_run_id=%s\n' "$WORKFLOW_RUN_ID" >> "$GITHUB_OUTPUT"
 
       - name: Download the unique protected-verification-plan artifact
@@ -70,6 +103,9 @@ jobs:
         if: steps.controller.outputs.bootstrap_active == 'true'
         id: identity
         shell: bash
+        env:
+          DISPATCH_PR_NUMBER: ${{ inputs.pr_number }}
+          PRODUCER_HEAD_SHA: ${{ steps.controller.outputs.producer_head_sha }}
         run: |
           set -euo pipefail
           node --input-type=module - artifacts/controller/protected-verification-plan.json "$GITHUB_OUTPUT" <<'NODE'
@@ -83,6 +119,13 @@ jobs:
             fs.appendFileSync(outputPath, `${name}=${value}\n`);
           }
           if (!Number.isSafeInteger(plan.prNumber) || plan.prNumber < 1) throw new Error('Protected hosted plan PR number is invalid.');
+          if (process.env.GITHUB_EVENT_NAME === 'workflow_dispatch') {
+            if (!/^[1-9][0-9]*$/.test(process.env.DISPATCH_PR_NUMBER ?? '')) throw new Error('workflow_dispatch PR routing key is malformed.');
+            if (Number(process.env.DISPATCH_PR_NUMBER) !== plan.prNumber) throw new Error('workflow_dispatch PR routing key does not match protected plan.');
+            if (process.env.PRODUCER_HEAD_SHA !== plan.protectedBaseSha || process.env.PRODUCER_HEAD_SHA !== plan.controller.sourceSha) {
+              throw new Error('workflow_dispatch protected controller producer head does not match protected plan.');
+            }
+          }
           fs.appendFileSync(outputPath, `pr_number=${plan.prNumber}\n`);
           NODE
 
@@ -165,7 +208,7 @@ jobs:
           const run = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
           if (run.status !== 'completed'
             || run.path !== '.github/workflows/protected-hosted-executor.yml'
-            || run.event !== 'workflow_run'
+            || !['workflow_run', 'workflow_dispatch'].includes(run.event)
             || run.repository?.full_name !== process.env.GITHUB_REPOSITORY) process.exit(1);
           NODE
             then
@@ -213,23 +256,23 @@ jobs:
           execution=artifacts/controller/protected-hosted-execution.json
           previous=artifacts/controller/previous-protected-verification-state.json
           changed=artifacts/controller/base-advance-changed-paths.json
+          changed_raw="$RUNNER_TEMP/base-advance-changed-paths-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT.txt"
           merge_status=clean
           if [[ "$PREVIOUS_STATE_PRESENT" == true ]]; then
             read -r old_base current_base candidate_head < <(node --input-type=module - "$previous" "$plan" <<'NODE'
           import fs from 'node:fs';
           const previous = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
           const current = JSON.parse(fs.readFileSync(process.argv[3], 'utf8'));
-          process.stdout.write(`${previous.plan.protectedBaseSha} ${current.protectedBaseSha} ${current.candidateHeadSha}`);
+          process.stdout.write(`${previous.plan.protectedBaseSha} ${current.protectedBaseSha} ${current.candidateHeadSha}\n`);
           NODE
             )
             git -C protected-control fetch --no-tags origin "$old_base" "$current_base" "$candidate_head"
-            git -C protected-control diff --name-only --diff-filter=ACDMRTUXB "$old_base" "$current_base" \
-              | node --input-type=module - "$changed" <<'NODE'
+            git -C protected-control diff --name-only --diff-filter=ACDMRTUXB "$old_base" "$current_base" > "$changed_raw"
+            node --input-type=module - "$changed_raw" "$changed" <<'NODE'
           import fs from 'node:fs';
-          const chunks = [];
-          for await (const chunk of process.stdin) chunks.push(chunk);
-          const paths = chunks.join('').split(/\r?\n/).filter(Boolean).sort();
-          fs.writeFileSync(process.argv[2], `${JSON.stringify(paths, null, 2)}\n`);
+          const [inputPath, outputPath] = process.argv.slice(2);
+          const paths = fs.readFileSync(inputPath, 'utf8').split(/\r?\n/).filter(Boolean).sort();
+          fs.writeFileSync(outputPath, `${JSON.stringify(paths, null, 2)}\n`);
           NODE
             set +e
             git -C protected-control merge-tree --write-tree "$current_base" "$candidate_head" > "$RUNNER_TEMP/merge-tree.txt" 2>&1
@@ -403,14 +446,23 @@ jobs:
           test -s artifacts/controller/protected-verification-plan.json
           test -s artifacts/controller/protected-hosted-execution.json
 
-      - name: Check out exact protected controller source
-        id: checkout
+      - name: Check out protected default-branch source
+        id: checkout_protected
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ needs.preflight.outputs.controller_source_sha }}
+          ref: ${{ github.sha }}
           fetch-depth: 0
           persist-credentials: false
           path: protected-control
+
+      - name: Fence protected source to exact controller
+        id: checkout_protected_fence
+        shell: bash
+        env:
+          CONTROLLER_SOURCE_SHA: ${{ needs.preflight.outputs.controller_source_sha }}
+        run: |
+          set -euo pipefail
+          test "$(git -C protected-control rev-parse HEAD)" = "$CONTROLLER_SOURCE_SHA"
 
       - name: Fence exact head and materialize protected dependencies
         id: fence
@@ -528,7 +580,8 @@ jobs:
         shell: bash
         env:
           DOWNLOAD: ${{ steps.download.outcome }}
-          CHECKOUT: ${{ steps.checkout.outcome }}
+          CHECKOUT_PROTECTED: ${{ steps.checkout_protected.outcome }}
+          CHECKOUT_PROTECTED_FENCE: ${{ steps.checkout_protected_fence.outcome }}
           FENCE: ${{ steps.fence.outcome }}
           PROBE: ${{ steps.probe.outcome }}
           BIND: ${{ steps.bind.outcome }}
@@ -539,7 +592,7 @@ jobs:
             printf 'failure_stage=ENVIRONMENT_QUALIFICATION\nfailure_code=ENVIRONMENT_PROBE_FAILED\nfailure_ownership=environment\n' >> "$GITHUB_OUTPUT"
           elif [[ "$PUBLISH" == failure ]]; then
             printf 'failure_stage=ENVIRONMENT_QUALIFICATION\nfailure_code=ENVIRONMENT_ARTIFACT_PUBLICATION_FAILED\nfailure_ownership=external\n' >> "$GITHUB_OUTPUT"
-          elif [[ "$DOWNLOAD" == failure || "$CHECKOUT" == failure || "$FENCE" == failure || "$BIND" == failure ]]; then
+          elif [[ "$DOWNLOAD" == failure || "$CHECKOUT_PROTECTED" == failure || "$CHECKOUT_PROTECTED_FENCE" == failure || "$FENCE" == failure || "$BIND" == failure ]]; then
             printf 'failure_stage=AUTHORITY_PREFLIGHT\nfailure_code=ENVIRONMENT_AUTHORITY_WIRING_FAILED\nfailure_ownership=authority\n' >> "$GITHUB_OUTPUT"
           fi
 
@@ -601,14 +654,23 @@ jobs:
           test -s artifacts/environment/protected-environment-qualification.json
           test -s artifacts/environment/environment-evidence-manifest.json
 
-      - name: Check out exact protected controller source
-        id: checkout
+      - name: Check out protected default-branch source
+        id: checkout_protected
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ needs.preflight.outputs.controller_source_sha }}
+          ref: ${{ github.sha }}
           fetch-depth: 0
           persist-credentials: false
           path: protected-control
+
+      - name: Fence protected source to exact controller
+        id: checkout_protected_fence
+        shell: bash
+        env:
+          CONTROLLER_SOURCE_SHA: ${{ needs.preflight.outputs.controller_source_sha }}
+        run: |
+          set -euo pipefail
+          test "$(git -C protected-control rev-parse HEAD)" = "$CONTROLLER_SOURCE_SHA"
 
       - name: Validate environment dependency and fence current head
         id: validate
@@ -896,7 +958,8 @@ jobs:
         shell: bash
         env:
           DOWNLOAD: ${{ steps.download.outcome }}
-          CHECKOUT: ${{ steps.checkout.outcome }}
+          CHECKOUT_PROTECTED: ${{ steps.checkout_protected.outcome }}
+          CHECKOUT_PROTECTED_FENCE: ${{ steps.checkout_protected_fence.outcome }}
           VALIDATE: ${{ steps.validate.outcome }}
           SELECT: ${{ steps.select.outcome }}
           PRODUCT: ${{ steps.product.outcome }}
@@ -913,7 +976,7 @@ jobs:
             printf 'failure_stage=EXECUTING\nfailure_code=HOSTED_BROWSER_ASSERTION_FAILED\nfailure_ownership=candidate\n' >> "$GITHUB_OUTPUT"
           elif [[ "$PUBLISH" == failure ]]; then
             printf 'failure_stage=EXECUTING\nfailure_code=HOSTED_ARTIFACT_PUBLICATION_FAILED\nfailure_ownership=external\n' >> "$GITHUB_OUTPUT"
-          elif [[ "$DOWNLOAD" == failure || "$CHECKOUT" == failure || "$VALIDATE" == failure || "$SELECT" == failure || "$CONTEXT" == failure || "$SUMMARY" == failure || "$MANIFEST" == failure ]]; then
+          elif [[ "$DOWNLOAD" == failure || "$CHECKOUT_PROTECTED" == failure || "$CHECKOUT_PROTECTED_FENCE" == failure || "$VALIDATE" == failure || "$SELECT" == failure || "$CONTEXT" == failure || "$SUMMARY" == failure || "$MANIFEST" == failure ]]; then
             printf 'failure_stage=AUTHORITY_PREFLIGHT\nfailure_code=HOSTED_AUTHORITY_WIRING_FAILED\nfailure_ownership=authority\n' >> "$GITHUB_OUTPUT"
           fi
 
