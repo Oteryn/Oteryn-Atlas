@@ -38,15 +38,15 @@ test('executor admits only an exact protected controller workflow_dispatch produ
   assert.match(executor, /current-pr\.json/);
 });
 
-test('workflow_dispatch heavy jobs execute only the exact protected default-branch source', () => {
+test('heavy jobs execute only protected default-branch source and never checkout controller output', () => {
   const environmentStart = executor.indexOf('  environment-qualification:');
   const hostedStart = executor.indexOf('  hosted-shards:');
   const fanInStart = executor.indexOf('  fan-in:');
   assert.ok(environmentStart >= 0 && hostedStart > environmentStart && fanInStart > hostedStart);
   for (const block of [executor.slice(environmentStart, hostedStart), executor.slice(hostedStart, fanInStart)]) {
-    assert.match(block, /if:\s*github\.event_name == 'workflow_dispatch'[\s\S]*?ref:\s*\$\{\{ github\.sha \}\}/);
-    assert.match(block, /CONTROLLER_SOURCE_SHA:\s*\$\{\{ needs\.preflight\.outputs\.controller_source_sha \}\}[\s\S]*?rev-parse HEAD\)" = "\$CONTROLLER_SOURCE_SHA"/);
-    assert.match(block, /if:\s*github\.event_name == 'workflow_run'[\s\S]*?ref:\s*\$\{\{ needs\.preflight\.outputs\.controller_source_sha \}\}/);
+    assert.match(block, /id:\s*checkout_protected[\s\S]*?ref:\s*\$\{\{ github\.sha \}\}/);
+    assert.doesNotMatch(block, /ref:\s*\$\{\{ needs\.preflight\.outputs\.controller_source_sha \}\}/);
+    assert.match(block, /id:\s*checkout_protected_fence[\s\S]*?CONTROLLER_SOURCE_SHA:\s*\$\{\{ needs\.preflight\.outputs\.controller_source_sha \}\}[\s\S]*?rev-parse HEAD\)" = "\$CONTROLLER_SOURCE_SHA"/);
   }
 });
 

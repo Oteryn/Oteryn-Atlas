@@ -446,9 +446,8 @@ jobs:
           test -s artifacts/controller/protected-verification-plan.json
           test -s artifacts/controller/protected-hosted-execution.json
 
-      - name: Check out protected default-branch source for workflow_dispatch
-        if: github.event_name == 'workflow_dispatch'
-        id: checkout_dispatch
+      - name: Check out protected default-branch source
+        id: checkout_protected
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
@@ -456,25 +455,14 @@ jobs:
           persist-credentials: false
           path: protected-control
 
-      - name: Fence workflow_dispatch source to exact protected controller
-        if: github.event_name == 'workflow_dispatch'
-        id: checkout_dispatch_fence
+      - name: Fence protected source to exact controller
+        id: checkout_protected_fence
         shell: bash
         env:
           CONTROLLER_SOURCE_SHA: ${{ needs.preflight.outputs.controller_source_sha }}
         run: |
           set -euo pipefail
           test "$(git -C protected-control rev-parse HEAD)" = "$CONTROLLER_SOURCE_SHA"
-
-      - name: Check out exact protected controller source for workflow_run
-        if: github.event_name == 'workflow_run'
-        id: checkout_workflow_run
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ needs.preflight.outputs.controller_source_sha }}
-          fetch-depth: 0
-          persist-credentials: false
-          path: protected-control
 
       - name: Fence exact head and materialize protected dependencies
         id: fence
@@ -592,9 +580,8 @@ jobs:
         shell: bash
         env:
           DOWNLOAD: ${{ steps.download.outcome }}
-          CHECKOUT_DISPATCH: ${{ steps.checkout_dispatch.outcome }}
-          CHECKOUT_DISPATCH_FENCE: ${{ steps.checkout_dispatch_fence.outcome }}
-          CHECKOUT_WORKFLOW_RUN: ${{ steps.checkout_workflow_run.outcome }}
+          CHECKOUT_PROTECTED: ${{ steps.checkout_protected.outcome }}
+          CHECKOUT_PROTECTED_FENCE: ${{ steps.checkout_protected_fence.outcome }}
           FENCE: ${{ steps.fence.outcome }}
           PROBE: ${{ steps.probe.outcome }}
           BIND: ${{ steps.bind.outcome }}
@@ -605,7 +592,7 @@ jobs:
             printf 'failure_stage=ENVIRONMENT_QUALIFICATION\nfailure_code=ENVIRONMENT_PROBE_FAILED\nfailure_ownership=environment\n' >> "$GITHUB_OUTPUT"
           elif [[ "$PUBLISH" == failure ]]; then
             printf 'failure_stage=ENVIRONMENT_QUALIFICATION\nfailure_code=ENVIRONMENT_ARTIFACT_PUBLICATION_FAILED\nfailure_ownership=external\n' >> "$GITHUB_OUTPUT"
-          elif [[ "$DOWNLOAD" == failure || "$CHECKOUT_DISPATCH" == failure || "$CHECKOUT_DISPATCH_FENCE" == failure || "$CHECKOUT_WORKFLOW_RUN" == failure || "$FENCE" == failure || "$BIND" == failure ]]; then
+          elif [[ "$DOWNLOAD" == failure || "$CHECKOUT_PROTECTED" == failure || "$CHECKOUT_PROTECTED_FENCE" == failure || "$FENCE" == failure || "$BIND" == failure ]]; then
             printf 'failure_stage=AUTHORITY_PREFLIGHT\nfailure_code=ENVIRONMENT_AUTHORITY_WIRING_FAILED\nfailure_ownership=authority\n' >> "$GITHUB_OUTPUT"
           fi
 
@@ -667,9 +654,8 @@ jobs:
           test -s artifacts/environment/protected-environment-qualification.json
           test -s artifacts/environment/environment-evidence-manifest.json
 
-      - name: Check out protected default-branch source for workflow_dispatch
-        if: github.event_name == 'workflow_dispatch'
-        id: checkout_dispatch
+      - name: Check out protected default-branch source
+        id: checkout_protected
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
@@ -677,25 +663,14 @@ jobs:
           persist-credentials: false
           path: protected-control
 
-      - name: Fence workflow_dispatch source to exact protected controller
-        if: github.event_name == 'workflow_dispatch'
-        id: checkout_dispatch_fence
+      - name: Fence protected source to exact controller
+        id: checkout_protected_fence
         shell: bash
         env:
           CONTROLLER_SOURCE_SHA: ${{ needs.preflight.outputs.controller_source_sha }}
         run: |
           set -euo pipefail
           test "$(git -C protected-control rev-parse HEAD)" = "$CONTROLLER_SOURCE_SHA"
-
-      - name: Check out exact protected controller source for workflow_run
-        if: github.event_name == 'workflow_run'
-        id: checkout_workflow_run
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ needs.preflight.outputs.controller_source_sha }}
-          fetch-depth: 0
-          persist-credentials: false
-          path: protected-control
 
       - name: Validate environment dependency and fence current head
         id: validate
@@ -983,9 +958,8 @@ jobs:
         shell: bash
         env:
           DOWNLOAD: ${{ steps.download.outcome }}
-          CHECKOUT_DISPATCH: ${{ steps.checkout_dispatch.outcome }}
-          CHECKOUT_DISPATCH_FENCE: ${{ steps.checkout_dispatch_fence.outcome }}
-          CHECKOUT_WORKFLOW_RUN: ${{ steps.checkout_workflow_run.outcome }}
+          CHECKOUT_PROTECTED: ${{ steps.checkout_protected.outcome }}
+          CHECKOUT_PROTECTED_FENCE: ${{ steps.checkout_protected_fence.outcome }}
           VALIDATE: ${{ steps.validate.outcome }}
           SELECT: ${{ steps.select.outcome }}
           PRODUCT: ${{ steps.product.outcome }}
@@ -1002,7 +976,7 @@ jobs:
             printf 'failure_stage=EXECUTING\nfailure_code=HOSTED_BROWSER_ASSERTION_FAILED\nfailure_ownership=candidate\n' >> "$GITHUB_OUTPUT"
           elif [[ "$PUBLISH" == failure ]]; then
             printf 'failure_stage=EXECUTING\nfailure_code=HOSTED_ARTIFACT_PUBLICATION_FAILED\nfailure_ownership=external\n' >> "$GITHUB_OUTPUT"
-          elif [[ "$DOWNLOAD" == failure || "$CHECKOUT_DISPATCH" == failure || "$CHECKOUT_DISPATCH_FENCE" == failure || "$CHECKOUT_WORKFLOW_RUN" == failure || "$VALIDATE" == failure || "$SELECT" == failure || "$CONTEXT" == failure || "$SUMMARY" == failure || "$MANIFEST" == failure ]]; then
+          elif [[ "$DOWNLOAD" == failure || "$CHECKOUT_PROTECTED" == failure || "$CHECKOUT_PROTECTED_FENCE" == failure || "$VALIDATE" == failure || "$SELECT" == failure || "$CONTEXT" == failure || "$SUMMARY" == failure || "$MANIFEST" == failure ]]; then
             printf 'failure_stage=AUTHORITY_PREFLIGHT\nfailure_code=HOSTED_AUTHORITY_WIRING_FAILED\nfailure_ownership=authority\n' >> "$GITHUB_OUTPUT"
           fi
 
