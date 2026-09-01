@@ -172,6 +172,25 @@
       "superseded_by": null
     },
     {
+      "id": "ATLAS-E2E-VERIFICATION-ANTI-LOOP-HARDENING",
+      "file": "ATLAS-E2E-VERIFICATION-ANTI-LOOP-HARDENING.md",
+      "blob_sha": "3850f7bf0b759d84e451f247ef1faee721a3b24a",
+      "class": "PROMPT_TASK_EXECUTION",
+      "version": 1,
+      "status": "ACTIVE",
+      "authority_owner": "Oteryn/Oteryn-Atlas",
+      "scope": "Systemic protected E2E evidence identity, base-advance compatibility, environment qualification and anti-loop hardening under Issue #179.",
+      "input_contract": "Fresh GitHub live state, root AGENTS.md, Issue #179, the anti-loop design/spec and implementation plan, and current protected controller/executor/fan-in/planner state.",
+      "output_contract": "Verified protected anti-loop architecture that preserves exact candidate safety while preventing unrelated main movement and environment/bootstrap defects from causing unbounded requalification loops.",
+      "prohibited_actions": "No weakened gates/retries/provenance, no candidate self-certification, no no-op retrigger commits, no serial micro-bootstrap cascade, no ordinary E2E migration to Molehill/Synology.",
+      "validation_contract": "Exact-head deterministic negative proofs plus authoritative protected controller/executor/fan-in, atlas-gate, provenance-gate and applicable security checks.",
+      "lifecycle_issue": "https://github.com/Oteryn/Oteryn-Atlas/issues/179",
+      "issue_state_at_audit": "open",
+      "terminal_disposition": "ON_ISSUE_CLOSE_ARCHIVE_HISTORICAL",
+      "supersedes": null,
+      "superseded_by": null
+    },
+    {
       "id": "ATLAS-FULLWORLD-AGENT-SUITE",
       "file": "ATLAS-FULLWORLD-AGENT-SUITE.md",
       "blob_sha": "32c87bac1b443b0039ce7ecc760256294d3314fc",
