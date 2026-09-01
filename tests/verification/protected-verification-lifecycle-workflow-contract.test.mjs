@@ -32,6 +32,16 @@ test('base-advance workflow dispatch resolves current protected main instead of 
   assert.match(controller, /candidate_head_sha:\s*pr\.head\.sha/, 'candidate identity must remain bound to the live PR head');
 });
 
+test('base-advance changed paths are captured without multiplexing pipeline stdin with the Node program', () => {
+  assert.doesNotMatch(
+    executor,
+    /git -C protected-control diff --name-only[\s\S]*?\|\s*node --input-type=module - "\$changed" <<'NODE'/,
+    'a heredoc consumes Node stdin, so git diff bytes cannot also feed that parser under pipefail',
+  );
+  assert.match(executor, /git -C protected-control diff --name-only[^\n]*> "\$changed_raw"/);
+  assert.match(executor, /node --input-type=module - "\$changed_raw" "\$changed" <<'NODE'/);
+});
+
 test('executor makes lifecycle decisions before expensive work and persists a stable exact-candidate state artifact', () => {
   assert.match(executor, /protected-verification-workflow\.mjs/);
   assert.match(executor, /decideProtectedWorkflowLifecycle/);

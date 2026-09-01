@@ -256,6 +256,7 @@ jobs:
           execution=artifacts/controller/protected-hosted-execution.json
           previous=artifacts/controller/previous-protected-verification-state.json
           changed=artifacts/controller/base-advance-changed-paths.json
+          changed_raw="$RUNNER_TEMP/base-advance-changed-paths-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT.txt"
           merge_status=clean
           if [[ "$PREVIOUS_STATE_PRESENT" == true ]]; then
             read -r old_base current_base candidate_head < <(node --input-type=module - "$previous" "$plan" <<'NODE'
@@ -266,13 +267,12 @@ jobs:
           NODE
             )
             git -C protected-control fetch --no-tags origin "$old_base" "$current_base" "$candidate_head"
-            git -C protected-control diff --name-only --diff-filter=ACDMRTUXB "$old_base" "$current_base" \
-              | node --input-type=module - "$changed" <<'NODE'
+            git -C protected-control diff --name-only --diff-filter=ACDMRTUXB "$old_base" "$current_base" > "$changed_raw"
+            node --input-type=module - "$changed_raw" "$changed" <<'NODE'
           import fs from 'node:fs';
-          const chunks = [];
-          for await (const chunk of process.stdin) chunks.push(chunk);
-          const paths = chunks.join('').split(/\r?\n/).filter(Boolean).sort();
-          fs.writeFileSync(process.argv[2], `${JSON.stringify(paths, null, 2)}\n`);
+          const [inputPath, outputPath] = process.argv.slice(2);
+          const paths = fs.readFileSync(inputPath, 'utf8').split(/\r?\n/).filter(Boolean).sort();
+          fs.writeFileSync(outputPath, `${JSON.stringify(paths, null, 2)}\n`);
           NODE
             set +e
             git -C protected-control merge-tree --write-tree "$current_base" "$candidate_head" > "$RUNNER_TEMP/merge-tree.txt" 2>&1
