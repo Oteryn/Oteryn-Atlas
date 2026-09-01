@@ -50,16 +50,21 @@ test('heavy jobs execute only protected default-branch source and never checkout
   }
 });
 
-test('executor preserves one concurrency key across successive heads of the same PR and accepts dispatch-produced lifecycle state', () => {
+test('executor uses the same candidate-ref concurrency key for normal and base-advance entry points', () => {
   const concurrencyGroupLine = executor
     .split('\n')
     .find((line) => line.trimStart().startsWith('group: atlas-protected-hosted-'))
     ?.trim();
   assert.equal(
     concurrencyGroupLine,
-    'group: atlas-protected-hosted-${{ inputs.pr_number || github.event.workflow_run.head_branch }}',
-    'workflow_run supersession must use stable candidate branch identity instead of per-run identity',
+    'group: atlas-protected-hosted-${{ inputs.candidate_head_ref || github.event.workflow_run.head_branch }}',
+    'normal and workflow_dispatch executor entries must converge on the same stable candidate branch identity',
   );
+  assert.match(executor, /candidate_head_ref:\s*\n[\s\S]*?required:\s*true/);
+  assert.match(executor, /pr_number:/, 'numeric PR routing remains a separate authority input');
+  assert.match(controller, /candidate_head_ref="\$\(jq -r '\.head\.ref \/\/ empty' artifacts\/base-advance-handoff\/current-pr\.json\)"/);
+  assert.match(controller, /inputs\[candidate_head_ref\]=\$candidate_head_ref/);
+  assert.match(controller, /inputs\[pr_number\]=\$EXPECTED_PR_NUMBER/);
   assert.match(executor, /cancel-in-progress:\s*true/);
   assert.match(executor, /run\.event[^\n]*workflow_run[^\n]*workflow_dispatch|\['workflow_run',\s*'workflow_dispatch'\]/);
   assert.match(state, /EVENTS = new Set\(\[[^\]]*'workflow_run'[^\]]*'workflow_dispatch'/);
