@@ -38,6 +38,18 @@ test('executor admits only an exact protected controller workflow_dispatch produ
   assert.match(executor, /current-pr\.json/);
 });
 
+test('workflow_dispatch heavy jobs execute only the exact protected default-branch source', () => {
+  const environmentStart = executor.indexOf('  environment-qualification:');
+  const hostedStart = executor.indexOf('  hosted-shards:');
+  const fanInStart = executor.indexOf('  fan-in:');
+  assert.ok(environmentStart >= 0 && hostedStart > environmentStart && fanInStart > hostedStart);
+  for (const block of [executor.slice(environmentStart, hostedStart), executor.slice(hostedStart, fanInStart)]) {
+    assert.match(block, /if:\s*github\.event_name == 'workflow_dispatch'[\s\S]*?ref:\s*\$\{\{ github\.sha \}\}/);
+    assert.match(block, /CONTROLLER_SOURCE_SHA:\s*\$\{\{ needs\.preflight\.outputs\.controller_source_sha \}\}[\s\S]*?rev-parse HEAD\)" = "\$CONTROLLER_SOURCE_SHA"/);
+    assert.match(block, /if:\s*github\.event_name == 'workflow_run'[\s\S]*?ref:\s*\$\{\{ needs\.preflight\.outputs\.controller_source_sha \}\}/);
+  }
+});
+
 test('executor preserves per-PR supersession and accepts dispatch-produced lifecycle state', () => {
   assert.match(executor, /group:\s*atlas-protected-hosted-\$\{\{[^\n]*inputs\.pr_number/);
   assert.match(executor, /cancel-in-progress:\s*true/);
