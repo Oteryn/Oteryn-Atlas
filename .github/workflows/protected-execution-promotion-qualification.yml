@@ -1,7 +1,7 @@
 name: Protected execution promotion qualification
 
 on:
-  pull_request:
+  pull_request_target:
     types: [labeled]
 
 permissions:
@@ -676,8 +676,9 @@ jobs:
           qualification_list="$(cat "$RUNNER_TEMP/atlas-functional-qualification-list-path.txt")"
           execution_context="$RUNNER_TEMP/atlas-functional-execution-context"
           artifacts="$RUNNER_TEMP/atlas-functional-browser-artifacts"
-          rm -rf "$execution_context" "$artifacts"
-          mkdir -p "$execution_context" "$artifacts"
+          identity_dir="$RUNNER_TEMP/atlas-functional-transition-identities"
+          rm -rf "$execution_context" "$artifacts" "$identity_dir"
+          mkdir -p "$execution_context" "$artifacts" "$identity_dir"
 
           rsync -a --delete --exclude='.git' candidate/ "$execution_context/"
           for path in e2e e2e/tests e2e/support web src; do
@@ -692,9 +693,70 @@ jobs:
           mkdir -p "$execution_context/tools/verification"
           cp trusted-base/tools/verification/stable-id.mjs "$execution_context/tools/verification/stable-id.mjs"
 
+          IDENTITY_DIR="$identity_dir" QUALIFICATION_LIST="$qualification_list" TRUST_PATH="$trust_path" node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import path from 'node:path';
+          import { bytesDigest, canonicalDigest } from './trusted-base/tools/verification/anti-loop-common.mjs';
+          import { buildProtectedExecutionEnvironmentIdentity } from './trusted-base/tools/verification/protected-execution-environment.mjs';
+          import { buildVerificationAuthorityIdentity } from './trusted-base/tools/verification/verification-authority.mjs';
+
+          const readJson = (target) => JSON.parse(fs.readFileSync(target, 'utf8'));
+          const exactSha = (value, label) => {
+            if (!/^[a-f0-9]{40}$/.test(value ?? '')) throw new TypeError(`${label} must be an exact SHA`);
+            return value;
+          };
+          const exactDigest = (value, label) => {
+            if (!/^sha256:[a-f0-9]{64}$/.test(value ?? '')) throw new TypeError(`${label} must be an exact digest`);
+            return value;
+          };
+          const candidateHeadSha = exactSha(process.env.ATLAS_CODE_REVISION, 'transition candidate head');
+          const protectedBaseSha = exactSha(process.env.ATLAS_BASE_SHA, 'transition protected base');
+          const authorityIdentity = await buildVerificationAuthorityIdentity({
+            manifest: readJson('trusted-base/tools/verification/verification-authority-manifest.json'),
+            readFile: async (relative) => fs.readFileSync(path.join('trusted-base', relative)),
+          });
+          const environmentIdentity = buildProtectedExecutionEnvironmentIdentity(
+            readJson('trusted-base/tools/verification/protected-execution-environment.json'),
+          );
+          const trust = readJson(process.env.TRUST_PATH);
+          if (trust.dataCapability !== 'qualification_fixture') throw new TypeError('transition trust is not qualification_fixture');
+          const semanticCore = {
+            schemaVersion: 1,
+            identityId: 'atlas-functional-qualification-transition-semantic-v1',
+            repository: process.env.GITHUB_REPOSITORY,
+            candidateHeadSha,
+            authorityDigest: exactDigest(authorityIdentity.authorityDigest, 'transition authority'),
+            environmentDigest: exactDigest(environmentIdentity.environmentDigest, 'transition environment'),
+            dataCapability: 'qualification_fixture',
+            productDigest: exactDigest(trust.productDigest, 'transition qualification product'),
+            protectedTestListDigest: bytesDigest(fs.readFileSync(process.env.QUALIFICATION_LIST)),
+            execution: { shard: '1/1', workers: 1, retries: 0 },
+          };
+          const semanticIdentity = { ...semanticCore, planSemanticDigest: canonicalDigest(semanticCore) };
+          const instanceCore = {
+            schemaVersion: 1,
+            identityId: 'atlas-functional-qualification-transition-instance-v1',
+            repository: process.env.GITHUB_REPOSITORY,
+            protectedBaseSha,
+            candidateHeadSha,
+            planSemanticDigest: semanticIdentity.planSemanticDigest,
+            runId: String(process.env.GITHUB_RUN_ID),
+            runAttempt: Number(process.env.GITHUB_RUN_ATTEMPT),
+          };
+          const instanceIdentity = { ...instanceCore, planInstanceDigest: canonicalDigest(instanceCore) };
+          fs.writeFileSync(path.join(process.env.IDENTITY_DIR, 'verification-authority-identity.json'), `${JSON.stringify(authorityIdentity, null, 2)}\n`);
+          fs.writeFileSync(path.join(process.env.IDENTITY_DIR, 'protected-execution-environment-identity.json'), `${JSON.stringify(environmentIdentity, null, 2)}\n`);
+          fs.writeFileSync(path.join(process.env.IDENTITY_DIR, 'transition-semantic-identity.json'), `${JSON.stringify(semanticIdentity, null, 2)}\n`);
+          fs.writeFileSync(path.join(process.env.IDENTITY_DIR, 'transition-instance-identity.json'), `${JSON.stringify(instanceIdentity, null, 2)}\n`);
+          NODE
+
           export COMPOSE_PROJECT_NAME="atlas-functional-qualification-${GITHUB_RUN_ID}"
           export ATLAS_CODE_REVISION="$ATLAS_CODE_REVISION"
           export ATLAS_VERIFICATION_PLAN_SHA256="sha256:$(printf '%s' "$ATLAS_CODE_REVISION" | sha256sum | awk '{print $1}')"
+          export ATLAS_PLAN_SEMANTIC_DIGEST="$(jq -er '.planSemanticDigest' "$identity_dir/transition-semantic-identity.json")"
+          export ATLAS_PLAN_INSTANCE_DIGEST="$(jq -er '.planInstanceDigest' "$identity_dir/transition-instance-identity.json")"
+          export ATLAS_AUTHORITY_DIGEST="$(jq -er '.authorityDigest' "$identity_dir/verification-authority-identity.json")"
+          export ATLAS_ENVIRONMENT_DIGEST="$(jq -er '.environmentDigest' "$identity_dir/protected-execution-environment-identity.json")"
           export ATLAS_E2E_SHARD='1/1'
           export ATLAS_E2E_WORKERS='1'
           export ATLAS_QUALIFICATION_PUBLICATION_HOST="$source_root"
@@ -739,7 +801,7 @@ jobs:
           gh api --method POST \
             "repos/$GITHUB_REPOSITORY/statuses/$ATLAS_CODE_REVISION" \
             -f state='success' \
-            -f context='atlas-local-e2e' \
+            -f context='atlas-protected-product-qualification' \
             -f description='Protected GitHub-hosted complete qualification functional safety net' \
             -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
 

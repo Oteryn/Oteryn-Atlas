@@ -5,7 +5,7 @@ import { buildEvidenceManifest } from '../../tools/verification/evidence-manifes
 import { REQUIRED_ENVIRONMENT_CHECKS } from '../../tools/verification/protected-execution-environment.mjs';
 import { planProtectedVerificationLifecycle } from '../../tools/verification/protected-verification-lifecycle.mjs';
 import { buildProtectedWorkflowSuccessState } from '../../tools/verification/protected-verification-workflow.mjs';
-import { validateProtectedHostedGate } from '../../tools/verification/protected-hosted-gate.mjs';
+import { validateProtectedHostedGate, validateProtectedProductQualificationGate } from '../../tools/verification/protected-hosted-gate.mjs';
 
 const sha = (character) => character.repeat(40);
 const digest = (character) => `sha256:${character.repeat(64)}`;
@@ -233,4 +233,91 @@ test('rejects candidate-controlled producer events and candidate controller auth
     controller: { id: 'atlas-protected-hosted-controller-v3', version: 3, sourceSha: sha('c') },
   });
   assert.throws(() => validateProtectedHostedGate(fixture({ plan: candidateAuthorityPlan })), /controller|authority|base/i);
+});
+
+
+function productQualificationFixture(overrides = {}) {
+  const protectedBaseSha = sha('a');
+  const candidateHeadSha = sha('c');
+  const prNumber = 268;
+  const runId = 9876;
+  const headRef = 'fix/issue-179-qualification-functional-fixture';
+  const livePr = {
+    number: prNumber,
+    state: 'open',
+    merged: false,
+    base: { ref: 'main', sha: protectedBaseSha, repo: { full_name: REPOSITORY } },
+    head: { ref: headRef, sha: candidateHeadSha, repo: { full_name: REPOSITORY } },
+  };
+  const status = {
+    state: 'success',
+    context: 'atlas-protected-product-qualification',
+    description: 'Protected GitHub-hosted complete qualification functional safety net',
+    target_url: `https://github.com/${REPOSITORY}/actions/runs/${runId}`,
+    creator: { login: 'github-actions[bot]' },
+  };
+  const producerRun = {
+    id: runId,
+    run_attempt: 1,
+    path: '.github/workflows/protected-execution-promotion-qualification.yml',
+    event: 'pull_request_target',
+    status: 'completed',
+    conclusion: 'success',
+    head_branch: 'main',
+    head_sha: protectedBaseSha,
+    repository: { full_name: REPOSITORY },
+    pull_requests: [{
+      number: prNumber,
+      head: { sha: candidateHeadSha, repo: { full_name: REPOSITORY } },
+      base: { sha: protectedBaseSha, repo: { full_name: REPOSITORY } },
+    }],
+  };
+  const producerJobs = {
+    jobs: [{
+      name: 'Publish functional qualification fixture compatibility evidence',
+      status: 'completed',
+      conclusion: 'success',
+    }],
+  };
+  return {
+    status, producerRun, producerJobs, livePr,
+    expectedRepository: REPOSITORY,
+    expectedPrNumber: prNumber,
+    expectedCandidateHeadSha: candidateHeadSha,
+    expectedProtectedBaseSha: protectedBaseSha,
+    ...overrides,
+  };
+}
+
+test('accepts only exact protected full qualification browser promotion evidence', () => {
+  const result = validateProtectedProductQualificationGate(productQualificationFixture());
+  assert.equal(result.status, 'success');
+  assert.equal(result.mode, 'protected-product-qualification');
+  assert.equal(result.qualificationId, 'qualification-functional-fixture-v1');
+  assert.equal(result.producerRunAttempt, 1);
+});
+
+test('rejects manual, stale, retried, wrong-event and no-browser promotion evidence', () => {
+  const valid = productQualificationFixture();
+  assert.throws(() => validateProtectedProductQualificationGate(productQualificationFixture({
+    status: { ...valid.status, creator: { login: 'blakinio' } },
+  })), /status|authoritative/i);
+  assert.throws(() => validateProtectedProductQualificationGate(productQualificationFixture({
+    producerRun: { ...valid.producerRun, event: 'pull_request' },
+  })), /producer/i);
+  assert.throws(() => validateProtectedProductQualificationGate(productQualificationFixture({
+    producerRun: { ...valid.producerRun, run_attempt: 2 },
+  })), /attempt/i);
+  assert.throws(() => validateProtectedProductQualificationGate(productQualificationFixture({
+    producerRun: { ...valid.producerRun, head_sha: sha('b') },
+  })), /base|stale/i);
+  assert.throws(() => validateProtectedProductQualificationGate(productQualificationFixture({
+    producerJobs: { jobs: [{ ...valid.producerJobs.jobs[0], conclusion: 'failure' }] },
+  })), /proof job|successful/i);
+  assert.throws(() => validateProtectedProductQualificationGate(productQualificationFixture({
+    livePr: {
+      ...valid.livePr,
+      head: { ...valid.livePr.head, ref: 'fix/issue-179-bounded-real-row-framing' },
+    },
+  })), /complete hosted browser/i);
 });
