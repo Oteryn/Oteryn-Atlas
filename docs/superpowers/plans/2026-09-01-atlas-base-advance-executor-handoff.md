@@ -305,7 +305,24 @@ const PRODUCER_EVENTS = new Set(['workflow_run', 'workflow_dispatch']);
 
 Do not broaden workflow paths, repository identity, run ID/attempt matching, status/conclusion requirements, plan identity, live PR head checks, or evidence availability rules.
 
-- [ ] **Step 4: Re-run state and gate tests**
+- [ ] **Step 4: Stop treating stale `livePr.base.sha` as hosted protected-base authority**
+
+Add a hosted-gate regression where `state.plan.protectedBaseSha` is the controller-resolved current protected base while `livePr.base.sha` is an older PR snapshot; the hosted gate must still validate when repository/base-ref/current-head and all protected plan/executor evidence are correct. Keep product-qualification semantics strict by parameterizing the shared live-PR validator rather than deleting base checking globally:
+
+```js
+function validateLivePr(pr, {
+  repository, prNumber, candidateHeadSha, protectedBaseSha, requireBaseSha = true,
+}) {
+  // existing repo/ref/head checks stay fail-closed
+  if (requireBaseSha && exactSha(pr.base.sha, 'protected hosted gate live PR base') !== protectedBaseSha) {
+    throw new TypeError('protected hosted gate live PR base is stale');
+  }
+}
+```
+
+Call it with `requireBaseSha: false` from `validateProtectedHostedGate`, because the protected plan/controller run binds current protected base. Keep `requireBaseSha: true` for `validateProtectedProductQualificationGate`, whose producer association remains exact-base bound.
+
+- [ ] **Step 5: Re-run state and gate tests**
 
 ```bash
 node --test \
