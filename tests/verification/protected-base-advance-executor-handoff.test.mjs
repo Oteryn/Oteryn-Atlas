@@ -50,8 +50,16 @@ test('heavy jobs execute only protected default-branch source and never checkout
   }
 });
 
-test('executor preserves per-PR supersession and accepts dispatch-produced lifecycle state', () => {
-  assert.match(executor, /group:\s*atlas-protected-hosted-\$\{\{[^\n]*inputs\.pr_number/);
+test('executor preserves one concurrency key across successive heads of the same PR and accepts dispatch-produced lifecycle state', () => {
+  const concurrencyGroupLine = executor
+    .split('\n')
+    .find((line) => line.trimStart().startsWith('group: atlas-protected-hosted-'))
+    ?.trim();
+  assert.equal(
+    concurrencyGroupLine,
+    'group: atlas-protected-hosted-${{ inputs.pr_number || github.event.workflow_run.head_branch }}',
+    'workflow_run supersession must use stable candidate branch identity instead of per-run identity',
+  );
   assert.match(executor, /cancel-in-progress:\s*true/);
   assert.match(executor, /run\.event[^\n]*workflow_run[^\n]*workflow_dispatch|\['workflow_run',\s*'workflow_dispatch'\]/);
   assert.match(state, /EVENTS = new Set\(\[[^\]]*'workflow_run'[^\]]*'workflow_dispatch'/);
