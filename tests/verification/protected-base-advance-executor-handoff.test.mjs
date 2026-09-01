@@ -50,20 +50,37 @@ test('heavy jobs execute only protected default-branch source and never checkout
   }
 });
 
-test('executor uses the same candidate-ref concurrency key for normal and base-advance entry points', () => {
+test('executor uses one numeric PR concurrency key across normal and base-advance entry points', () => {
+  const controllerRunNameLine = controller
+    .split('\n')
+    .find((line) => line.trimStart().startsWith('run-name:'))
+    ?.trim();
+  assert.equal(
+    controllerRunNameLine,
+    'run-name: ${{ inputs.pr_number || github.event.pull_request.number }}',
+    'protected controller workflow_run display_title must expose stable numeric PR identity',
+  );
+
   const concurrencyGroupLine = executor
     .split('\n')
     .find((line) => line.trimStart().startsWith('group: atlas-protected-hosted-'))
     ?.trim();
   assert.equal(
     concurrencyGroupLine,
-    'group: atlas-protected-hosted-${{ inputs.candidate_head_ref || github.event.workflow_run.head_branch }}',
-    'normal and workflow_dispatch executor entries must converge on the same stable candidate branch identity',
+    'group: atlas-protected-hosted-pr-${{ inputs.pr_number || github.event.workflow_run.display_title }}',
+    'normal workflow_run and explicit workflow_dispatch must converge on the same numeric PR key',
   );
-  assert.match(executor, /candidate_head_ref:\s*\n[\s\S]*?required:\s*true/);
-  assert.match(executor, /pr_number:/, 'numeric PR routing remains a separate authority input');
-  assert.match(controller, /candidate_head_ref="\$\(jq -r '\.head\.ref \/\/ empty' artifacts\/base-advance-handoff\/current-pr\.json\)"/);
-  assert.match(controller, /inputs\[candidate_head_ref\]=\$candidate_head_ref/);
+
+  const controllerDisplayTitle = ({ dispatchPrNumber, pullRequestNumber }) => String(dispatchPrNumber || pullRequestNumber);
+  const executorKey = ({ dispatchPrNumber, producerDisplayTitle }) => `atlas-protected-hosted-pr-${dispatchPrNumber || producerDisplayTitle}`;
+  const normalPr284 = executorKey({ producerDisplayTitle: controllerDisplayTitle({ pullRequestNumber: 284 }) });
+  const dispatchPr284 = executorKey({ dispatchPrNumber: '284' });
+  const normalPr285 = executorKey({ producerDisplayTitle: controllerDisplayTitle({ pullRequestNumber: 285 }) });
+  assert.equal(normalPr284, dispatchPr284, 'same PR must share one key across both executor events');
+  assert.notEqual(normalPr284, normalPr285, 'different PRs must never collide in the normal workflow_run path');
+
+  assert.doesNotMatch(executor, /candidate_head_ref:/, 'candidate branch ref is not a reliable workflow_run producer identity');
+  assert.doesNotMatch(controller, /inputs\[candidate_head_ref\]/);
   assert.match(controller, /inputs\[pr_number\]=\$EXPECTED_PR_NUMBER/);
   assert.match(executor, /cancel-in-progress:\s*true/);
   assert.match(executor, /run\.event[^\n]*workflow_run[^\n]*workflow_dispatch|\['workflow_run',\s*'workflow_dispatch'\]/);
