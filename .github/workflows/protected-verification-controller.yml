@@ -365,8 +365,11 @@ jobs:
             throw new Error('Base-advance handoff live PR identity is stale or invalid.');
           }
           NODE
+          candidate_head_ref="$(jq -r '.head.ref // empty' artifacts/base-advance-handoff/current-pr.json)"
+          test -n "$candidate_head_ref"
           gh api --method POST \
             "repos/$GITHUB_REPOSITORY/actions/workflows/protected-hosted-executor.yml/dispatches" \
             -f ref='main' \
             -f "inputs[controller_run_id]=$CONTROLLER_RUN_ID" \
-            -f "inputs[pr_number]=$EXPECTED_PR_NUMBER"
+            -f "inputs[pr_number]=$EXPECTED_PR_NUMBER" \
+            -f "inputs[candidate_head_ref]=$candidate_head_ref"
