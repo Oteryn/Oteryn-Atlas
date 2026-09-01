@@ -1,0 +1,183 @@
+name: Atlas Merge Queue gate
+
+on:
+  merge_group:
+    types: [checks_requested]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: atlas-merge-group-${{ github.event.merge_group.head_sha }}
+  cancel-in-progress: true
+
+jobs:
+  atlas-gate:
+    name: atlas-gate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Validate exact merge-group identity
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_ACTION: ${{ github.event.action }}
+          BASE_REF: ${{ github.event.merge_group.base_ref || '' }}
+          BASE_SHA: ${{ github.event.merge_group.base_sha || '' }}
+          HEAD_SHA: ${{ github.event.merge_group.head_sha || '' }}
+          GITHUB_SHA_VALUE: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          [[ "$EVENT_NAME" == merge_group ]]
+          [[ "$EVENT_ACTION" == checks_requested ]]
+          [[ "$BASE_REF" == refs/heads/main ]]
+          [[ "$BASE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$HEAD_SHA" == "$GITHUB_SHA_VALUE" ]]
+          [[ "$HEAD_SHA" != "$BASE_SHA" ]]
+
+      - name: Check out exact merge-group candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.merge_group.head_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Validate candidate range and repository contract
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.merge_group.base_sha }}
+          HEAD_SHA: ${{ github.event.merge_group.head_sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$HEAD_SHA"
+          git cat-file -e "${BASE_SHA}^{commit}"
+          git diff --check "$BASE_SHA" "$HEAD_SHA"
+          test -s README.md
+          test -s AGENTS.md
+          test -s SECURITY.md
+          test -s .github/CODEOWNERS
+          test -s web/proof/semantic/manifest.json
+          test -s web/proof/pixels/manifest.json
+          test -s web/proof/pixels/pack.rgba
+          test -s docs/migration/legacy-atlas-extraction-provenance.json
+          test -s tools/governance/verify_extraction_provenance.py
+          if find . -type f \( -name '*.otbm' -o -name '*.otb' -o -name '*.spr' -o -name '*.dat' \) -print -quit | grep -q .; then
+            echo 'Forbidden raw legacy/proprietary runtime input committed to repository.' >&2
+            exit 1
+          fi
+          if grep -R --line-number --include='*.ts' --include='*.js' --include='*.mjs' --include='*.svelte' -E '(\.otbm|Legacy IR|world\.otbm)' src web 2>/dev/null; then
+            echo 'Browser source must not reference legacy world formats.' >&2
+            exit 1
+          fi
+          node --test tests/deployment-policy.mjs
+
+      - name: Verify exact pinned extraction provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m py_compile tools/governance/verify_extraction_provenance.py tools/governance/test_verify_extraction_provenance.py
+          python tools/governance/test_verify_extraction_provenance.py
+          python tools/governance/verify_extraction_provenance.py
+
+      - name: Validate semantic and browser contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m py_compile \
+            tools/dyn-atlas-semantic/compiler.py \
+            tools/dyn-atlas-semantic/verify.py \
+            tools/dyn-atlas-semantic/self_test.py \
+            tools/dyn-atlas-semantic/benchmark.py \
+            tools/dyn-atlas-pixels/measure_metadata.py \
+            tools/dyn-atlas-pixels/publish_store.py
+          python tools/dyn-atlas-semantic/self_test.py
+          node --test tests/browser-semantic.mjs tests/pixel-store.mjs tests/gui-contract.mjs tests/animation-runtime.mjs
+          test -s web/index.html
+          test -s web/app.mjs
+          test -s web/style.css
+          grep -q 'type="module"' web/index.html
+
+      - name: Run real Chrome WebGL2 parity and GUI smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          CHROME="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || true)"
+          test -n "$CHROME"
+          python -m http.server 8765 --bind 127.0.0.1 >/tmp/atlas-http.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
+          for _ in $(seq 1 30); do curl -fsS http://127.0.0.1:8765/tests/browser-proof.html >/dev/null && break; sleep 1; done
+          rm -rf /tmp/chrome-browser-proof /tmp/chrome-app-proof /tmp/chrome-shot-proof
+          "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage --use-angle=swiftshader --enable-unsafe-swiftshader --force-device-scale-factor=1 --window-size=800,600 --virtual-time-budget=30000 --user-data-dir=/tmp/chrome-browser-proof --dump-dom http://127.0.0.1:8765/tests/browser-proof.html > /tmp/browser-proof.html
+          grep -q 'data-status="PASS"' /tmp/browser-proof.html
+          test "$(grep -c '"'"'"maxAbs"'"'": 0' /tmp/browser-proof.html)" -eq 5
+          "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage --use-angle=swiftshader --enable-unsafe-swiftshader --force-device-scale-factor=1 --window-size=1920,1080 --virtual-time-budget=30000 --user-data-dir=/tmp/chrome-app-proof --dump-dom 'http://127.0.0.1:8765/web/index.html?x=32377&y=32238&floor=-7&zoom=2' > /tmp/app-dom.html
+          grep -q 'VERIFIED' /tmp/app-dom.html
+          grep -q 'WEBGL2' /tmp/app-dom.html
+          grep -q '>30 / 30<' /tmp/app-dom.html
+          grep -q '<strong id="diag-draws">1</strong>' /tmp/app-dom.html
+          "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage --use-angle=swiftshader --enable-unsafe-swiftshader --hide-scrollbars --force-device-scale-factor=1 --window-size=1920,1080 --virtual-time-budget=30000 --user-data-dir=/tmp/chrome-shot-proof --screenshot=/tmp/gui.png 'http://127.0.0.1:8765/web/index.html?x=32377&y=32238&floor=-7&zoom=2'
+          python - <<'PY'
+          import struct
+          from pathlib import Path
+          data = Path('/tmp/gui.png').read_bytes()
+          assert data[:8] == b'\x89PNG\r\n\x1a\n'
+          assert struct.unpack('>II', data[16:24]) == (1920, 1080)
+          PY
+
+      - name: Run project checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -f package.json ]; then
+            if [ -f pnpm-lock.yaml ]; then
+              corepack enable
+              pnpm install --frozen-lockfile
+              pnpm run check
+              pnpm run test
+              pnpm run build
+            elif [ -f package-lock.json ]; then
+              npm ci
+              npm run check
+              npm test
+              npm run build
+            else
+              echo 'package.json exists without a supported lockfile' >&2
+              exit 1
+            fi
+          fi
+
+      - name: Run deterministic Atlas verification suite
+        shell: bash
+        env:
+          ATLAS_CODE_REVISION: ${{ github.event.merge_group.head_sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$ATLAS_CODE_REVISION"
+          files=(
+            tests/animation-runtime.mjs
+            tests/browser-semantic.mjs
+            tests/deployment-policy.mjs
+            tests/creature-presentation-geometry.mjs
+            tests/creature-interaction.mjs
+            tests/creature-interaction-target.mjs
+            tests/map-activation.mjs
+            tests/creature-map-activation-contract.mjs
+            tests/creature-interaction-runtime-contract.mjs
+            tests/creature-gameplay-profiles.mjs
+            tests/creature-inspector-state.mjs
+            tests/creature-gameplay-model.mjs
+            tests/creature-gameplay-runtime-contract.mjs
+            tests/gui-contract.mjs
+            tests/npc-markers.mjs
+            tests/pixel-store.mjs
+            tests/semantic-search.mjs
+            tests/semantic-search-creatures.mjs
+            tests/synology-live-workflow.mjs
+            tests/fullworld-layers/*.test.mjs
+            tests/fullworld-runtime/*.test.mjs
+            tests/properties/*.test.mjs
+            tests/verification/*.test.mjs
+          )
+          node --test "${files[@]}"
