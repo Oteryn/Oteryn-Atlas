@@ -6,12 +6,14 @@ import argparse
 import json
 import re
 import subprocess
+import tempfile
 from collections import Counter
 from pathlib import Path, PurePosixPath
 
 ROOT = Path(__file__).resolve().parents[2]
 MAP = ROOT / "docs" / "migration" / "legacy-atlas-extraction-provenance.json"
 HEX40 = re.compile(r"^[0-9a-f]{40}$")
+SOURCE_REPOSITORY = "https://github.com/blakinio/Otheryn.git"
 SOURCE_PREFIXES = ("tools/otbm_atlas/", "tools/otbm_atlas_facts/", ".github/workflows/otbm-atlas-")
 ALLOWED = {
     "GAME_OWNED_LEGACY_REFERENCE",
@@ -148,21 +150,35 @@ def verify(map_path: Path, source_root: Path | None = None) -> dict[str, int]:
     return dict(sorted(counts.items()))
 
 
+def fetch_pinned_source(source_sha: str, destination: Path) -> None:
+    assert HEX40.fullmatch(source_sha), source_sha
+    destination.mkdir(parents=True, exist_ok=False)
+    subprocess.run(["git", "init", "--quiet", str(destination)], check=True)
+    git(destination, "remote", "add", "origin", SOURCE_REPOSITORY)
+    git(destination, "fetch", "--quiet", "--depth=1", "origin", source_sha)
+    git(destination, "checkout", "--quiet", "--detach", source_sha)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--source-root",
         type=Path,
-        help="local inert checkout containing the exact pinned blakinio/Otheryn source commit; when supplied, every source row is cryptographically verified",
+        help="optional inert checkout containing the exact pinned blakinio/Otheryn source commit; when omitted, the verifier materializes that exact public source into a disposable temporary repository",
     )
     args = parser.parse_args()
-    source_root = args.source_root.resolve() if args.source_root is not None else None
-    counts = verify(MAP, source_root)
-    rows = len(json.loads(MAP.read_text(encoding="utf-8"))["rows"])
-    source_status = "verified" if source_root is not None else "not-requested"
-    print(
-        f"legacy extraction provenance PASS: rows={rows} source={source_status} classes={counts}"
-    )
+    data = json.loads(MAP.read_text(encoding="utf-8"))
+    source_sha = data["source"]["sha"]
+    if args.source_root is not None:
+        source_root = args.source_root.resolve()
+        counts = verify(MAP, source_root)
+    else:
+        with tempfile.TemporaryDirectory(prefix="atlas-pinned-source-") as tmp:
+            source_root = Path(tmp) / "source"
+            fetch_pinned_source(source_sha, source_root)
+            counts = verify(MAP, source_root)
+    rows = len(data["rows"])
+    print(f"legacy extraction provenance PASS: rows={rows} source=verified classes={counts}")
 
 
 if __name__ == "__main__":
