@@ -8,7 +8,8 @@ function readText(url) {
 
 const ci = readText(new URL('../../.github/workflows/ci.yml', import.meta.url));
 const nightly = readText(new URL('../../.github/workflows/verification-depth.yml', import.meta.url));
-const provenance = readText(new URL('../../.github/workflows/extraction-provenance.yml', import.meta.url));
+const mergeGroup = readText(new URL('../../.github/workflows/merge-group-gate.yml', import.meta.url));
+const provenanceWorkflow = new URL('../../.github/workflows/extraction-provenance.yml', import.meta.url);
 const synology = readText(new URL('../../.github/workflows/synology-live-acceptance.yml', import.meta.url));
 const playwrightConfig = readText(new URL('../../e2e/playwright.config.mjs', import.meta.url));
 const agents = readText(new URL('../../AGENTS.md', import.meta.url));
@@ -77,15 +78,21 @@ test('legacy local publisher remains exact while protected Playwright identity u
   assert.doesNotMatch(executor, /ATLAS_VERIFICATION_PLAN_SHA256/);
 });
 
-test('required workflows verify the exact pull-request head rather than a synthetic merge ref', () => {
+test('required PR and Merge Queue workflows bind to exact candidates', () => {
   const checkoutCount = (ci.match(/uses: actions\/checkout@/g) ?? []).length;
   const generalExactHeadCount = (ci.match(/ref: \${{ github\.event\.pull_request\.head\.sha \|\| github\.sha }}/g) ?? []).length;
   const prOnlyExactHeadCount = (ci.match(/ref: \${{ github\.event\.pull_request\.head\.sha }}/g) ?? []).length;
   const exactHeadCount = generalExactHeadCount + prOnlyExactHeadCount;
   assert.equal(exactHeadCount, checkoutCount);
 
-  const candidate = block(provenance, '      - name: Check out exact Atlas candidate\n', '      - name: Check out pinned legacy Atlas source as inert Git data\n');
-  assert.match(candidate, /ref: \${{ github\.event\.pull_request\.head\.sha \|\| github\.sha }}/);
+  assert.equal(fs.existsSync(provenanceWorkflow), false, 'separate provenance workflow must be retired');
+  assert.match(mergeGroup, /merge_group:\s*\n\s+types: \[checks_requested\]/);
+  assert.match(mergeGroup, /name: atlas-gate/);
+  assert.match(mergeGroup, /BASE_REF: \$\{\{ github\.event\.merge_group\.base_ref \|\| '' \}\}/);
+  assert.match(mergeGroup, /HEAD_SHA: \$\{\{ github\.event\.merge_group\.head_sha \|\| '' \}\}/);
+  assert.match(mergeGroup, /ref: \$\{\{ github\.event\.merge_group\.head_sha \}\}/);
+  assert.match(mergeGroup, /python tools\/governance\/verify_extraction_provenance\.py/);
+  assert.doesNotMatch(mergeGroup, /provenance-gate/);
 });
 
 test('nightly depth is scheduled, bounded, replayable, read-only and evidence-producing', () => {
