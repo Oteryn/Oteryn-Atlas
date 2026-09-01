@@ -337,6 +337,14 @@ test('protected promotion qualification registry binds exact functional qualific
       network: 'none',
       rootFilesystem: 'read-only',
     },
+    gateProof: {
+      kind: 'complete-hosted-browser-v1',
+      workflowPath: '.github/workflows/protected-execution-promotion-qualification.yml',
+      event: 'pull_request_target',
+      jobName: 'Publish functional qualification fixture compatibility evidence',
+      statusContext: 'atlas-protected-product-qualification',
+      statusDescription: 'Protected GitHub-hosted complete qualification functional safety net',
+    },
   });
   assert.equal(Object.isFrozen(spec), true);
   assert.equal(Object.isFrozen(spec.changedFiles), true);

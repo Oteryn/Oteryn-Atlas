@@ -42,15 +42,20 @@ jobs:
           [[ "$ATLAS_REQUESTED_PR_NUMBER" =~ ^[0-9]+$ ]]
           mkdir -p artifacts/protected-controller
           gh api "repos/$GITHUB_REPOSITORY/pulls/$ATLAS_REQUESTED_PR_NUMBER" > artifacts/protected-controller/requested-pr.json
-          node --input-type=module - artifacts/protected-controller/requested-pr.json "$GITHUB_OUTPUT" "$GITHUB_ENV" <<'NODE'
+          gh api "repos/$GITHUB_REPOSITORY/branches/main" > artifacts/protected-controller/protected-main.json
+          node --input-type=module - artifacts/protected-controller/requested-pr.json artifacts/protected-controller/protected-main.json "$GITHUB_OUTPUT" "$GITHUB_ENV" <<'NODE'
           import fs from 'node:fs';
-          const [payloadPath, outputPath, envPath] = process.argv.slice(2);
+          const [payloadPath, protectedMainPath, outputPath, envPath] = process.argv.slice(2);
           const pr = JSON.parse(fs.readFileSync(payloadPath, 'utf8'));
+          const protectedMain = JSON.parse(fs.readFileSync(protectedMainPath, 'utf8'));
           if (pr.state !== 'open' || pr.base?.ref !== 'main' || pr.base?.repo?.full_name !== process.env.GITHUB_REPOSITORY
             || pr.head?.repo?.full_name !== process.env.GITHUB_REPOSITORY) {
             throw new Error('Requested lifecycle PR is not an open same-repository main-targeting PR.');
           }
-          const values = { pr_number: String(pr.number), base_sha: pr.base.sha, candidate_head_sha: pr.head.sha };
+          if (protectedMain.name !== 'main' || !protectedMain.protected || !/^[a-f0-9]{40}$/.test(protectedMain.commit?.sha ?? '')) {
+            throw new Error('Current protected main identity is malformed or unprotected.');
+          }
+          const values = { pr_number: String(pr.number), base_sha: protectedMain.commit.sha, candidate_head_sha: pr.head.sha };
           if (!Number.isSafeInteger(pr.number) || pr.number < 1
             || !/^[a-f0-9]{40}$/.test(values.base_sha)
             || !/^[a-f0-9]{40}$/.test(values.candidate_head_sha)) {
