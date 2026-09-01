@@ -198,3 +198,23 @@ test('functional deterministic proof supplies the pinned Python command inside w
   assert.match(step, /--tmpfs \/tmp:rw,nosuid,nodev,size=256m/);
   assert.doesNotMatch(step, /apt-get|pip install|npm install/);
 });
+
+test('functional Chromium promotion derives all protected hosted identity digests instead of the legacy plan alias', () => {
+  const workflow = fs.readFileSync(workflowPath, 'utf8');
+  const job = workflow.split('  qualification-functional-fixture:')[1]?.split('  candidate-modification-overlay:')[0] ?? '';
+  const step = job.split('      - name: Prove complete protected qualification functional safety net in Chromium')[1]
+    ?.split('      - name: Fence exact head and publish functional qualification compatibility status')[0] ?? '';
+  assert.match(step, /buildProtectedPromotionBrowserIdentity/);
+  assert.match(step, /ATLAS_HEAD_REF/);
+  assert.match(step, /ATLAS_CODE_REVISION/);
+  assert.match(step, /ATLAS_BASE_SHA/);
+  assert.match(step, /GITHUB_RUN_ID/);
+  assert.match(step, /GITHUB_RUN_ATTEMPT/);
+  for (const variable of [
+    'ATLAS_PLAN_SEMANTIC_DIGEST',
+    'ATLAS_PLAN_INSTANCE_DIGEST',
+    'ATLAS_AUTHORITY_DIGEST',
+    'ATLAS_ENVIRONMENT_DIGEST',
+  ]) assert.match(step, new RegExp(`export ${variable}=`));
+  assert.doesNotMatch(step, /ATLAS_VERIFICATION_PLAN_SHA256/);
+});
