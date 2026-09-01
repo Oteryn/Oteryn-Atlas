@@ -131,8 +131,29 @@ jobs:
           set -euo pipefail
           git show "$ATLAS_PROTECTED_BASE_SHA:tools/verification/impact-manifest.json" > artifacts/protected-controller/trusted-impact.json
           git show "$ATLAS_PROTECTED_BASE_SHA:tools/verification/verification-catalog.json" > artifacts/protected-controller/trusted-catalog.json
-          git show "$ATLAS_CANDIDATE_HEAD_SHA:tools/verification/impact-manifest.json" > artifacts/protected-controller/candidate-impact.json
-          git show "$ATLAS_CANDIDATE_HEAD_SHA:tools/verification/verification-catalog.json" > artifacts/protected-controller/candidate-catalog.json
+          snapshot_candidate_policy() {
+            local path="$1"
+            local trusted="$2"
+            local target="$3"
+            if git cat-file -e "$ATLAS_CANDIDATE_HEAD_SHA:$path" 2>/dev/null; then
+              git show "$ATLAS_CANDIDATE_HEAD_SHA:$path" > "$target"
+              return
+            fi
+            node --input-type=module - artifacts/protected-controller/changed-files.json "$path" <<'NODE'
+          import fs from 'node:fs';
+          const [changedFilesPath, policyPath] = process.argv.slice(2);
+          const changes = JSON.parse(fs.readFileSync(changedFilesPath, 'utf8'));
+          if (!Array.isArray(changes)) throw new Error('Protected changed-file evidence is malformed.');
+          if (changes.some((change) => change?.path === policyPath || change?.previousPath === policyPath)) {
+            throw new Error(`Candidate changed or removed protected planning policy: ${policyPath}`);
+          }
+          NODE
+            cp "$trusted" "$target"
+          }
+          snapshot_candidate_policy tools/verification/impact-manifest.json \
+            artifacts/protected-controller/trusted-impact.json artifacts/protected-controller/candidate-impact.json
+          snapshot_candidate_policy tools/verification/verification-catalog.json \
+            artifacts/protected-controller/trusted-catalog.json artifacts/protected-controller/candidate-catalog.json
           git show "$ATLAS_PROTECTED_BASE_SHA:tools/verification/protected-hosted-product-identities.json" > artifacts/protected-controller/product-identities.json
 
       - name: Derive canonical protected authority and environment identities
