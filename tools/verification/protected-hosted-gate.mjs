@@ -7,7 +7,7 @@ import {
 } from './anti-loop-common.mjs';
 import { validateEvidenceManifest } from './evidence-manifest.mjs';
 import { validateProtectedExecutionEnvironmentQualification } from './protected-execution-environment.mjs';
-import { resolveProtectedPromotionQualification } from './protected-hosted-execution.mjs';
+import { resolveProtectedAuthorityRepinQualification, resolveProtectedPromotionQualification } from './protected-hosted-execution.mjs';
 import { validateProtectedHostedEvidenceFanIn } from './protected-hosted-fan-in.mjs';
 import {
   validateProtectedVerificationState,
@@ -246,10 +246,24 @@ export function validateProtectedProductQualificationGate(input) {
     repository, prNumber, candidateHeadSha, protectedBaseSha,
   });
   const headRef = nonEmptyString(input.livePr.head?.ref, 'protected product qualification gate head ref');
-  const qualification = resolveProtectedPromotionQualification(headRef);
+  let qualification;
+  let mode = 'protected-product-qualification';
+  try {
+    qualification = resolveProtectedPromotionQualification(headRef);
+  } catch (promotionError) {
+    try {
+      qualification = resolveProtectedAuthorityRepinQualification(headRef);
+      mode = 'protected-authority-repin-qualification';
+    } catch {
+      throw promotionError;
+    }
+  }
   const proof = qualification.gateProof;
-  if (!isPlainObject(proof) || proof.kind !== 'complete-hosted-browser-v1') {
-    throw new TypeError('protected product qualification is not a complete hosted browser gate proof');
+  const expectedProofKind = mode === 'protected-authority-repin-qualification'
+    ? 'complete-hosted-browser-authority-repin-v1'
+    : 'complete-hosted-browser-v1';
+  if (!isPlainObject(proof) || proof.kind !== expectedProofKind) {
+    throw new TypeError('protected product qualification is not an authoritative complete hosted browser gate proof');
   }
   if (qualification.headRef !== headRef) throw new TypeError('protected product qualification head ref mismatch');
 
@@ -303,13 +317,15 @@ export function validateProtectedProductQualificationGate(input) {
   return deepFreeze({
     schemaVersion: 1,
     status: 'success',
-    mode: 'protected-product-qualification',
+    mode,
     repository,
     prNumber,
     protectedBaseSha,
     candidateHeadSha,
     qualificationId: qualification.id,
-    productDigest: qualification.expectedProductDigest,
+    ...(mode === 'protected-authority-repin-qualification'
+      ? { sourceHeadRef: qualification.sourceHeadRef }
+      : { productDigest: qualification.expectedProductDigest }),
     producerRunId: runId,
     producerRunAttempt: runAttempt,
   });
