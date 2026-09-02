@@ -91,6 +91,13 @@ class PinnedSourceVerificationTest(unittest.TestCase):
         with self.assertRaises(AssertionError):
             verifier(data)
 
+    def test_current_merge_group_gate_matches_control_plane_pin(self) -> None:
+        m.verify_control_plane_pin(m.MERGE_GROUP_GATE_PATH, m.MERGE_GROUP_GATE_BLOB)
+
+    def test_control_plane_pin_rejects_wrong_blob(self) -> None:
+        with self.assertRaises(AssertionError):
+            m.verify_control_plane_pin(m.MERGE_GROUP_GATE_PATH, "0" * 40)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
