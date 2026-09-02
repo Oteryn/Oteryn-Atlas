@@ -14,19 +14,19 @@ function gitBlobSha(text) {
 
 const mergeGroupGateUrl = new URL('../../.github/workflows/merge-group-gate.yml', import.meta.url);
 const provenanceWorkflow = new URL('../../.github/workflows/extraction-provenance.yml', import.meta.url);
-const provenanceMapUrl = new URL('../../docs/migration/legacy-atlas-extraction-provenance.json', import.meta.url);
+const provenanceVerifierUrl = new URL('../../tools/governance/verify_extraction_provenance.py', import.meta.url);
 
-test('Merge Queue authority is provenance-pinned and emits only atlas-gate', () => {
+test('Merge Queue authority is exact-blob pinned and emits only atlas-gate', () => {
   assert.equal(fs.existsSync(provenanceWorkflow), false, 'separate provenance gate must remain retired');
   assert.equal(fs.existsSync(mergeGroupGateUrl), true, 'merge-group aggregate gate workflow must exist');
 
   const workflow = readText(mergeGroupGateUrl);
-  const provenanceMap = JSON.parse(readText(provenanceMapUrl));
-  const pins = provenanceMap.rows.flatMap((row) => row.target_paths ?? [])
-    .filter((target) => target.path === '.github/workflows/merge-group-gate.yml');
+  const verifier = readText(provenanceVerifierUrl);
+  const blob = gitBlobSha(workflow);
 
-  assert.equal(pins.length, 1, 'merge-group gate must have exactly one provenance target pin');
-  assert.equal(pins[0].blob, gitBlobSha(workflow), 'merge-group gate provenance pin must match exact workflow bytes');
+  assert.match(verifier, /MERGE_GROUP_GATE_PATH\s*=\s*["']\.github\/workflows\/merge-group-gate\.yml["']/);
+  assert.match(verifier, new RegExp(`MERGE_GROUP_GATE_BLOB\\s*=\\s*["']${blob}["']`));
+  assert.match(verifier, /verify_control_plane_pin\(MERGE_GROUP_GATE_PATH, MERGE_GROUP_GATE_BLOB\)/);
   assert.match(workflow, /merge_group:\s*\n\s*types:\s*\[checks_requested\]/);
   assert.match(workflow, /name:\s*atlas-gate/);
   assert.match(workflow, /BASE_REF: \$\{\{ github\.event\.merge_group\.base_ref \|\| '' \}\}/);
@@ -53,8 +53,8 @@ test('atlas-gate fully browser-qualifies the exact synthetic candidate with prot
   assert.match(workflow, /ATLAS_EXECUTION_CONTEXT/);
   assert.match(workflow, /ATLAS_PROTECTED_TEST_LIST/);
   assert.match(workflow, /ATLAS_CODE_REVISION/);
-  assert.match(workflow, /ATLAS_E2E_WORKERS=['"]?1['"]?/);
-  assert.match(workflow, /ATLAS_E2E_SHARD=['"]?1\/1['"]?/);
+  assert.match(workflow, /ATLAS_E2E_WORKERS:\s*['"]1['"]/);
+  assert.match(workflow, /ATLAS_E2E_SHARD:\s*['"]1\/1['"]/);
   assert.match(workflow, /--retries=0/);
   assert.match(workflow, /compose run --no-deps --rm e2e/);
   assert.doesNotMatch(workflow, /labels:\s*oteryn-atlas-pc|synology|real_fullworld/i);
