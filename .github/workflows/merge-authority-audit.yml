@@ -46,7 +46,6 @@ jobs:
           import json
           import os
           import re
-          import urllib.error
           import urllib.parse
           import urllib.request
 
@@ -60,6 +59,7 @@ jobs:
               'tools/governance/test_verify_extraction_provenance.py': os.environ['EXPECTED_PROVENANCE_TEST_BLOB'].strip().lower(),
               'docs/migration/legacy-atlas-extraction-provenance.json': os.environ['EXPECTED_PROVENANCE_MAP_BLOB'].strip().lower(),
           }
+          governance_prefix = 'tools/governance/'
 
           if re.fullmatch(r'[1-9][0-9]*', number) is None:
               raise SystemExit('invalid pull request number')
@@ -136,6 +136,7 @@ jobs:
               or path == retired_provenance
               or path in pins
               or path.startswith('.github/workflows/')
+              or path.startswith(governance_prefix)
               for path in changed
           )
           if not touches_control_plane:
@@ -149,6 +150,16 @@ jobs:
               )
           if retired_provenance in changed:
               raise SystemExit('separate provenance-gate workflow is retired and may not be restored')
+
+          unpinned_governance = sorted({
+              path for path in changed
+              if path.startswith(governance_prefix) and path not in pins
+          })
+          if unpinned_governance:
+              raise SystemExit(
+                  'candidate adds or mutates unpinned Python import authority beside the pinned provenance '
+                  f'verifier: {unpinned_governance!r}'
+              )
 
           texts = {}
           for path, expected_blob in pins.items():
