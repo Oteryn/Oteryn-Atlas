@@ -143,3 +143,8 @@ Finish autonomously through final merge and readback. DONE only when:
 
 Do not stop at a status report if the next action is authorized and safe. Stop only for a genuinely new security-sensitive authorization not covered above, an external credential/owner requirement, or contradictory live evidence that cannot be safely resolved.
 ```
+
+## Handoff integrity notes
+
+- The stored follow-up patch was regenerated as raw diff bytes and `git apply --check` passed against exact remote #268 head `a23072e9160f2f81e8262ed7e79739bd9655e669`.
+- While preparing this handoff, a review-thread connector action accidentally toggled one outdated #268 thread to resolved while a read was intended. It was immediately restored to unresolved. Next agent: use read-only endpoints for inspection and verify mutation targets before invoking any review-thread write action.
