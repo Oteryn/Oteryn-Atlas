@@ -74,6 +74,26 @@ test('protected-base audit owns Atlas merge-authority pins outside candidate che
   assert.doesNotMatch(audit, /^\s*(?:contents|pull-requests|actions|checks|statuses|id-token):\s*write\s*$/m);
 });
 
+test('candidate executable checks cannot mutate the atlas-gate runner state', () => {
+  const workflow = readText(mergeGroupGateUrl);
+  assert.match(workflow, /ATLAS_CANDIDATE_IMAGE:\s*mcr\.microsoft\.com\/playwright:v1\.62\.0-noble@sha256:baed2032d533817f3dbe6425de795788430ba345e819a1201337009ba17c9d07/);
+  assert.match(workflow, /candidate-checks:\s*\n\s*name:\s*merge-group-candidate-checks/);
+  assert.match(workflow, /name:\s*Run candidate executable contracts in networkless sandbox/);
+  assert.match(workflow, /docker run --rm/);
+  assert.match(workflow, /--network none/);
+  assert.match(workflow, /--read-only/);
+  assert.match(workflow, /--cap-drop ALL/);
+  assert.match(workflow, /--security-opt no-new-privileges/);
+  assert.match(workflow, /dst=\/candidate,readonly/);
+  assert.match(workflow, /atlas-gate:\s*\n\s*name:\s*atlas-gate\s*\n\s*needs:\s*candidate-checks/);
+
+  const gate = workflow.slice(workflow.indexOf('  atlas-gate:'));
+  assert.doesNotMatch(gate, /tools\/dyn-atlas-semantic\/self_test\.py/);
+  assert.doesNotMatch(gate, /tests\/deployment-policy\.mjs/);
+  assert.doesNotMatch(gate, /tests\/browser-semantic\.mjs/);
+  assert.doesNotMatch(gate, /tests\/verification\/\*\.test\.mjs/);
+});
+
 test('atlas-gate fully browser-qualifies the exact synthetic candidate with protected-base harness', () => {
   const workflow = readText(mergeGroupGateUrl);
 
