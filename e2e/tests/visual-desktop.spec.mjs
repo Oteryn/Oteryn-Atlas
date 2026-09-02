@@ -4,8 +4,8 @@ import { canvasAlphaCount, comparePngOutsideRects } from '../support/visual-orac
 import { assertUserVisibleSurface, captureUserVisualEvidence } from '../support/user-acceptance.mjs';
 const ENTRY = `${DESKTOP_ENTRY}&creatures=npc,monster&animation=off`;
 const VISUAL_ENTRY = `${DESKTOP_ENTRY}&animation=off`;
-const CREATURE_ONLY_PLAYBACK_ENTRY = `${DESKTOP_ENTRY}&animation=off&creatures=monster`;
-const NPC_ONLY_PLAYBACK_ENTRY = `${DESKTOP_ENTRY}&animation=off&creatures=npc`;
+const CREATURE_ONLY_PLAYBACK_ENTRY = isQualificationFixtureExecution() ? `${DESKTOP_ENTRY}&animation=off&creatures=monster` : '/web/fullworld.html?x=32831&y=32596&floor=-12&zoom=2&mode=map&animation=off&creatures=monster';
+const NPC_ONLY_PLAYBACK_ENTRY = isQualificationFixtureExecution() ? `${DESKTOP_ENTRY}&animation=off&creatures=npc` : '/web/fullworld.html?x=32209&y=31924&floor=-12&zoom=2&mode=map&animation=off&creatures=npc';
 
 async function overlayOpaquePixels(page) {
   return page.locator('#creature-overlay').evaluate((canvas) => {
