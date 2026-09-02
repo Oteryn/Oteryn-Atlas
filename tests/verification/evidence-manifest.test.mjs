@@ -66,6 +66,16 @@ test('executed evidence binds semantic, authority, environment, product, test-se
   assert.ok(Object.isFrozen(evidence));
 });
 
+test('candidate SHA changes execution provenance without changing evidence semantic identity', () => {
+  const first = manifest();
+  const second = manifest({
+    candidateHeadSha: 'b'.repeat(40),
+    planInstanceDigest: `sha256:${'7'.repeat(64)}`,
+  });
+  assert.equal(first.evidenceSemanticDigest, second.evidenceSemanticDigest);
+  assert.notEqual(first.evidenceDigest, second.evidenceDigest);
+});
+
 test('reused evidence uses the same schema and carries source plus compatibility provenance', () => {
   const source = manifest();
   const reused = manifest({

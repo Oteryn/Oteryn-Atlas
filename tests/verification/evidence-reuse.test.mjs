@@ -45,10 +45,19 @@ test('all exact dependency identities plus successful available bytes are reusab
   assert.equal(result.reason, 'MATCH');
 });
 
-test('candidate, authority, environment, policy and stable-ID mismatches are rejected', () => {
+test('same semantic evidence remains reusable across candidate SHA provenance changes', () => {
+  const source = evidence();
+  const result = resolveReusableEvidence(expected({
+    candidateHeadSha: 'b'.repeat(40),
+    availableEvidenceDigests: [source.evidenceDigest],
+  }, source), source);
+  assert.equal(result.reusable, true);
+  assert.equal(result.reason, 'MATCH');
+});
+
+test('authority, environment, policy and stable-ID mismatches are rejected', () => {
   const source = evidence();
   const cases = [
-    [{ candidateHeadSha: 'b'.repeat(40) }, /candidate/i],
     [{ authorityDigest: `sha256:${'8'.repeat(64)}` }, /authority/i],
     [{ environmentDigest: `sha256:${'8'.repeat(64)}` }, /environment/i],
     [{ executionPolicyDigest: `sha256:${'8'.repeat(64)}` }, /policy/i],
