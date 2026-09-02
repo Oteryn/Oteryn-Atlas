@@ -2,7 +2,9 @@ import { expect, test } from '@playwright/test';
 import { MOBILE_ENTRY, assertNoRuntimeFailures, captureRuntimeFailures, gotoAtlas, isQualificationFixtureExecution, waitForAtlas } from './runtime.mjs';
 import { canvasPng, exactPngPixelsEqual } from '../support/visual-oracle.mjs';
 
-const MONSTER_PLAYBACK_ENTRY = '/web/fullworld.html?x=32369&y=32241&floor=-7&zoom=2&mode=minimap&perf=reference&animation=off&creatures=npc,monster';
+const MONSTER_PLAYBACK_ENTRY = isQualificationFixtureExecution()
+  ? '/web/fullworld.html?x=32369&y=32241&floor=-7&zoom=2&mode=minimap&perf=reference&animation=off&creatures=npc,monster'
+  : '/web/fullworld.html?x=32724&y=31155&floor=-15&zoom=2&mode=minimap&perf=reference&animation=off&creatures=npc,monster';
 import { assertUserVisibleSurface, captureUserVisualEvidence } from '../support/user-acceptance.mjs';
 
 test('mobile Atlas-owned chrome and drawers retain reviewed user-facing visual contracts', async ({ page }, testInfo) => {

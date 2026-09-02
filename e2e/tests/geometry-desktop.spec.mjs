@@ -13,9 +13,12 @@ import {
   assertNoRuntimeFailures,
   captureRuntimeFailures,
   gotoAtlas,
+  isQualificationFixtureExecution,
 } from './runtime.mjs';
 
-const NPC_ENTRY = `${DESKTOP_ENTRY}&animation=on&creatures=npc&npcRole=shop`;
+const NPC_ENTRY = isQualificationFixtureExecution()
+  ? `${DESKTOP_ENTRY}&animation=on&creatures=npc&npcRole=shop`
+  : '/web/fullworld.html?x=32361&y=32198&floor=-7&zoom=2&mode=map&animation=on&creatures=npc&npcRole=shop';
 const DRIFT_TOLERANCE_PX = 0.25;
 
 async function waitForFinalAlignment(page) {
