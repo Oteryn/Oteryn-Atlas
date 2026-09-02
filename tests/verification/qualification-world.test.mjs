@@ -119,3 +119,30 @@ test('qualification trust descriptor is the exact browser trust subset of the ve
     fs.rmSync(parent, { recursive: true, force: true });
   }
 });
+
+test('qualification-aware browser probes retain their protected production viewport fallbacks', () => {
+  const contracts = [
+    {
+      file: 'e2e/tests/creature-presentation-desktop.spec.mjs',
+      production: '/web/fullworld.html?x=32831&y=32596&floor=-12&zoom=2&mode=map&animation=off&creatures=monster',
+    },
+    {
+      file: 'e2e/tests/visual-mobile.spec.mjs',
+      production: '/web/fullworld.html?x=32724&y=31155&floor=-15&zoom=2&mode=minimap&perf=reference&animation=off&creatures=npc,monster',
+    },
+    {
+      file: 'e2e/tests/geometry-desktop.spec.mjs',
+      production: '/web/fullworld.html?x=32361&y=32198&floor=-7&zoom=2&mode=map&animation=on&creatures=npc&npcRole=shop',
+    },
+    {
+      file: 'e2e/tests/geometry-mobile.spec.mjs',
+      production: '/web/fullworld.html?x=32361&y=32198&floor=-7&zoom=2&mode=map&animation=off&creatures=npc&npcRole=shop',
+    },
+  ];
+
+  for (const contract of contracts) {
+    const source = fs.readFileSync(path.resolve(contract.file), 'utf8');
+    assert.match(source, /isQualificationFixtureExecution\(\)/, `${contract.file} must explicitly split qualification and production execution`);
+    assert.ok(source.includes(contract.production), `${contract.file} must retain protected production viewport ${contract.production}`);
+  }
+});
