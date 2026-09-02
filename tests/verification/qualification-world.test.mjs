@@ -138,6 +138,18 @@ test('qualification-aware browser probes retain their protected production viewp
       file: 'e2e/tests/geometry-mobile.spec.mjs',
       production: '/web/fullworld.html?x=32361&y=32198&floor=-7&zoom=2&mode=map&animation=off&creatures=npc&npcRole=shop',
     },
+    {
+      file: 'e2e/tests/performance-desktop.spec.mjs',
+      production: '/web/fullworld.html?x=33018&y=32009&floor=-7&zoom=2&mode=map&animation=off&creatures=npc,monster',
+    },
+    {
+      file: 'e2e/tests/soak-desktop.spec.mjs',
+      production: '/web/fullworld.html?x=33018&y=32009&floor=-7&zoom=2&mode=map&animation=off&creatures=npc,monster',
+    },
+    {
+      file: 'e2e/tests/stress-desktop.spec.mjs',
+      production: '/web/fullworld.html?x=33018&y=32009&floor=-7&zoom=2&mode=map&animation=off&creatures=npc,monster',
+    },
   ];
 
   for (const contract of contracts) {

@@ -12,9 +12,11 @@ import {
   stopPerformanceProbe,
 } from '../support/performance.mjs';
 import { waitForCreatureAlignedToBase, waitForCreatureCommit, waitForRendererCommit } from '../support/diagnostics.mjs';
-import { DESKTOP_ENTRY, assertNoRuntimeFailures, captureRuntimeFailures, gotoAtlas, waitForAtlas } from './runtime.mjs';
+import { DESKTOP_ENTRY, assertNoRuntimeFailures, captureRuntimeFailures, gotoAtlas, isQualificationFixtureExecution, waitForAtlas } from './runtime.mjs';
 
-const ENTRY = `${DESKTOP_ENTRY}&animation=off&creatures=npc,monster`;
+const ENTRY = isQualificationFixtureExecution()
+  ? `${DESKTOP_ENTRY}&animation=off&creatures=npc,monster`
+  : '/web/fullworld.html?x=33018&y=32009&floor=-7&zoom=2&mode=map&animation=off&creatures=npc,monster';
 const FRAME_EVIDENCE_THRESHOLD_MS = 1000 / 30;
 
 test.setTimeout(300_000);
