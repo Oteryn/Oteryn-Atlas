@@ -1,0 +1,236 @@
+name: Merge authority audit
+
+on:
+  pull_request_target:
+    branches:
+      - main
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - edited
+
+permissions: {}
+
+concurrency:
+  group: atlas-merge-authority-audit-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    name: Merge authority audit / protected-base validate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+    env:
+      EXPECTED_PR_CI_BLOB: "0971077db65eaffcb6ebab4d528edaee798b93e7"
+      EXPECTED_MERGE_GROUP_GATE_BLOB: "c0879fac82ccb81136102c1019fac3dc5ff95482"
+      EXPECTED_PROVENANCE_VERIFIER_BLOB: "d18d66408e97f43557ca21b38b6bd858d0d424eb"
+      EXPECTED_PROVENANCE_MAP_BLOB: "c18e14b94823fa09ad46922431a797eae6c197bc"
+    steps:
+      - name: Validate Atlas merge-authority candidate as inert data
+        shell: bash
+        env:
+          EVENT_PR_NUMBER: ${{ github.event.pull_request.number }}
+          EVENT_PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import base64
+          import hashlib
+          import json
+          import os
+          import re
+          import urllib.error
+          import urllib.parse
+          import urllib.request
+
+          repository = os.environ['REPOSITORY']
+          number = os.environ['EVENT_PR_NUMBER'].strip()
+          expected_head = os.environ['EVENT_PR_HEAD_SHA'].strip().lower()
+          pins = {
+              '.github/workflows/ci.yml': os.environ['EXPECTED_PR_CI_BLOB'].strip().lower(),
+              '.github/workflows/merge-group-gate.yml': os.environ['EXPECTED_MERGE_GROUP_GATE_BLOB'].strip().lower(),
+              'tools/governance/verify_extraction_provenance.py': os.environ['EXPECTED_PROVENANCE_VERIFIER_BLOB'].strip().lower(),
+              'docs/migration/legacy-atlas-extraction-provenance.json': os.environ['EXPECTED_PROVENANCE_MAP_BLOB'].strip().lower(),
+          }
+
+          if re.fullmatch(r'[1-9][0-9]*', number) is None:
+              raise SystemExit('invalid pull request number')
+          if re.fullmatch(r'[0-9a-f]{40}', expected_head) is None:
+              raise SystemExit('invalid pull request head SHA')
+          for path, blob in pins.items():
+              if re.fullmatch(r'[0-9a-f]{40}', blob) is None:
+                  raise SystemExit(f'invalid protected-base blob pin for {path}')
+
+          headers = {
+              'Accept': 'application/vnd.github+json',
+              'Authorization': f"Bearer {os.environ['GH_TOKEN']}",
+              'X-GitHub-Api-Version': '2022-11-28',
+              'User-Agent': 'Oteryn-Atlas-protected-base-merge-authority-audit',
+          }
+
+          def api(path: str):
+              request = urllib.request.Request(
+                  f'https://api.github.com/repos/{repository}{path}',
+                  headers=headers,
+              )
+              with urllib.request.urlopen(request, timeout=30) as response:
+                  return json.load(response)
+
+          def read_candidate_text(path: str) -> tuple[str, str]:
+              encoded = urllib.parse.quote(path, safe='/')
+              payload = api(f'/contents/{encoded}?ref={expected_head}')
+              if payload.get('encoding') != 'base64' or not isinstance(payload.get('content'), str):
+                  raise SystemExit(f'unable to read candidate path as inert content: {path}')
+              raw = base64.b64decode(payload['content'])
+              try:
+                  text = raw.decode('utf-8')
+              except UnicodeDecodeError as exc:
+                  raise SystemExit(f'candidate path is not UTF-8 text: {path}') from exc
+              blob = hashlib.sha1(f'blob {len(raw)}\0'.encode('ascii') + raw).hexdigest()
+              return text, blob
+
+          pull = api(f'/pulls/{number}')
+          live_head = pull.get('head', {}).get('sha', '').lower()
+          if pull.get('state') != 'open':
+              raise SystemExit('audit requires an open pull request')
+          if live_head != expected_head:
+              raise SystemExit('pull request head moved after event identity was recorded')
+          if pull.get('head', {}).get('repo', {}).get('full_name') != repository:
+              raise SystemExit('audit accepts only same-repository pull request heads')
+          if pull.get('base', {}).get('ref') != 'main':
+              raise SystemExit('audit accepts only pull requests targeting main')
+
+          changed_files = pull.get('changed_files')
+          if not isinstance(changed_files, int) or changed_files < 0 or changed_files > 3000:
+              raise SystemExit('invalid or over-cap changed-files count')
+
+          changed = []
+          page = 1
+          while True:
+              batch = api(f'/pulls/{number}/files?per_page=100&page={page}')
+              for item in batch:
+                  filename = item.get('filename', '')
+                  if isinstance(filename, str) and filename:
+                      changed.append(filename)
+                  previous = item.get('previous_filename')
+                  if isinstance(previous, str) and previous:
+                      changed.append(previous)
+              if len(batch) < 100:
+                  break
+              page += 1
+          if len({path for path in changed if path}) < changed_files:
+              raise SystemExit('changed-files enumeration is incomplete')
+
+          protected_audit = '.github/workflows/merge-authority-audit.yml'
+          retired_provenance = '.github/workflows/extraction-provenance.yml'
+          touches_control_plane = any(
+              path == protected_audit
+              or path == retired_provenance
+              or path in pins
+              or path.startswith('.github/workflows/')
+              for path in changed
+          )
+          if not touches_control_plane:
+              print('No Atlas merge-authority control-plane paths changed; protected-base audit not applicable.')
+              raise SystemExit(0)
+
+          if protected_audit in changed:
+              raise SystemExit(
+                  'candidate modifies the protected-base audit itself; require explicit owner-authorized '
+                  'audit rotation and independent deep review before integration'
+              )
+          if retired_provenance in changed:
+              raise SystemExit('separate provenance-gate workflow is retired and may not be restored')
+
+          texts = {}
+          for path, expected_blob in pins.items():
+              text, actual_blob = read_candidate_text(path)
+              if actual_blob != expected_blob:
+                  raise SystemExit(
+                      f'candidate protected path does not match protected-base approved blob: {path}: '
+                      f'expected {expected_blob}, got {actual_blob}'
+                  )
+              texts[path] = text
+
+          gate = texts['.github/workflows/merge-group-gate.yml']
+          verifier = texts['tools/governance/verify_extraction_provenance.py']
+
+          required_gate = (
+              '  merge_group:\n    types: [checks_requested]\n',
+              '    name: atlas-gate\n',
+              'name: Check out exact protected merge-group base',
+              'path: trusted-base',
+              "catalog.groups?.['e2e.full']?.specs",
+              "ATLAS_E2E_WORKERS: '1'",
+              "ATLAS_E2E_SHARD: '1/1'",
+              '--retries=0',
+              'compose run --no-deps --rm e2e',
+          )
+          for fragment in required_gate:
+              if fragment not in gate:
+                  raise SystemExit(f'candidate merge-group gate missing protected fragment: {fragment}')
+          for forbidden in (
+              'continue-on-error:',
+              'workflow_dispatch:',
+              'pull_request_target:',
+              'contents: write',
+              'actions: write',
+              'checks: write',
+              'pull-requests: write',
+              'statuses: write',
+              'id-token: write',
+          ):
+              if forbidden in gate:
+                  raise SystemExit(f'candidate merge-group gate contains forbidden behavior: {forbidden}')
+
+          required_verifier = (
+              'SOURCE_REPOSITORY = "https://github.com/blakinio/Otheryn.git"',
+              'SOURCE_PREFIXES = ("tools/otbm_atlas/", "tools/otbm_atlas_facts/", ".github/workflows/otbm-atlas-")',
+              'MERGE_GROUP_GATE_PATH = ".github/workflows/merge-group-gate.yml"',
+              f'MERGE_GROUP_GATE_BLOB = "{pins[".github/workflows/merge-group-gate.yml"]}"',
+              'verify_control_plane_pin(MERGE_GROUP_GATE_PATH, MERGE_GROUP_GATE_BLOB)',
+              'verify_source_coverage(rows, source_root, source_sha)',
+              'fetch_pinned_source(source_sha, source_root)',
+          )
+          for fragment in required_verifier:
+              if fragment not in verifier:
+                  raise SystemExit(f'candidate provenance verifier missing protected fragment: {fragment}')
+
+          workflow_listing = api(f'/contents/.github/workflows?ref={expected_head}')
+          atlas_gate_paths = set()
+          provenance_gate_paths = set()
+          status_line = re.compile(r'^\s*name:\s*[\'\"]?atlas-gate[\'\"]?\s*$', re.MULTILINE)
+          provenance_line = re.compile(r'^\s*name:\s*[\'\"]?provenance-gate[\'\"]?\s*$', re.MULTILINE)
+          for item in workflow_listing:
+              path = item.get('path', '')
+              if not isinstance(path, str) or not path.endswith(('.yml', '.yaml')):
+                  continue
+              text, _ = read_candidate_text(path)
+              if status_line.search(text):
+                  atlas_gate_paths.add(path)
+              if provenance_line.search(text):
+                  provenance_gate_paths.add(path)
+
+          expected_atlas_gate_paths = {
+              '.github/workflows/ci.yml',
+              '.github/workflows/merge-group-gate.yml',
+          }
+          if atlas_gate_paths != expected_atlas_gate_paths:
+              raise SystemExit(
+                  f'atlas-gate must be emitted only by canonical PR and merge-group workflows: '
+                  f'{sorted(atlas_gate_paths)!r}'
+              )
+          if provenance_gate_paths:
+              raise SystemExit(f'separate provenance-gate status is retired: {sorted(provenance_gate_paths)!r}')
+
+          print(
+              f'Protected-base Atlas merge-authority audit PASS for PR #{number} exact head '
+              f'{expected_head}; pinned_paths={len(pins)}.'
+          )
+          PY
