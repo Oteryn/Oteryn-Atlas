@@ -11,39 +11,23 @@ concurrency:
   group: atlas-merge-group-${{ github.event.merge_group.head_sha }}
   cancel-in-progress: true
 
-jobs:
-  atlas-gate:
-    name: atlas-gate
-    runs-on: ubuntu-24.04
-    timeout-minutes: 60
-    steps:
-      - name: Validate exact merge-group identity
-        shell: bash
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          EVENT_ACTION: ${{ github.event.action }}
-          BASE_REF: ${{ github.event.merge_group.base_ref || '' }}
-          BASE_SHA: ${{ github.event.merge_group.base_sha || '' }}
-          HEAD_SHA: ${{ github.event.merge_group.head_sha || '' }}
-          GITHUB_SHA_VALUE: ${{ github.sha }}
-        run: |
-          set -euo pipefail
-          [[ "$EVENT_NAME" == merge_group ]]
-          [[ "$EVENT_ACTION" == checks_requested ]]
-          [[ "$BASE_REF" == refs/heads/main ]]
-          [[ "$BASE_SHA" =~ ^[0-9a-f]{40}$ ]]
-          [[ "$HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]
-          [[ "$HEAD_SHA" == "$GITHUB_SHA_VALUE" ]]
-          [[ "$HEAD_SHA" != "$BASE_SHA" ]]
+env:
+  ATLAS_CANDIDATE_IMAGE: mcr.microsoft.com/playwright:v1.62.0-noble@sha256:baed2032d533817f3dbe6425de795788430ba345e819a1201337009ba17c9d07
 
-      - name: Check out exact merge-group candidate
+jobs:
+  candidate-checks:
+    name: merge-group-candidate-checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact merge-group candidate for isolated candidate checks
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.merge_group.head_sha }}
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Validate candidate range and repository contract
+      - name: Validate candidate range and inert repository contract
         shell: bash
         env:
           BASE_SHA: ${{ github.event.merge_group.base_sha }}
@@ -70,33 +54,68 @@ jobs:
             echo 'Browser source must not reference legacy world formats.' >&2
             exit 1
           fi
-          node --test tests/deployment-policy.mjs
+          test ! -f package.json || { echo 'Root package.json requires a separately reviewed isolated dependency-install contract.' >&2; exit 1; }
 
-      - name: Verify exact pinned extraction provenance
+      - name: Run candidate executable contracts in networkless sandbox
         shell: bash
+        env:
+          ATLAS_CODE_REVISION: ${{ github.event.merge_group.head_sha }}
         run: |
           set -euo pipefail
-          python -m py_compile tools/governance/verify_extraction_provenance.py tools/governance/test_verify_extraction_provenance.py
-          python tools/governance/test_verify_extraction_provenance.py
-          python tools/governance/verify_extraction_provenance.py
-
-      - name: Validate semantic and browser contracts
-        shell: bash
-        run: |
-          set -euo pipefail
-          python -m py_compile \
-            tools/dyn-atlas-semantic/compiler.py \
-            tools/dyn-atlas-semantic/verify.py \
-            tools/dyn-atlas-semantic/self_test.py \
-            tools/dyn-atlas-semantic/benchmark.py \
-            tools/dyn-atlas-pixels/measure_metadata.py \
-            tools/dyn-atlas-pixels/publish_store.py
-          python tools/dyn-atlas-semantic/self_test.py
-          node --test tests/browser-semantic.mjs tests/pixel-store.mjs tests/gui-contract.mjs tests/animation-runtime.mjs
-          test -s web/index.html
-          test -s web/app.mjs
-          test -s web/style.css
-          grep -q 'type="module"' web/index.html
+          test "$(git rev-parse HEAD)" = "$ATLAS_CODE_REVISION"
+          timeout --signal=KILL 600s docker run --rm \
+            --network none \
+            --read-only \
+            --cap-drop ALL \
+            --security-opt no-new-privileges \
+            --pids-limit 256 \
+            --memory 2g \
+            --cpus 2 \
+            --user 1000:1000 \
+            --tmpfs /tmp:rw,nosuid,nodev,size=256m \
+            --mount "type=bind,src=$PWD,dst=/candidate,readonly" \
+            "$ATLAS_CANDIDATE_IMAGE" \
+            bash -lc '
+              set -euo pipefail
+              mkdir -p /tmp/bin /tmp/pycache
+              ln -s /usr/bin/python3 /tmp/bin/python
+              export PATH="/tmp/bin:$PATH" PYTHONPYCACHEPREFIX=/tmp/pycache
+              cd /candidate
+              python -m py_compile \
+                tools/dyn-atlas-semantic/compiler.py \
+                tools/dyn-atlas-semantic/verify.py \
+                tools/dyn-atlas-semantic/self_test.py \
+                tools/dyn-atlas-semantic/benchmark.py \
+                tools/dyn-atlas-pixels/measure_metadata.py \
+                tools/dyn-atlas-pixels/publish_store.py
+              python tools/dyn-atlas-semantic/self_test.py
+              files=(
+                tests/animation-runtime.mjs
+                tests/browser-semantic.mjs
+                tests/deployment-policy.mjs
+                tests/creature-presentation-geometry.mjs
+                tests/creature-interaction.mjs
+                tests/creature-interaction-target.mjs
+                tests/map-activation.mjs
+                tests/creature-map-activation-contract.mjs
+                tests/creature-interaction-runtime-contract.mjs
+                tests/creature-gameplay-profiles.mjs
+                tests/creature-inspector-state.mjs
+                tests/creature-gameplay-model.mjs
+                tests/creature-gameplay-runtime-contract.mjs
+                tests/gui-contract.mjs
+                tests/npc-markers.mjs
+                tests/pixel-store.mjs
+                tests/semantic-search.mjs
+                tests/semantic-search-creatures.mjs
+                tests/synology-live-workflow.mjs
+                tests/fullworld-layers/*.test.mjs
+                tests/fullworld-runtime/*.test.mjs
+                tests/properties/*.test.mjs
+                tests/verification/*.test.mjs
+              )
+              node --test "${files[@]}"
+            '
 
       - name: Run real Chrome WebGL2 parity and GUI smoke
         shell: bash
@@ -126,61 +145,46 @@ jobs:
           assert struct.unpack('>II', data[16:24]) == (1920, 1080)
           PY
 
-      - name: Run project checks
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [ -f package.json ]; then
-            if [ -f pnpm-lock.yaml ]; then
-              corepack enable
-              pnpm install --frozen-lockfile
-              pnpm run check
-              pnpm run test
-              pnpm run build
-            elif [ -f package-lock.json ]; then
-              npm ci
-              npm run check
-              npm test
-              npm run build
-            else
-              echo 'package.json exists without a supported lockfile' >&2
-              exit 1
-            fi
-          fi
-
-      - name: Run deterministic Atlas verification suite
+  atlas-gate:
+    name: atlas-gate
+    needs: candidate-checks
+    if: ${{ always() && needs.candidate-checks.result == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Validate exact merge-group identity
         shell: bash
         env:
-          ATLAS_CODE_REVISION: ${{ github.event.merge_group.head_sha }}
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_ACTION: ${{ github.event.action }}
+          BASE_REF: ${{ github.event.merge_group.base_ref || '' }}
+          BASE_SHA: ${{ github.event.merge_group.base_sha || '' }}
+          HEAD_SHA: ${{ github.event.merge_group.head_sha || '' }}
+          GITHUB_SHA_VALUE: ${{ github.sha }}
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = "$ATLAS_CODE_REVISION"
-          files=(
-            tests/animation-runtime.mjs
-            tests/browser-semantic.mjs
-            tests/deployment-policy.mjs
-            tests/creature-presentation-geometry.mjs
-            tests/creature-interaction.mjs
-            tests/creature-interaction-target.mjs
-            tests/map-activation.mjs
-            tests/creature-map-activation-contract.mjs
-            tests/creature-interaction-runtime-contract.mjs
-            tests/creature-gameplay-profiles.mjs
-            tests/creature-inspector-state.mjs
-            tests/creature-gameplay-model.mjs
-            tests/creature-gameplay-runtime-contract.mjs
-            tests/gui-contract.mjs
-            tests/npc-markers.mjs
-            tests/pixel-store.mjs
-            tests/semantic-search.mjs
-            tests/semantic-search-creatures.mjs
-            tests/synology-live-workflow.mjs
-            tests/fullworld-layers/*.test.mjs
-            tests/fullworld-runtime/*.test.mjs
-            tests/properties/*.test.mjs
-            tests/verification/*.test.mjs
-          )
-          node --test "${files[@]}"
+          [[ "$EVENT_NAME" == merge_group ]]
+          [[ "$EVENT_ACTION" == checks_requested ]]
+          [[ "$BASE_REF" == refs/heads/main ]]
+          [[ "$BASE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$HEAD_SHA" == "$GITHUB_SHA_VALUE" ]]
+          [[ "$HEAD_SHA" != "$BASE_SHA" ]]
+
+      - name: Check out exact merge-group candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.merge_group.head_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify exact pinned extraction provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m py_compile tools/governance/verify_extraction_provenance.py tools/governance/test_verify_extraction_provenance.py
+          python tools/governance/test_verify_extraction_provenance.py
+          python tools/governance/verify_extraction_provenance.py
 
       - name: Check out exact protected merge-group base
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
