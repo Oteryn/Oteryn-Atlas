@@ -18,6 +18,7 @@ const prCiUrl = new URL('../../.github/workflows/ci.yml', import.meta.url);
 const provenanceMapUrl = new URL('../../docs/migration/legacy-atlas-extraction-provenance.json', import.meta.url);
 const provenanceWorkflow = new URL('../../.github/workflows/extraction-provenance.yml', import.meta.url);
 const provenanceVerifierUrl = new URL('../../tools/governance/verify_extraction_provenance.py', import.meta.url);
+const provenanceTestUrl = new URL('../../tools/governance/test_verify_extraction_provenance.py', import.meta.url);
 
 test('Merge Queue authority is exact-blob pinned and emits only atlas-gate', () => {
   assert.equal(fs.existsSync(provenanceWorkflow), false, 'separate provenance gate must remain retired');
@@ -38,6 +39,7 @@ test('Merge Queue authority is exact-blob pinned and emits only atlas-gate', () 
   assert.match(workflow, /HEAD_SHA.*GITHUB_SHA_VALUE/);
   assert.match(workflow, /refs\/heads\/main/);
   assert.match(workflow, /verify_extraction_provenance\.py/);
+  assert.match(workflow, /test_verify_extraction_provenance\.py/);
   assert.doesNotMatch(workflow, /provenance-gate/);
 });
 
@@ -49,6 +51,7 @@ test('protected-base audit owns Atlas merge-authority pins outside candidate che
     ['EXPECTED_PR_CI_BLOB', gitBlobSha(readText(prCiUrl))],
     ['EXPECTED_MERGE_GROUP_GATE_BLOB', gitBlobSha(readText(mergeGroupGateUrl))],
     ['EXPECTED_PROVENANCE_VERIFIER_BLOB', gitBlobSha(readText(provenanceVerifierUrl))],
+    ['EXPECTED_PROVENANCE_TEST_BLOB', gitBlobSha(readText(provenanceTestUrl))],
     ['EXPECTED_PROVENANCE_MAP_BLOB', gitBlobSha(readText(provenanceMapUrl))],
   ];
 
@@ -66,6 +69,7 @@ test('protected-base audit owns Atlas merge-authority pins outside candidate che
   assert.match(audit, /expected_atlas_gate_paths/);
   assert.match(audit, /\.github\/workflows\/ci\.yml/);
   assert.match(audit, /\.github\/workflows\/merge-group-gate\.yml/);
+  assert.match(audit, /tools\/governance\/test_verify_extraction_provenance\.py/);
   assert.match(audit, /provenance_gate_paths/);
   assert.doesNotMatch(audit, /^\s*(?:contents|pull-requests|actions|checks|statuses|id-token):\s*write\s*$/m);
 });
