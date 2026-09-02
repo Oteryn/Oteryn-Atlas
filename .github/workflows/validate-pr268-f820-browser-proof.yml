@@ -67,7 +67,7 @@ jobs:
           import { resolveProtectedPromotionQualification } from './trusted-base/tools/verification/protected-hosted-execution.mjs';
           const q = resolveProtectedPromotionQualification('fix/issue-179-qualification-functional-fixture');
           const expected = [...q.changedFiles, 'src/browser/animation-runtime-service.mjs'].sort();
-          fs.writeFileSync(process.argv[2], ${expected.join('\n')}\n, 'utf8');
+          fs.writeFileSync(process.argv[2], `${expected.join('\n')}\n`, 'utf8');
           NODE
           diff -u "$expected" "$rows"
 
