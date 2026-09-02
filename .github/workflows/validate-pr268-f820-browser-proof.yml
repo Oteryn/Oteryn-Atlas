@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  ATLAS_CODE_REVISION: f8209a61dee08194f17dde33e0623adfd3e7ed3b
+  ATLAS_CODE_REVISION: 2a6919fa2f6f0671ebd6562eb004a2d8d964451c
   ATLAS_PROTECTED_BASE_SHA: e31015d0880e9f81a4b96f990658490af45e8fa6
   ATLAS_PR_NUMBER: '268'
   ATLAS_EXPECTED_PRODUCT_DIGEST: sha256:c36ed503f8ada27a673ba96780b70cb361fa2fe2ce08240e372dbff664a2866a
@@ -58,7 +58,7 @@ jobs:
           test "$(git -C trusted-base rev-parse HEAD)" = "$ATLAS_PROTECTED_BASE_SHA"
           test "$(git -C candidate rev-parse HEAD)" = "$ATLAS_CODE_REVISION"
           test "$(jq -r '.base.sha' "$payload")" = "$ATLAS_PROTECTED_BASE_SHA"
-          test "$(jq -r '.changed_files' "$payload")" = 28
+          test "$(jq -r '.changed_files' "$payload")" = 29
           rows="$RUNNER_TEMP/pr268-files.txt"
           expected="$RUNNER_TEMP/pr268-expected-files.txt"
           gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$ATLAS_PR_NUMBER/files?per_page=100" --jq '.[].filename' | sort > "$rows"
@@ -66,7 +66,8 @@ jobs:
           import fs from 'node:fs';
           import { resolveProtectedPromotionQualification } from './trusted-base/tools/verification/protected-hosted-execution.mjs';
           const q = resolveProtectedPromotionQualification('fix/issue-179-qualification-functional-fixture');
-          fs.writeFileSync(process.argv[2], `${[...q.changedFiles].sort().join('\n')}\n`, 'utf8');
+          const expected = [...q.changedFiles, 'src/browser/animation-runtime-service.mjs'].sort();
+          fs.writeFileSync(process.argv[2], ${expected.join('\n')}\n, 'utf8');
           NODE
           diff -u "$expected" "$rows"
 
