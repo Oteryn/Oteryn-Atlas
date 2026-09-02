@@ -11,6 +11,7 @@ const authority = `sha256:${'3'.repeat(64)}`;
 const environment = `sha256:${'4'.repeat(64)}`;
 const product = `sha256:${'5'.repeat(64)}`;
 const policy = `sha256:${'6'.repeat(64)}`;
+const semanticDependency = `sha256:${'7'.repeat(64)}`;
 const stableTestIds = ['desktop-chromium::e2e/tests/desktop.spec.mjs::loads fixture'];
 
 function evidence(overrides = {}) {
@@ -18,6 +19,7 @@ function evidence(overrides = {}) {
     evidenceId: 'hosted.qualification-fixture', evidenceType: 'HOSTED_FUNCTIONAL_PARTITION',
     result: 'SUCCESS', disposition: 'EXECUTED', candidateHeadSha: sha,
     planSemanticDigest: semantic, planInstanceDigest: instance, authorityDigest: authority,
+    semanticDependencyDigest: semanticDependency,
     environmentDigest: environment,
     productIdentities: { qualification_fixture: { id: 'atlas-qualification-world-v2', digest: product } },
     stableTestIds, executionPolicyDigest: policy,
@@ -32,6 +34,7 @@ function expected(overrides = {}, source = evidence()) {
   return {
     evidenceId: source.evidenceId, candidateHeadSha: sha, planSemanticDigest: semantic,
     evidenceSemanticDigest: source.evidenceSemanticDigest, authorityDigest: authority,
+    semanticDependencyDigest: semanticDependency,
     environmentDigest: environment, productIdentities: source.productIdentities,
     stableTestIds: source.stableTestIds, executionPolicyDigest: policy,
     dependencies: source.dependencies, now: '2026-08-30T00:00:00.000Z', ...overrides,
@@ -55,10 +58,20 @@ test('same semantic evidence remains reusable across candidate SHA provenance ch
   assert.equal(result.reason, 'MATCH');
 });
 
-test('authority, environment, policy and stable-ID mismatches are rejected', () => {
+test('global authority provenance may change while exact semantic dependencies remain reusable', () => {
+  const source = evidence();
+  const result = resolveReusableEvidence(expected({
+    authorityDigest: `sha256:${'8'.repeat(64)}`,
+    availableEvidenceDigests: [source.evidenceDigest],
+  }, source), source);
+  assert.equal(result.reusable, true);
+  assert.equal(result.reason, 'MATCH');
+});
+
+test('semantic dependency, environment, policy and stable-ID mismatches are rejected', () => {
   const source = evidence();
   const cases = [
-    [{ authorityDigest: `sha256:${'8'.repeat(64)}` }, /authority/i],
+    [{ semanticDependencyDigest: `sha256:${'8'.repeat(64)}` }, /semantic.*dependency/i],
     [{ environmentDigest: `sha256:${'8'.repeat(64)}` }, /environment/i],
     [{ executionPolicyDigest: `sha256:${'8'.repeat(64)}` }, /policy/i],
     [{ stableTestIds: ['desktop-chromium::e2e/tests/other.spec.mjs::other'] }, /stable|test.set/i],
@@ -85,14 +98,14 @@ test('product mismatch rejects only the node that declares that product dependen
 });
 
 test('dependency semantic mismatch or unavailable dependency/source bytes fail closed', () => {
-  const dependencyDigest = `sha256:${'7'.repeat(64)}`;
-  const dependencySemanticDigest = `sha256:${'8'.repeat(64)}`;
+  const dependencyDigest = `sha256:${'8'.repeat(64)}`;
+  const dependencySemanticDigest = `sha256:${'9'.repeat(64)}`;
   const source = evidence({ dependencies: {
     evidenceDigests: [dependencyDigest], evidenceSemanticDigests: [dependencySemanticDigest],
     paths: ['e2e/', 'src/browser/'], dataCapabilities: ['qualification_fixture'],
   } });
   const mismatch = resolveReusableEvidence(expected({ dependencies: {
-    ...source.dependencies, evidenceSemanticDigests: [`sha256:${'9'.repeat(64)}`],
+    ...source.dependencies, evidenceSemanticDigests: [`sha256:${'a'.repeat(64)}`],
   } }, source), source);
   assert.equal(mismatch.reusable, false);
   assert.match(mismatch.reason, /dependency.semantic/i);

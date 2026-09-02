@@ -26,6 +26,7 @@ function plan({
   authority = digest('3'),
   environment = digest('4'),
   product = digest('5'),
+  browserSemanticDependency = digest('b'),
 } = {}) {
   return {
     schemaVersion: 3,
@@ -36,6 +37,7 @@ function plan({
     authorityDigest: authority,
     environmentDigest: environment,
     executionPolicyDigest: digest('6'),
+    browserSemanticDependencyDigest: browserSemanticDependency,
     productIdentities: {
       qualification_fixture: { id: 'atlas-qualification-world-v2', digest: product },
     },
@@ -67,6 +69,7 @@ function evidence(currentPlan = plan()) {
     planSemanticDigest: currentPlan.planSemanticDigest,
     planInstanceDigest: currentPlan.planInstanceDigest,
     authorityDigest: currentPlan.authorityDigest,
+    semanticDependencyDigest: currentPlan.environmentDigest,
     environmentDigest: currentPlan.environmentDigest,
     productIdentities: {},
     stableTestIds: [],
@@ -91,6 +94,7 @@ function evidence(currentPlan = plan()) {
     planSemanticDigest: currentPlan.planSemanticDigest,
     planInstanceDigest: currentPlan.planInstanceDigest,
     authorityDigest: currentPlan.authorityDigest,
+    semanticDependencyDigest: currentPlan.browserSemanticDependencyDigest,
     environmentDigest: currentPlan.environmentDigest,
     productIdentities: currentPlan.productIdentities,
     stableTestIds: IDS,
@@ -209,6 +213,26 @@ test('candidate or synthetic merge-group SHA movement reuses semantic evidence w
   }
 });
 
+test('control-plane authority movement reuses browser evidence when semantic dependencies are unchanged', () => {
+  const prior = previousState();
+  const current = plan({
+    base: sha('b'), semantic: digest('8'), instance: digest('9'), authority: digest('a'),
+  });
+  const decision = planProtectedVerificationLifecycle({
+    currentPlan: current,
+    currentExecution: execution(),
+    previousState: prior,
+    baseAdvance: { changedPaths: ['.github/workflows/protected-hosted-executor.yml'], mergeStatus: 'clean' },
+    availableEvidenceDigests: available(prior),
+    now: NOW,
+  });
+  assert.equal(decision.disposition, 'REUSE');
+  assert.equal(decision.executeEnvironment, false);
+  assert.deepEqual(decision.executeHostedEvidenceIds, []);
+  assert.deepEqual(decision.reuseEvidenceIds, ['ENVIRONMENT_QUALIFICATION', 'HOSTED_FUNCTIONAL:SHARD_1']);
+  assert.equal(decision.heavyExecutionsRequired, 0);
+});
+
 test('product-only base movement reuses environment but reruns only hosted evidence', () => {
   const prior = previousState();
   const current = plan({
@@ -229,16 +253,21 @@ test('product-only base movement reuses environment but reruns only hosted evide
   assert.equal(decision.heavyExecutionsRequired, 1);
 });
 
-test('authority change forces full rerun and merge conflict requires reintegration', () => {
+test('browser semantic dependency change forces hosted rerun and merge conflict requires reintegration', () => {
   const prior = previousState();
-  const authorityChanged = plan({ base: sha('b'), semantic: digest('8'), instance: digest('9'), authority: digest('a') });
-  const full = planProtectedVerificationLifecycle({
-    currentPlan: authorityChanged, currentExecution: execution(), previousState: prior,
-    baseAdvance: { changedPaths: ['tools/verification/stable-id.mjs'], mergeStatus: 'clean' },
+  const dependencyChanged = plan({
+    base: sha('b'), semantic: digest('8'), instance: digest('9'), browserSemanticDependency: digest('a'),
+  });
+  const rerun = planProtectedVerificationLifecycle({
+    currentPlan: dependencyChanged, currentExecution: execution(), previousState: prior,
+    baseAdvance: { changedPaths: ['src/browser/search.mjs'], mergeStatus: 'clean' },
     availableEvidenceDigests: available(prior), now: NOW,
   });
-  assert.equal(full.disposition, 'FULL_RERUN');
-  assert.equal(full.heavyExecutionsRequired, 1);
+  assert.equal(rerun.disposition, 'PARTIAL_RERUN');
+  assert.equal(rerun.executeEnvironment, false);
+  assert.deepEqual(rerun.executeHostedEvidenceIds, ['HOSTED_FUNCTIONAL:SHARD_1']);
+  assert.deepEqual(rerun.reuseEvidenceIds, ['ENVIRONMENT_QUALIFICATION']);
+  assert.equal(rerun.heavyExecutionsRequired, 1);
 
   const conflict = planProtectedVerificationLifecycle({
     currentPlan: plan({ base: sha('b'), instance: digest('7') }), currentExecution: execution(), previousState: prior,

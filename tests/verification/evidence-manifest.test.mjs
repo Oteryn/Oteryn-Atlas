@@ -15,6 +15,7 @@ const digests = {
   environment: `sha256:${'4'.repeat(64)}`,
   product: `sha256:${'5'.repeat(64)}`,
   policy: `sha256:${'6'.repeat(64)}`,
+  dependency: `sha256:${'7'.repeat(64)}`,
 };
 
 function manifest(overrides = {}) {
@@ -27,6 +28,7 @@ function manifest(overrides = {}) {
     planSemanticDigest: digests.semantic,
     planInstanceDigest: digests.instance,
     authorityDigest: digests.authority,
+    semanticDependencyDigest: digests.dependency,
     environmentDigest: digests.environment,
     productIdentities: {
       qualification_fixture: { id: 'atlas-qualification-world-v2', digest: digests.product },
@@ -54,11 +56,12 @@ function manifest(overrides = {}) {
   });
 }
 
-test('executed evidence binds semantic, authority, environment, product, test-set and policy identities', () => {
+test('executed evidence binds semantic dependencies, authority provenance, environment, product, test-set and policy identities', () => {
   const evidence = manifest();
   assert.equal(evidence.schemaVersion, 2);
   assert.equal(evidence.disposition, 'EXECUTED');
   assert.equal(evidence.result, 'SUCCESS');
+  assert.equal(evidence.semanticDependencyDigest, digests.dependency);
   assert.match(evidence.stableTestIdsDigest, /^sha256:[a-f0-9]{64}$/);
   assert.match(evidence.evidenceSemanticDigest, /^sha256:[a-f0-9]{64}$/);
   assert.match(evidence.evidenceDigest, /^sha256:[a-f0-9]{64}$/);
@@ -70,10 +73,23 @@ test('candidate SHA changes execution provenance without changing evidence seman
   const first = manifest();
   const second = manifest({
     candidateHeadSha: 'b'.repeat(40),
-    planInstanceDigest: `sha256:${'7'.repeat(64)}`,
+    planInstanceDigest: `sha256:${'8'.repeat(64)}`,
   });
   assert.equal(first.evidenceSemanticDigest, second.evidenceSemanticDigest);
   assert.notEqual(first.evidenceDigest, second.evidenceDigest);
+});
+
+test('global authority changes provenance without changing evidence semantic identity when semantic dependencies match', () => {
+  const first = manifest();
+  const second = manifest({ authorityDigest: `sha256:${'8'.repeat(64)}` });
+  assert.equal(first.evidenceSemanticDigest, second.evidenceSemanticDigest);
+  assert.notEqual(first.evidenceDigest, second.evidenceDigest);
+});
+
+test('semantic dependency changes invalidate evidence semantic identity', () => {
+  const first = manifest();
+  const second = manifest({ semanticDependencyDigest: `sha256:${'8'.repeat(64)}` });
+  assert.notEqual(first.evidenceSemanticDigest, second.evidenceSemanticDigest);
 });
 
 test('reused evidence uses the same schema and carries source plus compatibility provenance', () => {
@@ -81,7 +97,7 @@ test('reused evidence uses the same schema and carries source plus compatibility
   const reused = manifest({
     disposition: 'REUSED',
     sourceEvidenceDigest: source.evidenceDigest,
-    compatibilityDigest: `sha256:${'7'.repeat(64)}`,
+    compatibilityDigest: `sha256:${'8'.repeat(64)}`,
     runProvenance: {
       repository: 'Oteryn/Oteryn-Atlas',
       runId: 101,

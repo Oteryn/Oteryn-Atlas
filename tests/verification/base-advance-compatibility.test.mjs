@@ -32,14 +32,14 @@ function input(overrides = {}) {
       {
         id: 'environment',
         dependencyPaths: [],
-        dependsOnAuthority: true,
+        dependsOnAuthority: false,
         dependsOnEnvironment: true,
         productCapabilities: [],
       },
       {
         id: 'hosted-fixture',
         dependencyPaths: ['src/browser/'],
-        dependsOnAuthority: true,
+        dependsOnAuthority: false,
         dependsOnEnvironment: true,
         productCapabilities: ['qualification_fixture'],
       },
@@ -72,27 +72,29 @@ test('one selected dependency change schedules only its exact evidence node', ()
   assert.deepEqual(result.affectedEvidenceIds, ['hosted-fixture']);
 });
 
-test('authority, stable-ID or environment identity changes invalidate all dependent evidence', () => {
+test('control-plane authority movement invalidates only evidence that declares authority semantics', () => {
   const authorityResult = classifyBaseAdvance(input({
-    changedPaths: ['tools/verification/stable-id.mjs'],
+    changedPaths: ['.github/workflows/protected-hosted-executor.yml'],
     currentIdentities: {
       authorityDigest: `sha256:${'9'.repeat(64)}`,
       environmentDigest: env,
       products: { qualification_fixture: fixture },
     },
   }));
-  assert.equal(authorityResult.disposition, 'FULL_RERUN');
-  assert.deepEqual(authorityResult.affectedEvidenceIds, ['deterministic', 'environment', 'hosted-fixture']);
+  assert.equal(authorityResult.disposition, 'PARTIAL_RERUN');
+  assert.deepEqual(authorityResult.affectedEvidenceIds, ['deterministic']);
+});
 
+test('environment identity changes invalidate only evidence that executes in that environment', () => {
   const environmentResult = classifyBaseAdvance(input({
-    changedPaths: ['.github/workflows/protected-hosted-executor.yml'],
+    changedPaths: ['tools/verification/protected-execution-environment.json'],
     currentIdentities: {
       authorityDigest: auth,
       environmentDigest: `sha256:${'8'.repeat(64)}`,
       products: { qualification_fixture: fixture },
     },
   }));
-  assert.equal(environmentResult.disposition, 'FULL_RERUN');
+  assert.equal(environmentResult.disposition, 'PARTIAL_RERUN');
   assert.deepEqual(environmentResult.affectedEvidenceIds, ['environment', 'hosted-fixture']);
 });
 
