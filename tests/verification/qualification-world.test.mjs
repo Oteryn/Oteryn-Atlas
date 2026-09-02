@@ -48,6 +48,9 @@ test('qualification world carries a non-trivial searchable corpus and dynamic NP
     assert.ok(semanticFloor.chunks.length >= 9, 'qualification world must span multiple semantic chunks for range/race coverage');
     assert.equal(runtimeFloor.chunks.length, semanticFloor.chunks.length, 'runtime and semantic qualification chunk census must agree');
     assert.equal(overviewFloor.chunks.length, semanticFloor.chunks.length, 'overview and semantic qualification chunk census must agree');
+    assert.equal(runtimeFloor.counts.tiles, semanticFloor.counts.tiles, 'runtime and semantic qualification floor tile census must agree');
+    assert.equal(overviewFloor.counts.tiles, semanticFloor.counts.tiles, 'overview and semantic qualification floor tile census must agree');
+    assert.equal(overviewFloor.counts.resolvedPrimitives, semanticFloor.counts.resolvedPrimitives, 'overview and semantic qualification floor primitive census must agree');
     assert.equal(overviewWorld.counts.chunks, semanticWorld.counts.shards, 'overview and semantic world chunk census must agree');
     assert.equal(overviewWorld.counts.tiles, semanticWorld.counts.tiles, 'overview and semantic world tile census must agree');
     assert.equal(overviewWorld.counts.resolvedPrimitives, semanticWorld.counts.resolvedPrimitives, 'overview and semantic world primitive census must agree');

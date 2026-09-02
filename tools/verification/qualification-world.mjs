@@ -146,7 +146,7 @@ async function buildOverview(root, publicationRoot, semanticWorld, semanticFloor
       sourceFloorRoot: semanticEntry.rootContentId,
       bounds: BOUNDS,
       chunks,
-      counts: { cells: active ? 1 : 0, chunks: chunks.length, resolvedPrimitives: active ? 1 : 0, tiles: active ? 1 : 0 },
+      counts: { cells: chunks.reduce((sum, entry) => sum + entry.counts.cells, 0), chunks: chunks.length, resolvedPrimitives: chunks.reduce((sum, entry) => sum + entry.counts.resolvedPrimitives, 0), tiles: chunks.reduce((sum, entry) => sum + entry.counts.tiles, 0) },
     };
     const floorManifest = { ...floorCore, rootContentId: await computeOverviewRoot(floorCore, overviewDomains.floor) };
     writeJson(root, `overview/floors/f${floor}.json`, floorManifest);
