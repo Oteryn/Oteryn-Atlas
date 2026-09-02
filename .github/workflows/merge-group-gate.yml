@@ -130,7 +130,7 @@ jobs:
           rm -rf /tmp/chrome-browser-proof /tmp/chrome-app-proof /tmp/chrome-shot-proof
           "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage --use-angle=swiftshader --enable-unsafe-swiftshader --force-device-scale-factor=1 --window-size=800,600 --virtual-time-budget=30000 --user-data-dir=/tmp/chrome-browser-proof --dump-dom http://127.0.0.1:8765/tests/browser-proof.html > /tmp/browser-proof.html
           grep -q 'data-status="PASS"' /tmp/browser-proof.html
-          test "$(grep -c '"'"'"maxAbs"'"'": 0' /tmp/browser-proof.html)" -eq 5
+          test "$(grep -c '"maxAbs": 0' /tmp/browser-proof.html)" -eq 5
           "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage --use-angle=swiftshader --enable-unsafe-swiftshader --force-device-scale-factor=1 --window-size=1920,1080 --virtual-time-budget=30000 --user-data-dir=/tmp/chrome-app-proof --dump-dom 'http://127.0.0.1:8765/web/index.html?x=32377&y=32238&floor=-7&zoom=2' > /tmp/app-dom.html
           grep -q 'VERIFIED' /tmp/app-dom.html
           grep -q 'WEBGL2' /tmp/app-dom.html
@@ -148,10 +148,18 @@ jobs:
   atlas-gate:
     name: atlas-gate
     needs: candidate-checks
-    if: ${{ always() && needs.candidate-checks.result == 'success' }}
+    if: ${{ always() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
+      - name: Require isolated candidate checks to pass
+        shell: bash
+        env:
+          CANDIDATE_CHECKS_RESULT: ${{ needs.candidate-checks.result }}
+        run: |
+          set -euo pipefail
+          [[ "$CANDIDATE_CHECKS_RESULT" == success ]]
+
       - name: Validate exact merge-group identity
         shell: bash
         env:

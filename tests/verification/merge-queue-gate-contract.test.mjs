@@ -98,6 +98,10 @@ test('candidate executable checks cannot mutate the atlas-gate runner state', ()
   assert.match(workflow, /--security-opt no-new-privileges/);
   assert.match(workflow, /dst=\/candidate,readonly/);
   assert.match(workflow, /atlas-gate:\s*\n\s*name:\s*atlas-gate\s*\n\s*needs:\s*candidate-checks/);
+  assert.match(workflow, /needs:\s*candidate-checks\s*\n\s*if:\s*\$\{\{\s*always\(\)\s*\}\}/);
+  assert.match(workflow, /name:\s*Require isolated candidate checks to pass/);
+  assert.match(workflow, /CANDIDATE_CHECKS_RESULT:\s*\$\{\{\s*needs\.candidate-checks\.result\s*\}\}/);
+  assert.match(workflow, /\[\[\s*"\$CANDIDATE_CHECKS_RESULT"\s*==\s*success\s*\]\]/);
 
   const gate = workflow.slice(workflow.indexOf('  atlas-gate:'));
   assert.doesNotMatch(gate, /tools\/dyn-atlas-semantic\/self_test\.py/);
@@ -108,6 +112,11 @@ test('candidate executable checks cannot mutate the atlas-gate runner state', ()
 
 test('atlas-gate fully browser-qualifies the exact synthetic candidate with protected-base harness', () => {
   const workflow = readText(mergeGroupGateUrl);
+
+  const prCi = readText(prCiUrl);
+  const canonicalMaxAbsAssertion = `test "$(grep -c '"maxAbs": 0' /tmp/browser-proof.html)" -eq 5`;
+  assert.ok(prCi.includes(canonicalMaxAbsAssertion), 'PR CI must retain the canonical Chrome parity assertion');
+  assert.ok(workflow.includes(canonicalMaxAbsAssertion), 'Merge Queue Chrome parity assertion must match proven PR CI quoting');
 
   assert.match(workflow, /name: Check out exact protected merge-group base/);
   assert.match(workflow, /ref: \$\{\{ github\.event\.merge_group\.base_sha \}\}/);
