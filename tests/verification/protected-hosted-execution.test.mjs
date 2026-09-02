@@ -320,7 +320,7 @@ test('protected promotion qualification registry binds exact functional qualific
       'web/fullworld-farm-explorer.mjs',
       'web/fullworld-search.mjs',
     ],
-    expectedProductDigest: 'sha256:7bac8358ecb8e44d05636f9657c318fa6bb6f22445143237c8fa207d45be820b',
+    expectedProductDigest: 'sha256:3ab3472677e95e30795015869c73e54e6422c2b6144b01cccfbbbbaeafa98de9',
     candidateCensusMount: {
       sourceTree: 'exact-candidate-checkout',
       containerRoot: '/candidate',
