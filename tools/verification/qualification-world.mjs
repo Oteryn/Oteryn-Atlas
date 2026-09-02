@@ -28,9 +28,9 @@ const SOURCE_FINGERPRINT = 'sha256:5af8a7b6d6cb61bf6a430842141a658d3ba183f6e2ec5
 const FLOORS = Object.freeze([-8, -7, -6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7]);
 const ACTIVE_FLOOR = QUALIFICATION_ACTIVE_FLOOR;
 const CHUNK_PATH = 'chunks/f-7-r1008-c1004.jsonl';
-const REGION_XS = Object.freeze([1007, 1008, 1009]);
-const REGION_YS = Object.freeze([1003, 1004, 1005]);
-const BOUNDS = Object.freeze({ x_min: 32224, x_max_exclusive: 32320, y_min: 32096, y_max_exclusive: 32192 });
+const REGION_XS = Object.freeze([1007, 1008, 1009, 1010, 1011, 1012, 1013, 1014, 1015]);
+const REGION_YS = Object.freeze([1003, 1004, 1005, 1006, 1007, 1008, 1009, 1010, 1011]);
+const BOUNDS = Object.freeze({ x_min: 32224, x_max_exclusive: 32512, y_min: 32096, y_max_exclusive: 32384 });
 const MINIMAP_BOUNDS = Object.freeze({ x_min: 32256, x_max_exclusive: 32512, y_min: 32000, y_max_exclusive: 32256 });
 const PIXEL_BYTES = 32 * 32 * 4;
 const MINIMAP_PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64');
