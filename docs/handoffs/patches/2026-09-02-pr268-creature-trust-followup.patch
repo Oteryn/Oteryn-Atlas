@@ -1,4 +1,4 @@
-﻿diff --git a/tests/verification/qualification-world.test.mjs b/tests/verification/qualification-world.test.mjs
+diff --git a/tests/verification/qualification-world.test.mjs b/tests/verification/qualification-world.test.mjs
 index f961bce..f99dbf8 100644
 --- a/tests/verification/qualification-world.test.mjs
 +++ b/tests/verification/qualification-world.test.mjs
