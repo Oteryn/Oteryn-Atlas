@@ -20,7 +20,6 @@ export function resolveReusableEvidence(expected, candidateEvidence) {
   if (!expected || typeof expected !== 'object' || Array.isArray(expected)) return reject('EXPECTED_IDENTITY_INVALID');
   if (evidence.result !== 'SUCCESS') return reject('RESULT_NOT_SUCCESS');
   if (evidence.evidenceId !== expected.evidenceId) return reject('EVIDENCE_ID_MISMATCH');
-  if (evidence.candidateHeadSha !== expected.candidateHeadSha) return reject('CANDIDATE_HEAD_MISMATCH');
   if (expected.allowPlanSemanticRebinding !== true
     && evidence.planSemanticDigest !== expected.planSemanticDigest) return reject('SEMANTIC_PLAN_MISMATCH');
   if (evidence.authorityDigest !== expected.authorityDigest) return reject('AUTHORITY_IDENTITY_MISMATCH');

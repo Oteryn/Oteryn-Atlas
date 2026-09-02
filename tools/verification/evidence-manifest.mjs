@@ -1,4 +1,4 @@
-﻿import {
+import {
   canonicalDigest,
   deepFreeze,
   exactDigest,
@@ -73,7 +73,6 @@ function normalizeAvailability(value) {
 function semanticCore({
   evidenceId,
   evidenceType,
-  candidateHeadSha,
   authorityDigest,
   environmentDigest,
   productIdentities,
@@ -85,7 +84,6 @@ function semanticCore({
     schemaVersion: 1,
     evidenceId,
     evidenceType,
-    candidateHeadSha,
     authorityDigest,
     environmentDigest,
     productIdentities,
