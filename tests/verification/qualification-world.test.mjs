@@ -38,12 +38,19 @@ test('qualification world carries a non-trivial searchable corpus and dynamic NP
   try {
     await buildQualificationWorld(root);
     const semantic = JSON.parse(fs.readFileSync(path.join(root, 'web', 'semantic-search', 'index.json'), 'utf8'));
+    const semanticWorld = JSON.parse(fs.readFileSync(path.join(root, 'publication', 'semantic', 'world.json'), 'utf8'));
     const semanticFloor = JSON.parse(fs.readFileSync(path.join(root, 'publication', 'semantic', 'floors', 'f-7.json'), 'utf8'));
     const runtimeFloor = JSON.parse(fs.readFileSync(path.join(root, 'runtime-index', 'floors', 'f-7.json'), 'utf8'));
+    const overviewWorld = JSON.parse(fs.readFileSync(path.join(root, 'overview', 'world.json'), 'utf8'));
+    const overviewFloor = JSON.parse(fs.readFileSync(path.join(root, 'overview', 'floors', 'f-7.json'), 'utf8'));
     const creatures = JSON.parse(fs.readFileSync(path.join(root, 'data', 'creatures', 'search.json'), 'utf8'));
     const programs = JSON.parse(fs.readFileSync(path.join(root, 'animation', 'programs.json'), 'utf8'));
     assert.ok(semanticFloor.chunks.length >= 9, 'qualification world must span multiple semantic chunks for range/race coverage');
     assert.equal(runtimeFloor.chunks.length, semanticFloor.chunks.length, 'runtime and semantic qualification chunk census must agree');
+    assert.equal(overviewFloor.chunks.length, semanticFloor.chunks.length, 'overview and semantic qualification chunk census must agree');
+    assert.equal(overviewWorld.counts.chunks, semanticWorld.counts.shards, 'overview and semantic world chunk census must agree');
+    assert.equal(overviewWorld.counts.tiles, semanticWorld.counts.tiles, 'overview and semantic world tile census must agree');
+    assert.equal(overviewWorld.counts.resolvedPrimitives, semanticWorld.counts.resolvedPrimitives, 'overview and semantic world primitive census must agree');
     assert.ok(runtimeFloor.bounds.x_max_exclusive - runtimeFloor.bounds.x_min >= 96, 'qualification x bounds must span at least three regions');
     assert.ok(runtimeFloor.bounds.y_max_exclusive - runtimeFloor.bounds.y_min >= 96, 'qualification y bounds must span at least three regions');
     assert.ok(semantic.records.length + creatures.records.length > 50, 'qualification search corpus must exercise bounded repeated-search behavior');

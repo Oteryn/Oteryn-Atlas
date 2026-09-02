@@ -114,26 +114,29 @@ async function buildRuntimePixelBuckets(root, publicationRoot, pixelRoot, pixelC
   return manifest;
 }
 
-async function buildOverview(root, publicationRoot, semanticWorld, semanticFloors, chunkContentId) {
+async function buildOverview(root, publicationRoot, semanticWorld, semanticFloors, activeChunks) {
   const floors = [];
   for (const semanticEntry of semanticFloors) {
     const floor = semanticEntry.floor;
     const active = floor === ACTIVE_FLOOR;
     const chunks = [];
     if (active) {
-      const chunkCore = {
-        profile: overviewProfiles.chunk,
-        logicalAddress: { floor, region_x: 1008, region_y: 1004 },
-        sourceContentId: chunkContentId,
-        sourceFingerprint: SOURCE_FINGERPRINT,
-        cellSizeTiles: 8,
-        cells: [{ cell_x: Math.floor(32280 / 8), cell_y: Math.floor(32155 / 8), tiles: 1, resolvedPrimitives: 1 }],
-        counts: { cells: 1, resolvedPrimitives: 1, tiles: 1 },
-      };
-      const bytes = canonicalJsonBytes(chunkCore);
-      const relative = `chunks/f${floor}-r1008-c1004.json`;
-      writeBytes(root, `overview/${relative}`, bytes);
-      chunks.push({ logicalAddress: chunkCore.logicalAddress, path: relative, bytes: bytes.length, contentId: await sha256ContentId(bytes), sourceContentId: chunkContentId, counts: chunkCore.counts });
+      for (const sourceChunk of activeChunks) {
+        const { region_x: regionX, region_y: regionY } = sourceChunk.logicalAddress;
+        const chunkCore = {
+          profile: overviewProfiles.chunk,
+          logicalAddress: { floor, region_x: regionX, region_y: regionY },
+          sourceContentId: sourceChunk.contentId,
+          sourceFingerprint: SOURCE_FINGERPRINT,
+          cellSizeTiles: 8,
+          cells: [{ cell_x: Math.floor(sourceChunk.position.x / 8), cell_y: Math.floor(sourceChunk.position.y / 8), tiles: 1, resolvedPrimitives: 1 }],
+          counts: { cells: 1, resolvedPrimitives: 1, tiles: 1 },
+        };
+        const bytes = canonicalJsonBytes(chunkCore);
+        const relative = `chunks/f${floor}-r${regionX}-c${regionY}.json`;
+        writeBytes(root, `overview/${relative}`, bytes);
+        chunks.push({ logicalAddress: chunkCore.logicalAddress, path: relative, bytes: bytes.length, contentId: await sha256ContentId(bytes), sourceContentId: sourceChunk.contentId, counts: chunkCore.counts });
+      }
     }
     const floorCore = {
       profile: overviewProfiles.floor,
@@ -155,7 +158,7 @@ async function buildOverview(root, publicationRoot, semanticWorld, semanticFloor
     source: { authority: 'Oteryn/Oteryn-Game', publicationRoot, semanticRoot: semanticWorld.rootContentId, sourceFingerprint: SOURCE_FINGERPRINT },
     semantics: { walkability: 'NOT_CLAIMED', collision: 'NOT_CLAIMED', terrainClassification: 'NOT_CLAIMED' },
     floors,
-    counts: { cells: 1, chunks: 1, floors: FLOORS.length, resolvedPrimitives: 1, tiles: 1 },
+    counts: { cells: activeChunks.length, chunks: activeChunks.length, floors: FLOORS.length, resolvedPrimitives: activeChunks.length, tiles: activeChunks.length },
   };
   const world = { ...worldCore, rootContentId: await computeOverviewRoot(worldCore, overviewDomains.world) };
   writeJson(root, 'overview/world.json', world);
@@ -488,7 +491,7 @@ export async function buildQualificationWorld(destination) {
   const runtimeWorld = { ...runtimeWorldCore, rootContentId: await rootedContentId(RUNTIME_WORLD_DOMAIN, runtimeWorldCore) };
   writeJson(root, 'runtime-index/world.json', runtimeWorld);
   const pixelBuckets = await buildRuntimePixelBuckets(root, publication.rootContentId, pixel.manifest.rootContentId, pixel.pixelContentId, pixel.pixels);
-  const overview = await buildOverview(root, publication.rootContentId, semanticWorld, semanticFloors, anchorChunk.contentId);
+  const overview = await buildOverview(root, publication.rootContentId, semanticWorld, semanticFloors, activeChunks);
   const minimap = await buildMinimap(root, publication.rootContentId, pixel.manifest.rootContentId, anchorChunk.contentId);
 
   const animation = await buildQualificationAnimation(root, semanticWorld.rootContentId, pixel.manifest.rootContentId, pixel.pixelContentId, pixel.pixels);
