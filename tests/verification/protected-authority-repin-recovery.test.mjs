@@ -15,6 +15,23 @@ const SOURCE_HEAD_REF = 'fix/issue-179-qualification-functional-fixture';
 const OLD_DIGEST = 'sha256:2f457583f21cd3ebf8d995c1cc520ea099b277dace69453db08d568de7584613';
 const NEW_DIGEST = 'sha256:c36ed503f8ada27a673ba96780b70cb361fa2fe2ce08240e372dbff664a2866a';
 const sha = (character) => character.repeat(40);
+const BOOTSTRAP_CHANGED_FILES = [
+  '.github/workflows/ci.yml',
+  '.github/workflows/merge-authority-audit.yml',
+  '.github/workflows/merge-group-gate.yml',
+  '.github/workflows/protected-execution-promotion-qualification.yml',
+  'docs/migration/legacy-atlas-extraction-provenance.json',
+  'tests/verification/ci-workflow-contract.test.mjs',
+  'tests/verification/merge-queue-gate-contract.test.mjs',
+  'tests/verification/pr-browser-trust.test.mjs',
+  'tests/verification/protected-anti-loop-workflow-integration.test.mjs',
+  'tests/verification/protected-authority-repin-recovery.test.mjs',
+  'tests/verification/protected-hosted-execution.test.mjs',
+  'tests/verification/selfhosted-compose-contract.test.mjs',
+  'tools/governance/verify_extraction_provenance.py',
+  'tools/verification/protected-hosted-execution.mjs',
+  'tools/verification/protected-hosted-gate.mjs',
+];
 
 function authorityGateFixture(overrides = {}) {
   const protectedBaseSha = sha('a');
@@ -203,20 +220,7 @@ test('one-shot stabilization bootstrap consumes exact protected legacy heavy pro
     expectedPrNumber: prNumber,
     expectedCandidateHeadSha: candidateHeadSha,
     expectedProtectedBaseSha: protectedBaseSha,
-    changedFiles: [
-      '.github/workflows/ci.yml',
-      '.github/workflows/merge-authority-audit.yml',
-      '.github/workflows/protected-execution-promotion-qualification.yml',
-      'docs/migration/legacy-atlas-extraction-provenance.json',
-      'tests/verification/ci-workflow-contract.test.mjs',
-      'tests/verification/pr-browser-trust.test.mjs',
-      'tests/verification/protected-anti-loop-workflow-integration.test.mjs',
-      'tests/verification/protected-authority-repin-recovery.test.mjs',
-      'tests/verification/protected-hosted-execution.test.mjs',
-      'tests/verification/selfhosted-compose-contract.test.mjs',
-      'tools/verification/protected-hosted-execution.mjs',
-      'tools/verification/protected-hosted-gate.mjs',
-    ],
+    changedFiles: BOOTSTRAP_CHANGED_FILES,
   });
   assert.equal(result.status, 'success');
   assert.equal(result.mode, 'legacy-transition-heavy-proof-exact-base-only');
@@ -231,20 +235,7 @@ test('one-shot stabilization bootstrap consumes exact protected legacy heavy pro
     expectedPrNumber: prNumber,
     expectedCandidateHeadSha: candidateHeadSha,
     expectedProtectedBaseSha: protectedBaseSha,
-    changedFiles: [
-      '.github/workflows/ci.yml',
-      '.github/workflows/merge-authority-audit.yml',
-      '.github/workflows/protected-execution-promotion-qualification.yml',
-      'docs/migration/legacy-atlas-extraction-provenance.json',
-      'tests/verification/ci-workflow-contract.test.mjs',
-      'tests/verification/pr-browser-trust.test.mjs',
-      'tests/verification/protected-anti-loop-workflow-integration.test.mjs',
-      'tests/verification/protected-authority-repin-recovery.test.mjs',
-      'tests/verification/protected-hosted-execution.test.mjs',
-      'tests/verification/selfhosted-compose-contract.test.mjs',
-      'tools/verification/protected-hosted-execution.mjs',
-      'tools/verification/protected-hosted-gate.mjs',
-    ],
+    changedFiles: BOOTSTRAP_CHANGED_FILES,
   }), /association mismatch/i);
 
   const ci = fs.readFileSync(path.join(ROOT, '.github/workflows/ci.yml'), 'utf8');
@@ -255,4 +246,68 @@ test('one-shot stabilization bootstrap consumes exact protected legacy heavy pro
   assert.match(browserJob, /legacy-molehill-transition-qualification\.yml/);
   const cutover = browserJob.split('ATLAS_LEGACY_CUTOVER_BASE_SHA')[1]?.split('expected_name=')[0] ?? '';
   assert.doesNotMatch(cutover, /atlas-local-e2e/);
+});
+
+
+test('merge-group bootstrap accepts only the exact PR 303 synthetic tree and protected heavy proof', () => {
+  assert.equal(typeof protectedGate.validateLegacyTransitionMergeGroupBootstrapGate, 'function');
+  const protectedBaseSha = 'e31015d0880e9f81a4b96f990658490af45e8fa6';
+  const candidateHeadSha = sha('d');
+  const syntheticHeadSha = sha('e');
+  const treeSha = sha('f');
+  const prNumber = 303;
+  const headRef = 'feat/issue-179-legacy-transition-qualifier';
+  const livePr = {
+    number: prNumber, state: 'open', merged: false,
+    base: { ref: 'main', sha: protectedBaseSha, repo: { full_name: REPOSITORY } },
+    head: { ref: headRef, sha: candidateHeadSha, repo: { full_name: REPOSITORY } },
+  };
+  const producerRun = {
+    id: 13002, run_attempt: 1,
+    path: '.github/workflows/legacy-molehill-transition-qualification.yml',
+    event: 'pull_request', status: 'completed', conclusion: 'failure',
+    head_branch: headRef, head_sha: candidateHeadSha,
+    repository: { id: 1337995824, full_name: REPOSITORY },
+    pull_requests: [{ number: prNumber,
+      head: { ref: headRef, sha: candidateHeadSha, repo: { id: 1337995824, name: 'Oteryn-Atlas' } },
+      base: { ref: 'main', sha: protectedBaseSha, repo: { id: 1337995824, name: 'Oteryn-Atlas' } },
+    }],
+  };
+  const producerJobs = { jobs: [
+    { name: 'Capture exact-head legacy transition evidence', status: 'completed', conclusion: 'success' },
+    { name: 'Publish targeted protected-census compatibility evidence', status: 'completed', conclusion: 'skipped' },
+    { name: 'Publish reviewed atlas-local-e2e transition status', status: 'completed', conclusion: 'failure' },
+  ] };
+  const input = {
+    producerRun, producerJobs, livePr,
+    changedFiles: BOOTSTRAP_CHANGED_FILES,
+    expectedRepository: REPOSITORY,
+    expectedPrNumber: prNumber,
+    expectedProtectedBaseSha: protectedBaseSha,
+    expectedSyntheticHeadSha: syntheticHeadSha,
+    currentMainSha: protectedBaseSha,
+    mergeGroup: {
+      baseRef: 'refs/heads/main', baseSha: protectedBaseSha,
+      headRef: `refs/heads/gh-readonly-queue/main/pr-${prNumber}-${protectedBaseSha}`,
+      headSha: syntheticHeadSha,
+    },
+    syntheticCommit: { sha: syntheticHeadSha, tree: { sha: treeSha }, parents: [{ sha: protectedBaseSha }] },
+    candidateCommit: { sha: candidateHeadSha, tree: { sha: treeSha } },
+  };
+  const result = protectedGate.validateLegacyTransitionMergeGroupBootstrapGate(input);
+  assert.equal(result.status, 'success');
+  assert.equal(result.mode, 'legacy-transition-merge-group-heavy-proof-exact-base-only');
+  assert.equal(result.candidateHeadSha, candidateHeadSha);
+  assert.equal(result.syntheticHeadSha, syntheticHeadSha);
+  assert.equal(result.treeSha, treeSha);
+
+  assert.throws(() => protectedGate.validateLegacyTransitionMergeGroupBootstrapGate({
+    ...input, candidateCommit: { ...input.candidateCommit, tree: { sha: sha('1') } },
+  }), /tree/i);
+  assert.throws(() => protectedGate.validateLegacyTransitionMergeGroupBootstrapGate({
+    ...input, mergeGroup: { ...input.mergeGroup, headRef: 'refs/heads/gh-readonly-queue/main/pr-304-wrong' },
+  }), /queue|head ref/i);
+  assert.throws(() => protectedGate.validateLegacyTransitionMergeGroupBootstrapGate({
+    ...input, currentMainSha: sha('2'),
+  }), /current main|stale/i);
 });

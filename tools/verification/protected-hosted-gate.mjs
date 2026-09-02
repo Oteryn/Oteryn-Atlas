@@ -339,17 +339,21 @@ const LEGACY_TRANSITION_BOOTSTRAP = deepFreeze({
   event: 'pull_request',
   heavyJobName: 'Capture exact-head legacy transition evidence',
   allowedNonEvidenceFailureJobName: 'Publish reviewed atlas-local-e2e transition status',
+  prNumber: 303,
   changedFiles: [
     '.github/workflows/ci.yml',
     '.github/workflows/merge-authority-audit.yml',
+    '.github/workflows/merge-group-gate.yml',
     '.github/workflows/protected-execution-promotion-qualification.yml',
     'docs/migration/legacy-atlas-extraction-provenance.json',
     'tests/verification/ci-workflow-contract.test.mjs',
+    'tests/verification/merge-queue-gate-contract.test.mjs',
     'tests/verification/pr-browser-trust.test.mjs',
     'tests/verification/protected-anti-loop-workflow-integration.test.mjs',
     'tests/verification/protected-authority-repin-recovery.test.mjs',
     'tests/verification/protected-hosted-execution.test.mjs',
     'tests/verification/selfhosted-compose-contract.test.mjs',
+    'tools/governance/verify_extraction_provenance.py',
     'tools/verification/protected-hosted-execution.mjs',
     'tools/verification/protected-hosted-gate.mjs',
   ],
@@ -430,5 +434,73 @@ export function validateLegacyTransitionBootstrapGate(input) {
     headRef: LEGACY_TRANSITION_BOOTSTRAP.headRef,
     producerRunId: runId,
     producerRunAttempt: runAttempt,
+  });
+}
+
+export function validateLegacyTransitionMergeGroupBootstrapGate(input) {
+  if (!isPlainObject(input)) throw new TypeError('legacy transition merge-group bootstrap input is invalid');
+  const repository = nonEmptyString(input.expectedRepository, 'legacy transition merge-group repository');
+  if (repository !== 'Oteryn/Oteryn-Atlas') throw new TypeError('legacy transition merge-group repository is invalid');
+  const prNumber = exactPositiveInteger(input.expectedPrNumber, 'legacy transition merge-group PR number');
+  if (prNumber !== LEGACY_TRANSITION_BOOTSTRAP.prNumber) {
+    throw new TypeError('legacy transition merge-group PR number is not preauthorized');
+  }
+  const protectedBaseSha = exactSha(input.expectedProtectedBaseSha, 'legacy transition merge-group protected base');
+  if (protectedBaseSha !== LEGACY_TRANSITION_BOOTSTRAP.protectedBaseSha) {
+    throw new TypeError('legacy transition merge-group protected base is not preauthorized');
+  }
+  const syntheticHeadSha = exactSha(input.expectedSyntheticHeadSha, 'legacy transition merge-group synthetic head');
+  const currentMainSha = exactSha(input.currentMainSha, 'legacy transition merge-group current main');
+  if (currentMainSha !== protectedBaseSha) {
+    throw new TypeError('legacy transition merge-group current main is stale');
+  }
+
+  const mergeGroup = input.mergeGroup;
+  const expectedQueueHeadRef = `refs/heads/gh-readonly-queue/main/pr-${prNumber}-${protectedBaseSha}`;
+  if (!isPlainObject(mergeGroup)
+    || mergeGroup.baseRef !== 'refs/heads/main'
+    || mergeGroup.headRef !== expectedQueueHeadRef
+    || exactSha(mergeGroup.baseSha, 'legacy transition merge-group event base') !== protectedBaseSha
+    || exactSha(mergeGroup.headSha, 'legacy transition merge-group event head') !== syntheticHeadSha) {
+    throw new TypeError('legacy transition merge-group queue head ref or event identity mismatch');
+  }
+
+  const syntheticCommit = input.syntheticCommit;
+  if (!isPlainObject(syntheticCommit)
+    || exactSha(syntheticCommit.sha, 'legacy transition synthetic commit') !== syntheticHeadSha
+    || !Array.isArray(syntheticCommit.parents)
+    || syntheticCommit.parents.length !== 1
+    || exactSha(syntheticCommit.parents[0]?.sha, 'legacy transition synthetic parent') !== protectedBaseSha) {
+    throw new TypeError('legacy transition synthetic commit parent identity mismatch');
+  }
+  const syntheticTreeSha = exactSha(syntheticCommit.tree?.sha, 'legacy transition synthetic tree');
+
+  const candidateHeadSha = exactSha(input.livePr?.head?.sha, 'legacy transition merge-group candidate head');
+  const candidateCommit = input.candidateCommit;
+  if (!isPlainObject(candidateCommit)
+    || exactSha(candidateCommit.sha, 'legacy transition candidate commit') !== candidateHeadSha) {
+    throw new TypeError('legacy transition merge-group candidate commit identity mismatch');
+  }
+  const candidateTreeSha = exactSha(candidateCommit.tree?.sha, 'legacy transition candidate tree');
+  if (candidateTreeSha !== syntheticTreeSha) {
+    throw new TypeError('legacy transition merge-group synthetic tree does not equal exact candidate tree');
+  }
+
+  const protectedProof = validateLegacyTransitionBootstrapGate({
+    producerRun: input.producerRun,
+    producerJobs: input.producerJobs,
+    livePr: input.livePr,
+    changedFiles: input.changedFiles,
+    expectedRepository: repository,
+    expectedPrNumber: prNumber,
+    expectedCandidateHeadSha: candidateHeadSha,
+    expectedProtectedBaseSha: protectedBaseSha,
+  });
+
+  return deepFreeze({
+    ...protectedProof,
+    mode: 'legacy-transition-merge-group-heavy-proof-exact-base-only',
+    syntheticHeadSha,
+    treeSha: syntheticTreeSha,
   });
 }
