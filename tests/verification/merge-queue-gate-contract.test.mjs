@@ -71,6 +71,10 @@ test('protected-base audit owns Atlas merge-authority pins outside candidate che
   assert.match(audit, /\.github\/workflows\/merge-group-gate\.yml/);
   assert.match(audit, /tools\/governance\/test_verify_extraction_provenance\.py/);
   assert.match(audit, /provenance_gate_paths/);
+  assert.match(audit, /governance_prefix\s*=\s*['"]tools\/governance\//);
+  assert.match(audit, /path\.startsWith\(governance_prefix\)|path\.startswith\(governance_prefix\)/);
+  assert.match(audit, /unpinned_governance/);
+  assert.match(audit, /unpinned Python import authority/);
   assert.doesNotMatch(audit, /^\s*(?:contents|pull-requests|actions|checks|statuses|id-token):\s*write\s*$/m);
 });
 
