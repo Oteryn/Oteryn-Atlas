@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import test from 'node:test';
 
@@ -6,48 +7,55 @@ function readText(url) {
   return fs.readFileSync(url, 'utf8').replace(/\r\n/g, '\n');
 }
 
-function block(source, start, end) {
-  const begin = source.indexOf(start);
-  assert.notEqual(begin, -1, `missing ${start}`);
-  const finish = source.indexOf(end, begin + start.length);
-  return source.slice(begin, finish === -1 ? source.length : finish);
+function gitBlobSha(text) {
+  const bytes = Buffer.from(text, 'utf8');
+  return crypto.createHash('sha1').update(`blob ${bytes.length}\0`).update(bytes).digest('hex');
 }
 
-const ci = readText(new URL('../../.github/workflows/ci.yml', import.meta.url));
-const standaloneMergeGroupGate = new URL('../../.github/workflows/merge-group-gate.yml', import.meta.url);
+const mergeGroupGateUrl = new URL('../../.github/workflows/merge-group-gate.yml', import.meta.url);
 const provenanceWorkflow = new URL('../../.github/workflows/extraction-provenance.yml', import.meta.url);
+const provenanceMapUrl = new URL('../../docs/migration/legacy-atlas-extraction-provenance.json', import.meta.url);
 
-test('Merge Queue authority stays in the existing aggregate CI workflow', () => {
+test('Merge Queue authority is provenance-pinned and emits only atlas-gate', () => {
   assert.equal(fs.existsSync(provenanceWorkflow), false, 'separate provenance gate must remain retired');
-  assert.equal(fs.existsSync(standaloneMergeGroupGate), false, 'candidate-defined standalone Merge Queue gate must be retired');
-  assert.match(ci, /merge_group:\s*\n\s*types:\s*\[checks_requested\]/);
+  assert.equal(fs.existsSync(mergeGroupGateUrl), true, 'merge-group aggregate gate workflow must exist');
 
-  const repositoryContract = block(ci, '  repository-contract:\n', '  semantic-proof:\n');
-  assert.match(repositoryContract, /github\.event_name/);
-  assert.match(repositoryContract, /github\.event\.merge_group\.base_ref/);
-  assert.match(repositoryContract, /github\.event\.merge_group\.base_sha/);
-  assert.match(repositoryContract, /github\.event\.merge_group\.head_sha/);
-  assert.match(repositoryContract, /github\.sha/);
-  assert.match(repositoryContract, /refs\/heads\/main/);
-  assert.match(repositoryContract, /verify_extraction_provenance\.py/);
+  const workflow = readText(mergeGroupGateUrl);
+  const provenanceMap = JSON.parse(readText(provenanceMapUrl));
+  const pins = provenanceMap.rows.flatMap((row) => row.target_paths ?? [])
+    .filter((target) => target.path === '.github/workflows/merge-group-gate.yml');
+
+  assert.equal(pins.length, 1, 'merge-group gate must have exactly one provenance target pin');
+  assert.equal(pins[0].blob, gitBlobSha(workflow), 'merge-group gate provenance pin must match exact workflow bytes');
+  assert.match(workflow, /merge_group:\s*\n\s*types:\s*\[checks_requested\]/);
+  assert.match(workflow, /name:\s*atlas-gate/);
+  assert.match(workflow, /BASE_REF: \$\{\{ github\.event\.merge_group\.base_ref \|\| '' \}\}/);
+  assert.match(workflow, /BASE_SHA: \$\{\{ github\.event\.merge_group\.base_sha \|\| '' \}\}/);
+  assert.match(workflow, /HEAD_SHA: \$\{\{ github\.event\.merge_group\.head_sha \|\| '' \}\}/);
+  assert.match(workflow, /HEAD_SHA.*GITHUB_SHA_VALUE/);
+  assert.match(workflow, /refs\/heads\/main/);
+  assert.match(workflow, /verify_extraction_provenance\.py/);
+  assert.doesNotMatch(workflow, /provenance-gate/);
 });
 
-test('atlas-gate requires protected-base full browser qualification for every merge-group candidate', () => {
-  const mergeBrowser = block(ci, '  verification-merge-group-browser:\n', '  atlas-gate:\n');
-  const gate = ci.slice(ci.indexOf('  atlas-gate:\n'));
+test('atlas-gate fully browser-qualifies the exact synthetic candidate with protected-base harness', () => {
+  const workflow = readText(mergeGroupGateUrl);
 
-  assert.match(mergeBrowser, /github\.event_name == 'merge_group'/);
-  assert.match(mergeBrowser, /github\.event\.merge_group\.base_sha/);
-  assert.match(mergeBrowser, /github\.event\.merge_group\.head_sha/);
-  assert.match(mergeBrowser, /path:\s*trusted-base/);
-  assert.match(mergeBrowser, /path:\s*candidate/);
-  assert.match(mergeBrowser, /qualification-world\.mjs/);
-  assert.match(mergeBrowser, /compose\.protected-hosted-executor\.yml/);
-  assert.match(mergeBrowser, /compose\.github-hosted\.yml/);
-  assert.match(mergeBrowser, /--retries=0/);
-  assert.match(mergeBrowser, /--workers=1/);
-
-  assert.match(gate, /- verification-merge-group-browser/);
-  assert.match(gate, /MERGE_GROUP_BROWSER:.*needs\.verification-merge-group-browser\.result/);
-  assert.match(gate, /GITHUB_EVENT_NAME.*merge_group[\s\S]*MERGE_GROUP_BROWSER[\s\S]*success/);
+  assert.match(workflow, /name: Check out exact protected merge-group base/);
+  assert.match(workflow, /ref: \$\{\{ github\.event\.merge_group\.base_sha \}\}/);
+  assert.match(workflow, /path:\s*trusted-base/);
+  assert.match(workflow, /buildQualificationWorld/);
+  assert.match(workflow, /qualificationTrustDescriptor/);
+  assert.match(workflow, /trusted-base\/tools\/verification\/verification-catalog\.json/);
+  assert.match(workflow, /e2e\.full/);
+  assert.match(workflow, /trusted-base\/e2e\/compose\.protected-hosted-executor\.yml/);
+  assert.match(workflow, /trusted-base\/e2e\/compose\.github-hosted\.yml/);
+  assert.match(workflow, /ATLAS_EXECUTION_CONTEXT/);
+  assert.match(workflow, /ATLAS_PROTECTED_TEST_LIST/);
+  assert.match(workflow, /ATLAS_CODE_REVISION/);
+  assert.match(workflow, /ATLAS_E2E_WORKERS=['"]?1['"]?/);
+  assert.match(workflow, /ATLAS_E2E_SHARD=['"]?1\/1['"]?/);
+  assert.match(workflow, /--retries=0/);
+  assert.match(workflow, /compose run --no-deps --rm e2e/);
+  assert.doesNotMatch(workflow, /labels:\s*oteryn-atlas-pc|synology|real_fullworld/i);
 });
