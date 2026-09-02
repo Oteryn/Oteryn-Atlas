@@ -137,8 +137,21 @@ export async function waitForAtlas(page) {
   expect(result.capabilities?.blockedOrUnknownEnabled).toBe(false);
   await expect(page.locator('#runtime-badge')).toContainText('VERIFIED FULL-WORLD');
   await expect(page.locator('#diag-backend')).toContainText(/webgl2/i);
-  await page.waitForFunction(() => globalThis.__OTERYN_ATLAS_SEMANTIC_SEARCH__?.status === 'PASS', null, { timeout: 30_000 });
   return result;
+}
+
+export async function semanticSearchResult(page) {
+  await page.waitForFunction(() => {
+    const status = globalThis.__OTERYN_ATLAS_SEMANTIC_SEARCH__?.status;
+    return status === 'PASS' || status === 'FAIL';
+  }, null, { timeout: 30_000 });
+  return page.evaluate(() => globalThis.__OTERYN_ATLAS_SEMANTIC_SEARCH__ ?? null);
+}
+
+export async function waitForSemanticSearch(page) {
+  const semantic = await semanticSearchResult(page);
+  expect(semantic?.status, semantic?.error || `semantic-search=${semantic?.status ?? 'UNKNOWN'}`).toBe('PASS');
+  return semantic;
 }
 
 export async function expectQualificationFailure(page, messagePattern) {

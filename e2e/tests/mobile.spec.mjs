@@ -6,12 +6,14 @@ import {
   gotoAtlas,
   isQualificationFixtureExecution,
   waitForAtlas,
+  waitForSemanticSearch,
 } from './runtime.mjs';
 
 test('mobile FullWorld exposes drawers and semantic navigation', async ({ page }) => {
   const runtime = captureRuntimeFailures(page);
   await gotoAtlas(page, MOBILE_ENTRY);
   await waitForAtlas(page);
+  await waitForSemanticSearch(page);
 
   await expect(page.locator('html')).toHaveAttribute('data-mobile-ui', 'ready');
   const controlsToggle = page.locator('#mobile-controls-toggle');

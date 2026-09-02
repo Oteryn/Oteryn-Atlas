@@ -5,6 +5,7 @@ import {
   captureRuntimeFailures,
   gotoAtlas,
   waitForAtlas,
+  waitForSemanticSearch,
 } from './runtime.mjs';
 
 async function publishedSemanticIndex(page) {
@@ -25,6 +26,7 @@ test('published semantic result navigates, survives reload, and restores through
   const runtime = captureRuntimeFailures(page);
   await gotoAtlas(page, DESKTOP_ENTRY);
   await waitForAtlas(page);
+  await waitForSemanticSearch(page);
   const initial = new URL(page.url());
   const index = await publishedSemanticIndex(page);
   const record = uniqueNavigableRecord(index);
@@ -45,12 +47,14 @@ test('published semantic result navigates, survives reload, and restores through
     option.click(),
   ]);
   await waitForAtlas(page);
+  await waitForSemanticSearch(page);
   await expect(page.locator('#inspector-content')).toContainText(record.label);
   await expect(page.locator('#inspector-content')).toContainText(record.id);
   expect(await page.evaluate(() => globalThis.__OTERYN_ATLAS_SEMANTIC_SEARCH__?.activeId)).toBe(record.id);
 
   await page.reload({ waitUntil: 'domcontentloaded' });
   await waitForAtlas(page);
+  await waitForSemanticSearch(page);
   expect(new URL(page.url()).searchParams.get('semantic')).toBe(record.id);
   await expect(page.locator('#inspector-content')).toContainText(record.id);
 

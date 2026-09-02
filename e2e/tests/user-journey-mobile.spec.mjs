@@ -16,6 +16,7 @@ import {
   captureRuntimeFailures,
   gotoAtlas,
   waitForAtlas,
+  waitForSemanticSearch,
 } from './runtime.mjs';
 
 const DEFAULT_SEED = 0x9158;
@@ -29,6 +30,7 @@ async function exerciseDrawer(page) {
 }
 
 async function searchPublishedPlace(page, record) {
+  await waitForSemanticSearch(page);
   await ensureMobileControls(page);
   const input = page.locator('#mobile-search-input');
   const results = page.locator('#semantic-search-results-mobile');

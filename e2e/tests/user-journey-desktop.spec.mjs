@@ -14,12 +14,14 @@ import {
   captureRuntimeFailures,
   gotoAtlas,
   waitForAtlas,
+  waitForSemanticSearch,
 } from './runtime.mjs';
 
 const DEFAULT_SEED = 0x158;
 const DEFAULT_LENGTH = 12;
 
 async function searchPublishedPlace(page, record) {
+  await waitForSemanticSearch(page);
   const input = page.locator('#search-input');
   const results = page.locator('#semantic-search-results-desktop');
   await input.fill(record.label);

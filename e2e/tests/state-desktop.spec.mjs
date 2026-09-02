@@ -6,12 +6,14 @@ import {
   fixtureAwarePosition,
   gotoAtlas,
   waitForAtlas,
+  waitForSemanticSearch,
 } from './runtime.mjs';
 
 test('desktop invalid search and out-of-bounds coordinates fail safely', async ({ page }) => {
   const runtime = captureRuntimeFailures(page);
   await gotoAtlas(page, DESKTOP_ENTRY);
   await waitForAtlas(page);
+  await waitForSemanticSearch(page);
 
   await expect(page.getByRole('button', { name: 'Zoom in' })).toBeEnabled();
   await expect(page.getByRole('button', { name: 'Zoom out' })).toBeEnabled();

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { DESKTOP_ENTRY, assertNoRuntimeFailures, captureRuntimeFailures, gotoAtlas, isQualificationFixtureExecution, waitForAtlas } from './runtime.mjs';
+import { DESKTOP_ENTRY, assertNoRuntimeFailures, captureRuntimeFailures, gotoAtlas, isQualificationFixtureExecution, waitForAtlas, waitForSemanticSearch } from './runtime.mjs';
 import { canvasAlphaCount, comparePngOutsideRects } from '../support/visual-oracle.mjs';
 import { assertUserVisibleSurface, captureUserVisualEvidence } from '../support/user-acceptance.mjs';
 const ENTRY = `${DESKTOP_ENTRY}&creatures=npc,monster&animation=off`;
@@ -77,6 +77,7 @@ test('desktop Atlas-owned chrome and user journey retain reviewed visual contrac
   const runtime = captureRuntimeFailures(page);
   await gotoAtlas(page, `${VISUAL_ENTRY}&creatures=npc,monster`);
   await waitForAtlas(page);
+  await waitForSemanticSearch(page);
 
   const initialMetrics = await assertUserVisibleSurface(page, {
     label: 'desktop initial Atlas',

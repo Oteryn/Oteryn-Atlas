@@ -5,6 +5,7 @@ import {
   captureRuntimeFailures,
   gotoAtlas,
   waitForAtlas,
+  waitForSemanticSearch,
 } from './runtime.mjs';
 
 async function publishedCatalogs(page) {
@@ -26,6 +27,7 @@ test('browser search diagnostics match published semantic API contracts', async 
   const runtime = captureRuntimeFailures(page);
   await gotoAtlas(page, DESKTOP_ENTRY);
   await waitForAtlas(page);
+  await waitForSemanticSearch(page);
   const { index, creatures } = await publishedCatalogs(page);
 
   expect(index.schema_version).toBe(1);
@@ -57,6 +59,7 @@ test('published API records render unchanged through browser search', async ({ p
   const runtime = captureRuntimeFailures(page);
   await gotoAtlas(page, DESKTOP_ENTRY);
   await waitForAtlas(page);
+  await waitForSemanticSearch(page);
   const { index } = await publishedCatalogs(page);
   const records = index.records.slice(0, Math.min(5, index.records.length));
   expect(records.length).toBeGreaterThan(0);

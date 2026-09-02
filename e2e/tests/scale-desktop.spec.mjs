@@ -5,6 +5,7 @@ import {
   captureRuntimeFailures,
   gotoAtlas,
   waitForAtlas,
+  waitForSemanticSearch,
 } from './runtime.mjs';
 
 async function publishedSearchCorpus(page) {
@@ -26,6 +27,7 @@ test('repeated searches over published corpus stay bounded without DOM growth', 
   const runtime = captureRuntimeFailures(page);
   await gotoAtlas(page, DESKTOP_ENTRY);
   await waitForAtlas(page);
+  await waitForSemanticSearch(page);
   const corpus = await publishedSearchCorpus(page);
   expect(corpus.length).toBeGreaterThan(50);
 

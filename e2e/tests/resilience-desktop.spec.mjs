@@ -5,7 +5,7 @@ import {
   captureRuntimeFailures,
   expectQualificationFailure,
   gotoAtlas,
-  qualificationResult,
+  semanticSearchResult,
   waitForAtlas,
 } from './runtime.mjs';
 import { assertUserVisibleSurface, captureUserVisualEvidence } from '../support/user-acceptance.mjs';
@@ -39,10 +39,9 @@ test('malformed semantic search product fails closed without corrupting map qual
     await route.fulfill({ status: 200, contentType: 'application/json', body: '{ malformed-json' });
   });
   await gotoAtlas(page, DESKTOP_ENTRY);
-  const { status, result } = await qualificationResult(page);
-  expect(status, result.error || 'FullWorld qualification').toBe('PASS');
-  await page.waitForFunction(() => globalThis.__OTERYN_ATLAS_SEMANTIC_SEARCH__?.status === 'FAIL', null, { timeout: 30_000 });
-  const search = await page.evaluate(() => globalThis.__OTERYN_ATLAS_SEMANTIC_SEARCH__);
+  await waitForAtlas(page);
+  const search = await semanticSearchResult(page);
+  expect(search?.status).toBe('FAIL');
   expect(search.error).toMatch(/JSON|parse|unexpected/i);
   await expect(page.locator('#runtime-badge')).toContainText('VERIFIED FULL-WORLD');
 });

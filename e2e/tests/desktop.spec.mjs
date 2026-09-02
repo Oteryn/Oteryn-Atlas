@@ -7,12 +7,14 @@ import {
   isQualificationFixtureExecution,
   qualificationAnchor,
   waitForAtlas,
+  waitForSemanticSearch,
 } from './runtime.mjs';
 
 test('desktop FullWorld qualifies, streams verified ranges and navigates semantic search', async ({ page }) => {
   const runtime = captureRuntimeFailures(page);
   await gotoAtlas(page, DESKTOP_ENTRY);
   await waitForAtlas(page);
+  await waitForSemanticSearch(page);
 
   const anchor = await qualificationAnchor(page);
   await expect(page.locator('#coord-x')).toHaveText(String(anchor?.x ?? 32369));

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { MOBILE_ENTRY, assertNoRuntimeFailures, captureRuntimeFailures, gotoAtlas, isQualificationFixtureExecution, waitForAtlas } from './runtime.mjs';
+import { MOBILE_ENTRY, assertNoRuntimeFailures, captureRuntimeFailures, gotoAtlas, isQualificationFixtureExecution, waitForAtlas, waitForSemanticSearch } from './runtime.mjs';
 import { canvasPng, exactPngPixelsEqual } from '../support/visual-oracle.mjs';
 
 const MONSTER_PLAYBACK_ENTRY = isQualificationFixtureExecution()
@@ -11,6 +11,7 @@ test('mobile Atlas-owned chrome and drawers retain reviewed user-facing visual c
   const runtime = captureRuntimeFailures(page);
   await gotoAtlas(page, `${MOBILE_ENTRY}&creatures=npc,monster`);
   await waitForAtlas(page);
+  await waitForSemanticSearch(page);
 
   const initialMetrics = await assertUserVisibleSurface(page, {
     label: 'mobile initial Atlas',
