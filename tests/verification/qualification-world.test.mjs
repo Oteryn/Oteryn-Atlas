@@ -71,6 +71,28 @@ test('qualification world carries a non-trivial searchable corpus and dynamic NP
   }
 });
 
+test('qualification world preserves the protected browser navigation lower-bound regions', async () => {
+  const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-qualification-lower-bound-'));
+  const root = path.join(parent, 'world');
+  try {
+    await buildQualificationWorld(root);
+    const semanticFloor = JSON.parse(fs.readFileSync(path.join(root, 'publication', 'semantic', 'floors', 'f-7.json'), 'utf8'));
+    const protectedPoints = [
+      { x: 32369, y: 32241, floor: -7 },
+      { x: 32380, y: 32250, floor: -7 },
+      { x: 32469, y: 32341, floor: -7 },
+    ];
+    const regions = new Set((semanticFloor.chunks ?? []).map((chunk) => `${chunk.logicalAddress.region_x}:${chunk.logicalAddress.region_y}`));
+    for (const point of protectedPoints) {
+      assert.ok(point.x >= semanticFloor.bounds.x_min && point.x < semanticFloor.bounds.x_max_exclusive, `protected x=${point.x} must remain inside qualification bounds`);
+      assert.ok(point.y >= semanticFloor.bounds.y_min && point.y < semanticFloor.bounds.y_max_exclusive, `protected y=${point.y} must remain inside qualification bounds`);
+      assert.ok(regions.has(`${Math.floor(point.x / 32)}:${Math.floor(point.y / 32)}`), `protected point ${point.x},${point.y} must have a published qualification chunk`);
+    }
+  } finally {
+    fs.rmSync(parent, { recursive: true, force: true });
+  }
+});
+
 test('qualification trust descriptor is the exact browser trust subset of the verified product manifest', async () => {
   const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-qualification-trust-'));
   const root = path.join(parent, 'world');
