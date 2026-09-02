@@ -186,10 +186,10 @@ test('one-shot stabilization bootstrap consumes exact protected legacy heavy pro
     path: '.github/workflows/legacy-molehill-transition-qualification.yml',
     event: 'pull_request', status: 'completed', conclusion: 'failure',
     head_branch: headRef, head_sha: candidateHeadSha,
-    repository: { full_name: REPOSITORY },
+    repository: { id: 1337995824, full_name: REPOSITORY },
     pull_requests: [{ number: prNumber,
-      head: { ref: headRef, sha: candidateHeadSha, repo: { full_name: REPOSITORY } },
-      base: { ref: 'main', sha: protectedBaseSha, repo: { full_name: REPOSITORY } },
+      head: { ref: headRef, sha: candidateHeadSha, repo: { id: 1337995824, url: `https://api.github.com/repos/${REPOSITORY}`, name: 'Oteryn-Atlas' } },
+      base: { ref: 'main', sha: protectedBaseSha, repo: { id: 1337995824, url: `https://api.github.com/repos/${REPOSITORY}`, name: 'Oteryn-Atlas' } },
     }],
   };
   const producerJobs = { jobs: [
@@ -221,6 +221,29 @@ test('one-shot stabilization bootstrap consumes exact protected legacy heavy pro
   assert.equal(result.mode, 'legacy-transition-heavy-proof-exact-base-only');
   assert.equal(result.headRef, headRef);
   assert.equal(result.producerRunAttempt, 1);
+
+  const mismatchedRepo = structuredClone(producerRun);
+  mismatchedRepo.pull_requests[0].head.repo.id = 42;
+  assert.throws(() => protectedGate.validateLegacyTransitionBootstrapGate({
+    producerRun: mismatchedRepo, producerJobs, livePr,
+    expectedRepository: REPOSITORY,
+    expectedPrNumber: prNumber,
+    expectedCandidateHeadSha: candidateHeadSha,
+    expectedProtectedBaseSha: protectedBaseSha,
+    changedFiles: [
+      '.github/workflows/ci.yml',
+      '.github/workflows/merge-authority-audit.yml',
+      '.github/workflows/protected-execution-promotion-qualification.yml',
+      'docs/migration/legacy-atlas-extraction-provenance.json',
+      'tests/verification/ci-workflow-contract.test.mjs',
+      'tests/verification/pr-browser-trust.test.mjs',
+      'tests/verification/protected-anti-loop-workflow-integration.test.mjs',
+      'tests/verification/protected-authority-repin-recovery.test.mjs',
+      'tests/verification/selfhosted-compose-contract.test.mjs',
+      'tools/verification/protected-hosted-execution.mjs',
+      'tools/verification/protected-hosted-gate.mjs',
+    ],
+  }), /association mismatch/i);
 
   const ci = fs.readFileSync(path.join(ROOT, '.github/workflows/ci.yml'), 'utf8');
   const browserJob = ci.split('  verification-browser:')[1]?.split('  atlas-gate:')[0] ?? '';

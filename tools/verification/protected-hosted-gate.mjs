@@ -387,11 +387,13 @@ export function validateLegacyTransitionBootstrapGate(input) {
   if (exactSha(run.head_sha, 'legacy transition bootstrap producer head') !== candidateHeadSha) {
     throw new TypeError('legacy transition bootstrap producer head is stale');
   }
+  const runRepositoryId = exactPositiveInteger(Number(run.repository?.id), 'legacy transition bootstrap producer repository ID');
   const association = (Array.isArray(run.pull_requests) ? run.pull_requests : []).find((item) => item?.number === prNumber);
   if (!association
-    || association.head?.repo?.full_name !== repository
-    || association.base?.repo?.full_name !== repository
+    || Number(association.head?.repo?.id) !== runRepositoryId
+    || Number(association.base?.repo?.id) !== runRepositoryId
     || association.head?.ref !== LEGACY_TRANSITION_BOOTSTRAP.headRef
+    || association.base?.ref !== 'main'
     || exactSha(association.head?.sha, 'legacy transition bootstrap associated head') !== candidateHeadSha
     || exactSha(association.base?.sha, 'legacy transition bootstrap associated base') !== protectedBaseSha) {
     throw new TypeError('legacy transition bootstrap producer PR association mismatch');
