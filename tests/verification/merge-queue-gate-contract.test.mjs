@@ -12,7 +12,10 @@ function gitBlobSha(text) {
   return crypto.createHash('sha1').update(`blob ${bytes.length}\0`).update(bytes).digest('hex');
 }
 
+const mergeAuthorityAuditUrl = new URL('../../.github/workflows/merge-authority-audit.yml', import.meta.url);
 const mergeGroupGateUrl = new URL('../../.github/workflows/merge-group-gate.yml', import.meta.url);
+const prCiUrl = new URL('../../.github/workflows/ci.yml', import.meta.url);
+const provenanceMapUrl = new URL('../../docs/migration/legacy-atlas-extraction-provenance.json', import.meta.url);
 const provenanceWorkflow = new URL('../../.github/workflows/extraction-provenance.yml', import.meta.url);
 const provenanceVerifierUrl = new URL('../../tools/governance/verify_extraction_provenance.py', import.meta.url);
 
@@ -36,6 +39,35 @@ test('Merge Queue authority is exact-blob pinned and emits only atlas-gate', () 
   assert.match(workflow, /refs\/heads\/main/);
   assert.match(workflow, /verify_extraction_provenance\.py/);
   assert.doesNotMatch(workflow, /provenance-gate/);
+});
+
+test('protected-base audit owns Atlas merge-authority pins outside candidate checkout', () => {
+  assert.equal(fs.existsSync(mergeAuthorityAuditUrl), true, 'protected-base merge-authority audit must exist');
+
+  const audit = readText(mergeAuthorityAuditUrl);
+  const expectedPins = [
+    ['EXPECTED_PR_CI_BLOB', gitBlobSha(readText(prCiUrl))],
+    ['EXPECTED_MERGE_GROUP_GATE_BLOB', gitBlobSha(readText(mergeGroupGateUrl))],
+    ['EXPECTED_PROVENANCE_VERIFIER_BLOB', gitBlobSha(readText(provenanceVerifierUrl))],
+    ['EXPECTED_PROVENANCE_MAP_BLOB', gitBlobSha(readText(provenanceMapUrl))],
+  ];
+
+  assert.match(audit, /pull_request_target:\s*\n\s*branches:\s*\n\s*- main/);
+  assert.match(audit, /permissions:\s*\{\}/);
+  assert.match(audit, /contents:\s*read/);
+  assert.match(audit, /pull-requests:\s*read/);
+  assert.doesNotMatch(audit, /^\s*uses:\s*actions\/checkout@/m);
+  for (const [name, blob] of expectedPins) {
+    assert.match(audit, new RegExp(`${name}:\\s*["']${blob}["']`));
+  }
+  assert.match(audit, /candidate modifies the protected-base audit itself/);
+  assert.match(audit, /read_candidate_text/);
+  assert.match(audit, /actual_blob != expected_blob/);
+  assert.match(audit, /expected_atlas_gate_paths/);
+  assert.match(audit, /\.github\/workflows\/ci\.yml/);
+  assert.match(audit, /\.github\/workflows\/merge-group-gate\.yml/);
+  assert.match(audit, /provenance_gate_paths/);
+  assert.doesNotMatch(audit, /contents:\s*write|pull-requests:\s*write|actions:\s*write|checks:\s*write|statuses:\s*write|id-token:\s*write/);
 });
 
 test('atlas-gate fully browser-qualifies the exact synthetic candidate with protected-base harness', () => {
