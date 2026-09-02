@@ -158,6 +158,30 @@ test('protected hosted plan preserves protected IDs and accepts candidate additi
   ]) assert.match(plan[field], /^sha256:[a-f0-9]{64}$/, field);
 });
 
+test('candidate SHA is provenance and does not change protected plan semantic identity', () => {
+  const left = build();
+  const nextCandidateHeadSha = 'd'.repeat(40);
+  const right = build({
+    candidateHeadSha: nextCandidateHeadSha,
+    candidateCensus: candidateCensus([baseId, candidateId], { candidateHeadSha: nextCandidateHeadSha }),
+  });
+
+  assert.equal(left.planSemanticDigest, right.planSemanticDigest);
+  assert.notEqual(left.planInstanceDigest, right.planInstanceDigest);
+  assert.notEqual(left.candidateDigest, right.candidateDigest);
+});
+
+test('qualification product identity remains part of protected plan semantic identity', () => {
+  const baseline = build();
+  const productChanged = build({
+    productIdentities: {
+      qualification_fixture: { id: 'atlas-qualification-world-v2', digest: `sha256:${'2'.repeat(64)}` },
+    },
+  });
+
+  assert.notEqual(baseline.planSemanticDigest, productChanged.planSemanticDigest);
+});
+
 test('zero-work plan does not retain candidate-only census drift as an executable obligation', () => {
   const docsImpact = {
     schemaVersion: 2,
