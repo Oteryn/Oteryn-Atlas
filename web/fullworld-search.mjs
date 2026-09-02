@@ -16,11 +16,20 @@ const CREATURE_SEARCH_URL = new URL('./semantic-search/creatures.json', import.m
 const MAX_INDEX_BYTES = 2 * 1024 * 1024;
 const MAX_CREATURE_SEARCH_BYTES = 2 * 1024 * 1024;
 const MAX_RESULTS = 12;
+const PRODUCTION_CREATURE_SEARCH_CAPABILITY = 'static-creatures-v1';
 const ancillarySources = ancillarySourceExpectations(FULLWORLD_TRUST);
 const state = { index: null, creatureSearch: [], active: null, lastQuery: '', lastResults: 0, status: 'LOADING', error: null };
 
 function requireValue(condition, message) {
   if (!condition) throw new Error(message);
+}
+
+function verifyAncillarySourceBoundary() {
+  if (ancillarySources.mode !== 'production') return;
+  requireValue(
+    ancillarySources.semanticSearch.creatureCapability === PRODUCTION_CREATURE_SEARCH_CAPABILITY,
+    'production creature search source unsupported',
+  );
 }
 
 async function boundedJson(url, maxBytes) {
@@ -237,8 +246,8 @@ function renderActiveInspector() {
   const provenanceAuthority = record.provenance?.authority ?? state.index.source.authority;
   const provenanceCapability = record.provenance?.source_capability;
   source.textContent = provenanceCapability
-    ? `Source: ${provenanceAuthority} ? ${provenanceCapability}`
-    : `Source: ${state.index.source.repository}@${state.index.source.game_revision.slice(0, 12)} ? ${state.index.source.profile_id}`;
+    ? `Source: ${provenanceAuthority} · ${provenanceCapability}`
+    : `Source: ${state.index.source.repository}@${state.index.source.game_revision.slice(0, 12)} · ${state.index.source.profile_id}`;
   const bounds = document.createElement('p'); bounds.textContent = record.bounds ? 'Authoritative bounds published.' : 'Authoritative bounds: not published by Game.';
   inspector.replaceChildren(card, position, id);
   if (recordId) inspector.append(recordId);
@@ -255,6 +264,7 @@ async function boot() {
   injectStyle();
   wireForm('#search-form', '#search-input', 'desktop');
   wireForm('#mobile-search-form', '#mobile-search-input', 'mobile');
+  verifyAncillarySourceBoundary();
   const raw = await boundedJson(INDEX_URL, MAX_INDEX_BYTES);
   state.index = validateSemanticSearchIndex(raw, ancillarySources.semanticSearch);
   state.creatureSearch = await loadCreatureSearch();
