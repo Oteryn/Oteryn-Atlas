@@ -108,6 +108,33 @@ jobs:
           if pull.get('base', {}).get('ref') != 'main':
               raise SystemExit('audit accepts only pull requests targeting main')
 
+          commit = api(f'/git/commits/{expected_head}')
+          candidate_tree_sha = commit.get('tree', {}).get('sha', '').lower()
+          if re.fullmatch(r'[0-9a-f]{40}', candidate_tree_sha) is None:
+              raise SystemExit('candidate commit does not expose an exact tree SHA')
+          candidate_tree = api(f'/git/trees/{candidate_tree_sha}?recursive=1')
+          if candidate_tree.get('truncated') is True:
+              raise SystemExit('candidate tree enumeration is truncated')
+          tree_entries = {
+              item.get('path'): item
+              for item in candidate_tree.get('tree', [])
+              if isinstance(item, dict) and isinstance(item.get('path'), str)
+          }
+          for path, expected_blob in pins.items():
+              entry = tree_entries.get(path)
+              if not isinstance(entry, dict):
+                  raise SystemExit(f'pinned control-plane path missing from candidate tree: {path}')
+              if entry.get('type') != 'blob' or entry.get('mode') != '100644':
+                  raise SystemExit(
+                      f'pinned control-plane path must be a regular non-symlink blob: {path}: '
+                      f'type={entry.get("type")!r} mode={entry.get("mode")!r}'
+                  )
+              if entry.get('sha', '').lower() != expected_blob:
+                  raise SystemExit(
+                      f'pinned control-plane tree entry drift: {path}: '
+                      f'{entry.get("sha")!r} != {expected_blob}'
+                  )
+
           changed_files = pull.get('changed_files')
           if not isinstance(changed_files, int) or changed_files < 0 or changed_files > 3000:
               raise SystemExit('invalid or over-cap changed-files count')
