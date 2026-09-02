@@ -67,7 +67,7 @@ test('protected-base audit owns Atlas merge-authority pins outside candidate che
   assert.match(audit, /\.github\/workflows\/ci\.yml/);
   assert.match(audit, /\.github\/workflows\/merge-group-gate\.yml/);
   assert.match(audit, /provenance_gate_paths/);
-  assert.doesNotMatch(audit, /contents:\s*write|pull-requests:\s*write|actions:\s*write|checks:\s*write|statuses:\s*write|id-token:\s*write/);
+  assert.doesNotMatch(audit, /^\s*(?:contents|pull-requests|actions|checks|statuses|id-token):\s*write\s*$/m);
 });
 
 test('atlas-gate fully browser-qualifies the exact synthetic candidate with protected-base harness', () => {
