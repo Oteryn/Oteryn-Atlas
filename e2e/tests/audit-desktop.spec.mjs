@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { DESKTOP_ENTRY, assertNoRuntimeFailures, captureRuntimeFailures, gotoAtlas, waitForAtlas } from './runtime.mjs';
+import { DESKTOP_ENTRY, assertNoRuntimeFailures, captureRuntimeFailures, fixtureAwarePosition, gotoAtlas, waitForAtlas } from './runtime.mjs';
 import { assertUserVisibleSurface, captureUserVisualEvidence, waitForCurrentDetailScene } from '../support/user-acceptance.mjs';
 
 async function waitRep(page, expected) {

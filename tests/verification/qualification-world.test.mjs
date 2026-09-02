@@ -158,3 +158,32 @@ test('qualification-aware browser probes retain their protected production viewp
     assert.ok(source.includes(contract.production), `${contract.file} must retain protected production viewport ${contract.production}`);
   }
 });
+test('qualification animation browser service resolves fixture source expectations from live trust', async () => {
+  const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-qualification-animation-service-'));
+  const root = path.join(parent, 'world');
+  try {
+    await buildQualificationWorld(root);
+    const verified = await verifyQualificationWorld(root);
+    globalThis.__OTERYN_ATLAS_QUALIFICATION_TRUST__ = qualificationTrustDescriptor(verified);
+    const { getAnimationRuntime } = await import(`../../src/browser/animation-runtime-service.mjs?qualification=${Date.now()}`);
+    const fetcher = async (input) => {
+      const url = new URL(input);
+      const relative = decodeURIComponent(url.pathname.replace(/^\/animation\//, ''));
+      const target = path.join(root, 'animation', relative);
+      if (!fs.existsSync(target)) return new Response('not found', { status: 404 });
+      return new Response(fs.readFileSync(target), { status: 200 });
+    };
+    const runtime = await getAnimationRuntime('https://qualification.invalid/animation/', fetcher);
+    assert.equal(runtime.manifest.source.game_sha, 'fixture');
+    assert.equal(runtime.manifest.source.appearance_product_root, verified.pixelRoot);
+    assert.equal(runtime.manifest.source.outfit_spatial_product_root, verified.semanticRoot);
+  } finally {
+    delete globalThis.__OTERYN_ATLAS_QUALIFICATION_TRUST__;
+    fs.rmSync(parent, { recursive: true, force: true });
+  }
+});
+
+test('audit coordinate probe imports its qualification-aware position helper', () => {
+  const source = fs.readFileSync(path.resolve('e2e/tests/audit-desktop.spec.mjs'), 'utf8');
+  assert.match(source, /import\s*\{[^}]*fixtureAwarePosition[^}]*\}\s*from\s*['"]\.\/runtime\.mjs['"]/s);
+});
