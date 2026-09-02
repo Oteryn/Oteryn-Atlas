@@ -1,4 +1,4 @@
-﻿import assert from 'node:assert/strict';
+import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { buildEvidenceManifest } from '../../tools/verification/evidence-manifest.mjs';
@@ -169,6 +169,44 @@ test('qualified candidate plus unrelated base advance reuses exact evidence with
   assert.ok(rebound.every((manifest) => manifest.disposition === 'REUSED'));
   assert.ok(rebound.every((manifest) => manifest.planInstanceDigest === current.planInstanceDigest));
   assert.deepEqual(rebound[1].dependencies.evidenceDigests, [rebound[0].evidenceDigest]);
+});
+
+test('candidate or synthetic merge-group SHA movement reuses semantic evidence with zero heavy execution', () => {
+  const prior = previousState();
+  for (const [candidate, instance] of [[sha('d'), digest('7')], [sha('e'), digest('8')]]) {
+    const current = plan({ candidate, instance });
+    const decision = planProtectedVerificationLifecycle({
+      currentPlan: current,
+      currentExecution: execution(),
+      previousState: prior,
+      baseAdvance: { changedPaths: [], mergeStatus: 'clean' },
+      availableEvidenceDigests: available(prior),
+      now: NOW,
+    });
+    assert.equal(decision.candidateHeadSha, candidate);
+    assert.equal(decision.disposition, 'REUSE');
+    assert.equal(decision.executeEnvironment, false);
+    assert.deepEqual(decision.executeHostedEvidenceIds, []);
+    assert.deepEqual(decision.reuseEvidenceIds, ['ENVIRONMENT_QUALIFICATION', 'HOSTED_FUNCTIONAL:SHARD_1']);
+    assert.equal(decision.heavyExecutionsRequired, 0);
+
+    const rebound = materializeReusedEvidence({
+      currentPlan: current,
+      decision,
+      sourceEvidenceManifests: prior.evidenceManifests,
+      runProvenance: {
+        repository: 'Oteryn/Oteryn-Atlas', runId: 102, runAttempt: 1,
+        jobName: 'preflight', artifactName: `protected-verification-state-${candidate}`,
+      },
+    });
+    assert.ok(rebound.every((manifest) => manifest.candidateHeadSha === candidate));
+    assert.ok(rebound.every((manifest) => manifest.planInstanceDigest === current.planInstanceDigest));
+    assert.ok(rebound.every((manifest) => manifest.runProvenance.runId === 102));
+    assert.deepEqual(
+      rebound.map(({ sourceEvidenceDigest }) => sourceEvidenceDigest),
+      prior.evidenceManifests.map(({ evidenceDigest }) => evidenceDigest),
+    );
+  }
 });
 
 test('product-only base movement reuses environment but reruns only hosted evidence', () => {
