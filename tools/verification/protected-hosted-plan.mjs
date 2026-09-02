@@ -96,6 +96,12 @@ function validateCandidateCensus(candidate, candidateHeadSha, catalogs) {
     candidateHeadSha,
     sandboxPolicyId: SANDBOX_POLICY_ID,
     census,
+    semanticDigest: digest({
+      schemaVersion: 1,
+      status: 'success',
+      sandboxPolicyId: SANDBOX_POLICY_ID,
+      censusDigest: census.digest,
+    }),
     digest: digest({
       schemaVersion: 1,
       status: 'success',
@@ -200,6 +206,7 @@ export function buildProtectedHostedPlan(input) {
   const productIdentities = validateProductIdentities(input.productIdentities, basePlan.requiredDataCapabilities);
   const protectedCensusDigest = protectedCensus.digest;
   const candidateCensusDigest = candidateCensus.digest;
+  const candidateCensusSemanticDigest = candidateCensus.semanticDigest;
   const trustedImpactManifestDigest = digest(trustedImpact);
   const candidateImpactManifestDigest = digest(candidateImpact);
   const trustedVerificationCatalogDigest = digest(trustedCatalog);
@@ -225,7 +232,6 @@ export function buildProtectedHostedPlan(input) {
   const semanticIdentity = {
     schemaVersion: 1,
     repository: input.repository,
-    candidateDigest,
     changeSetDigest,
     authorityDigest,
     authorityManifestDigest,
@@ -238,7 +244,7 @@ export function buildProtectedHostedPlan(input) {
     verificationCatalogDigest: basePlan.verificationCatalogDigest,
     stableIdAlgorithmDigest,
     protectedCensusDigest,
-    candidateCensusDigest,
+    candidateCensusSemanticDigest,
     expectedStableTestIdsDigest: basePlan.expectedStableTestIdsDigest,
     productIdentitiesDigest,
     workerPolicyDigest,
@@ -275,6 +281,7 @@ export function buildProtectedHostedPlan(input) {
     stableIdAlgorithmDigest,
     protectedCensusDigest,
     candidateCensusDigest,
+    candidateCensusSemanticDigest,
     candidateStableIdAdditions,
     candidateStableIdModifications,
     profile: basePlan.profile,
