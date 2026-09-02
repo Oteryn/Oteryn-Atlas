@@ -57,5 +57,7 @@ test('atlas-gate fully browser-qualifies the exact synthetic candidate with prot
   assert.match(workflow, /ATLAS_E2E_SHARD:\s*['"]1\/1['"]/);
   assert.match(workflow, /--retries=0/);
   assert.match(workflow, /compose run --no-deps --rm e2e/);
-  assert.doesNotMatch(workflow, /labels:\s*oteryn-atlas-pc|synology|real_fullworld/i);
+  assert.match(workflow, /runs-on:\s*ubuntu-24\.04/);
+  assert.doesNotMatch(workflow, /runs-on:\s*\[[^\]]*(?:oteryn-atlas-pc|synology)[^\]]*\]/i);
+  assert.doesNotMatch(workflow, /dataCapability:\s*real_fullworld|ATLAS_DATA_CAPABILITY:\s*real_fullworld/i);
 });
