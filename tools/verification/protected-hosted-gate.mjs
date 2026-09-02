@@ -348,6 +348,7 @@ const LEGACY_TRANSITION_BOOTSTRAP = deepFreeze({
     'tests/verification/pr-browser-trust.test.mjs',
     'tests/verification/protected-anti-loop-workflow-integration.test.mjs',
     'tests/verification/protected-authority-repin-recovery.test.mjs',
+    'tests/verification/protected-hosted-execution.test.mjs',
     'tests/verification/selfhosted-compose-contract.test.mjs',
     'tools/verification/protected-hosted-execution.mjs',
     'tools/verification/protected-hosted-gate.mjs',
