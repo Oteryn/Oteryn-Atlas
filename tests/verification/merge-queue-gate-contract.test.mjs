@@ -75,6 +75,14 @@ test('protected-base audit owns Atlas merge-authority pins outside candidate che
   assert.match(audit, /path\.startsWith\(governance_prefix\)|path\.startswith\(governance_prefix\)/);
   assert.match(audit, /unpinned_governance/);
   assert.match(audit, /unpinned Python import authority/);
+  assert.match(audit, /\/git\/commits\/\{expected_head\}/);
+  assert.match(audit, /candidate_tree_sha/);
+  assert.match(audit, /\/git\/trees\/\{candidate_tree_sha\}\?recursive=1/);
+  assert.match(audit, /candidate tree enumeration is truncated/);
+  assert.match(audit, /entry\.get\('type'\) != 'blob'/);
+  assert.match(audit, /entry\.get\('mode'\) != '100644'/);
+  assert.match(audit, /regular non-symlink blob/);
+  assert.match(audit, /pinned control-plane tree entry drift/);
   assert.doesNotMatch(audit, /^\s*(?:contents|pull-requests|actions|checks|statuses|id-token):\s*write\s*$/m);
 });
 
