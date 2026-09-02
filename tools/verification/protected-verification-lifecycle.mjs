@@ -226,7 +226,6 @@ export function planProtectedVerificationLifecycle(input) {
   const previousManifests = Array.isArray(previousState?.evidenceManifests) ? previousState.evidenceManifests : [];
   const canConsiderReuse = previousPlan
     && previousExecution
-    && previousPlan.candidateHeadSha === currentPlan.candidateHeadSha
     && REUSABLE_PROGRESS.has(previousProgress?.status);
 
   if (!canConsiderReuse) {
