@@ -56,6 +56,13 @@ test('tampering or non-authoritative producer metadata fails closed', () => {
   assert.throws(() => state({ producer: { ...value.producer, workflowPath: '.github/workflows/ci.yml' } }), /workflow path/i);
 });
 
+test('protected executor workflow_dispatch producer is accepted while unrelated events fail closed', () => {
+  const base = state();
+  const dispatched = state({ producer: { ...base.producer, event: 'workflow_dispatch' } });
+  assert.equal(validateProtectedVerificationState(dispatched).producer.event, 'workflow_dispatch');
+  assert.throws(() => state({ producer: { ...base.producer, event: 'repository_dispatch' } }), /producer event/i);
+});
+
 test('dependency and reused source bytes must be archived, not merely named', () => {
   const source = manifest();
   const reused = manifest({

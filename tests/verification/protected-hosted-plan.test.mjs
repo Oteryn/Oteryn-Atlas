@@ -158,6 +158,24 @@ test('protected hosted plan preserves protected IDs and accepts candidate additi
   ]) assert.match(plan[field], /^sha256:[a-f0-9]{64}$/, field);
 });
 
+test('zero-work plan does not retain candidate-only census drift as an executable obligation', () => {
+  const docsImpact = {
+    schemaVersion: 2,
+    entries: [{ pathPrefix: 'docs/', domains: ['documentation'], minimumProfile: 'none', requiredGroups: [] }],
+    crossDomainEscalations: [],
+  };
+  const plan = build({
+    changedFiles: [{ path: 'docs/agents/prompts/ATLAS-STATIC-CREATURE-RESTORE-CLOSEOUT.md' }],
+    trustedImpactManifest: docsImpact,
+    candidateImpactManifest: docsImpact,
+  });
+  assert.equal(plan.profile, 'none');
+  assert.deepEqual(plan.requiredGroupIds, []);
+  assert.deepEqual(plan.stableTestIds, []);
+  assert.deepEqual(plan.candidateStableIdAdditions, []);
+  assert.deepEqual(plan.candidateStableIdModifications, []);
+});
+
 test('changed existing spec IDs are candidate modifications while remaining protected lower-bound work', () => {
   const plan = build({
     changedFiles: [{ path: 'e2e/tests/desktop.spec.mjs' }],

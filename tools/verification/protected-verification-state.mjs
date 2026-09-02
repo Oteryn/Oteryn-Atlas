@@ -10,7 +10,7 @@ import { validateEvidenceManifest } from './evidence-manifest.mjs';
 import { VERIFICATION_STATES } from './verification-progress-state.mjs';
 
 const WORKFLOW_PATH = '.github/workflows/protected-hosted-executor.yml';
-const EVENTS = new Set(['pull_request', 'workflow_run']);
+const EVENTS = new Set(['pull_request', 'workflow_run', 'workflow_dispatch']);
 
 function exactPositiveInteger(value, label) {
   if (!Number.isSafeInteger(value) || value < 1) throw new TypeError(`${label} must be a positive integer`);
