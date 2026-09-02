@@ -28,6 +28,7 @@ jobs:
       EXPECTED_PR_CI_BLOB: "0971077db65eaffcb6ebab4d528edaee798b93e7"
       EXPECTED_MERGE_GROUP_GATE_BLOB: "c0879fac82ccb81136102c1019fac3dc5ff95482"
       EXPECTED_PROVENANCE_VERIFIER_BLOB: "d18d66408e97f43557ca21b38b6bd858d0d424eb"
+      EXPECTED_PROVENANCE_TEST_BLOB: "0e2dda25befd0b66ab870ffe05416986c27ceb61"
       EXPECTED_PROVENANCE_MAP_BLOB: "c18e14b94823fa09ad46922431a797eae6c197bc"
     steps:
       - name: Validate Atlas merge-authority candidate as inert data
@@ -56,6 +57,7 @@ jobs:
               '.github/workflows/ci.yml': os.environ['EXPECTED_PR_CI_BLOB'].strip().lower(),
               '.github/workflows/merge-group-gate.yml': os.environ['EXPECTED_MERGE_GROUP_GATE_BLOB'].strip().lower(),
               'tools/governance/verify_extraction_provenance.py': os.environ['EXPECTED_PROVENANCE_VERIFIER_BLOB'].strip().lower(),
+              'tools/governance/test_verify_extraction_provenance.py': os.environ['EXPECTED_PROVENANCE_TEST_BLOB'].strip().lower(),
               'docs/migration/legacy-atlas-extraction-provenance.json': os.environ['EXPECTED_PROVENANCE_MAP_BLOB'].strip().lower(),
           }
 
