@@ -130,10 +130,12 @@ test('hosted execution requires semantic, instance, authority and environment id
 });
 
 test('candidate test bodies can widen only through new stable IDs; protected IDs stay protected-body work', () => {
-  const result = buildProtectedHostedExecutionContract(plan({
-    stableTestIds: [hostedId, candidateAdditionalId],
-    candidateStableIdAdditions: [candidateAdditionalId],
-  }), { currentHeadSha: head });
+  const result = buildProtectedHostedExecutionContract(plan(
+    {
+      stableTestIds: [hostedId, candidateAdditionalId],
+      candidateStableIdAdditions: [candidateAdditionalId],
+    },
+  ), { currentHeadSha: head });
   assert.deepEqual(result.hosted.stableTestIds, [candidateAdditionalId, hostedId].sort());
   assert.deepEqual(result.hosted.protectedStableTestIds, [hostedId]);
   assert.deepEqual(result.hosted.candidateAdditionalStableTestIds, [candidateAdditionalId]);
@@ -320,7 +322,7 @@ test('protected promotion qualification registry binds exact functional qualific
       'web/fullworld-farm-explorer.mjs',
       'web/fullworld-search.mjs',
     ],
-    expectedProductDigest: 'sha256:2f457583f21cd3ebf8d995c1cc520ea099b277dace69453db08d568de7584613',
+    expectedProductDigest: 'sha256:3ab3472677e95e30795015869c73e54e6422c2b6144b01cccfbbbbaeafa98de9',
     candidateCensusMount: {
       sourceTree: 'exact-candidate-checkout',
       containerRoot: '/candidate',

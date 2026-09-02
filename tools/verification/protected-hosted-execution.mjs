@@ -84,7 +84,7 @@ const PROTECTED_PROMOTION_QUALIFICATIONS = freeze({
       'web/fullworld-farm-explorer.mjs',
       'web/fullworld-search.mjs',
     ],
-    expectedProductDigest: 'sha256:2f457583f21cd3ebf8d995c1cc520ea099b277dace69453db08d568de7584613',
+    expectedProductDigest: 'sha256:3ab3472677e95e30795015869c73e54e6422c2b6144b01cccfbbbbaeafa98de9',
     candidateCensusMount: {
       sourceTree: 'exact-candidate-checkout',
       containerRoot: '/candidate',
@@ -223,133 +223,139 @@ function partitionHostedByDataCapability(hostedGroups, hostedStableTestIds, cand
 
 export function buildProtectedHostedExecutionContract(plan, { currentHeadSha } = {}) {
   if (!plan || typeof plan !== 'object' || Array.isArray(plan) || plan.schemaVersion !== 3) {
-    throw new TypeError('protected hosted execution requires plan schemaVersion 3');
-  }
-  if (plan.controller?.id !== 'atlas-protected-hosted-controller-v3' || plan.controller?.version !== 3) {
-    throw new TypeError('protected hosted execution controller identity is invalid');
-  }
-  const controllerSourceSha = exactSha(plan.controller.sourceSha, 'controller source SHA');
-  const candidateHeadSha = exactSha(plan.candidateHeadSha, 'candidate head SHA');
-  if (exactSha(currentHeadSha, 'current PR head') !== candidateHeadSha) {
-    throw new TypeError('protected hosted execution current PR head is stale');
-  }
-  const planSemanticDigest = exactDigest(plan.planSemanticDigest, 'plan semantic digest');
-  const planInstanceDigest = exactDigest(plan.planInstanceDigest, 'plan instance digest');
-  const authorityDigest = exactDigest(plan.authorityDigest, 'plan authority digest');
-  const environmentDigest = exactDigest(plan.environmentDigest, 'plan environment digest');
-  const expectedStableTestIdsDigest = exactDigest(plan.expectedStableTestIdsDigest, 'expected stable-ID digest');
-  const productIdentitiesDigest = exactDigest(plan.productIdentitiesDigest, 'product identities digest');
-  const workerPolicyDigest = exactDigest(plan.workerPolicyDigest, 'worker policy digest');
-  const executionPolicyDigest = exactDigest(plan.executionPolicyDigest, 'execution policy digest');
-  if (plan.retryPolicy?.retries !== 0) throw new TypeError('protected hosted execution retries must be zero');
-  if (plan.selectiveExecution !== false) throw new TypeError('protected hosted execution selective execution must remain disabled');
-  if (!Array.isArray(plan.requiredGroupIds) || new Set(plan.requiredGroupIds).size !== plan.requiredGroupIds.length) {
-    throw new TypeError('protected hosted execution required group IDs are invalid');
-  }
-  const zeroWork = plan.requiredGroupIds.length === 0;
-  if (zeroWork && plan.profile !== 'none') {
-    throw new TypeError('protected hosted execution zero-work plan must be profile none');
-  }
-  if (!Array.isArray(plan.groups) || plan.groups.length !== plan.requiredGroupIds.length) {
-    throw new TypeError('protected hosted execution selected groups must exactly match required group IDs');
-  }
+    throw new TypeErroЉ	Ь›ЭXЭYЬЭY^XЭ][Ы€™\]Z\™\И[€ШЪ[XU™\њЪ[Ы€ЙКNВ€B€Y€
+[‹ЫЫќ›Ы\ЏЛљYOOH	Ш]\Л\›ЭXЭYZЬЭYXЫЫќ›Ы\‹]ЊЙИ[‹ЫЫќ›Ы\ЏЛќ™\њЪ[Ы€OOHКHВ€›ЭИ™]И\Q\њ›ЬЉ›ЭXЭYЬЭY^XЭ][Ы€ЫЫќ›Ы\€Y[ќ]H\И[ќ[Y	КNВ€B€ЫЫњЭЫЫќ›Ы\”ЫЭ\ЩTЪHH^XЭЪJ[‹ЫЫќ›Ы\‹њЫЭ\ЩTЪK	ШЫЫќ›Ы\€ЫЭ\ЩHТIКNВ€ЫЫњЭШ[™Y]RXYЪHH^XЭЪJ[‹Ш[™Y]RXYЪK	ШШ[™Y]HXYТIКNВ€Y€
+^XЭЪJЭ\њ™[ќXYЪK	ШЭ\њ™[ќ€XY	КHOOHШ[™Y]RXYЪJHВ€›ЭИ™]И\Q\њ›ЬЉ	Ь›ЭXЭYЬЭY^XЭ][Ы€Э\њ™[ќ€XY\ИЭ[IКNВ€B€ЫЫњЭ[”Щ[X[ќXСYЩ\ЭH^XЭYЩ\Э
+[‹њ[”Щ[X[ќXСYЩ\Э	Ь[€Щ[X[ќXИYЩ\Э	КNВ€ЫЫњЭ[’[њЭ[ЩQYЩ\ЭH^XЭYЩ\Э
+[‹њ[’[њЭ[ЩQYЩ\Э	Ь[€[њЭ[ЩHYЩ\Э	КNВ€ЫЫњЭ]]Ьљ]QYЩ\ЭH^XЭYЩ\Э
+[‹]]Ьљ]QYЩ\Э	Ь[€]]Ьљ]HYЩ\Э	КNВ€ЫЫњЭ[ќљ\›Ы›Y[ќYЩ\ЭH^XЭYЩ\Э
+[‹™[ќљ\›Ы›Y[ќYЩ\Э	Ь[€[ќљ\›Ы›Y[ќYЩ\Э	КNВ€ЫЫњЭ^XЭYЭX›U\ЭYСYЩ\ЭH^XЭYЩ\Э
+[‹™^XЭYЭX›U\ЭYСYЩ\Э	Щ^XЭYЭX›KRQYЩ\Э	КNВ€ЫЫњЭ›ЩXЭY[ќ]Y\СYЩ\ЭH^XЭYЩ\Э
+[‹њ›ЩXЭY[ќ]Y\СYЩ\Э	Ь›ЩXЭY[ќ]Y\ИYЩ\Э	КNВ€ЫЫњЭЫЬљЩ\”ЫXЮQYЩ\ЭH^XЭYЩ\Э
+[‹ќЫЬљЩ\”ЫXЮQYЩ\Э	ЭЫЬљЩ\€ЫXЮHYЩ\Э	КNВ€ЫЫњЭ^XЭ][Ы”ЫXЮQYЩ\ЭH^XЭYЩ\Э
+[‹™^XЭ][Ы”ЫXЮQYЩ\Э	Щ^XЭ][Ы€ЫXЮHYЩ\Э	КNВ€Y€
+[‹њ™]ћTЫXЮOЛњ™]љY\ИOOH
+H›ЭИ™]И\Q\њ›ЬЉ	Ь›ЭXЭYЬЭY^XЭ][Ы€™]љY\И]\Э™H™\›ЙКNВ€Y€
+[‹њЩ[XЭ]™Q^XЭ][Ы€OOH[ЩJH›ЭИ™]И\Q\њ›ЬЉ	Ь›ЭXЭYЬЭY^XЭ][Ы€Щ[XЭ]™H^XЭ][Ы€]\Э™[XZ[€\ШX›Y	КNВ€Y€
+P\њ^Kљ\Р\њ^J[‹њ™\]Z\™YЬ›Э\YКH™]ИЩ]
+[‹њ™\]Z\™YЬ›Э\YКKњЪ^™HOOH[‹њ™\]Z\™YЬ›Э\YЛ›[™Э
+HВ€›ЭИ™]И\Q\њ›ЬЉ	Ь›ЭXЭYЬЭY^XЭ][Ы€™\]Z\™YЬ›Э\QИ\™H[ќ[Y	КNВ€B€ЫЫњЭ™\›ХЫЬљИH[‹њ™\]Z\™YЬ›Э\YЛ›[™ЭOOHВ€Y€
+™\›ХЫЬљИ	‰€[‹њ›Щљ[HOOH	Ы›Ы™IКHВ€›ЭИ™]И\Q\њ›ЬЉ›ЭXЭYЬЭY^XЭ][Ы€™\›Л]ЫЬљИ[€]\Э™H›Щљ[H›Ы™IКNВ€B€Y€
+P\њ^Kљ\Р\њ^J[‹™Ь›Э\КH[‹™Ь›Э\Л›[™ЭOOH[‹њ™\]Z\™YЬ›Э\YЛ›[™Э
+HВ€›ЭИ™]И\Q\њ›ЬЉ	Ь›ЭXЭYЬЭY^XЭ][Ы€Щ[XЭYЬ›Э\И]\Э^XЭHX]Ъ™\]Z\™YЬ›Э\QЙКNВ€B‚€ЫЫњЭ™\]Z\™YYИH™]ИЩ]
+[‹њ™\]Z\™YЬ›Э\YКNВ€ЫЫњЭЬ›Э\ИH[‹™Ь›Э\Л›X\
 
-  const requiredIds = new Set(plan.requiredGroupIds);
-  const groups = plan.groups.map((group) => validateGroup(group, requiredIds));
-  if (new Set(groups.map((group) => group.id)).size !== groups.length
-    || groups.some((group) => !requiredIds.has(group.id))
-    || plan.requiredGroupIds.some((id) => !groups.some((group) => group.id === id))) {
-    throw new TypeError('protected hosted execution selected groups do not exactly match required group IDs');
-  }
+Ь›Э\
+HO€[Y]QЬ›Э\
+Ь›Э\™\]Z\™YYКJNВ€Y€
+™]ИЩ]
+Ь›Э\Л›X\
 
-  const hostedGroups = groups.filter((group) => group.capabilities.browser && group.capabilities.hosted);
-  const specialistGroups = groups.filter(isSpecialistGroup);
-  const reviewGroups = groups.filter(isReviewGroup);
-  const requiresRealFullWorld = specialistGroups.length > 0;
-  if (Boolean(plan.requiresRealFullWorld) !== requiresRealFullWorld) {
-    throw new TypeError('protected hosted execution real_fullworld placement conflicts with plan');
-  }
+Ь›Э\
+HO€Ь›Э\љY
+JKњЪ^™HOOHЬ›Э\Л›[™Э€Ь›Э\ЛњЫЫYJ
+Ь›Э\
+HO€\™\]Z\™YYЛљ\КЬ›Э\љY
+JB€[‹њ™\]Z\™YЬ›Э\YЛњЫЫYJ
+Y
+HO€YЬ›Э\ЛњЫЫYJ
+Ь›Э\
+HO€Ь›Э\љYOOHY
+JJHВ€›ЭИ™]И\Q\њ›ЬЉ	Ь›ЭXЭYЬЭY^XЭ][Ы€Щ[XЭYЬ›Э\ИИ›Э^XЭHX]Ъ™\]Z\™YЬ›Э\QЙКNВ€B‚€ЫЫњЭЬЭYЬ›Э\ИHЬ›Э\Л™љ[\Љ
+Ь›Э\
+HO€Ь›Э\Ш\Xљ[]Y\Лњ›ЭЬЩ\€	‰€Ь›Э\Ш\Xљ[]Y\ЛљЬЭY
+NВ€ЫЫњЭЬXЪX[\ЭЬ›Э\ИHЬ›Э\Л™љ[\Љ\ФЬXЪX[\ЭЬ›Э\
+NВ€ЫЫњЭ™]љY]СЬ›Э\ИHЬ›Э\Л™љ[\Љ\Ф™]љY]СЬ›Э\
+NВ€ЫЫњЭ™\]Z\™\Ф™X[ќ[ЫЬ›HЬXЪX[\ЭЬ›Э\Л›[™Э€В€Y€
+›ЫЫX[Љ[‹њ™\]Z\™\Ф™X[ќ[ЫЬ›
+HOOH™\]Z\™\Ф™X[ќ[ЫЬ›
+HВ€›ЭИ™]И\Q\њ›ЬЉ	Ь›ЭXЭYЬЭY^XЭ][Ы€™X[Щќ[ЫЬ›XЩ[Y[ќЫЫ™›XЭИЪ][‰КNВ€B‚€ЫЫњЭЭX›U\ЭYИH^XЭЭX›RYК[‹њЭX›U\ЭYЛ	Ь[›™YЭX›HQЙЛИ[ЭС[\N€™\›ХЫЬљИJNВ€Y€
+™\›ХЫЬљИ	‰€
+ЭX›U\ЭYЛ›[™ЭOOH€
+[‹Ш[™Y]TЭX›RYY][ЫњИПИЧJK›[™ЭOOH€
+[‹Ш[™Y]TЭX›RY[ЩYљXШ][ЫњИПИЧJK›[™ЭOOH€
+[‹њ™\]Z\™Y]PШ\Xљ[]Y\ИПИЧJK›[™ЭOOH€›ЫЫX[Љ[‹њ™\]Z\™\Ф™X[ќ[ЫЬ›
+JJHВ€›ЭИ™]И\Q\њ›ЬЉ	Ь›ЭXЭYЬЭY^XЭ][Ы€™\›Л]ЫЬљИ[€ЫЫќZ[њИ^XЭ]X›HШ›YШ][ЫњЙКNВ€B€ЫЫњЭЭX›U\ЭYЩ]H™]ИЩ]
+ЭX›U\ЭYКNВ€ЫЫњЭШ[™Y]TЭX›RYY][ЫњИH^XЭЭX›RYК[‹Ш[™Y]TЭX›RYY][ЫњИПИЧK	ШШ[™Y]HЭX›KRQY][ЫњЙЛИ[ЭС[\N€ќYHJNВ€ЫЫњЭШ[™Y]TЭX›RY[ЩYљXШ][ЫњИH^XЭЭX›RYК[‹Ш[™Y]TЭX›RY[ЩYљXШ][ЫњИПИЧK	ШШ[™Y]HЭX›KRQ[ЩYљXШ][ЫњЙЛИ[ЭС[\N€ќYHJNВ€›Ь€
+ЫЫњЭYЩ€Ш[™Y]TЭX›RYY][ЫњКHВ€Y€
+\ЭX›U\ЭYЩ]љ\КY
+JH›ЭИ™]И\Q\њ›ЬЉШ[™Y]HЭX›KRQY][Ы€\И›Э[€H^XЭ[›™YЩ[њЭ\О€	ЪYX
+NВ€B€ЫЫњЭШ[™Y]PY][Ы”Щ]H™]ИЩ]
+Ш[™Y]TЭX›RYY][ЫњКNВ€›Ь€
+ЫЫњЭYЩ€Ш[™Y]TЭX›RY[ЩYљXШ][ЫњКHВ€Y€
+\ЭX›U\ЭYЩ]љ\КY
+JH›ЭИ™]И\Q\њ›ЬЉШ[™Y]HЭX›KRQ[ЩYљXШ][Ы€\И›Э[€H^XЭ[›™YЩ[њЭ\О€	ЪYX
+NВ€Y€
+Ш[™Y]PY][Ы”Щ]љ\КY
+JH›ЭИ™]И\Q\њ›ЬЉШ[™Y]HЭX›KRQ[ЩYљXШ][Ы€Ш[››Э[ЫИ™H[€Y][ЫЋ€	ЪYX
+NВ€B€ЫЫњЭШ[™Y]S[ЩYљXШ][Ы”Щ]H™]ИЩ]
+Ш[™Y]TЭX›RY[ЩYљXШ][ЫњКNВ‚€ЫЫњЭЬЭYЭX›U\ЭYИHЧNВ€ЫЫњЭЬXЪX[\ЭЭX›U\ЭYИHЧNВ€ЫЫњЭ™]љY]ФЭX›U\ЭYИHЧNВ€›Ь€
+ЫЫњЭYЩ€ЭX›U\ЭYКHВ€ЫЫњЭXЩ[Y[ќИH™]ИЩ]
 
-  const stableTestIds = exactStableIds(plan.stableTestIds, 'planned stable IDs', { allowEmpty: zeroWork });
-  if (zeroWork && (stableTestIds.length !== 0
-    || (plan.candidateStableIdAdditions ?? []).length !== 0
-    || (plan.candidateStableIdModifications ?? []).length !== 0
-    || (plan.requiredDataCapabilities ?? []).length !== 0
-    || Boolean(plan.requiresRealFullWorld))) {
-    throw new TypeError('protected hosted execution zero-work plan contains executable obligations');
-  }
-  const stableTestIdSet = new Set(stableTestIds);
-  const candidateStableIdAdditions = exactStableIds(plan.candidateStableIdAdditions ?? [], 'candidate stable-ID additions', { allowEmpty: true });
-  const candidateStableIdModifications = exactStableIds(plan.candidateStableIdModifications ?? [], 'candidate stable-ID modifications', { allowEmpty: true });
-  for (const id of candidateStableIdAdditions) {
-    if (!stableTestIdSet.has(id)) throw new TypeError(`candidate stable-ID addition is not in the exact planned census: ${id}`);
-  }
-  const candidateAdditionSet = new Set(candidateStableIdAdditions);
-  for (const id of candidateStableIdModifications) {
-    if (!stableTestIdSet.has(id)) throw new TypeError(`candidate stable-ID modification is not in the exact planned census: ${id}`);
-    if (candidateAdditionSet.has(id)) throw new TypeError(`candidate stable-ID modification cannot also be an addition: ${id}`);
-  }
-  const candidateModificationSet = new Set(candidateStableIdModifications);
+NВ€Y€
+ЬЭYЬ›Э\ЛњЫЫYJ
+Ь›Э\
+HO€Ь›Э\X]Ъ\ФЭX›RY
+Ь›Э\Y
+JJHXЩ[Y[ќЛY
+	ЪЬЭY	КNВ€Y€
+ЬXЪX[\ЭЬ›Э\ЛњЫЫYJ
+Ь›Э\
+HO€Ь›Э\X]Ъ\ФЭX›RY
+Ь›Э\Y
+JJHXЩ[Y[ќЛY
+	ЬЬXЪX[\Э	КNВ€Y€
+™]љY]СЬ›Э\ЛњЫЫYJ
+Ь›Э\
+HO€Ь›Э\X]Ъ\ФЭX›RY
+Ь›Э\Y
+JJH™]љY]ФЭX›U\ЭYЛњ\Ъ
+Y
+NВ€Y€
+XЩ[Y[ќЛњЪ^™HOOH
+H›ЭИ™]И\Q\њ›ЬЉ[›™YЭX›HQ\И›ИЩ[XЭYXXЪ[™H^XЭ][Ы€XЩ[Y[ќ€	ЪYX
+NВ€Y€
+XЩ[Y[ќЛњЪ^™HOOHJH›ЭИ™]И\Q\њ›ЬЉ[›™YЭX›HQ\И[XљYЭ[Э\ИXXЪ[™H^XЭ][Ы€XЩ[Y[ќ€	ЪYX
+NВ€Y€
+XЩ[Y[ќЛљ\К	ЪЬЭY	КJHЬЭYЭX›U\ЭYЛњ\Ъ
+Y
+NВ€[ЩHЬXЪX[\ЭЭX›U\ЭYЛњ\Ъ
+Y
+NВ€B‚€ЬЭYЭX›U\ЭYЛњЫЬќ
 
-  const hostedStableTestIds = [];
-  const specialistStableTestIds = [];
-  const reviewStableTestIds = [];
-  for (const id of stableTestIds) {
-    const placements = new Set();
-    if (hostedGroups.some((group) => groupMatchesStableId(group, id))) placements.add('hosted');
-    if (specialistGroups.some((group) => groupMatchesStableId(group, id))) placements.add('specialist');
-    if (reviewGroups.some((group) => groupMatchesStableId(group, id))) reviewStableTestIds.push(id);
-    if (placements.size === 0) throw new TypeError(`planned stable ID has no selected machine execution placement: ${id}`);
-    if (placements.size !== 1) throw new TypeError(`planned stable ID has ambiguous machine execution placement: ${id}`);
-    if (placements.has('hosted')) hostedStableTestIds.push(id);
-    else specialistStableTestIds.push(id);
-  }
+NВ€ЬXЪX[\ЭЭX›U\ЭYЛњЫЬќ
 
-  hostedStableTestIds.sort();
-  specialistStableTestIds.sort();
-  reviewStableTestIds.sort();
-  const hostedSet = new Set(hostedStableTestIds);
-  const specialistSet = new Set(specialistStableTestIds);
-  const hostedCandidateModifiedStableTestIds = candidateStableIdModifications.filter((id) => hostedSet.has(id));
-  const specialistCandidateModifiedStableTestIds = candidateStableIdModifications.filter((id) => specialistSet.has(id));
-  const hostedExpectedStableTestIdsDigest = digest(hostedStableTestIds);
-  const specialistExpectedStableTestIdsDigest = digest(specialistStableTestIds);
-  const hostedSourcePartition = partitionByCandidateAdditions(hostedStableTestIds, candidateAdditionSet);
-  const specialistSourcePartition = partitionByCandidateAdditions(specialistStableTestIds, candidateAdditionSet);
-  const hostedPartitions = partitionHostedByDataCapability(hostedGroups, hostedStableTestIds, candidateAdditionSet, candidateModificationSet);
+NВ€™]љY]ФЭX›U\ЭYЛњЫЬќ
 
-  return freeze({
-    schemaVersion: 2,
-    controllerSourceSha,
-    candidateHeadSha,
-    planSemanticDigest,
-    planInstanceDigest,
-    authorityDigest,
-    environmentDigest,
-    expectedStableTestIdsDigest,
-    hostedExpectedStableTestIdsDigest,
-    specialistExpectedStableTestIdsDigest,
-    productIdentitiesDigest,
-    workerPolicyDigest,
-    executionPolicyDigest,
-    retries: 0,
-    selectiveExecution: false,
-    hosted: {
-      groupIds: hostedGroups.map((group) => group.id).sort(),
-      stableTestIds: hostedStableTestIds,
-      ...hostedSourcePartition,
-      candidateModifiedStableTestIds: hostedCandidateModifiedStableTestIds,
-      partitions: hostedPartitions,
-    },
-    specialist: {
-      groupIds: specialistGroups.map((group) => group.id).sort(),
-      stableTestIds: specialistStableTestIds,
-      ...specialistSourcePartition,
-      candidateModifiedStableTestIds: specialistCandidateModifiedStableTestIds,
-    },
-    review: {
-      groupIds: reviewGroups.map((group) => group.id).sort(),
-      stableTestIds: reviewStableTestIds,
-    },
-  });
-}
+NВ€ЫЫњЭЬЭYЩ]H™]ИЩ]
+ЬЭYЭX›U\ЭYКNВ€ЫЫњЭЬXЪX[\ЭЩ]H™]ИЩ]
+ЬXЪX[\ЭЭX›U\ЭYКNВ€ЫЫњЭЬЭYШ[™Y]S[ЩYљYYЭX›U\ЭYИHШ[™Y]TЭX›RY[ЩYљXШ][ЫњЛ™љ[\Љ
+Y
+HO€ЬЭYЩ]љ\КY
+JNВ€ЫЫњЭЬXЪX[\ЭШ[™Y]S[ЩYљYYЭX›U\ЭYИHШ[™Y]TЭX›RY[ЩYљXШ][ЫњЛ™љ[\Љ
+Y
+HO€ЬXЪX[\ЭЩ]љ\КY
+JNВ€ЫЫњЭЬЭY^XЭYЭX›U\ЭYСYЩ\ЭHYЩ\Э
+ЬЭYЭX›U\ЭYКNВ€ЫЫњЭЬXЪX[\Э^XЭYЭX›U\ЭYСYЩ\ЭHYЩ\Э
+ЬXЪX[\ЭЭX›U\ЭYКNВ€ЫЫњЭЬЭYЫЭ\ЩT\ќ][Ы€H\ќ][ЫђћPШ[™Y]PY][ЫњКЬЭYЭX›U\ЭYЛШ[™Y]PY][Ы”Щ]
+NВ€ЫЫњЭЬXЪX[\ЭЫЭ\ЩT\ќ][Ы€H\ќ][ЫђћPШ[™Y]PY][ЫњКЬXЪX[\ЭЭX›U\ЭYЛШ[™Y]PY][Ы”Щ]
+NВ€ЫЫњЭЬЭY\ќ][ЫњИH\ќ][Ы’ЬЭYћQ]PШ\Xљ[]JЬЭYЬ›Э\ЛЬЭYЭX›U\ЭYЛШ[™Y]PY][Ы”Щ]Ш[™Y]S[ЩYљXШ][Ы”Щ]
+NВ‚€™]\›€њ™Y^™JВ€ШЪ[XU™\њЪ[ЫЋ€‹€ЫЫќ›Ы\”ЫЭ\ЩTЪK€Ш[™Y]RXYЪK€[”Щ[X[ќXСYЩ\Э€[’[њЭ[ЩQYЩ\Э€]]Ьљ]QYЩ\Э€[ќљ\›Ы›Y[ќYЩ\Э€^XЭYЭX›U\ЭYСYЩ\Э€ЬЭY^XЭYЭX›U\ЭYСYЩ\Э€ЬXЪX[\Э^XЭYЭX›U\ЭYСYЩ\Э€›ЩXЭY[ќ]Y\СYЩ\Э€ЫЬљЩ\”ЫXЮQYЩ\Э€^XЭ][Ы”ЫXЮQYЩ\Э€™]љY\О€€Щ[XЭ]™Q^XЭ][ЫЋ€[ЩK€ЬЭY€В€Ь›Э\YО€ЬЭYЬ›Э\Л›X\
+
+Ь›Э\
+HO€Ь›Э\љY
+KњЫЬќ
+
+K€ЭX›U\ЭYО€ЬЭYЭX›U\ЭYЛ€‹‹љЬЭYЫЭ\ЩT\ќ][Ы‹€Ш[™Y]S[ЩYљYYЭX›U\ЭYО€ЬЭYШ[™Y]S[ЩYљYYЭX›U\ЭYЛ€\ќ][ЫњО€ЬЭY\ќ][ЫњЛ€K€ЬXЪX[\Э€В€Ь›Э\YО€ЬXЪX[\ЭЬ›Э\Л›X\
+
+Ь›Э\
+HO€Ь›Э\љY
+KњЫЬќ
+
+K€ЭX›U\ЭYО€ЬXЪX[\ЭЭX›U\ЭYЛ€‹‹њЬXЪX[\ЭЫЭ\ЩT\ќ][Ы‹€Ш[™Y]S[ЩYљYYЭX›U\ЭYО€ЬXЪX[\ЭШ[™Y]S[ЩYљYYЭX›U\ЭYЛ€K€™]љY]О€В€Ь›Э\YО€™]љY]СЬ›Э\Л›X\
+
+Ь›Э\
+HO€Ь›Э\љY
+KњЫЬќ
+
+K€ЭX›U\ЭYО€™]љY]ФЭX›U\ЭYЛ€K€JNВџB
