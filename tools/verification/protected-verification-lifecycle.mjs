@@ -174,8 +174,7 @@ export function planProtectedVerificationLifecycle(input) {
   const hostedIds = expectedEvidence.filter(({ evidenceId }) => evidenceId !== ENVIRONMENT_EVIDENCE_ID).map(({ evidenceId }) => evidenceId);
   const previousState = input.previousState;
   const previousProgress = isPlainObject(previousState?.progress) ? previousState.progress : null;
-  const sameSemanticInputs = previousState?.plan?.candidateHeadSha === currentPlan.candidateHeadSha
-    && previousState?.plan?.planSemanticDigest === currentPlan.planSemanticDigest;
+  const sameSemanticInputs = previousState?.plan?.planSemanticDigest === currentPlan.planSemanticDigest;
 
   if (previousProgress?.status === 'ARCHITECTURE_STABILIZATION_REQUIRED'
     || (previousProgress?.status === 'STALLED' && sameSemanticInputs)) {
