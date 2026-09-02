@@ -5,7 +5,7 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import * as protectedExecution from '../../tools/verification/protected-hosted-execution.mjs';
-import { validateProtectedProductQualificationGate } from '../../tools/verification/protected-hosted-gate.mjs';
+import * as protectedGate from '../../tools/verification/protected-hosted-gate.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const workflowPath = path.join(ROOT, '.github/workflows/protected-execution-promotion-qualification.yml');
@@ -124,7 +124,7 @@ test('authority-only repin verifier accepts only the same digest literal replace
 });
 
 test('hosted gate accepts only the protected complete-browser authority repin producer', () => {
-  const result = validateProtectedProductQualificationGate(authorityGateFixture());
+  const result = protectedGate.validateProtectedProductQualificationGate(authorityGateFixture());
   assert.equal(result.status, 'success');
   assert.equal(result.mode, 'protected-authority-repin-qualification');
   assert.equal(result.qualificationId, 'qualification-live-digest-authority-v1');
@@ -132,10 +132,10 @@ test('hosted gate accepts only the protected complete-browser authority repin pr
   assert.equal(result.producerRunAttempt, 1);
 
   const valid = authorityGateFixture();
-  assert.throws(() => validateProtectedProductQualificationGate(authorityGateFixture({
+  assert.throws(() => protectedGate.validateProtectedProductQualificationGate(authorityGateFixture({
     producerJobs: { jobs: [{ ...valid.producerJobs.jobs[0], conclusion: 'failure' }] },
   })), /proof job|successful/i);
-  assert.throws(() => validateProtectedProductQualificationGate(authorityGateFixture({
+  assert.throws(() => protectedGate.validateProtectedProductQualificationGate(authorityGateFixture({
     status: { ...valid.status, description: 'weaker authority proof' },
   })), /status|authoritative/i);
 });
@@ -168,4 +168,66 @@ test('protected promotion workflow proves authority repin against its exact sour
   assert.match(job, /Protected GitHub-hosted qualification authority repin safety net/);
   assert.doesNotMatch(job, /context='atlas-local-e2e'/);
   assert.doesNotMatch(job, /group:\s*atlas-runners|labels:\s*oteryn-atlas-pc|visual-review\.json|synology|real_fullworld/i);
+});
+
+test('one-shot stabilization bootstrap consumes exact protected legacy heavy proof rather than manual local status', () => {
+  assert.equal(typeof protectedGate.validateLegacyTransitionBootstrapGate, 'function');
+  const protectedBaseSha = 'e31015d0880e9f81a4b96f990658490af45e8fa6';
+  const candidateHeadSha = sha('d');
+  const prNumber = 303;
+  const headRef = 'feat/issue-179-legacy-transition-qualifier';
+  const livePr = {
+    number: prNumber, state: 'open', merged: false,
+    base: { ref: 'main', sha: protectedBaseSha, repo: { full_name: REPOSITORY } },
+    head: { ref: headRef, sha: candidateHeadSha, repo: { full_name: REPOSITORY } },
+  };
+  const producerRun = {
+    id: 13001, run_attempt: 1,
+    path: '.github/workflows/legacy-molehill-transition-qualification.yml',
+    event: 'pull_request', status: 'completed', conclusion: 'failure',
+    head_branch: headRef, head_sha: candidateHeadSha,
+    repository: { full_name: REPOSITORY },
+    pull_requests: [{ number: prNumber,
+      head: { ref: headRef, sha: candidateHeadSha, repo: { full_name: REPOSITORY } },
+      base: { ref: 'main', sha: protectedBaseSha, repo: { full_name: REPOSITORY } },
+    }],
+  };
+  const producerJobs = { jobs: [
+    { name: 'Capture exact-head legacy transition evidence', status: 'completed', conclusion: 'success' },
+    { name: 'Publish targeted protected-census compatibility evidence', status: 'completed', conclusion: 'skipped' },
+    { name: 'Publish reviewed atlas-local-e2e transition status', status: 'completed', conclusion: 'failure' },
+  ] };
+  const result = protectedGate.validateLegacyTransitionBootstrapGate({
+    producerRun, producerJobs, livePr,
+    expectedRepository: REPOSITORY,
+    expectedPrNumber: prNumber,
+    expectedCandidateHeadSha: candidateHeadSha,
+    expectedProtectedBaseSha: protectedBaseSha,
+    changedFiles: [
+      '.github/workflows/ci.yml',
+      '.github/workflows/merge-authority-audit.yml',
+      '.github/workflows/protected-execution-promotion-qualification.yml',
+      'docs/migration/legacy-atlas-extraction-provenance.json',
+      'tests/verification/ci-workflow-contract.test.mjs',
+      'tests/verification/pr-browser-trust.test.mjs',
+      'tests/verification/protected-anti-loop-workflow-integration.test.mjs',
+      'tests/verification/protected-authority-repin-recovery.test.mjs',
+      'tests/verification/selfhosted-compose-contract.test.mjs',
+      'tools/verification/protected-hosted-execution.mjs',
+      'tools/verification/protected-hosted-gate.mjs',
+    ],
+  });
+  assert.equal(result.status, 'success');
+  assert.equal(result.mode, 'legacy-transition-heavy-proof-exact-base-only');
+  assert.equal(result.headRef, headRef);
+  assert.equal(result.producerRunAttempt, 1);
+
+  const ci = fs.readFileSync(path.join(ROOT, '.github/workflows/ci.yml'), 'utf8');
+  const browserJob = ci.split('  verification-browser:')[1]?.split('  atlas-gate:')[0] ?? '';
+  assert.match(browserJob, /ATLAS_LEGACY_CUTOVER_BASE_SHA:\s*e31015d0880e9f81a4b96f990658490af45e8fa6/);
+  assert.match(browserJob, /ATLAS_LEGACY_CUTOVER_HEAD_REF:\s*feat\/issue-179-legacy-transition-qualifier/);
+  assert.match(browserJob, /validateLegacyTransitionBootstrapGate/);
+  assert.match(browserJob, /legacy-molehill-transition-qualification\.yml/);
+  const cutover = browserJob.split('ATLAS_LEGACY_CUTOVER_BASE_SHA')[1]?.split('expected_name=')[0] ?? '';
+  assert.doesNotMatch(cutover, /atlas-local-e2e/);
 });

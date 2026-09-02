@@ -330,3 +330,102 @@ export function validateProtectedProductQualificationGate(input) {
     producerRunAttempt: runAttempt,
   });
 }
+
+const LEGACY_TRANSITION_BOOTSTRAP = deepFreeze({
+  id: 'authority-repin-recovery-stabilization-v1',
+  protectedBaseSha: 'e31015d0880e9f81a4b96f990658490af45e8fa6',
+  headRef: 'feat/issue-179-legacy-transition-qualifier',
+  workflowPath: '.github/workflows/legacy-molehill-transition-qualification.yml',
+  event: 'pull_request',
+  heavyJobName: 'Capture exact-head legacy transition evidence',
+  allowedNonEvidenceFailureJobName: 'Publish reviewed atlas-local-e2e transition status',
+  changedFiles: [
+    '.github/workflows/ci.yml',
+    '.github/workflows/merge-authority-audit.yml',
+    '.github/workflows/protected-execution-promotion-qualification.yml',
+    'docs/migration/legacy-atlas-extraction-provenance.json',
+    'tests/verification/ci-workflow-contract.test.mjs',
+    'tests/verification/pr-browser-trust.test.mjs',
+    'tests/verification/protected-anti-loop-workflow-integration.test.mjs',
+    'tests/verification/protected-authority-repin-recovery.test.mjs',
+    'tests/verification/selfhosted-compose-contract.test.mjs',
+    'tools/verification/protected-hosted-execution.mjs',
+    'tools/verification/protected-hosted-gate.mjs',
+  ],
+});
+
+export function validateLegacyTransitionBootstrapGate(input) {
+  if (!isPlainObject(input)) throw new TypeError('legacy transition bootstrap gate input is invalid');
+  const repository = nonEmptyString(input.expectedRepository, 'legacy transition bootstrap repository');
+  if (repository !== 'Oteryn/Oteryn-Atlas') throw new TypeError('legacy transition bootstrap repository is invalid');
+  const prNumber = exactPositiveInteger(input.expectedPrNumber, 'legacy transition bootstrap PR number');
+  const candidateHeadSha = exactSha(input.expectedCandidateHeadSha, 'legacy transition bootstrap candidate head');
+  const protectedBaseSha = exactSha(input.expectedProtectedBaseSha, 'legacy transition bootstrap protected base');
+  if (protectedBaseSha !== LEGACY_TRANSITION_BOOTSTRAP.protectedBaseSha) {
+    throw new TypeError('legacy transition bootstrap protected base is not the one-shot authority base');
+  }
+  validateLivePr(input.livePr, { repository, prNumber, candidateHeadSha, protectedBaseSha });
+  if (input.livePr.head?.ref !== LEGACY_TRANSITION_BOOTSTRAP.headRef) {
+    throw new TypeError('legacy transition bootstrap head ref is not preauthorized');
+  }
+  const changedFiles = exactArray(input.changedFiles, 'legacy transition bootstrap changed files');
+  exactObject(changedFiles, LEGACY_TRANSITION_BOOTSTRAP.changedFiles, 'legacy transition bootstrap exact changed files');
+
+  const run = input.producerRun;
+  if (!isPlainObject(run)
+    || run.status !== 'completed'
+    || !new Set(['success', 'failure']).has(run.conclusion)
+    || run.path !== LEGACY_TRANSITION_BOOTSTRAP.workflowPath
+    || run.event !== LEGACY_TRANSITION_BOOTSTRAP.event
+    || run.repository?.full_name !== repository
+    || run.head_branch !== LEGACY_TRANSITION_BOOTSTRAP.headRef) {
+    throw new TypeError('legacy transition bootstrap producer run is not authoritative');
+  }
+  const runId = exactPositiveInteger(Number(run.id), 'legacy transition bootstrap producer run ID');
+  const runAttempt = exactPositiveInteger(Number(run.run_attempt), 'legacy transition bootstrap producer run attempt');
+  if (runAttempt !== 1) throw new TypeError('legacy transition bootstrap producer run must be attempt 1');
+  if (exactSha(run.head_sha, 'legacy transition bootstrap producer head') !== candidateHeadSha) {
+    throw new TypeError('legacy transition bootstrap producer head is stale');
+  }
+  const association = (Array.isArray(run.pull_requests) ? run.pull_requests : []).find((item) => item?.number === prNumber);
+  if (!association
+    || association.head?.repo?.full_name !== repository
+    || association.base?.repo?.full_name !== repository
+    || association.head?.ref !== LEGACY_TRANSITION_BOOTSTRAP.headRef
+    || exactSha(association.head?.sha, 'legacy transition bootstrap associated head') !== candidateHeadSha
+    || exactSha(association.base?.sha, 'legacy transition bootstrap associated base') !== protectedBaseSha) {
+    throw new TypeError('legacy transition bootstrap producer PR association mismatch');
+  }
+
+  const jobs = input.producerJobs?.jobs;
+  if (!Array.isArray(jobs)) throw new TypeError('legacy transition bootstrap producer jobs are invalid');
+  const heavy = jobs.filter((job) => job?.name === LEGACY_TRANSITION_BOOTSTRAP.heavyJobName);
+  if (heavy.length !== 1 || heavy[0].status !== 'completed' || heavy[0].conclusion !== 'success') {
+    throw new TypeError('legacy transition bootstrap heavy exact-head proof is not successful');
+  }
+  const unexpectedFailures = jobs.filter((job) => job?.status === 'completed' && job?.conclusion === 'failure'
+    && job?.name !== LEGACY_TRANSITION_BOOTSTRAP.allowedNonEvidenceFailureJobName);
+  if (unexpectedFailures.length !== 0) {
+    throw new TypeError('legacy transition bootstrap has an unexpected failed producer job');
+  }
+  if (run.conclusion === 'failure') {
+    const allowedFailures = jobs.filter((job) => job?.status === 'completed' && job?.conclusion === 'failure'
+      && job?.name === LEGACY_TRANSITION_BOOTSTRAP.allowedNonEvidenceFailureJobName);
+    if (allowedFailures.length !== 1) {
+      throw new TypeError('legacy transition bootstrap failed run is not visual-review-only');
+    }
+  }
+
+  return deepFreeze({
+    schemaVersion: 1,
+    status: 'success',
+    mode: 'legacy-transition-heavy-proof-exact-base-only',
+    repository,
+    prNumber,
+    protectedBaseSha,
+    candidateHeadSha,
+    headRef: LEGACY_TRANSITION_BOOTSTRAP.headRef,
+    producerRunId: runId,
+    producerRunAttempt: runAttempt,
+  });
+}
