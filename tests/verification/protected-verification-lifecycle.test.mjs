@@ -294,14 +294,25 @@ test('actual workflow failures feed ownership and executable circuit breakers', 
   assert.equal(progress.status, 'STALLED');
   assert.equal(progress.nextAttemptAllowed, false);
 
+  const prior = previousState(currentPlan, { progress });
   const blocked = planProtectedVerificationLifecycle({
     currentPlan, currentExecution: execution(),
-    previousState: previousState(currentPlan, { progress }),
+    previousState: prior,
     baseAdvance: { changedPaths: [], mergeStatus: 'clean' }, now: NOW,
   });
   assert.equal(blocked.disposition, 'BLOCKED');
   assert.equal(blocked.heavyExecutionsRequired, 0);
   assert.equal(blocked.circuitBreaker, 'UNCHANGED_DETERMINISTIC_FAILURE');
+
+  const movedCandidate = plan({ candidate: sha('d'), instance: digest('7') });
+  const stillBlocked = planProtectedVerificationLifecycle({
+    currentPlan: movedCandidate, currentExecution: execution(),
+    previousState: prior,
+    baseAdvance: { changedPaths: [], mergeStatus: 'clean' }, now: NOW,
+  });
+  assert.equal(stillBlocked.disposition, 'BLOCKED');
+  assert.equal(stillBlocked.heavyExecutionsRequired, 0);
+  assert.equal(stillBlocked.circuitBreaker, 'UNCHANGED_DETERMINISTIC_FAILURE');
 });
 
 test('profile-none execution becomes merge-ready with zero evidence and zero heavy work', () => {
