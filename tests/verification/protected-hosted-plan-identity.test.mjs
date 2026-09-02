@@ -146,9 +146,15 @@ test('unrelated protected base and PR-instance movement changes only planInstanc
   assert.notEqual(first.planInstanceDigest, second.planInstanceDigest);
 });
 
-test('candidate, authority and environment changes alter semantic identity', () => {
+test('candidate SHA movement changes only forensic instance identity', () => {
   const baseline = build();
-  assert.notEqual(build({ candidateHeadSha: 'f'.repeat(40) }).planSemanticDigest, baseline.planSemanticDigest);
+  const movedCandidate = build({ candidateHeadSha: 'f'.repeat(40) });
+  assert.equal(movedCandidate.planSemanticDigest, baseline.planSemanticDigest);
+  assert.notEqual(movedCandidate.planInstanceDigest, baseline.planInstanceDigest);
+});
+
+test('authority and environment changes alter semantic identity', () => {
+  const baseline = build();
   assert.notEqual(build({ authorityIdentity: changedAuthorityIdentity }).planSemanticDigest, baseline.planSemanticDigest);
   assert.notEqual(build({ environmentIdentity: changedEnvironmentIdentity }).planSemanticDigest, baseline.planSemanticDigest);
 });
