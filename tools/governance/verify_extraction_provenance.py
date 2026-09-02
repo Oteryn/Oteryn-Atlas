@@ -15,6 +15,8 @@ MAP = ROOT / "docs" / "migration" / "legacy-atlas-extraction-provenance.json"
 HEX40 = re.compile(r"^[0-9a-f]{40}$")
 SOURCE_REPOSITORY = "https://github.com/blakinio/Otheryn.git"
 SOURCE_PREFIXES = ("tools/otbm_atlas/", "tools/otbm_atlas_facts/", ".github/workflows/otbm-atlas-")
+MERGE_GROUP_GATE_PATH = ".github/workflows/merge-group-gate.yml"
+MERGE_GROUP_GATE_BLOB = "c0879fac82ccb81136102c1019fac3dc5ff95482"
 ALLOWED = {
     "GAME_OWNED_LEGACY_REFERENCE",
     "SPLIT_REWRITE_WORKFLOW",
@@ -45,6 +47,12 @@ def target_git_blob(path: str) -> str:
     if not candidate.is_file():
         raise AssertionError(f"mapped target path missing: {path}")
     return git(ROOT, "hash-object", path)
+
+
+def verify_control_plane_pin(path: str, expected_blob: str) -> None:
+    assert HEX40.fullmatch(expected_blob), f"invalid expected control-plane blob: {expected_blob}"
+    actual = target_git_blob(path)
+    assert actual == expected_blob, f"control-plane blob drift: {path}: {actual} != {expected_blob}"
 
 
 def verify_source_row(row: dict, source_root: Path, source_sha: str) -> None:
@@ -110,6 +118,7 @@ def verify_terminal_lifecycle(data: dict) -> None:
 def verify(map_path: Path, source_root: Path | None = None) -> dict[str, int]:
     data = json.loads(map_path.read_text(encoding="utf-8"))
     verify_terminal_lifecycle(data)
+    verify_control_plane_pin(MERGE_GROUP_GATE_PATH, MERGE_GROUP_GATE_BLOB)
     assert data["source"]["repository"] == "blakinio/Otheryn"
     assert data["target"]["repository"] == "Oteryn/Oteryn-Atlas"
     source_sha = data["source"]["sha"]
