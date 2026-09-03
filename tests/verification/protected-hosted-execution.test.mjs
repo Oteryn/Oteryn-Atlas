@@ -310,6 +310,7 @@ test('protected promotion qualification registry binds exact functional qualific
       'e2e/tests/stress-desktop.spec.mjs',
       'e2e/tests/visual-desktop.spec.mjs',
       'e2e/tests/visual-mobile.spec.mjs',
+      'src/browser/animation-runtime-service.mjs',
       'src/browser/semantic-search.mjs',
       'tests/verification/protected-hosted-product-identities.test.mjs',
       'tests/verification/qualification-semantic-source-trust.test.mjs',
