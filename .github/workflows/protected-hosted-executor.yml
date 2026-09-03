@@ -180,7 +180,7 @@ jobs:
           ]) fs.appendFileSync(githubOutput, `${name}=${value}\n`);
           NODE
 
-      - name: Restore latest authoritative exact-candidate lifecycle state
+      - name: Restore latest authoritative PR lifecycle state
         if: steps.controller.outputs.bootstrap_active == 'true'
         id: previous
         shell: bash
@@ -190,13 +190,15 @@ jobs:
         run: |
           set -euo pipefail
           state_name="protected-verification-state-pr-$PR_NUMBER-$CANDIDATE_HEAD_SHA"
+          state_prefix="protected-verification-state-pr-$PR_NUMBER-"
           printf 'state_artifact_name=%s\nprevious_state_present=false\n' "$state_name" >> "$GITHUB_OUTPUT"
           list="$RUNNER_TEMP/protected-state-artifacts.json"
-          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?name=$state_name&per_page=100" > "$list"
-          mapfile -t candidates < <(node --input-type=module - "$list" <<'NODE'
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?per_page=100" > "$list"
+          mapfile -t candidates < <(node --input-type=module - "$list" "$state_prefix" <<'NODE'
           import fs from 'node:fs';
-          const artifacts = (JSON.parse(fs.readFileSync(process.argv[2], 'utf8')).artifacts ?? [])
-            .filter((artifact) => !artifact.expired && artifact.workflow_run?.id)
+          const [listPath, statePrefix] = process.argv.slice(2);
+          const artifacts = (JSON.parse(fs.readFileSync(listPath, 'utf8')).artifacts ?? [])
+            .filter((artifact) => !artifact.expired && artifact.workflow_run?.id && artifact.name?.startsWith(statePrefix))
             .sort((left, right) => Date.parse(right.created_at) - Date.parse(left.created_at));
           for (const artifact of artifacts) process.stdout.write(`${artifact.id}\t${artifact.workflow_run.id}\n`);
           NODE
@@ -229,14 +231,14 @@ jobs:
             fi
             mapfile -t states < <(find "$candidate_dir/unpacked" -type f -name protected-verification-state.json -print)
             [[ "${#states[@]}" -eq 1 ]] || continue
-            if node --input-type=module - "${states[0]}" "$run_json" "$PR_NUMBER" "$CANDIDATE_HEAD_SHA" <<'NODE'
+            if node --input-type=module - "${states[0]}" "$run_json" "$PR_NUMBER" <<'NODE'
           import fs from 'node:fs';
           import { validateProtectedVerificationState } from './protected-control/tools/verification/protected-verification-state.mjs';
-          const [statePath, runPath, prValue, candidateHeadSha] = process.argv.slice(2);
+          const [statePath, runPath, prValue] = process.argv.slice(2);
           const state = validateProtectedVerificationState(JSON.parse(fs.readFileSync(statePath, 'utf8')));
           const run = JSON.parse(fs.readFileSync(runPath, 'utf8'));
           if (state.repository !== process.env.GITHUB_REPOSITORY || state.prNumber !== Number(prValue)
-            || state.candidateHeadSha !== candidateHeadSha
+            || state.plan?.candidateHeadSha !== state.candidateHeadSha
             || state.producer.runId !== Number(run.id) || state.producer.runAttempt !== Number(run.run_attempt)
             || state.producer.workflowPath !== run.path || state.producer.event !== run.event) process.exit(1);
           NODE
