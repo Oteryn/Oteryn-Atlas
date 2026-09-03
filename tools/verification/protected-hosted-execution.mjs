@@ -152,26 +152,28 @@ export function resolveProtectedPromotionQualification(headRef) {
   return qualification;
 }
 
-function exactDigestReplacement(trustedSource, candidateSource, previousDigest, label) {
+function exactDigestReplacement(trustedSource, candidateSource, label) {
   if (typeof trustedSource !== 'string' || typeof candidateSource !== 'string') {
     throw new TypeError(`${label} authority repin sources must be UTF-8 text`);
   }
-  const first = trustedSource.indexOf(previousDigest);
-  if (first < 0 || trustedSource.indexOf(previousDigest, first + previousDigest.length) >= 0) {
-    throw new TypeError(`${label} authority repin protected bytes must contain the previous digest exactly once`);
+  const replacements = [];
+  for (const match of trustedSource.matchAll(/sha256:[a-f0-9]{64}/g)) {
+    const previousDigest = exactDigest(match[0], `${label} authority repin previous digest`);
+    if (trustedSource.indexOf(previousDigest) !== trustedSource.lastIndexOf(previousDigest)) continue;
+    const first = match.index;
+    const prefix = trustedSource.slice(0, first);
+    const suffix = trustedSource.slice(first + previousDigest.length);
+    if (!candidateSource.startsWith(prefix) || !candidateSource.endsWith(suffix)) continue;
+    const nextDigest = candidateSource.slice(prefix.length, candidateSource.length - suffix.length);
+    if (!SHA256.test(nextDigest) || nextDigest === previousDigest) continue;
+    if (candidateSource.indexOf(nextDigest) !== candidateSource.lastIndexOf(nextDigest)) continue;
+    if (`${prefix}${nextDigest}${suffix}` !== candidateSource) continue;
+    replacements.push({ previousDigest, nextDigest });
   }
-  const prefix = trustedSource.slice(0, first);
-  const suffix = trustedSource.slice(first + previousDigest.length);
-  if (!candidateSource.startsWith(prefix) || !candidateSource.endsWith(suffix)) {
-    throw new TypeError(`${label} authority repin must be a digest-only byte replacement`);
+  if (replacements.length !== 1) {
+    throw new TypeError(`${label} authority repin must be exactly one digest-only byte replacement`);
   }
-  const replacement = candidateSource.slice(prefix.length, candidateSource.length - suffix.length);
-  const nextDigest = exactDigest(replacement, `${label} authority repin replacement digest`);
-  if (nextDigest === previousDigest) throw new TypeError(`${label} authority repin digest must change`);
-  if (`${prefix}${nextDigest}${suffix}` !== candidateSource) {
-    throw new TypeError(`${label} authority repin contains bytes outside the digest replacement`);
-  }
-  return nextDigest;
+  return replacements[0];
 }
 
 export function validateProtectedAuthorityRepinSources({
@@ -183,29 +185,35 @@ export function validateProtectedAuthorityRepinSources({
 } = {}) {
   const authority = resolveProtectedAuthorityRepinQualification(authorityHeadRef);
   const sourceQualification = resolveProtectedPromotionQualification(authority.sourceHeadRef);
-  const previousProductDigest = exactDigest(sourceQualification.expectedProductDigest, 'protected authority repin previous product digest');
-  const expectedProductDigest = exactDigestReplacement(
+  const moduleReplacement = exactDigestReplacement(
     trustedModuleSource,
     candidateModuleSource,
-    previousProductDigest,
     'protected hosted execution module',
   );
-  const mirroredDigest = exactDigestReplacement(
+  const mirrorReplacement = exactDigestReplacement(
     trustedTestSource,
     candidateTestSource,
-    previousProductDigest,
     'protected hosted execution mirror test',
   );
-  if (mirroredDigest !== expectedProductDigest) {
-    throw new TypeError('protected authority repin module and mirror test digests differ');
+  if (moduleReplacement.previousDigest !== mirrorReplacement.previousDigest
+    || moduleReplacement.nextDigest !== mirrorReplacement.nextDigest) {
+    throw new TypeError('protected authority repin module and mirror test digest replacements differ');
+  }
+  const configuredProductDigest = exactDigest(
+    sourceQualification.expectedProductDigest,
+    'protected authority repin configured product digest',
+  );
+  if (configuredProductDigest !== moduleReplacement.previousDigest
+    && configuredProductDigest !== moduleReplacement.nextDigest) {
+    throw new TypeError('protected authority repin configured product digest is outside the exact replacement');
   }
   return freeze({
     id: authority.id,
     headRef: authority.headRef,
     changedFiles: [...authority.changedFiles],
     sourceHeadRef: authority.sourceHeadRef,
-    previousProductDigest,
-    expectedProductDigest,
+    previousProductDigest: moduleReplacement.previousDigest,
+    expectedProductDigest: moduleReplacement.nextDigest,
     gateProof: authority.gateProof,
   });
 }
