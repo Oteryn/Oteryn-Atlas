@@ -88,6 +88,16 @@ test('executed and reused evidence use schema v2 and converge through one exact 
   assert.match(gate, /validateEvidenceManifest/);
 });
 
+test('executed environment evidence binds environment semantics instead of global authority provenance', () => {
+  const bind = executor.split('      - name: Bind environment qualification into dependency evidence')[1]?.split('      - name: Publish protected environment qualification')[0] ?? '';
+  assert.match(bind, /semanticDependencyDigest:\s*plan\.environmentDigest/);
+});
+
+test('executed hosted evidence binds browser content semantics instead of global authority provenance', () => {
+  const manifest = executor.split('      - name: Build dependency-bound hosted shard manifest')[1]?.split('      - name: Publish protected shard evidence')[0] ?? '';
+  assert.match(manifest, /semanticDependencyDigest:\s*plan\.browserSemanticDependencyDigest/);
+});
+
 test('workflow failures feed canonical ownership and progress circuit breakers instead of candidate mutation', () => {
   assert.match(executor, /buildProtectedWorkflowFailureState/);
   assert.match(executor, /failure_ownership=environment/);
