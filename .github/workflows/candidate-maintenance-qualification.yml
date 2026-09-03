@@ -1,0 +1,331 @@
+name: Candidate maintenance qualification
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/candidate-maintenance-qualification.yml'
+      - 'tools/verification/qualification-fixture-definition.mjs'
+      - 'tools/verification/qualification-world.mjs'
+      - 'tools/verification/protected-hosted-product-identities.json'
+      - 'src/browser/fullworld-trust.mjs'
+      - 'src/browser/animation-runtime-service.mjs'
+      - 'src/browser/semantic-search.mjs'
+      - 'web/fullworld-creatures.mjs'
+      - 'web/fullworld-search.mjs'
+      - 'web/fullworld-farm-explorer.mjs'
+      - 'e2e/**'
+      - 'tests/verification/**'
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: atlas-candidate-maintenance-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  candidate-maintenance-qualification:
+    name: Prove exact candidate qualification safety net
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      GH_TOKEN: ${{ github.token }}
+      ATLAS_PR_NUMBER: ${{ github.event.pull_request.number }}
+      ATLAS_CODE_REVISION: ${{ github.event.pull_request.head.sha }}
+      ATLAS_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      ATLAS_CANDIDATE_IMAGE: mcr.microsoft.com/playwright:v1.62.0-noble@sha256:baed2032d533817f3dbe6425de795788430ba345e819a1201337009ba17c9d07
+    steps:
+      - name: Check out exact protected base
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+          path: trusted-base
+
+      - name: Check out exact candidate head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+          path: candidate
+
+      - name: Fence exact PR head before proof
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C trusted-base rev-parse HEAD)" = "$ATLAS_BASE_SHA"
+          test "$(git -C candidate rev-parse HEAD)" = "$ATLAS_CODE_REVISION"
+          payload="$RUNNER_TEMP/atlas-maintenance-before.json"
+          gh api "repos/$GITHUB_REPOSITORY/pulls/$ATLAS_PR_NUMBER" > "$payload"
+          node trusted-base/tools/verification/assert-current-pr-head.mjs \
+            --payload "$payload" \
+            --repository "$GITHUB_REPOSITORY" \
+            --pr-number "$ATLAS_PR_NUMBER" \
+            --expected-head-sha "$ATLAS_CODE_REVISION"
+
+      - name: Prove candidate Playwright stable-ID census exactly matches protected census
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci --prefix trusted-base/e2e --ignore-scripts --no-audit --no-fund
+          protected_list="$RUNNER_TEMP/atlas-maintenance-protected-list.txt"
+          candidate_list="$RUNNER_TEMP/atlas-maintenance-candidate-list.txt"
+          protected_ids="$RUNNER_TEMP/atlas-maintenance-protected-ids.json"
+          candidate_ids="$RUNNER_TEMP/atlas-maintenance-candidate-ids.json"
+          qualification_list="$RUNNER_TEMP/atlas-maintenance-qualification-list.txt"
+
+          (
+            cd trusted-base
+            ATLAS_ARTIFACTS_DIR="$RUNNER_TEMP/atlas-maintenance-protected-list-artifacts" \
+              npm exec --prefix e2e -- playwright test --config=e2e/playwright.config.mjs --list
+          ) > "$protected_list"
+
+          test ! -e candidate/e2e/node_modules
+          ln -s /protected-e2e-node-modules/node_modules candidate/e2e/node_modules
+          timeout --signal=KILL 120s docker run --rm \
+            --network none \
+            --read-only \
+            --cap-drop ALL \
+            --security-opt no-new-privileges \
+            --pids-limit 192 \
+            --memory 1536m \
+            --cpus 2 \
+            --user 1000:1000 \
+            --tmpfs /tmp:rw,nosuid,nodev,size=256m \
+            --mount "type=bind,src=$PWD/candidate,dst=/candidate,readonly" \
+            --mount "type=bind,src=$PWD/trusted-base/e2e/node_modules,dst=/protected-e2e-node-modules/node_modules,readonly" \
+            "$ATLAS_CANDIDATE_IMAGE" \
+            bash -lc 'cd /candidate && CI=1 ATLAS_ARTIFACTS_DIR=/tmp/artifacts e2e/node_modules/.bin/playwright test --config=e2e/playwright.config.mjs --list' \
+            > "$candidate_list"
+
+          node trusted-base/tools/verification/parse-playwright-test-list.mjs "$protected_list" > "$protected_ids"
+          node trusted-base/tools/verification/parse-playwright-test-list.mjs "$candidate_list" > "$candidate_ids"
+          diff -u "$protected_ids" "$candidate_ids"
+
+          CANDIDATE_LIST="$candidate_list" QUALIFICATION_LIST="$qualification_list" node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const catalog = JSON.parse(fs.readFileSync('./trusted-base/tools/verification/verification-catalog.json', 'utf8'));
+          const group = catalog.groups?.['e2e.full'];
+          if (!group || group.capabilities?.dataCapability !== 'qualification_fixture' || group.capabilities?.requiresRealFullWorld === true) {
+            throw new TypeError('protected e2e.full group is not ordinary qualification_fixture coverage');
+          }
+          const specs = new Set(group.specs ?? []);
+          if (!specs.size) throw new TypeError('protected e2e.full qualification catalog is empty');
+          const selected = [];
+          for (const line of fs.readFileSync(process.env.CANDIDATE_LIST, 'utf8').split(/\r?\n/)) {
+            const match = line.match(/^\s*\[([^\]]+)\]\s+›\s+([^:]+):\d+:\d+\s+›\s+(.+)$/);
+            if (!match) continue;
+            if (specs.has(`e2e/tests/${match[2]}`)) selected.push(line.trim());
+          }
+          if (!selected.length) throw new TypeError('candidate e2e.full qualification selection is empty');
+          fs.writeFileSync(process.env.QUALIFICATION_LIST, `${selected.join('\n')}\n`, 'utf8');
+          NODE
+          test -s "$qualification_list"
+          printf '%s\n' "$qualification_list" > "$RUNNER_TEMP/atlas-maintenance-qualification-list-path.txt"
+
+      - name: Build and verify exact candidate qualification product in networkless read-only sandbox
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_root="$RUNNER_TEMP/atlas-maintenance-qualification-world"
+          trust_dir="$RUNNER_TEMP/atlas-maintenance-qualification-trust"
+          trust_path="$trust_dir/qualification_fixture.json"
+          rm -rf "$source_root" "$trust_dir"
+          mkdir -p "$source_root" "$trust_dir"
+          chmod 0777 "$source_root" "$trust_dir"
+          proof="$RUNNER_TEMP/atlas-maintenance-qualification-proof.mjs"
+          cat > "$proof" <<'NODE'
+          import fs from 'node:fs';
+          import { resolveFullWorldTrust } from '/trusted/src/browser/fullworld-trust.mjs';
+          import { buildQualificationWorld, qualificationTrustDescriptor, verifyQualificationWorld } from '/candidate/tools/verification/qualification-world.mjs';
+
+          const registry = JSON.parse(fs.readFileSync('/candidate/tools/verification/protected-hosted-product-identities.json', 'utf8'));
+          const expectedDigest = registry.qualification_fixture?.digest;
+          if (!/^sha256:[0-9a-f]{64}$/.test(expectedDigest ?? '')) throw new TypeError('candidate qualification product registry digest is invalid');
+          const built = await buildQualificationWorld('/out/product');
+          const verified = await verifyQualificationWorld('/out/product');
+          if (built.productDigest !== expectedDigest || verified.productDigest !== expectedDigest) {
+            throw new TypeError('rebuilt candidate qualification fixture does not match candidate product registry');
+          }
+          const descriptor = qualificationTrustDescriptor(verified);
+          const trust = resolveFullWorldTrust({ __OTERYN_ATLAS_QUALIFICATION_TRUST__: descriptor });
+          if (trust.qualificationFixtureId !== verified.fixtureId || trust.qualificationProductDigest !== expectedDigest) {
+            throw new TypeError('protected trust policy rejected candidate qualification fixture identity');
+          }
+          for (const field of ['publicationRoot', 'semanticRoot', 'pixelRoot', 'runtimeIndexRoot', 'pixelBucketRoot', 'overviewRoot', 'minimapRoot', 'sourceFingerprint']) {
+            if (trust[field] !== verified[field]) throw new TypeError(`candidate qualification trust field mismatch: ${field}`);
+          }
+          fs.writeFileSync('/out/qualification_fixture.json', `${JSON.stringify(descriptor)}\n`, 'utf8');
+          NODE
+          timeout --signal=KILL 180s docker run --rm \
+            --network none \
+            --read-only \
+            --cap-drop ALL \
+            --security-opt no-new-privileges \
+            --pids-limit 192 \
+            --memory 1024m \
+            --cpus 2 \
+            --user 1000:1000 \
+            --tmpfs /tmp:rw,nosuid,nodev,size=128m \
+            --mount "type=bind,src=$PWD/trusted-base,dst=/trusted,readonly" \
+            --mount "type=bind,src=$PWD/candidate,dst=/candidate,readonly" \
+            --mount "type=bind,src=$proof,dst=/proof.mjs,readonly" \
+            --mount "type=bind,src=$source_root,dst=/out" \
+            "$ATLAS_CANDIDATE_IMAGE" \
+            node /proof.mjs
+          test -s "$source_root/qualification_fixture.json"
+          mv "$source_root/qualification_fixture.json" "$trust_path"
+          test -s "$trust_path"
+          printf '%s\n' "$source_root/product" > "$RUNNER_TEMP/atlas-maintenance-source-root.txt"
+          printf '%s\n' "$trust_path" > "$RUNNER_TEMP/atlas-maintenance-trust-path.txt"
+
+      - name: Run candidate deterministic verification in networkless read-only sandbox
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout --signal=KILL 240s docker run --rm \
+            --network none \
+            --read-only \
+            --cap-drop ALL \
+            --security-opt no-new-privileges \
+            --pids-limit 256 \
+            --memory 1536m \
+            --cpus 2 \
+            --user 1000:1000 \
+            --tmpfs /tmp:rw,nosuid,nodev,size=256m \
+            --mount "type=bind,src=$PWD/candidate,dst=/candidate,readonly" \
+            "$ATLAS_CANDIDATE_IMAGE" \
+            bash -lc 'set -euo pipefail
+              cd /candidate
+              test "$(command -v python3)" = /usr/bin/python3
+              mkdir -p /tmp/atlas-python-bin /tmp/atlas-python-pycache
+              ln -s /usr/bin/python3 /tmp/atlas-python-bin/python
+              export PATH="/tmp/atlas-python-bin:$PATH"
+              export PYTHONPYCACHEPREFIX=/tmp/atlas-python-pycache
+              node --test tests/verification/*.test.mjs'
+
+      - name: Prove complete candidate qualification safety net in Chromium
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_root="$(cat "$RUNNER_TEMP/atlas-maintenance-source-root.txt")"
+          trust_path="$(cat "$RUNNER_TEMP/atlas-maintenance-trust-path.txt")"
+          qualification_list="$(cat "$RUNNER_TEMP/atlas-maintenance-qualification-list-path.txt")"
+          execution_context="$RUNNER_TEMP/atlas-maintenance-execution-context"
+          artifacts="$RUNNER_TEMP/atlas-maintenance-browser-artifacts"
+          identity_dir="$RUNNER_TEMP/atlas-maintenance-identities"
+          rm -rf "$execution_context" "$artifacts" "$identity_dir"
+          mkdir -p "$execution_context" "$artifacts" "$identity_dir"
+
+          rsync -a --delete --exclude='.git' candidate/ "$execution_context/"
+          for path in e2e e2e/tests e2e/support web src; do
+            test -d "$execution_context/$path"
+            test ! -L "$execution_context/$path"
+          done
+          rm -rf "$execution_context/e2e/node_modules"
+          rm -f "$execution_context/.dockerignore" "$execution_context/e2e/Dockerfile.dockerignore"
+          cp trusted-base/e2e/Dockerfile "$execution_context/e2e/Dockerfile"
+          cp trusted-base/e2e/package.json trusted-base/e2e/package-lock.json "$execution_context/e2e/"
+          cp trusted-base/e2e/playwright.config.mjs trusted-base/e2e/summary-reporter.mjs "$execution_context/e2e/"
+          mkdir -p "$execution_context/tools/verification"
+          cp trusted-base/tools/verification/stable-id.mjs "$execution_context/tools/verification/stable-id.mjs"
+
+          IDENTITY_DIR="$identity_dir" QUALIFICATION_LIST="$qualification_list" TRUST_PATH="$trust_path" node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import path from 'node:path';
+          import { bytesDigest, canonicalDigest } from './trusted-base/tools/verification/anti-loop-common.mjs';
+          import { buildProtectedExecutionEnvironmentIdentity } from './trusted-base/tools/verification/protected-execution-environment.mjs';
+          import { buildVerificationAuthorityIdentity } from './trusted-base/tools/verification/verification-authority.mjs';
+          const readJson = (target) => JSON.parse(fs.readFileSync(target, 'utf8'));
+          const exactSha = (value, label) => { if (!/^[a-f0-9]{40}$/.test(value ?? '')) throw new TypeError(`${label} must be an exact SHA`); return value; };
+          const exactDigest = (value, label) => { if (!/^sha256:[a-f0-9]{64}$/.test(value ?? '')) throw new TypeError(`${label} must be an exact digest`); return value; };
+          const candidateHeadSha = exactSha(process.env.ATLAS_CODE_REVISION, 'maintenance candidate head');
+          const protectedBaseSha = exactSha(process.env.ATLAS_BASE_SHA, 'maintenance protected base');
+          const authorityIdentity = await buildVerificationAuthorityIdentity({
+            manifest: readJson('trusted-base/tools/verification/verification-authority-manifest.json'),
+            readFile: async (relative) => fs.readFileSync(path.join('trusted-base', relative)),
+          });
+          const environmentIdentity = buildProtectedExecutionEnvironmentIdentity(readJson('trusted-base/tools/verification/protected-execution-environment.json'));
+          const trust = readJson(process.env.TRUST_PATH);
+          if (trust.dataCapability !== 'qualification_fixture') throw new TypeError('maintenance trust is not qualification_fixture');
+          const semanticCore = {
+            schemaVersion: 1,
+            identityId: 'atlas-candidate-maintenance-semantic-v1',
+            repository: process.env.GITHUB_REPOSITORY,
+            candidateHeadSha,
+            authorityDigest: exactDigest(authorityIdentity.authorityDigest, 'maintenance authority'),
+            environmentDigest: exactDigest(environmentIdentity.environmentDigest, 'maintenance environment'),
+            dataCapability: 'qualification_fixture',
+            productDigest: exactDigest(trust.productDigest, 'maintenance qualification product'),
+            protectedTestListDigest: bytesDigest(fs.readFileSync(process.env.QUALIFICATION_LIST)),
+            execution: { shard: '1/1', workers: 1, retries: 0 },
+          };
+          const semanticIdentity = { ...semanticCore, planSemanticDigest: canonicalDigest(semanticCore) };
+          const instanceCore = {
+            schemaVersion: 1,
+            identityId: 'atlas-candidate-maintenance-instance-v1',
+            repository: process.env.GITHUB_REPOSITORY,
+            protectedBaseSha,
+            candidateHeadSha,
+            planSemanticDigest: semanticIdentity.planSemanticDigest,
+            runId: String(process.env.GITHUB_RUN_ID),
+            runAttempt: Number(process.env.GITHUB_RUN_ATTEMPT),
+          };
+          const instanceIdentity = { ...instanceCore, planInstanceDigest: canonicalDigest(instanceCore) };
+          fs.writeFileSync(path.join(process.env.IDENTITY_DIR, 'verification-authority-identity.json'), `${JSON.stringify(authorityIdentity, null, 2)}\n`);
+          fs.writeFileSync(path.join(process.env.IDENTITY_DIR, 'protected-execution-environment-identity.json'), `${JSON.stringify(environmentIdentity, null, 2)}\n`);
+          fs.writeFileSync(path.join(process.env.IDENTITY_DIR, 'semantic-identity.json'), `${JSON.stringify(semanticIdentity, null, 2)}\n`);
+          fs.writeFileSync(path.join(process.env.IDENTITY_DIR, 'instance-identity.json'), `${JSON.stringify(instanceIdentity, null, 2)}\n`);
+          NODE
+
+          export COMPOSE_PROJECT_NAME="atlas-maintenance-${GITHUB_RUN_ID}"
+          export ATLAS_VERIFICATION_PLAN_SHA256="sha256:$(printf '%s' "$ATLAS_CODE_REVISION" | sha256sum | awk '{print $1}')"
+          export ATLAS_PLAN_SEMANTIC_DIGEST="$(jq -er '.planSemanticDigest' "$identity_dir/semantic-identity.json")"
+          export ATLAS_PLAN_INSTANCE_DIGEST="$(jq -er '.planInstanceDigest' "$identity_dir/instance-identity.json")"
+          export ATLAS_AUTHORITY_DIGEST="$(jq -er '.authorityDigest' "$identity_dir/verification-authority-identity.json")"
+          export ATLAS_ENVIRONMENT_DIGEST="$(jq -er '.environmentDigest' "$identity_dir/protected-execution-environment-identity.json")"
+          export ATLAS_E2E_SHARD='1/1'
+          export ATLAS_E2E_WORKERS='1'
+          export ATLAS_QUALIFICATION_PUBLICATION_HOST="$source_root"
+          export ATLAS_QUALIFICATION_TRUST_JSON="$(jq -c . "$trust_path")"
+          export ATLAS_EXECUTION_CONTEXT="$execution_context"
+          export ATLAS_E2E_ARTIFACTS_HOST="$artifacts"
+          export ATLAS_PROTECTED_TEST_LIST="$qualification_list"
+
+          compose_down() {
+            docker compose \
+              -f trusted-base/e2e/compose.protected-hosted-executor.yml \
+              -f trusted-base/e2e/compose.github-hosted.yml \
+              down -v --remove-orphans >/dev/null 2>&1 || true
+          }
+          trap compose_down EXIT
+          compose_down
+          docker compose \
+            -f trusted-base/e2e/compose.protected-hosted-executor.yml \
+            -f trusted-base/e2e/compose.github-hosted.yml \
+            up -d --wait atlas-publication atlas-web
+          docker compose \
+            -f trusted-base/e2e/compose.protected-hosted-executor.yml \
+            -f trusted-base/e2e/compose.github-hosted.yml \
+            build e2e
+          docker compose \
+            -f trusted-base/e2e/compose.protected-hosted-executor.yml \
+            -f trusted-base/e2e/compose.github-hosted.yml \
+            run --rm e2e \
+            bash -lc 'exec ./node_modules/.bin/playwright test --config=playwright.config.mjs --test-list=/run/atlas-protected-test-list.txt --workers=1 --retries=0'
+
+      - name: Fence exact PR head after proof
+        shell: bash
+        run: |
+          set -euo pipefail
+          payload="$RUNNER_TEMP/atlas-maintenance-after.json"
+          gh api "repos/$GITHUB_REPOSITORY/pulls/$ATLAS_PR_NUMBER" > "$payload"
+          node trusted-base/tools/verification/assert-current-pr-head.mjs \
+            --payload "$payload" \
+            --repository "$GITHUB_REPOSITORY" \
+            --pr-number "$ATLAS_PR_NUMBER" \
+            --expected-head-sha "$ATLAS_CODE_REVISION"
