@@ -115,6 +115,7 @@ const PRODUCTION_ANCILLARY_SOURCES = Object.freeze({
   mode: 'production',
   animation: Object.freeze({ gameSha: '8f6a4fdea4487a61c4cdaf1889d421ecd2265a31', appearanceProductRoot: 'sha256:0d1c8fc777d1d220a9d7723507fddd72585f7358d35a40209bd7415f1fe057c1', outfitSpatialProductRoot: 'sha256:62fdd7d0ce02652582f03bf971455f4a2f9ec1e472eaebfec5af739cf11a921e' }),
   creatures: Object.freeze({ contractId: 'oteryn-game-atlas-export-v1', capability: 'animated-creatures-v1', semanticDigest: 'sha256:7dc951874c95424279737eaaf51cf2d50940162ef4799daea39a187a581ef0e8', npcRoleSchemaVersion: 1 }),
+  creatureGameplay: Object.freeze({ availability: 'required' }),
   semanticSearch: Object.freeze({ authority: 'Oteryn/Oteryn-Game', repository: 'Oteryn/Oteryn-Game', contractId: 'oteryn-game-atlas-export-v1', capability: 'semantic-search-source-v1', profileId: 'oteryn-game-atlas-semantic-search-v1', creatureContractId: 'oteryn-game-atlas-export-v1', creatureCapability: 'static-creatures-v1', creatureSemanticDigest: 'sha256:81505e91d7089f91e71813ec43f97118932db9cc7fd76d291fa399447ee2dfa4' }),
 });
 
@@ -125,6 +126,7 @@ export function ancillarySourceExpectations(trust = PRODUCTION_FULLWORLD_TRUST) 
       mode: 'bounded_real_world', contractId: BOUNDED_REAL_SOURCE_CONTRACT,
       animation: Object.freeze({ gameSha: BOUNDED_REAL_GAME_SHA, appearanceProductRoot: trust.pixelRoot, outfitSpatialProductRoot: trust.semanticRoot }),
       creatures: Object.freeze({ contractId: BOUNDED_REAL_SOURCE_CONTRACT, capability: BOUNDED_REAL_CREATURE_CAPABILITY, semanticDigest: PRODUCTION_ANCILLARY_SOURCES.semanticSearch.creatureSemanticDigest, npcRoleSchemaVersion: 1, fixtureId: BOUNDED_REAL_FIXTURE_ID }),
+      creatureGameplay: PRODUCTION_ANCILLARY_SOURCES.creatureGameplay,
       semanticSearch: PRODUCTION_ANCILLARY_SOURCES.semanticSearch,
     });
   }
@@ -134,6 +136,7 @@ export function ancillarySourceExpectations(trust = PRODUCTION_FULLWORLD_TRUST) 
     mode: 'qualification_fixture', contractId: QUALIFICATION_SOURCE_CONTRACT,
     animation: Object.freeze({ gameSha: 'fixture', appearanceProductRoot: trust.pixelRoot, outfitSpatialProductRoot: trust.semanticRoot }),
     creatures: Object.freeze({ contractId: QUALIFICATION_SOURCE_CONTRACT, capability: 'qualification-creatures-v1', semanticDigest: trust.semanticRoot, npcRoleSchemaVersion: 1, fixtureId: QUALIFICATION_FIXTURE_ID }),
+    creatureGameplay: Object.freeze({ availability: 'unavailable', reason: 'qualification-fixture' }),
     semanticSearch: Object.freeze({ authority: 'Oteryn/Oteryn-Atlas', repository: 'Oteryn/Oteryn-Atlas', contractId: QUALIFICATION_SOURCE_CONTRACT, capability: 'qualification-semantic-search-v1', profileId: 'oteryn-atlas-qualification-semantic-search-v1', fixtureId: QUALIFICATION_FIXTURE_ID, gameRevision: 'fixture', semanticDigest: trust.semanticRoot, creatureContractId: QUALIFICATION_SOURCE_CONTRACT, creatureCapability: 'qualification-creatures-v1', creatureSemanticDigest: trust.semanticRoot }),
   });
 }
