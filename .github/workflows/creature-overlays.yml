@@ -155,10 +155,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          grep -q "EXPECTED_SEMANTIC_DIGEST = 'sha256:7dc951874c95424279737eaaf51cf2d50940162ef4799daea39a187a581ef0e8'" web/fullworld-creatures.mjs
-          grep -q "EXPECTED_CAPABILITY = 'animated-creatures-v1'" web/fullworld-creatures.mjs
+          grep -q 'ancillarySourceExpectations(FULLWORLD_TRUST)' web/fullworld-creatures.mjs
+          grep -q 'const expected = SOURCE_EXPECTATIONS.creatures' web/fullworld-creatures.mjs
+          grep -q 'SOURCE_EXPECTATIONS.animation' web/fullworld-creatures.mjs
+          grep -q 'expected.semanticDigest' web/fullworld-creatures.mjs
+          grep -q 'expected.npcRoleSchemaVersion' web/fullworld-creatures.mjs
           grep -q 'getAnimationRuntime' web/fullworld-creatures.mjs
-          grep -q "EXPECTED_NPC_ROLE_SCHEMA = 1" web/fullworld-creatures.mjs
           grep -q "NPC_BADGE_STYLE = 'functional-icons-v2'" src/browser/npc-badge-primitives.mjs
           grep -q 'createCreaturePresentationController' web/fullworld-creatures.mjs
           grep -q "id=\"npc-role-filter\"" web/fullworld-creatures.mjs
@@ -166,6 +168,10 @@ jobs:
           grep -q "panel.id = 'creature-inspector'" web/fullworld-creatures.mjs
           grep -q "params.set('creature', item.record_id)" web/fullworld-creatures.mjs
           grep -q 'MAX_CACHE_CHUNKS' web/fullworld-creatures.mjs
+          if grep -E 'EXPECTED_(SEMANTIC_DIGEST|CAPABILITY|NPC_ROLE_SCHEMA)' web/fullworld-creatures.mjs; then
+            echo 'Browser creature consumer must derive source identity from FullWorld trust.' >&2
+            exit 1
+          fi
           if grep -E '(\.otbm|Legacy IR|world\.otbm|crystalserver|data-otservbr-global)' web/fullworld-creatures.mjs; then
             echo 'Browser creature consumer must not reference legacy world inputs.' >&2
             exit 1
