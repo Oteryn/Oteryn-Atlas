@@ -69,6 +69,14 @@ function allEvidencePaths(changedFiles) {
 }
 
 function matchesForPath(path, manifest) {
+  if (path === 'AGENTS.md') {
+    return [{
+      pathPrefix: 'AGENTS.md',
+      domains: ['instruction-only'],
+      minimumProfile: 'none',
+      requiredGroups: [],
+    }];
+  }
   return manifest.entries.filter((entry) => path.startsWith(entry.pathPrefix));
 }
 
