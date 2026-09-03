@@ -13,8 +13,13 @@ import {
   captureRuntimeFailures,
   fixtureAwarePosition,
   gotoAtlas,
+  isQualificationFixtureExecution,
   waitForAtlas,
 } from './runtime.mjs';
+
+const REORDER_RANGE_ENTRY = isQualificationFixtureExecution()
+  ? '/web/fullworld.html?x=32369&y=32241&floor=-7&zoom=0.5&mode=map'
+  : DESKTOP_ENTRY;
 
 async function navigateCoordinates(page, x, y, floor = -7) {
   await page.locator('#search-input').fill(`${x} ${y} ${floor}`);
@@ -36,7 +41,7 @@ async function rangeTargets(page) {
 
 test('reordered authenticated range completion cannot commit a stale pan target', async ({ page }) => {
   const runtime = captureRuntimeFailures(page);
-  await gotoAtlas(page, DESKTOP_ENTRY);
+  await gotoAtlas(page, REORDER_RANGE_ENTRY);
   await waitForAtlas(page);
   const before = await committedRenderer(page);
   const { first } = await rangeTargets(page);
