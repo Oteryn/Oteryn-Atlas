@@ -229,6 +229,17 @@ export function buildProtectedHostedPlan(input) {
   const authorityDigest = authorityIdentity.authorityDigest;
   const authorityManifestDigest = authorityIdentity.manifestDigest;
   const environmentDigest = environmentIdentity.environmentDigest;
+  const browserSemanticContentDigest = input.browserSemanticContentDigest === undefined
+    ? authorityDigest
+    : exactDigest(input.browserSemanticContentDigest, 'browser semantic content');
+  const browserSemanticDependencyDigest = digest({
+    schemaVersion: 1,
+    browserSemanticContentDigest,
+    stableIdAlgorithmDigest,
+    expectedStableTestIdsDigest: basePlan.expectedStableTestIdsDigest,
+    workerPolicyDigest,
+    executionPolicyDigest,
+  });
   const semanticIdentity = {
     schemaVersion: 1,
     repository: input.repository,
@@ -249,6 +260,7 @@ export function buildProtectedHostedPlan(input) {
     productIdentitiesDigest,
     workerPolicyDigest,
     executionPolicyDigest,
+    browserSemanticDependencyDigest,
   };
   const planSemanticDigest = digest(semanticIdentity);
 
@@ -307,6 +319,8 @@ export function buildProtectedHostedPlan(input) {
     selectiveExecution: false,
     lowerBoundMode: 'protected-v3-widen-only',
     executionPolicyDigest,
+    browserSemanticContentDigest,
+    browserSemanticDependencyDigest,
     planSemanticDigest,
   };
   return freeze({ ...core, planInstanceDigest: digest(core) });
