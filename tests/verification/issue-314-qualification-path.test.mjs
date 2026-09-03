@@ -1,0 +1,122 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { spawnSync } from 'node:child_process';
+import test from 'node:test';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+
+import { buildVerificationPlan } from '../../tools/verification/build-verification-plan.mjs';
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+const impactManifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'tools/verification/impact-manifest.json'), 'utf8'));
+const verificationCatalog = JSON.parse(fs.readFileSync(path.join(ROOT, 'tools/verification/verification-catalog.json'), 'utf8'));
+const classifierPath = path.join(ROOT, 'tools/verification/classify-pr-changes.mjs');
+const creatureSource = fs.readFileSync(path.join(ROOT, 'web/fullworld-creatures.mjs'), 'utf8');
+
+function classify(paths) {
+  const result = spawnSync(process.execPath, [classifierPath], {
+    cwd: ROOT,
+    input: `${paths.join('\n')}\n`,
+    encoding: 'utf8',
+  });
+  assert.equal(result.status, 0, result.stderr);
+  return Object.fromEntries(result.stdout.trim().split(/\r?\n/).map((line) => line.split('=')));
+}
+
+function planFor(pathname) {
+  return buildVerificationPlan({
+    repository: 'Oteryn/Oteryn-Atlas',
+    headSha: 'a'.repeat(40),
+    integrationBaseSha: 'b'.repeat(40),
+    mergeBaseSha: 'c'.repeat(40),
+    changedFiles: [{ path: pathname }],
+    trustedImpactManifest: impactManifest,
+    candidateImpactManifest: impactManifest,
+    trustedVerificationCatalog: verificationCatalog,
+    candidateVerificationCatalog: verificationCatalog,
+  });
+}
+
+test('A: root instruction-only governance does not recursively require browser qualification', () => {
+  assert.deepEqual(classify(['AGENTS.md']), { docs_only: 'true', requires_e2e: 'false' });
+  const plan = planFor('AGENTS.md');
+  assert.equal(plan.profile, 'none');
+  assert.deepEqual(plan.requiredGroupIds, []);
+
+  const unknownMarkdown = planFor('README.md');
+  assert.equal(unknownMarkdown.profile, 'full', 'arbitrary Markdown must remain fail-closed');
+  assert.deepEqual(unknownMarkdown.requiredGroupIds, ['deterministic.core', 'e2e.full']);
+});
+
+test('B: pure verification regressions stay deterministic while executable authority stays broad and fail-closed', () => {
+  const regression = planFor('tests/verification/new-regression.test.mjs');
+  assert.equal(regression.profile, 'focused');
+  assert.deepEqual(regression.requiredGroupIds, ['deterministic.core']);
+
+  for (const pathname of [
+    'tools/verification/classify-pr-changes.mjs',
+    '.github/workflows/protected-hosted-executor.yml',
+  ]) {
+    const plan = planFor(pathname);
+    assert.equal(plan.profile, 'full', pathname);
+    assert.deepEqual(plan.requiredGroupIds, ['deterministic.core', 'e2e.full'], pathname);
+  }
+});
+
+test('C: verification profile remains independent from product data capability', () => {
+  assert.equal(verificationCatalog.groups['e2e.full'].capabilities.dataCapability, 'qualification_fixture');
+  assert.equal(verificationCatalog.groups['e2e.common-smoke'].capabilities.dataCapability, 'qualification_fixture');
+  assert.equal(verificationCatalog.groups['integration.source-contract'].capabilities.dataCapability, 'bounded_real_world');
+  assert.equal(verificationCatalog.groups['fullworld.animation-census'].capabilities.dataCapability, 'real_fullworld');
+  assert.equal(planFor('web/fullworld-creatures.mjs').profile, 'broad');
+});
+
+test('D/E: qualification repair admission is branch-agnostic, exact-scope and monotonic', async () => {
+  const policyUrl = pathToFileURL(path.join(ROOT, 'tools/verification/qualification-repair-policy.mjs')).href;
+  const { validateQualificationRepairTransition } = await import(policyUrl);
+  const protectedPlan = {
+    profile: 'full',
+    requiredGroupIds: ['deterministic.core', 'e2e.full'],
+    requiredDataCapabilities: ['qualification_fixture'],
+    retryPolicy: { retries: 0 },
+  };
+  const candidatePlan = structuredClone(protectedPlan);
+
+  const accepted = validateQualificationRepairTransition({
+    changedPaths: ['tools/verification/qualification-fixture-definition.mjs', 'web/fullworld-creatures.mjs'],
+    protectedPlan,
+    candidatePlan,
+  });
+  assert.equal(accepted.eligible, true);
+  assert.deepEqual(accepted.requiredGroupIds, ['deterministic.core', 'e2e.full']);
+  assert.equal(JSON.stringify(accepted).includes('issue-'), false);
+  assert.equal(JSON.stringify(accepted).includes('branch'), false);
+  assert.equal(JSON.stringify(accepted).includes('prNumber'), false);
+
+  assert.throws(() => validateQualificationRepairTransition({
+    changedPaths: ['tools/verification/qualification-fixture-definition.mjs'],
+    protectedPlan,
+    candidatePlan: { ...candidatePlan, requiredGroupIds: ['deterministic.core'] },
+  }), /narrow|monotonic|protected/i);
+
+  assert.throws(() => validateQualificationRepairTransition({
+    changedPaths: ['.github/workflows/protected-hosted-executor.yml'],
+    protectedPlan,
+    candidatePlan,
+  }), /scope|eligible|repair/i);
+});
+
+test('F: creature runtime consumes trust-bound ancillary source expectations instead of production constants', () => {
+  assert.match(creatureSource, /ancillarySourceExpectations\(FULLWORLD_TRUST\)/);
+  assert.doesNotMatch(creatureSource, /validateCreatureIndex\(index,\s*\{[\s\S]*EXPECTED_GAME_SHA256/);
+});
+
+test('G: genuine runtime-impacting browser changes still require hosted qualification-fixture evidence', () => {
+  const plan = planFor('web/fullworld-creatures.mjs');
+  assert.equal(plan.profile, 'broad');
+  assert(plan.requiredGroupIds.includes('e2e.full'));
+  const group = verificationCatalog.groups['e2e.full'];
+  assert.equal(group.capabilities.browser, true);
+  assert.equal(group.capabilities.hosted, true);
+  assert.equal(group.capabilities.dataCapability, 'qualification_fixture');
+});
