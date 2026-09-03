@@ -1,4 +1,5 @@
 import { loadAnimationRuntime } from './animation-runtime.mjs';
+import { ancillarySourceExpectations, resolveFullWorldTrust } from './fullworld-trust.mjs';
 
 let shared = null;
 let sharedBase = null;
@@ -8,7 +9,8 @@ export function getAnimationRuntime(baseUrl, fetcher = fetch) {
   if (sharedBase != null && sharedBase !== base) throw new Error('animation runtime base changed after initialization');
   if (shared == null) {
     sharedBase = base;
-    shared = loadAnimationRuntime(new URL(base), fetcher).catch((error) => {
+    const expectedSource = ancillarySourceExpectations(resolveFullWorldTrust()).animation;
+    shared = loadAnimationRuntime(new URL(base), fetcher, expectedSource).catch((error) => {
       shared = null;
       sharedBase = null;
       throw error;

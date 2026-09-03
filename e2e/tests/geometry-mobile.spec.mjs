@@ -8,9 +8,11 @@ import {
   waitForCreatureCommit,
   waitForRendererCommit,
 } from '../support/diagnostics.mjs';
-import { assertNoRuntimeFailures, captureRuntimeFailures, gotoAtlas } from './runtime.mjs';
+import { assertNoRuntimeFailures, captureRuntimeFailures, gotoAtlas, isQualificationFixtureExecution } from './runtime.mjs';
 
-const ENTRY = '/web/fullworld.html?x=32361&y=32198&floor=-7&zoom=2&mode=map&animation=off&creatures=npc&npcRole=shop';
+const ENTRY = isQualificationFixtureExecution()
+  ? '/web/fullworld.html?x=32369&y=32241&floor=-7&zoom=2&mode=map&animation=off&creatures=npc&npcRole=shop'
+  : '/web/fullworld.html?x=32361&y=32198&floor=-7&zoom=2&mode=map&animation=off&creatures=npc&npcRole=shop';
 const TOLERANCE_PX = 0.25;
 
 async function resizeAndAlign(page, width, height) {

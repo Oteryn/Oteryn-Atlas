@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { validateCreatureSearchCatalog } from '../../src/browser/creature-search.mjs';
-import { validateSemanticSearchIndex } from '../../src/browser/semantic-search.mjs';
+import { searchSemanticIndex, validateSemanticSearchIndex } from '../../src/browser/semantic-search.mjs';
 import { ancillarySourceExpectations, resolveQualificationManifestTrust } from '../../src/browser/fullworld-trust.mjs';
 
 const hash = (digit) => `sha256:${digit.repeat(64)}`;
@@ -37,6 +37,13 @@ test('semantic search accepts fixture-owned index only under qualification expec
 
 test('semantic search production default rejects fixture-owned index', () => {
   assert.throws(() => validateSemanticSearchIndex(semanticIndex()), /authority|contract|revision/i);
+});
+
+test('semantic search query preserves the already-bound qualification source expectations', () => {
+  const index = validateSemanticSearchIndex(semanticIndex(), expected);
+  const result = searchSemanticIndex(index, 'Fixture Harbor', { expectedSource: expected });
+  assert.equal(result.mode, 'semantic');
+  assert.equal(result.results[0]?.label, 'Fixture Harbor');
 });
 
 test('creature search catalog binds qualification contract, digest and fixture identity', () => {

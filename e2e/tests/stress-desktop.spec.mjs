@@ -13,9 +13,11 @@ import {
   parseReplayActionLog,
   serializeActionLog,
 } from '../support/seeded-actions.mjs';
-import { assertNoRuntimeFailures, captureRuntimeFailures, gotoAtlas } from './runtime.mjs';
+import { DESKTOP_ENTRY, assertNoRuntimeFailures, captureRuntimeFailures, gotoAtlas, isQualificationFixtureExecution } from './runtime.mjs';
 
-const ENTRY = '/web/fullworld.html?x=33018&y=32009&floor=-7&zoom=2&mode=map&animation=off&creatures=npc,monster';
+const ENTRY = isQualificationFixtureExecution()
+  ? `${DESKTOP_ENTRY}&animation=off&creatures=npc,monster`
+  : '/web/fullworld.html?x=33018&y=32009&floor=-7&zoom=2&mode=map&animation=off&creatures=npc,monster';
 const DEFAULT_SEED = 0x85;
 const DEFAULT_LENGTH = 18;
 const TOLERANCE_PX = 0.25;

@@ -13,9 +13,11 @@ import {
   stopPerformanceProbe,
 } from '../support/performance.mjs';
 import { waitForCreatureAlignedToBase, waitForCreatureCommit, waitForRendererCommit } from '../support/diagnostics.mjs';
-import { assertNoRuntimeFailures, captureRuntimeFailures, gotoAtlas, waitForAtlas } from './runtime.mjs';
+import { DESKTOP_ENTRY, assertNoRuntimeFailures, captureRuntimeFailures, gotoAtlas, isQualificationFixtureExecution, waitForAtlas } from './runtime.mjs';
 
-const ENTRY = '/web/fullworld.html?x=33018&y=32009&floor=-7&zoom=2&mode=map&animation=off&creatures=npc,monster';
+const ENTRY = isQualificationFixtureExecution()
+  ? `${DESKTOP_ENTRY}&animation=off&creatures=npc,monster`
+  : '/web/fullworld.html?x=33018&y=32009&floor=-7&zoom=2&mode=map&animation=off&creatures=npc,monster';
 const SOAK_CYCLES = 4;
 const STRUCTURAL_GROWTH_FIELDS = Object.freeze(['retainedChunks', 'retainedGroups', 'rangeCacheBytes', 'creatureCacheChunks']);
 

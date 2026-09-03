@@ -20,7 +20,17 @@ import {
 } from '../support/creature-presentation-verification.mjs';
 import { captureUserVisualEvidence } from '../support/user-acceptance.mjs';
 import { waitForCreatureAlignedToBase } from '../support/diagnostics.mjs';
-import { assertNoRuntimeFailures, captureRuntimeFailures, gotoAtlas, waitForAtlas } from './runtime.mjs';
+import {
+  assertNoRuntimeFailures,
+  captureRuntimeFailures,
+  gotoAtlas,
+  isQualificationFixtureExecution,
+  waitForAtlas,
+} from './runtime.mjs';
+
+const MONSTER_PLAYBACK_ENTRY = isQualificationFixtureExecution()
+  ? '/web/fullworld.html?x=32369&y=32241&floor=-7&zoom=2&mode=map&animation=off&creatures=monster'
+  : '/web/fullworld.html?x=32831&y=32596&floor=-12&zoom=2&mode=map&animation=off&creatures=monster';
 
 async function openScenario(page, entry) {
   await gotoAtlas(page, entry);
@@ -294,7 +304,7 @@ test('desktop selection, camera/floor changes and animation preserve layout-life
   expect(state.selectedRecordId).toBe(TWO_ROLE_NPC.record_id);
   expect(labelLayoutFor(state, TWO_ROLE_NPC.record_id)?.priority).toBe('selected');
 
-  state = await openScenario(page, '/web/fullworld.html?x=32831&y=32596&floor=-12&zoom=2&mode=map&animation=off&creatures=monster');
+  state = await openScenario(page, MONSTER_PLAYBACK_ENTRY);
   render = assertPresentationContract(state);
   expect(state.pixelDrawnRecords, 'animation layout probe requires factual pixel-rendered creatures').toBeGreaterThan(0);
   const stableLayoutGeneration = render.labelLayoutGeneration;
