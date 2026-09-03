@@ -140,21 +140,11 @@ test('authority-only repin verifier accepts only the same digest literal replace
   }), /digest-only|authority.*repin|byte/i);
 });
 
-test('hosted gate accepts only the protected complete-browser authority repin producer', () => {
-  const result = protectedGate.validateProtectedProductQualificationGate(authorityGateFixture());
-  assert.equal(result.status, 'success');
-  assert.equal(result.mode, 'protected-authority-repin-qualification');
-  assert.equal(result.qualificationId, 'qualification-live-digest-authority-v1');
-  assert.equal(result.sourceHeadRef, SOURCE_HEAD_REF);
-  assert.equal(result.producerRunAttempt, 1);
-
-  const valid = authorityGateFixture();
-  assert.throws(() => protectedGate.validateProtectedProductQualificationGate(authorityGateFixture({
-    producerJobs: { jobs: [{ ...valid.producerJobs.jobs[0], conclusion: 'failure' }] },
-  })), /proof job|successful/i);
-  assert.throws(() => protectedGate.validateProtectedProductQualificationGate(authorityGateFixture({
-    status: { ...valid.status, description: 'weaker authority proof' },
-  })), /status|authoritative/i);
+test('historical authority repin proof is not an active product-qualification admission path', () => {
+  assert.throws(
+    () => protectedGate.validateProtectedProductQualificationGate(authorityGateFixture()),
+    /status|producer|qualification repair/i,
+  );
 });
 
 test('protected promotion workflow proves authority repin against its exact source PR without Molehill or FullWorld', () => {

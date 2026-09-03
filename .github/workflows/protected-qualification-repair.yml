@@ -1,0 +1,354 @@
+name: Protected qualification repair
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+    paths:
+      - src/browser/animation-runtime-service.mjs
+      - src/browser/fullworld-trust.mjs
+      - src/browser/semantic-search.mjs
+      - tools/verification/qualification-fixture-definition.mjs
+      - tools/verification/qualification-world.mjs
+      - web/fullworld-creatures.mjs
+      - web/fullworld-farm-explorer.mjs
+      - web/fullworld-search.mjs
+
+permissions:
+  contents: read
+
+concurrency:
+  group: atlas-protected-qualification-repair-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  qualification-repair:
+    name: Protected qualification repair
+    if: >-
+      github.event.pull_request.base.ref == 'main' &&
+      github.event.pull_request.base.repo.full_name == github.repository &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      pull-requests: read
+      statuses: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      ATLAS_PR_NUMBER: ${{ github.event.pull_request.number }}
+      ATLAS_CODE_REVISION: ${{ github.event.pull_request.head.sha }}
+      ATLAS_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      ATLAS_CHANGED_FILE_COUNT: ${{ github.event.pull_request.changed_files }}
+      ATLAS_CANDIDATE_IMAGE: mcr.microsoft.com/playwright:v1.62.0-noble@sha256:baed2032d533817f3dbe6425de795788430ba345e819a1201337009ba17c9d07
+    steps:
+      - name: Check out exact protected-base authority
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+          path: trusted-base
+
+      - name: Check out exact candidate as untrusted repair data
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+          path: candidate
+
+      - name: Fence exact candidate before admission
+        shell: bash
+        run: |
+          set -euo pipefail
+          payload="$RUNNER_TEMP/atlas-qualification-repair-pr-before.json"
+          gh api "repos/$GITHUB_REPOSITORY/pulls/$ATLAS_PR_NUMBER" > "$payload"
+          node trusted-base/tools/verification/assert-current-pr-head.mjs \
+            --payload "$payload" \
+            --repository "$GITHUB_REPOSITORY" \
+            --pr-number "$ATLAS_PR_NUMBER" \
+            --expected-head-sha "$ATLAS_CODE_REVISION"
+          test "$(git -C candidate rev-parse HEAD)" = "$ATLAS_CODE_REVISION"
+          test "$(git -C trusted-base rev-parse HEAD)" = "$ATLAS_BASE_SHA"
+
+      - name: Admit only exact-scope monotonic qualification repair
+        id: admission
+        shell: bash
+        run: |
+          set -euo pipefail
+          changes="$RUNNER_TEMP/atlas-qualification-repair-changes.json"
+          admission="$RUNNER_TEMP/atlas-qualification-repair-admission.json"
+          gh api --paginate --slurp \
+            "repos/$GITHUB_REPOSITORY/pulls/$ATLAS_PR_NUMBER/files?per_page=100" \
+            --jq '[.[][] | {path: .filename, previousPath: (.previous_filename // null)}]' > "$changes"
+          test "$(jq 'length' "$changes")" = "$ATLAS_CHANGED_FILE_COUNT"
+          merge_base="$(git -C candidate merge-base HEAD "$ATLAS_BASE_SHA")"
+          [[ "$merge_base" =~ ^[a-f0-9]{40}$ ]]
+          ATLAS_MERGE_BASE_SHA="$merge_base" node --input-type=module - "$changes" "$admission" <<'NODE'
+          import fs from 'node:fs';
+          import { buildVerificationPlan } from './trusted-base/tools/verification/build-verification-plan.mjs';
+          import { validateQualificationRepairTransition } from './trusted-base/tools/verification/qualification-repair-policy.mjs';
+          const read = (target) => JSON.parse(fs.readFileSync(target, 'utf8'));
+          const [changesPath, outputPath] = process.argv.slice(2);
+          const changes = read(changesPath);
+          const trustedImpact = read('./trusted-base/tools/verification/impact-manifest.json');
+          const candidateImpact = read('./candidate/tools/verification/impact-manifest.json');
+          const trustedCatalog = read('./trusted-base/tools/verification/verification-catalog.json');
+          const candidateCatalog = read('./candidate/tools/verification/verification-catalog.json');
+          const common = {
+            repository: process.env.GITHUB_REPOSITORY,
+            headSha: process.env.ATLAS_CODE_REVISION,
+            integrationBaseSha: process.env.ATLAS_BASE_SHA,
+            mergeBaseSha: process.env.ATLAS_MERGE_BASE_SHA,
+            changedFiles: changes,
+            requiredGroupFloor: ['deterministic.core', 'e2e.full'],
+          };
+          const protectedPlan = buildVerificationPlan({
+            ...common,
+            trustedImpactManifest: trustedImpact,
+            candidateImpactManifest: trustedImpact,
+            trustedVerificationCatalog: trustedCatalog,
+            candidateVerificationCatalog: trustedCatalog,
+          });
+          const candidatePlan = buildVerificationPlan({
+            ...common,
+            trustedImpactManifest: trustedImpact,
+            candidateImpactManifest: candidateImpact,
+            trustedVerificationCatalog: trustedCatalog,
+            candidateVerificationCatalog: candidateCatalog,
+          });
+          const changedPaths = [...new Set(changes.flatMap(({ path, previousPath }) => [path, previousPath].filter(Boolean)))].sort();
+          const result = validateQualificationRepairTransition({ changedPaths, protectedPlan, candidatePlan });
+          fs.writeFileSync(outputPath, `${JSON.stringify({ ...result, protectedPlan, candidatePlan }, null, 2)}\n`, 'utf8');
+          NODE
+          test "$(jq -r '.eligible' "$admission")" = true
+          printf 'admission_path=%s\n' "$admission" >> "$GITHUB_OUTPUT"
+
+      - name: Materialize protected execution context with admitted candidate overlay
+        id: context
+        shell: bash
+        run: |
+          set -euo pipefail
+          admission="${{ steps.admission.outputs.admission_path }}"
+          execution_context="$RUNNER_TEMP/atlas-qualification-repair-context"
+          rm -rf "$execution_context"
+          mkdir -p "$execution_context"
+          rsync -a --delete --exclude='.git' --exclude='e2e/node_modules' trusted-base/ "$execution_context/"
+          while IFS= read -r relative; do
+            test -f "candidate/$relative"
+            test ! -L "candidate/$relative"
+            mkdir -p "$execution_context/$(dirname "$relative")"
+            cp "candidate/$relative" "$execution_context/$relative"
+          done < <(jq -r '.changedPaths[]' "$admission")
+          printf 'execution_context=%s\n' "$execution_context" >> "$GITHUB_OUTPUT"
+
+      - name: Rebuild exact repair fixture in networkless read-only sandbox
+        id: fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          execution_context="${{ steps.context.outputs.execution_context }}"
+          source_root="$RUNNER_TEMP/atlas-qualification-repair-world"
+          trust_dir="$RUNNER_TEMP/atlas-qualification-repair-trust"
+          trust_path="$trust_dir/qualification_fixture.json"
+          rm -rf "$source_root" "$trust_dir"
+          mkdir -p "$source_root" "$trust_dir"
+          chmod 0777 "$source_root" "$trust_dir"
+          proof="$RUNNER_TEMP/atlas-qualification-repair-product-proof.mjs"
+          cat > "$proof" <<'NODE'
+          import fs from 'node:fs';
+          import { resolveFullWorldTrust } from '/trusted/src/browser/fullworld-trust.mjs';
+          import { buildQualificationWorld, qualificationTrustDescriptor, verifyQualificationWorld } from '/candidate/tools/verification/qualification-world.mjs';
+          const built = await buildQualificationWorld('/out/product');
+          const verified = await verifyQualificationWorld('/out/product');
+          if (built.productDigest !== verified.productDigest) throw new TypeError('qualification repair product is not deterministic');
+          const descriptor = qualificationTrustDescriptor(verified);
+          const trust = resolveFullWorldTrust({ __OTERYN_ATLAS_QUALIFICATION_TRUST__: descriptor });
+          if (trust.dataCapability !== 'qualification_fixture' || trust.qualificationProductDigest !== verified.productDigest) {
+            throw new TypeError('protected trust rejected qualification repair fixture');
+          }
+          fs.writeFileSync('/out/qualification_fixture.json', `${JSON.stringify(descriptor)}\n`, 'utf8');
+          NODE
+          timeout --signal=KILL 180s docker run --rm \
+            --network none --read-only --cap-drop ALL --security-opt no-new-privileges \
+            --pids-limit 192 --memory 1024m --cpus 2 --user 1000:1000 \
+            --tmpfs /tmp:rw,nosuid,nodev,size=128m \
+            --mount "type=bind,src=$PWD/trusted-base,dst=/trusted,readonly" \
+            --mount "type=bind,src=$execution_context,dst=/candidate,readonly" \
+            --mount "type=bind,src=$proof,dst=/proof.mjs,readonly" \
+            --mount "type=bind,src=$source_root,dst=/out" \
+            "$ATLAS_CANDIDATE_IMAGE" node /proof.mjs
+          test -s "$source_root/qualification_fixture.json"
+          mv "$source_root/qualification_fixture.json" "$trust_path"
+          printf 'source_root=%s\ntrust_path=%s\n' "$source_root/product" "$trust_path" >> "$GITHUB_OUTPUT"
+
+      - name: Run protected deterministic regressions against admitted overlay
+        shell: bash
+        run: |
+          set -euo pipefail
+          execution_context="${{ steps.context.outputs.execution_context }}"
+          timeout --signal=KILL 180s docker run --rm \
+            --network none --read-only --cap-drop ALL --security-opt no-new-privileges \
+            --pids-limit 256 --memory 1536m --cpus 2 --user 1000:1000 \
+            --tmpfs /tmp:rw,nosuid,nodev,size=256m \
+            --mount "type=bind,src=$execution_context,dst=/candidate,readonly" \
+            "$ATLAS_CANDIDATE_IMAGE" \
+            bash -lc 'set -euo pipefail
+              cd /candidate
+              mkdir -p /tmp/atlas-python-bin /tmp/atlas-python-pycache
+              ln -s /usr/bin/python3 /tmp/atlas-python-bin/python
+              export PATH="/tmp/atlas-python-bin:$PATH"
+              export PYTHONPYCACHEPREFIX=/tmp/atlas-python-pycache
+              node --test tests/verification/*.test.mjs'
+
+      - name: Resolve exact protected e2e.full stable test list
+        id: tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci --prefix trusted-base/e2e --ignore-scripts --no-audit --no-fund
+          full_list="$RUNNER_TEMP/atlas-qualification-repair-full-list.txt"
+          qualification_list="$RUNNER_TEMP/atlas-qualification-repair-e2e-full.txt"
+          (
+            cd trusted-base
+            ATLAS_ARTIFACTS_DIR="$RUNNER_TEMP/atlas-qualification-repair-list-artifacts" \
+              npm exec --prefix e2e -- playwright test --config=e2e/playwright.config.mjs --list
+          ) > "$full_list"
+          FULL_LIST="$full_list" QUALIFICATION_LIST="$qualification_list" node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const catalog = JSON.parse(fs.readFileSync('./trusted-base/tools/verification/verification-catalog.json', 'utf8'));
+          const specs = new Set(catalog.groups?.['e2e.full']?.specs ?? []);
+          if (!specs.size) throw new TypeError('protected e2e.full qualification catalog is empty');
+          const selected = [];
+          for (const line of fs.readFileSync(process.env.FULL_LIST, 'utf8').split(/\r?\n/)) {
+            const match = line.match(/^\s*\[([^\]]+)\]\s+›\s+([^:]+):\d+:\d+\s+›\s+(.+)$/);
+            if (!match) continue;
+            if (specs.has(`e2e/tests/${match[2]}`)) selected.push(line.trim());
+          }
+          if (!selected.length) throw new TypeError('protected e2e.full qualification selection is empty');
+          fs.writeFileSync(process.env.QUALIFICATION_LIST, `${selected.join('\n')}\n`, 'utf8');
+          NODE
+          test -s "$qualification_list"
+          printf 'qualification_list=%s\n' "$qualification_list" >> "$GITHUB_OUTPUT"
+
+      - name: Bind protected authority and exact repair instance identities
+        id: identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          identity_dir="$RUNNER_TEMP/atlas-qualification-repair-identities"
+          mkdir -p "$identity_dir"
+          IDENTITY_DIR="$identity_dir" \
+          ADMISSION_PATH="${{ steps.admission.outputs.admission_path }}" \
+          TRUST_PATH="${{ steps.fixture.outputs.trust_path }}" \
+          TEST_LIST="${{ steps.tests.outputs.qualification_list }}" \
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import path from 'node:path';
+          import { bytesDigest, canonicalDigest } from './trusted-base/tools/verification/anti-loop-common.mjs';
+          import { buildProtectedExecutionEnvironmentIdentity } from './trusted-base/tools/verification/protected-execution-environment.mjs';
+          import { buildVerificationAuthorityIdentity } from './trusted-base/tools/verification/verification-authority.mjs';
+          const read = (target) => JSON.parse(fs.readFileSync(target, 'utf8'));
+          const authority = await buildVerificationAuthorityIdentity({
+            manifest: read('./trusted-base/tools/verification/verification-authority-manifest.json'),
+            readFile: async (relative) => fs.readFileSync(path.join('trusted-base', relative)),
+          });
+          const environment = buildProtectedExecutionEnvironmentIdentity(read('./trusted-base/tools/verification/protected-execution-environment.json'));
+          const admission = read(process.env.ADMISSION_PATH);
+          const trust = read(process.env.TRUST_PATH);
+          const semanticCore = {
+            schemaVersion: 1,
+            identityId: 'atlas-protected-qualification-repair-semantic-v1',
+            repository: process.env.GITHUB_REPOSITORY,
+            candidateHeadSha: process.env.ATLAS_CODE_REVISION,
+            authorityDigest: authority.authorityDigest,
+            environmentDigest: environment.environmentDigest,
+            dataCapability: 'qualification_fixture',
+            productDigest: trust.productDigest,
+            changedPaths: admission.changedPaths,
+            protectedTestListDigest: bytesDigest(fs.readFileSync(process.env.TEST_LIST)),
+            execution: { shard: '1/1', workers: 1, retries: 0 },
+          };
+          const semantic = { ...semanticCore, planSemanticDigest: canonicalDigest(semanticCore) };
+          const instanceCore = {
+            schemaVersion: 1,
+            identityId: 'atlas-protected-qualification-repair-instance-v1',
+            repository: process.env.GITHUB_REPOSITORY,
+            protectedBaseSha: process.env.ATLAS_BASE_SHA,
+            candidateHeadSha: process.env.ATLAS_CODE_REVISION,
+            planSemanticDigest: semantic.planSemanticDigest,
+            runId: String(process.env.GITHUB_RUN_ID),
+            runAttempt: Number(process.env.GITHUB_RUN_ATTEMPT),
+          };
+          const instance = { ...instanceCore, planInstanceDigest: canonicalDigest(instanceCore) };
+          fs.writeFileSync(path.join(process.env.IDENTITY_DIR, 'authority.json'), `${JSON.stringify(authority, null, 2)}\n`);
+          fs.writeFileSync(path.join(process.env.IDENTITY_DIR, 'environment.json'), `${JSON.stringify(environment, null, 2)}\n`);
+          fs.writeFileSync(path.join(process.env.IDENTITY_DIR, 'semantic.json'), `${JSON.stringify(semantic, null, 2)}\n`);
+          fs.writeFileSync(path.join(process.env.IDENTITY_DIR, 'instance.json'), `${JSON.stringify(instance, null, 2)}\n`);
+          NODE
+          printf 'identity_dir=%s\n' "$identity_dir" >> "$GITHUB_OUTPUT"
+
+      - name: Prove complete protected qualification safety net in Chromium
+        shell: bash
+        run: |
+          set -euo pipefail
+          execution_context="${{ steps.context.outputs.execution_context }}"
+          source_root="${{ steps.fixture.outputs.source_root }}"
+          trust_path="${{ steps.fixture.outputs.trust_path }}"
+          qualification_list="${{ steps.tests.outputs.qualification_list }}"
+          identity_dir="${{ steps.identity.outputs.identity_dir }}"
+          artifacts="$RUNNER_TEMP/atlas-qualification-repair-browser-artifacts"
+          mkdir -p "$artifacts"
+          rm -rf "$execution_context/e2e/node_modules"
+          export COMPOSE_PROJECT_NAME="atlas-qualification-repair-${GITHUB_RUN_ID}"
+          export ATLAS_CODE_REVISION="$ATLAS_CODE_REVISION"
+          export ATLAS_PLAN_SEMANTIC_DIGEST="$(jq -er '.planSemanticDigest' "$identity_dir/semantic.json")"
+          export ATLAS_PLAN_INSTANCE_DIGEST="$(jq -er '.planInstanceDigest' "$identity_dir/instance.json")"
+          export ATLAS_AUTHORITY_DIGEST="$(jq -er '.authorityDigest' "$identity_dir/authority.json")"
+          export ATLAS_ENVIRONMENT_DIGEST="$(jq -er '.environmentDigest' "$identity_dir/environment.json")"
+          export ATLAS_E2E_SHARD='1/1'
+          export ATLAS_E2E_WORKERS='1'
+          export ATLAS_QUALIFICATION_PUBLICATION_HOST="$source_root"
+          export ATLAS_QUALIFICATION_TRUST_JSON="$(jq -c . "$trust_path")"
+          export ATLAS_EXECUTION_CONTEXT="$execution_context"
+          export ATLAS_E2E_ARTIFACTS_HOST="$artifacts"
+          export ATLAS_PROTECTED_TEST_LIST="$qualification_list"
+          compose_down() {
+            docker compose \
+              -f trusted-base/e2e/compose.protected-hosted-executor.yml \
+              -f trusted-base/e2e/compose.github-hosted.yml \
+              down -v --remove-orphans >/dev/null 2>&1 || true
+          }
+          trap compose_down EXIT
+          compose_down
+          docker compose \
+            -f trusted-base/e2e/compose.protected-hosted-executor.yml \
+            -f trusted-base/e2e/compose.github-hosted.yml \
+            up -d --wait atlas-publication atlas-web
+          docker compose \
+            -f trusted-base/e2e/compose.protected-hosted-executor.yml \
+            -f trusted-base/e2e/compose.github-hosted.yml \
+            build e2e
+          docker compose \
+            -f trusted-base/e2e/compose.protected-hosted-executor.yml \
+            -f trusted-base/e2e/compose.github-hosted.yml \
+            run --rm e2e \
+            bash -lc 'exec ./node_modules/.bin/playwright test --config=playwright.config.mjs --test-list=/run/atlas-protected-test-list.txt --workers=1 --retries=0'
+
+      - name: Fence exact head and publish generic protected qualification evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          payload="$RUNNER_TEMP/atlas-qualification-repair-pr-after.json"
+          gh api "repos/$GITHUB_REPOSITORY/pulls/$ATLAS_PR_NUMBER" > "$payload"
+          node trusted-base/tools/verification/assert-current-pr-head.mjs \
+            --payload "$payload" \
+            --repository "$GITHUB_REPOSITORY" \
+            --pr-number "$ATLAS_PR_NUMBER" \
+            --expected-head-sha "$ATLAS_CODE_REVISION"
+          gh api --method POST \
+            "repos/$GITHUB_REPOSITORY/statuses/$ATLAS_CODE_REVISION" \
+            -f state='success' \
+            -f context='atlas-protected-product-qualification' \
+            -f description='Protected GitHub-hosted qualification repair safety net' \
+            -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"

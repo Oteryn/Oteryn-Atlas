@@ -1,16 +1,24 @@
 import { loadAnimationRuntime } from './animation-runtime.mjs';
 
 let shared = null;
-let sharedBase = null;
+let sharedIdentity = null;
 
-export function getAnimationRuntime(baseUrl, fetcher = fetch) {
+function runtimeIdentity(base, expectedSource) {
+  if (expectedSource == null) return `${base}\nproduction-default`;
+  return `${base}\n${expectedSource.gameSha ?? ''}\n${expectedSource.appearanceProductRoot ?? ''}\n${expectedSource.outfitSpatialProductRoot ?? ''}`;
+}
+
+export function getAnimationRuntime(baseUrl, fetcher = fetch, expectedSource = undefined) {
   const base = new URL(baseUrl).href;
-  if (sharedBase != null && sharedBase !== base) throw new Error('animation runtime base changed after initialization');
+  const identity = runtimeIdentity(base, expectedSource);
+  if (sharedIdentity != null && sharedIdentity !== identity) {
+    throw new Error('animation runtime identity changed after initialization');
+  }
   if (shared == null) {
-    sharedBase = base;
-    shared = loadAnimationRuntime(new URL(base), fetcher).catch((error) => {
+    sharedIdentity = identity;
+    shared = loadAnimationRuntime(new URL(base), fetcher, expectedSource).catch((error) => {
       shared = null;
-      sharedBase = null;
+      sharedIdentity = null;
       throw error;
     });
   }

@@ -7,7 +7,6 @@ import {
 } from './anti-loop-common.mjs';
 import { validateEvidenceManifest } from './evidence-manifest.mjs';
 import { validateProtectedExecutionEnvironmentQualification } from './protected-execution-environment.mjs';
-import { resolveProtectedAuthorityRepinQualification, resolveProtectedPromotionQualification } from './protected-hosted-execution.mjs';
 import { validateProtectedHostedEvidenceFanIn } from './protected-hosted-fan-in.mjs';
 import {
   validateProtectedVerificationState,
@@ -16,6 +15,10 @@ import {
 import { canonicalJson } from './verification-plan-schema.mjs';
 
 const EXECUTOR_WORKFLOW_PATH = '.github/workflows/protected-hosted-executor.yml';
+const QUALIFICATION_REPAIR_WORKFLOW_PATH = '.github/workflows/protected-qualification-repair.yml';
+const QUALIFICATION_REPAIR_STATUS_CONTEXT = 'atlas-protected-product-qualification';
+const QUALIFICATION_REPAIR_STATUS_DESCRIPTION = 'Protected GitHub-hosted qualification repair safety net';
+const QUALIFICATION_REPAIR_JOB_NAME = 'Protected qualification repair';
 const PRODUCER_EVENTS = new Set(['workflow_run', 'workflow_dispatch']);
 const SUCCESS_PROGRESS = new Set(['QUALIFIED', 'MERGE_READY']);
 
@@ -86,6 +89,7 @@ function validateAvailability(manifest, now) {
     throw new TypeError(`protected hosted gate evidence is expired: ${manifest.evidenceId}`);
   }
 }
+
 function expectedHostedProducts(plan, execution) {
   const capabilities = exactArray(
     execution.hosted.partitions.map(({ dataCapability }) => dataCapability),
@@ -136,6 +140,7 @@ function validateFanInEvidence(payload, state, now) {
   );
   return evidence;
 }
+
 export function validateProtectedHostedGate(input) {
   if (!isPlainObject(input)) throw new TypeError('protected hosted gate input is invalid');
   const repository = nonEmptyString(input.expectedRepository, 'protected hosted gate repository');
@@ -233,99 +238,71 @@ export function validateProtectedHostedGate(input) {
   });
 }
 
-
 export function validateProtectedProductQualificationGate(input) {
-  if (!isPlainObject(input)) throw new TypeError('protected product qualification gate input is invalid');
-  const repository = nonEmptyString(input.expectedRepository, 'protected product qualification gate repository');
-  if (repository !== 'Oteryn/Oteryn-Atlas') throw new TypeError('protected product qualification gate repository is invalid');
-  const prNumber = exactPositiveInteger(input.expectedPrNumber, 'protected product qualification gate PR number');
-  const candidateHeadSha = exactSha(input.expectedCandidateHeadSha, 'protected product qualification gate candidate head');
-  const protectedBaseSha = exactSha(input.expectedProtectedBaseSha, 'protected product qualification gate protected base');
+  if (!isPlainObject(input)) throw new TypeError('protected qualification repair gate input is invalid');
+  const repository = nonEmptyString(input.expectedRepository, 'protected qualification repair gate repository');
+  if (repository !== 'Oteryn/Oteryn-Atlas') throw new TypeError('protected qualification repair gate repository is invalid');
+  const prNumber = exactPositiveInteger(input.expectedPrNumber, 'protected qualification repair gate PR number');
+  const candidateHeadSha = exactSha(input.expectedCandidateHeadSha, 'protected qualification repair gate candidate head');
+  const protectedBaseSha = exactSha(input.expectedProtectedBaseSha, 'protected qualification repair gate protected base');
 
-  validateLivePr(input.livePr, {
-    repository, prNumber, candidateHeadSha, protectedBaseSha,
-  });
-  const headRef = nonEmptyString(input.livePr.head?.ref, 'protected product qualification gate head ref');
-  let qualification;
-  let mode = 'protected-product-qualification';
-  try {
-    qualification = resolveProtectedPromotionQualification(headRef);
-  } catch (promotionError) {
-    try {
-      qualification = resolveProtectedAuthorityRepinQualification(headRef);
-      mode = 'protected-authority-repin-qualification';
-    } catch {
-      throw promotionError;
-    }
-  }
-  const proof = qualification.gateProof;
-  const expectedProofKind = mode === 'protected-authority-repin-qualification'
-    ? 'complete-hosted-browser-authority-repin-v1'
-    : 'complete-hosted-browser-v1';
-  if (!isPlainObject(proof) || proof.kind !== expectedProofKind) {
-    throw new TypeError('protected product qualification is not an authoritative complete hosted browser gate proof');
-  }
-  if (qualification.headRef !== headRef) throw new TypeError('protected product qualification head ref mismatch');
+  validateLivePr(input.livePr, { repository, prNumber, candidateHeadSha, protectedBaseSha });
 
   const status = input.status;
   if (!isPlainObject(status)
     || status.state !== 'success'
-    || status.context !== proof.statusContext
-    || status.description !== proof.statusDescription
+    || status.context !== QUALIFICATION_REPAIR_STATUS_CONTEXT
+    || status.description !== QUALIFICATION_REPAIR_STATUS_DESCRIPTION
     || status.creator?.login !== 'github-actions[bot]') {
-    throw new TypeError('protected product qualification commit status is not authoritative');
+    throw new TypeError('protected qualification repair commit status is not authoritative');
   }
 
   const run = input.producerRun;
   if (!isPlainObject(run)
     || run.status !== 'completed'
     || run.conclusion !== 'success'
-    || run.path !== proof.workflowPath
-    || run.event !== proof.event
+    || run.path !== QUALIFICATION_REPAIR_WORKFLOW_PATH
+    || run.event !== 'pull_request_target'
     || run.repository?.full_name !== repository
     || run.head_branch !== 'main') {
-    throw new TypeError('protected product qualification producer run is not authoritative');
+    throw new TypeError('protected qualification repair producer run is not authoritative');
   }
-  const runId = exactPositiveInteger(Number(run.id), 'protected product qualification producer run ID');
-  const runAttempt = exactPositiveInteger(Number(run.run_attempt), 'protected product qualification producer run attempt');
-  if (runAttempt !== 1) throw new TypeError('protected product qualification producer run must be attempt 1');
-  if (exactSha(run.head_sha, 'protected product qualification producer base') !== protectedBaseSha) {
-    throw new TypeError('protected product qualification producer base is stale');
+  const runId = exactPositiveInteger(Number(run.id), 'protected qualification repair producer run ID');
+  const runAttempt = exactPositiveInteger(Number(run.run_attempt), 'protected qualification repair producer run attempt');
+  if (runAttempt !== 1) throw new TypeError('protected qualification repair producer run must be attempt 1');
+  if (exactSha(run.head_sha, 'protected qualification repair producer base') !== protectedBaseSha) {
+    throw new TypeError('protected qualification repair producer base is stale');
   }
   const expectedTarget = `https://github.com/${repository}/actions/runs/${runId}`;
-  if (status.target_url !== expectedTarget) throw new TypeError('protected product qualification status target run mismatch');
+  if (status.target_url !== expectedTarget) throw new TypeError('protected qualification repair status target run mismatch');
 
   const associations = Array.isArray(run.pull_requests) ? run.pull_requests : [];
   const association = associations.find((item) => item?.number === prNumber);
   if (!association
     || association.head?.repo?.full_name !== repository
     || association.base?.repo?.full_name !== repository
-    || exactSha(association.head?.sha, 'protected product qualification associated head') !== candidateHeadSha
-    || exactSha(association.base?.sha, 'protected product qualification associated base') !== protectedBaseSha) {
-    throw new TypeError('protected product qualification producer PR association mismatch');
+    || exactSha(association.head?.sha, 'protected qualification repair associated head') !== candidateHeadSha
+    || exactSha(association.base?.sha, 'protected qualification repair associated base') !== protectedBaseSha) {
+    throw new TypeError('protected qualification repair producer PR association mismatch');
   }
 
   const jobs = input.producerJobs?.jobs;
-  if (!Array.isArray(jobs)) throw new TypeError('protected product qualification producer jobs are invalid');
-  const proofJobs = jobs.filter((job) => job?.name === proof.jobName);
+  if (!Array.isArray(jobs)) throw new TypeError('protected qualification repair producer jobs are invalid');
+  const proofJobs = jobs.filter((job) => job?.name === QUALIFICATION_REPAIR_JOB_NAME);
   if (proofJobs.length !== 1
     || proofJobs[0].status !== 'completed'
     || proofJobs[0].conclusion !== 'success') {
-    throw new TypeError('protected product qualification complete browser proof job is not successful');
+    throw new TypeError('protected qualification repair proof job is not successful');
   }
 
   return deepFreeze({
     schemaVersion: 1,
     status: 'success',
-    mode,
+    mode: 'protected-qualification-repair',
     repository,
     prNumber,
     protectedBaseSha,
     candidateHeadSha,
-    qualificationId: qualification.id,
-    ...(mode === 'protected-authority-repin-qualification'
-      ? { sourceHeadRef: qualification.sourceHeadRef }
-      : { productDigest: qualification.expectedProductDigest }),
     producerRunId: runId,
     producerRunAttempt: runAttempt,
   });

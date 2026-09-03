@@ -367,6 +367,14 @@
       "path": "tools/verification/qualification-fixture-definition.mjs"
     },
     {
+      "id": "qualification-repair-policy",
+      "path": "tools/verification/qualification-repair-policy.mjs"
+    },
+    {
+      "id": "qualification-repair-workflow",
+      "path": ".github/workflows/protected-qualification-repair.yml"
+    },
+    {
       "id": "qualification-world",
       "path": "tools/verification/qualification-world.mjs"
     },

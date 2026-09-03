@@ -1,6 +1,6 @@
 import { sha256ContentId } from '../src/browser/loader.mjs';
 import { getAnimationRuntime } from '../src/browser/animation-runtime-service.mjs';
-import { FULLWORLD_PATHS } from '../src/browser/fullworld-trust.mjs';
+import { ancillarySourceExpectations, FULLWORLD_PATHS, FULLWORLD_TRUST } from '../src/browser/fullworld-trust.mjs';
 import { createCreatureRenderSnapshot } from '../src/browser/creature-render-diagnostics.mjs';
 import { buildCreatureInteractionIndex, createClosedCreatureCardState, placeCreatureCard, queryCreatureHits, reduceCreatureCardState } from '../src/browser/creature-interaction.mjs';
 import { createCreatureInteractionTarget } from '../src/browser/creature-interaction-target.mjs';
@@ -12,10 +12,7 @@ import { createCreatureGameplayInspectorController } from './fullworld-creature-
 
 const ROOT = new URL('../data/creatures/', location.href);
 const GAMEPLAY_ROOT = new URL('./creature-gameplay/', import.meta.url);
-const EXPECTED_CONTRACT = 'oteryn-game-atlas-export-v1';
-const EXPECTED_CAPABILITY = 'animated-creatures-v1';
-const EXPECTED_SEMANTIC_DIGEST = 'sha256:7dc951874c95424279737eaaf51cf2d50940162ef4799daea39a187a581ef0e8';
-const EXPECTED_NPC_ROLE_SCHEMA = 1;
+const SOURCE_EXPECTATIONS = ancillarySourceExpectations(FULLWORLD_TRUST);
 const MAX_INDEX_CHUNKS = 20_000;
 const MAX_CHUNK_RECORDS = 5_000;
 const MAX_VISIBLE_CHUNKS = 64;
@@ -290,7 +287,7 @@ function renderCreatureSemantic(panel, record) {
   const verifiedPixel = record.presentation_resolution_state === 'RESOLVED' && state.animationRuntime?.hasCreature(record);
   panel.append(
     createTextRow('Presentation', verifiedPixel ? `Verified outfit pixels · ${state.animationOn ? 'animated' : 'static verified phase'}` : `Factual marker fallback · ${record.presentation_reason ?? record.presentation_resolution_state ?? 'UNKNOWN'}`),
-    createTextRow('Authority', `${EXPECTED_CONTRACT} / ${EXPECTED_CAPABILITY}`),
+    createTextRow('Authority', `${SOURCE_EXPECTATIONS.creatures.contractId} / ${SOURCE_EXPECTATIONS.creatures.capability}`),
     createTextRow('Semantic digest', state.index.source.semantic_digest),
   );
 }
@@ -1028,12 +1025,19 @@ async function boot() {
   try {
     requireValue(!selectedParam || RECORD_ID.test(selectedParam), 'invalid creature deep-link id');
     requireValue([...requested].every((kind) => kind === 'npc' || kind === 'monster'), 'unsupported creature layer');
-    state.animationRuntime = await getAnimationRuntime(new URL(FULLWORLD_PATHS.animation, location.href));
+    state.animationRuntime = await getAnimationRuntime(
+      new URL(FULLWORLD_PATHS.animation, location.href),
+      fetch,
+      SOURCE_EXPECTATIONS.animation,
+    );
     const index = await boundedJson(new URL('index.json', ROOT), MAX_INDEX_BYTES);
+    const expected = SOURCE_EXPECTATIONS.creatures;
     requireValue(index.schema_version === 1, 'unsupported creature index schema');
-    requireValue(index.source?.contract_id === EXPECTED_CONTRACT && index.source?.capability === EXPECTED_CAPABILITY, 'unsupported creature index authority');
-    requireValue(index.source?.semantic_digest === EXPECTED_SEMANTIC_DIGEST, 'untrusted Game creature semantic digest');
-    requireValue(index.source?.npc_role_schema_version === EXPECTED_NPC_ROLE_SCHEMA, 'unsupported Game NPC role schema');
+    requireValue(index.source?.contract_id === expected.contractId && index.source?.capability === expected.capability, 'unsupported creature index authority');
+    requireValue(index.source?.semantic_digest === expected.semanticDigest, 'untrusted Game creature semantic digest');
+    requireValue(index.source?.npc_role_schema_version === expected.npcRoleSchemaVersion, 'unsupported Game NPC role schema');
+    if (expected.fixtureId != null) requireValue(index.source?.fixture_id === expected.fixtureId, 'untrusted creature fixture identity');
+    else requireValue(index.source?.fixture_id == null, 'unexpected creature fixture identity');
     requireValue(index.source?.appearance_product_root === state.animationRuntime.manifest.source.appearance_product_root, 'creature/animation appearance root mismatch');
     requireValue(index.source?.outfit_spatial_product_root === state.animationRuntime.manifest.source.outfit_spatial_product_root, 'creature/animation outfit root mismatch');
     requireValue(Array.isArray(index.chunks) && index.chunks.length === index.counts?.chunks && index.chunks.length <= MAX_INDEX_CHUNKS, 'creature index exceeds bounded chunk cap');
