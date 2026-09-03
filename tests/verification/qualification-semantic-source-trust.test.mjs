@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { createCreatureGameplayProfileService } from '../../src/browser/creature-gameplay-profiles.mjs';
 import { validateCreatureSearchCatalog } from '../../src/browser/creature-search.mjs';
 import { searchSemanticIndex, validateSemanticSearchIndex } from '../../src/browser/semantic-search.mjs';
 import { ancillarySourceExpectations, resolveQualificationManifestTrust } from '../../src/browser/fullworld-trust.mjs';
@@ -50,4 +51,21 @@ test('creature search catalog binds qualification contract, digest and fixture i
   const catalog = validateCreatureSearchCatalog(creatureCatalog(), expected);
   assert.equal(catalog.records[0].provenance.authority, 'Oteryn/Oteryn-Atlas');
   assert.throws(() => validateCreatureSearchCatalog({ ...creatureCatalog(), source: { ...creatureCatalog().source, fixture_id: 'other' } }, expected), /fixture/i);
+});
+
+test('qualification gameplay is explicitly unavailable without any network request', async () => {
+  const gameplay = ancillarySourceExpectations(trust).creatureGameplay;
+  assert.deepEqual(gameplay, { availability: 'unavailable', reason: 'qualification-fixture' });
+  let fetches = 0;
+  const service = createCreatureGameplayProfileService({
+    baseUrl: 'https://atlas.invalid/web/creature-gameplay/',
+    sourceExpectation: gameplay,
+    fetchImpl: async () => {
+      fetches += 1;
+      throw new Error('qualification gameplay must not fetch');
+    },
+  });
+  const result = await service.get('npc-entity:11111111111111111111111111111111');
+  assert.deepEqual(result, { status: 'unavailable', reason: 'qualification-fixture' });
+  assert.equal(fetches, 0);
 });
