@@ -106,6 +106,27 @@ test('D/E: qualification repair admission is branch-agnostic, exact-scope and mo
   }), /scope|eligible|repair/i);
 });
 
+test('D/E: protected qualification repair is an active generic hosted proof rather than a branch registry', () => {
+  const workflowPath = path.join(ROOT, '.github/workflows/protected-qualification-repair.yml');
+  assert.equal(fs.existsSync(workflowPath), true, 'generic protected qualification repair workflow must exist');
+  const workflow = fs.readFileSync(workflowPath, 'utf8');
+  const job = workflow.split('  qualification-repair:')[1] ?? '';
+  const gateSource = fs.readFileSync(path.join(ROOT, 'tools/verification/protected-hosted-gate.mjs'), 'utf8');
+
+  assert.match(workflow, /pull_request_target:/);
+  assert.match(job, /validateQualificationRepairTransition/);
+  assert.match(job, /runs-on:\s*ubuntu-24\.04/);
+  assert.match(job, /--network none/);
+  assert.match(job, /--read-only/);
+  assert.match(job, /--workers=1/);
+  assert.match(job, /--retries=0/);
+  assert.match(job, /context='atlas-protected-product-qualification'/);
+  assert.doesNotMatch(job, /ATLAS_HEAD_REF|head\.ref|fix\/issue-|pull_request\.number\s*==/);
+
+  assert.match(gateSource, /\.github\/workflows\/protected-qualification-repair\.yml/);
+  assert.doesNotMatch(gateSource, /resolveProtectedPromotionQualification|resolveProtectedAuthorityRepinQualification/);
+});
+
 test('F: creature runtime consumes trust-bound ancillary source expectations instead of production constants', () => {
   assert.match(creatureSource, /ancillarySourceExpectations\(FULLWORLD_TRUST\)/);
   assert.doesNotMatch(creatureSource, /validateCreatureIndex\(index,\s*\{[\s\S]*EXPECTED_GAME_SHA256/);
