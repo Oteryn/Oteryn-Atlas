@@ -209,7 +209,7 @@ test('desktop dense occupancy is deterministic and long factual names stay bound
     x: LONG_NAME_NPC.position.x - Math.max(0.5, halfTiles - 0.75),
     y: LONG_NAME_NPC.position.y,
   } };
-  state = await openScenario(page, sceneEntry(edgeScene, { creatures: 'npc', zoom: 2 }));
+  state = await openScenario(page, sceneEntry(edgeScene, { creatures: 'npc', zoom: 2, npcRole: 'other' }));
   render = assertPresentationContract(state);
   const longLabel = labelLayoutFor(state, LONG_NAME_NPC.record_id);
   expect(longLabel, 'long-name label must be represented in bounded diagnostics').not.toBeNull();
