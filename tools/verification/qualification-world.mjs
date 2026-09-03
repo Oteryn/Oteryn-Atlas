@@ -240,14 +240,15 @@ async function buildQualificationAnimation(root, semanticRoot, pixelRoot, conten
   const secondContentId = await sha256ContentId(secondPhase);
   if (secondContentId === contentId) throw new TypeError('qualification animation phases must have distinct content identities');
   const bucketBytes = Buffer.concat([pixels, secondPhase]);
+  const animation = {
+    default_start_phase: 0,
+    loop_count: 0,
+    loop_type: 'infinite',
+    presentation_durations_ms: [120, 120],
+    synchronized: true,
+  };
   const dynamic = QUALIFICATION_CREATURES.filter((record) => record.outfit_presentation).map((record) => ({
-    animation: {
-      default_start_phase: 0,
-      loop_count: 0,
-      loop_type: 'infinite',
-      presentation_durations_ms: [120, 120],
-      synchronized: true,
-    },
+    animation: { ...animation },
     animation_program_id: `animation-program:${record.record_id}`,
     displacement: { x: 0, y: 0 },
     height: 32,
@@ -259,9 +260,20 @@ async function buildQualificationAnimation(root, semanticRoot, pixelRoot, conten
   }));
   const program = {
     profile: 'oteryn-atlas-animation-runtime-v1',
-    object_programs: [],
+    object_programs: [{
+      animation: { ...animation },
+      animation_program_id: 'animation-program:qualification-world-object-1',
+      appearance_source_id: 1,
+      layers: 1,
+      patterns: { width: 1, height: 1, depth: 1 },
+      phase_count: 2,
+      sprite_source_ids: [1, 2],
+    }],
     creature_programs: dynamic,
-    sprite_index: {},
+    sprite_index: {
+      '1': { content_id: contentId },
+      '2': { content_id: secondContentId },
+    },
     blob_index: {
       [contentId]: { bucket: bucketId, bytes: pixels.length, height: 32, offset: 0, width: 32 },
       [secondContentId]: { bucket: bucketId, bytes: secondPhase.length, height: 32, offset: pixels.length, width: 32 },
