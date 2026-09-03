@@ -155,10 +155,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          grep -q "EXPECTED_SEMANTIC_DIGEST = 'sha256:7dc951874c95424279737eaaf51cf2d50940162ef4799daea39a187a581ef0e8'" web/fullworld-creatures.mjs
-          grep -q "EXPECTED_CAPABILITY = 'animated-creatures-v1'" web/fullworld-creatures.mjs
+          grep -q 'ancillarySourceExpectations' web/fullworld-creatures.mjs
+          grep -q 'FULLWORLD_TRUST' web/fullworld-creatures.mjs
+          grep -q 'EXPECTED_CREATURE_SOURCE = ancillarySourceExpectations(FULLWORLD_TRUST).creatures' web/fullworld-creatures.mjs
+          grep -q 'index.source?.contract_id === EXPECTED_CREATURE_SOURCE.contractId' web/fullworld-creatures.mjs
+          grep -q 'index.source?.capability === EXPECTED_CREATURE_SOURCE.capability' web/fullworld-creatures.mjs
+          grep -q 'index.source?.semantic_digest === EXPECTED_CREATURE_SOURCE.semanticDigest' web/fullworld-creatures.mjs
+          grep -q 'index.source?.npc_role_schema_version === EXPECTED_CREATURE_SOURCE.npcRoleSchemaVersion' web/fullworld-creatures.mjs
+          grep -q 'index.source?.fixture_id === EXPECTED_CREATURE_SOURCE.fixtureId' web/fullworld-creatures.mjs
           grep -q 'getAnimationRuntime' web/fullworld-creatures.mjs
-          grep -q "EXPECTED_NPC_ROLE_SCHEMA = 1" web/fullworld-creatures.mjs
           grep -q "NPC_BADGE_STYLE = 'functional-icons-v2'" src/browser/npc-badge-primitives.mjs
           grep -q 'createCreaturePresentationController' web/fullworld-creatures.mjs
           grep -q "id=\"npc-role-filter\"" web/fullworld-creatures.mjs
