@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import test from 'node:test';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
+import { PRODUCTION_ANIMATION_SOURCE } from '../../src/browser/animation-runtime.mjs';
 import { buildVerificationPlan } from '../../tools/verification/build-verification-plan.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -35,6 +37,19 @@ function planFor(pathname) {
     trustedVerificationCatalog: verificationCatalog,
     candidateVerificationCatalog: verificationCatalog,
   });
+}
+
+function jsonBytes(value) {
+  return new TextEncoder().encode(JSON.stringify(value));
+}
+
+function responseFor(bytes) {
+  return {
+    ok: true,
+    status: 200,
+    headers: { get: () => String(bytes.byteLength) },
+    arrayBuffer: async () => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
+  };
 }
 
 test('A: root instruction-only governance does not recursively require browser qualification', () => {
@@ -130,6 +145,47 @@ test('D/E: protected qualification repair is an active generic hosted proof rath
 test('F: creature runtime consumes trust-bound ancillary source expectations instead of production constants', () => {
   assert.match(creatureSource, /ancillarySourceExpectations\(FULLWORLD_TRUST\)/);
   assert.doesNotMatch(creatureSource, /validateCreatureIndex\(index,\s*\{[\s\S]*EXPECTED_GAME_SHA256/);
+});
+
+test('F2: implicit and explicit production animation authority share one singleton identity', async () => {
+  const programs = jsonBytes({
+    profile: 'oteryn-atlas-animation-runtime-v1',
+    object_programs: [],
+    creature_programs: [],
+    sprite_index: {},
+    blob_index: {},
+  });
+  const programsDigest = `sha256:${crypto.createHash('sha256').update(programs).digest('hex')}`;
+  const manifest = jsonBytes({
+    profile: 'oteryn-atlas-animation-runtime-v1',
+    identityAuthority: false,
+    source: {
+      game_sha: PRODUCTION_ANIMATION_SOURCE.gameSha,
+      appearance_product_root: PRODUCTION_ANIMATION_SOURCE.appearanceProductRoot,
+      outfit_spatial_product_root: PRODUCTION_ANIMATION_SOURCE.outfitSpatialProductRoot,
+    },
+    buckets: [],
+    programs: { path: 'programs.json', digest: programsDigest, bytes: programs.byteLength },
+  });
+  const fetcher = async (url) => {
+    if (url.pathname.endsWith('/manifest.json')) return responseFor(manifest);
+    if (url.pathname.endsWith('/programs.json')) return responseFor(programs);
+    throw new Error(`unexpected animation fixture URL: ${url}`);
+  };
+  const serviceUrl = pathToFileURL(path.join(ROOT, 'src/browser/animation-runtime-service.mjs'));
+  serviceUrl.searchParams.set('regression', 'implicit-explicit-production-authority');
+  const { getAnimationRuntime } = await import(serviceUrl.href);
+  const base = new URL('https://atlas.example/fullworld/animation/');
+
+  const implicit = getAnimationRuntime(base, fetcher);
+  const explicit = getAnimationRuntime(base, fetcher, PRODUCTION_ANIMATION_SOURCE);
+  assert.strictEqual(explicit, implicit);
+  await implicit;
+
+  assert.throws(() => getAnimationRuntime(base, fetcher, {
+    ...PRODUCTION_ANIMATION_SOURCE,
+    gameSha: 'fixture',
+  }), /identity changed/i);
 });
 
 test('G: genuine runtime-impacting browser changes still require hosted qualification-fixture evidence', () => {
