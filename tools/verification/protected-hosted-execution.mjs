@@ -74,6 +74,7 @@ const PROTECTED_PROMOTION_QUALIFICATIONS = freeze({
       'e2e/tests/stress-desktop.spec.mjs',
       'e2e/tests/visual-desktop.spec.mjs',
       'e2e/tests/visual-mobile.spec.mjs',
+      'src/browser/animation-runtime-service.mjs',
       'src/browser/semantic-search.mjs',
       'tests/verification/protected-hosted-product-identities.test.mjs',
       'tests/verification/qualification-semantic-source-trust.test.mjs',
@@ -112,6 +113,35 @@ const PROTECTED_PROMOTION_QUALIFICATIONS = freeze({
   },
 });
 
+const PROTECTED_AUTHORITY_REPIN_QUALIFICATIONS = freeze({
+  'fix/issue-179-qualification-live-digest-authority': {
+    id: 'qualification-live-digest-authority-v1',
+    headRef: 'fix/issue-179-qualification-live-digest-authority',
+    changedFiles: [
+      'tests/verification/protected-hosted-execution.test.mjs',
+      'tools/verification/protected-hosted-execution.mjs',
+    ],
+    sourceHeadRef: 'fix/issue-179-qualification-functional-fixture',
+    gateProof: {
+      kind: 'complete-hosted-browser-authority-repin-v1',
+      workflowPath: '.github/workflows/protected-execution-promotion-qualification.yml',
+      event: 'pull_request_target',
+      jobName: 'Publish protected qualification authority repin evidence',
+      statusContext: 'atlas-protected-product-qualification',
+      statusDescription: 'Protected GitHub-hosted qualification authority repin safety net',
+    },
+  },
+});
+
+export function resolveProtectedAuthorityRepinQualification(headRef) {
+  if (typeof headRef !== 'string' || headRef.length === 0) {
+    throw new TypeError('protected authority repin head ref must be non-empty');
+  }
+  const qualification = PROTECTED_AUTHORITY_REPIN_QUALIFICATIONS[headRef];
+  if (!qualification) throw new TypeError(`unsupported protected authority repin qualification: ${headRef}`);
+  return qualification;
+}
+
 export function resolveProtectedPromotionQualification(headRef) {
   if (typeof headRef !== 'string' || headRef.length === 0) {
     throw new TypeError('protected promotion head ref must be non-empty');
@@ -120,6 +150,64 @@ export function resolveProtectedPromotionQualification(headRef) {
   if (!qualification) throw new TypeError(`unsupported protected promotion qualification: ${headRef}`);
   exactDigest(qualification.expectedProductDigest, 'protected promotion product digest');
   return qualification;
+}
+
+function exactDigestReplacement(trustedSource, candidateSource, previousDigest, label) {
+  if (typeof trustedSource !== 'string' || typeof candidateSource !== 'string') {
+    throw new TypeError(`${label} authority repin sources must be UTF-8 text`);
+  }
+  const first = trustedSource.indexOf(previousDigest);
+  if (first < 0 || trustedSource.indexOf(previousDigest, first + previousDigest.length) >= 0) {
+    throw new TypeError(`${label} authority repin protected bytes must contain the previous digest exactly once`);
+  }
+  const prefix = trustedSource.slice(0, first);
+  const suffix = trustedSource.slice(first + previousDigest.length);
+  if (!candidateSource.startsWith(prefix) || !candidateSource.endsWith(suffix)) {
+    throw new TypeError(`${label} authority repin must be a digest-only byte replacement`);
+  }
+  const replacement = candidateSource.slice(prefix.length, candidateSource.length - suffix.length);
+  const nextDigest = exactDigest(replacement, `${label} authority repin replacement digest`);
+  if (nextDigest === previousDigest) throw new TypeError(`${label} authority repin digest must change`);
+  if (`${prefix}${nextDigest}${suffix}` !== candidateSource) {
+    throw new TypeError(`${label} authority repin contains bytes outside the digest replacement`);
+  }
+  return nextDigest;
+}
+
+export function validateProtectedAuthorityRepinSources({
+  authorityHeadRef,
+  trustedModuleSource,
+  candidateModuleSource,
+  trustedTestSource,
+  candidateTestSource,
+} = {}) {
+  const authority = resolveProtectedAuthorityRepinQualification(authorityHeadRef);
+  const sourceQualification = resolveProtectedPromotionQualification(authority.sourceHeadRef);
+  const previousProductDigest = exactDigest(sourceQualification.expectedProductDigest, 'protected authority repin previous product digest');
+  const expectedProductDigest = exactDigestReplacement(
+    trustedModuleSource,
+    candidateModuleSource,
+    previousProductDigest,
+    'protected hosted execution module',
+  );
+  const mirroredDigest = exactDigestReplacement(
+    trustedTestSource,
+    candidateTestSource,
+    previousProductDigest,
+    'protected hosted execution mirror test',
+  );
+  if (mirroredDigest !== expectedProductDigest) {
+    throw new TypeError('protected authority repin module and mirror test digests differ');
+  }
+  return freeze({
+    id: authority.id,
+    headRef: authority.headRef,
+    changedFiles: [...authority.changedFiles],
+    sourceHeadRef: authority.sourceHeadRef,
+    previousProductDigest,
+    expectedProductDigest,
+    gateProof: authority.gateProof,
+  });
 }
 
 function exactStableIds(value, label, { allowEmpty = false } = {}) {

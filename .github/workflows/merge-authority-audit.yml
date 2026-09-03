@@ -25,11 +25,11 @@ jobs:
       contents: read
       pull-requests: read
     env:
-      EXPECTED_PR_CI_BLOB: "0971077db65eaffcb6ebab4d528edaee798b93e7"
-      EXPECTED_MERGE_GROUP_GATE_BLOB: "72b2bdc199873bb4d30573a2031108cd16f3c16d"
-      EXPECTED_PROVENANCE_VERIFIER_BLOB: "03c58bf810f0c92e2176baece3342ebb72a4c6f5"
+      EXPECTED_PR_CI_BLOB: "27d0a6bc250a5378064f714b57569a092a2c1579"
+      EXPECTED_MERGE_GROUP_GATE_BLOB: "2f4ef822b34b1699af70e8142365ee5fc1afdc84"
+      EXPECTED_PROVENANCE_VERIFIER_BLOB: "8abcf380d6746b9aa095ec5a792638f2ce1b6314"
       EXPECTED_PROVENANCE_TEST_BLOB: "0e2dda25befd0b66ab870ffe05416986c27ceb61"
-      EXPECTED_PROVENANCE_MAP_BLOB: "c18e14b94823fa09ad46922431a797eae6c197bc"
+      EXPECTED_PROVENANCE_MAP_BLOB: "f5e2c3c04a749ded7a94f721e6fa299b3ce2bf2d"
     steps:
       - name: Validate Atlas merge-authority candidate as inert data
         shell: bash

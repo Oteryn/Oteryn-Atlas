@@ -22,8 +22,9 @@ test('required PR gate validates hosted lifecycle artifacts while nightly keeps 
   assert.match(ci, /protected-hosted-fan-in/);
   assert.match(ci, /protected-verification-state/);
   assert.match(ci, /validateProtectedHostedGate/);
-  assert.match(ci, /ATLAS_LEGACY_CUTOVER_BASE_SHA: f8de8e42ca57112cf71100aa19322ef22527b168/);
-  assert.match(ci, /atlas-local-e2e/);
+  assert.match(ci, /ATLAS_LEGACY_CUTOVER_BASE_SHA: e31015d0880e9f81a4b96f990658490af45e8fa6/);
+  assert.match(ci, /validateLegacyTransitionBootstrapGate/);
+  assert.doesNotMatch(ci, /atlas-local-e2e/);
   assert.doesNotMatch(ci, /compose\.selfhosted\.yml|docker cp/);
   assert.match(nightly, /compose\.selfhosted\.yml/);
   assert.match(nightly, /docker cp/);

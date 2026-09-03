@@ -414,7 +414,8 @@ jobs:
       ATLAS_CODE_REVISION: ${{ github.event.pull_request.head.sha }}
       ATLAS_PROTECTED_BASE_SHA: ${{ github.event.pull_request.base.sha }}
       ATLAS_PR_NUMBER: ${{ github.event.pull_request.number }}
-      ATLAS_LEGACY_CUTOVER_BASE_SHA: f8de8e42ca57112cf71100aa19322ef22527b168
+      ATLAS_LEGACY_CUTOVER_BASE_SHA: e31015d0880e9f81a4b96f990658490af45e8fa6
+      ATLAS_LEGACY_CUTOVER_HEAD_REF: feat/issue-179-legacy-transition-qualifier
     steps:
       - name: Check out exact Atlas candidate gate authority
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -431,16 +432,65 @@ jobs:
           test "$GITHUB_REPOSITORY" = Oteryn/Oteryn-Atlas
           test "$(git rev-parse HEAD)" = "$ATLAS_CODE_REVISION"
           if [[ "$ATLAS_PROTECTED_BASE_SHA" == "$ATLAS_LEGACY_CUTOVER_BASE_SHA" ]]; then
-            state="$(gh api "repos/$GITHUB_REPOSITORY/commits/$ATLAS_CODE_REVISION/statuses" --jq '[.[] | select(.context == "atlas-local-e2e")][0].state // ""')"
-            test "$state" = success
-            mkdir -p artifacts/protected-hosted-fan-in
-            node --input-type=module <<'NODE'
+            work=artifacts/protected-hosted-fan-in
+            mkdir -p "$work"
+            live_pr="$work/live-pr.json"
+            changed_files="$work/legacy-cutover-changed-files.txt"
+            gh api "repos/$GITHUB_REPOSITORY/pulls/$ATLAS_PR_NUMBER" > "$live_pr"
+            test "$(jq -r '.head.ref' "$live_pr")" = "$ATLAS_LEGACY_CUTOVER_HEAD_REF"
+            gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$ATLAS_PR_NUMBER/files?per_page=100" \
+              --jq '.[].filename' | sort > "$changed_files"
+            runs="$work/legacy-transition-runs.json"
+            gh api "repos/$GITHUB_REPOSITORY/actions/workflows/legacy-molehill-transition-qualification.yml/runs?event=pull_request&branch=$ATLAS_LEGACY_CUTOVER_HEAD_REF&per_page=100" > "$runs"
+            mapfile -t legacy_run_ids < <(node --input-type=module - "$runs" <<'NODE'
           import fs from 'node:fs';
-          fs.writeFileSync('artifacts/protected-hosted-fan-in/protected-hosted-gate-validation.json', `${JSON.stringify({
-            schemaVersion: 1, status: 'success', mode: 'legacy-cutover-exact-base-only',
-            candidateHeadSha: process.env.ATLAS_CODE_REVISION, protectedBaseSha: process.env.ATLAS_PROTECTED_BASE_SHA,
-          }, null, 2)}\n`);
+          const runs = JSON.parse(fs.readFileSync(process.argv[2], 'utf8')).workflow_runs ?? [];
+          const ids = runs
+            .filter((run) => run.status === 'completed'
+              && run.path === '.github/workflows/legacy-molehill-transition-qualification.yml'
+              && run.event === 'pull_request'
+              && run.head_branch === process.env.ATLAS_LEGACY_CUTOVER_HEAD_REF
+              && run.head_sha === process.env.ATLAS_CODE_REVISION
+              && run.repository?.full_name === process.env.GITHUB_REPOSITORY
+              && Number(run.run_attempt) === 1)
+            .map((run) => Number(run.id))
+            .filter((id) => Number.isSafeInteger(id) && id > 0)
+            .sort((left, right) => right - left);
+          for (const id of ids) process.stdout.write(`${id}\n`);
           NODE
+            )
+            selected_legacy_run=''
+            for legacy_run_id in "${legacy_run_ids[@]}"; do
+              run_json="$work/legacy-transition-run-$legacy_run_id.json"
+              jobs_json="$work/legacy-transition-jobs-$legacy_run_id.json"
+              gh api "repos/$GITHUB_REPOSITORY/actions/runs/$legacy_run_id" > "$run_json"
+              gh api "repos/$GITHUB_REPOSITORY/actions/runs/$legacy_run_id/jobs?per_page=100" > "$jobs_json"
+              if node --input-type=module - "$run_json" "$jobs_json" "$live_pr" "$changed_files" "$work/protected-hosted-gate-validation.json" <<'NODE'
+          import fs from 'node:fs';
+          import { validateLegacyTransitionBootstrapGate } from './tools/verification/protected-hosted-gate.mjs';
+          const [runPath, jobsPath, livePrPath, changedFilesPath, outputPath] = process.argv.slice(2);
+          const read = (path) => JSON.parse(fs.readFileSync(path, 'utf8'));
+          const changedFiles = fs.readFileSync(changedFilesPath, 'utf8').split(/\r?\n/).filter(Boolean);
+          const result = validateLegacyTransitionBootstrapGate({
+            producerRun: read(runPath),
+            producerJobs: read(jobsPath),
+            livePr: read(livePrPath),
+            changedFiles,
+            expectedRepository: process.env.GITHUB_REPOSITORY,
+            expectedPrNumber: Number(process.env.ATLAS_PR_NUMBER),
+            expectedCandidateHeadSha: process.env.ATLAS_CODE_REVISION,
+            expectedProtectedBaseSha: process.env.ATLAS_PROTECTED_BASE_SHA,
+          });
+          fs.writeFileSync(outputPath, `${JSON.stringify(result, null, 2)}\n`);
+          NODE
+              then
+                selected_legacy_run="$legacy_run_id"
+                break
+              fi
+            done
+            [[ "$selected_legacy_run" =~ ^[1-9][0-9]*$ ]]
+            printf 'producer_run_id=%s\nartifact_name=%s\n' \
+              "$selected_legacy_run" 'legacy-transition-heavy-proof' >> "$GITHUB_OUTPUT"
             exit 0
           fi
           expected_name="protected-hosted-fan-in-$ATLAS_PROTECTED_BASE_SHA-$ATLAS_CODE_REVISION"

@@ -110,6 +110,27 @@ test('candidate executable checks cannot mutate the atlas-gate runner state', ()
   assert.doesNotMatch(gate, /tests\/verification\/\*\.test\.mjs/);
 });
 
+test('one-shot PR 303 merge-group bootstrap consumes exact protected heavy proof and cannot widen to other queues', () => {
+  const workflow = readText(mergeGroupGateUrl);
+  const gate = workflow.slice(workflow.indexOf('  atlas-gate:'));
+
+  assert.match(workflow, /permissions:\s*\n\s*contents:\s*read\s*\n\s*actions:\s*read\s*\n\s*pull-requests:\s*read/);
+  assert.match(gate, /name:\s*Validate one-shot PR 303 merge-group bootstrap proof/);
+  assert.match(gate, /ATLAS_LEGACY_CUTOVER_BASE_SHA:\s*e31015d0880e9f81a4b96f990658490af45e8fa6/);
+  assert.match(gate, /ATLAS_LEGACY_CUTOVER_PR_NUMBER:\s*['"]303['"]/);
+  assert.match(gate, /ATLAS_LEGACY_CUTOVER_HEAD_REF:\s*feat\/issue-179-legacy-transition-qualifier/);
+  assert.match(gate, /refs\/heads\/gh-readonly-queue\/main\/pr-\$ATLAS_LEGACY_CUTOVER_PR_NUMBER-\$ATLAS_LEGACY_CUTOVER_BASE_SHA/);
+  assert.match(gate, /validateLegacyTransitionMergeGroupBootstrapGate/);
+  assert.match(gate, /legacy-molehill-transition-qualification\.yml/);
+  assert.match(gate, /git\/commits\/\$ATLAS_CODE_REVISION/);
+  assert.match(gate, /git\/commits\/\$candidate_head_sha/);
+  assert.match(gate, /branches\/main/);
+  assert.match(gate, /use_legacy_proof=true/);
+  assert.match(gate, /producer_run_id=/);
+  assert.match(gate, /Prove complete protected-base browser qualification for synthetic candidate[\s\S]*if:\s*\$\{\{\s*steps\.legacy-bootstrap\.outputs\.use_legacy_proof != 'true'\s*\}\}/);
+  assert.doesNotMatch(gate, /atlas-local-e2e/);
+});
+
 test('atlas-gate fully browser-qualifies the exact synthetic candidate with protected-base harness', () => {
   const workflow = readText(mergeGroupGateUrl);
 

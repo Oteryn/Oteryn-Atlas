@@ -6,6 +6,8 @@ on:
 
 permissions:
   contents: read
+  actions: read
+  pull-requests: read
 
 concurrency:
   group: atlas-merge-group-${{ github.event.merge_group.head_sha }}
@@ -202,7 +204,106 @@ jobs:
           persist-credentials: false
           path: trusted-base
 
+      - name: Validate one-shot PR 303 merge-group bootstrap proof
+        id: legacy-bootstrap
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ATLAS_CODE_REVISION: ${{ github.event.merge_group.head_sha }}
+          ATLAS_PROTECTED_BASE_SHA: ${{ github.event.merge_group.base_sha }}
+          ATLAS_MERGE_GROUP_HEAD_REF: ${{ github.event.merge_group.head_ref || '' }}
+          ATLAS_LEGACY_CUTOVER_BASE_SHA: e31015d0880e9f81a4b96f990658490af45e8fa6
+          ATLAS_LEGACY_CUTOVER_PR_NUMBER: '303'
+          ATLAS_LEGACY_CUTOVER_HEAD_REF: feat/issue-179-legacy-transition-qualifier
+        run: |
+          set -euo pipefail
+          printf 'use_legacy_proof=false\n' >> "$GITHUB_OUTPUT"
+          expected_queue_ref="refs/heads/gh-readonly-queue/main/pr-$ATLAS_LEGACY_CUTOVER_PR_NUMBER-$ATLAS_LEGACY_CUTOVER_BASE_SHA"
+          if [[ "$ATLAS_PROTECTED_BASE_SHA" != "$ATLAS_LEGACY_CUTOVER_BASE_SHA" \
+            || "$ATLAS_MERGE_GROUP_HEAD_REF" != "$expected_queue_ref" ]]; then
+            exit 0
+          fi
+          test "$GITHUB_REPOSITORY" = Oteryn/Oteryn-Atlas
+          work="$RUNNER_TEMP/atlas-merge-group-legacy-bootstrap"
+          rm -rf "$work"
+          mkdir -p "$work"
+          live_pr="$work/live-pr.json"
+          changed_files="$work/changed-files.txt"
+          synthetic_commit="$work/synthetic-commit.json"
+          candidate_commit="$work/candidate-commit.json"
+          gh api "repos/$GITHUB_REPOSITORY/pulls/$ATLAS_LEGACY_CUTOVER_PR_NUMBER" > "$live_pr"
+          candidate_head_sha="$(jq -r '.head.sha' "$live_pr")"
+          [[ "$candidate_head_sha" =~ ^[0-9a-f]{40}$ ]]
+          gh api "repos/$GITHUB_REPOSITORY/git/commits/$ATLAS_CODE_REVISION" > "$synthetic_commit"
+          gh api "repos/$GITHUB_REPOSITORY/git/commits/$candidate_head_sha" > "$candidate_commit"
+          current_main_sha="$(gh api "repos/$GITHUB_REPOSITORY/branches/main" --jq '.commit.sha')"
+          [[ "$current_main_sha" =~ ^[0-9a-f]{40}$ ]]
+          gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$ATLAS_LEGACY_CUTOVER_PR_NUMBER/files?per_page=100" \
+            --jq '.[].filename' | sort > "$changed_files"
+          runs="$work/legacy-transition-runs.json"
+          gh api "repos/$GITHUB_REPOSITORY/actions/workflows/legacy-molehill-transition-qualification.yml/runs?event=pull_request&branch=$ATLAS_LEGACY_CUTOVER_HEAD_REF&per_page=100" > "$runs"
+          mapfile -t legacy_run_ids < <(node --input-type=module - "$runs" "$candidate_head_sha" <<'NODE'
+          import fs from 'node:fs';
+          const [runsPath, candidateHeadSha] = process.argv.slice(2);
+          const runs = JSON.parse(fs.readFileSync(runsPath, 'utf8')).workflow_runs ?? [];
+          const ids = runs
+            .filter((run) => run.status === 'completed'
+              && run.path === '.github/workflows/legacy-molehill-transition-qualification.yml'
+              && run.event === 'pull_request'
+              && run.head_branch === process.env.ATLAS_LEGACY_CUTOVER_HEAD_REF
+              && run.head_sha === candidateHeadSha
+              && run.repository?.full_name === process.env.GITHUB_REPOSITORY
+              && Number(run.run_attempt) === 1)
+            .map((run) => Number(run.id))
+            .filter((id) => Number.isSafeInteger(id) && id > 0)
+            .sort((left, right) => right - left);
+          for (const id of ids) process.stdout.write(`${id}\n`);
+          NODE
+          )
+          selected_legacy_run=''
+          for legacy_run_id in "${legacy_run_ids[@]}"; do
+            run_json="$work/run-$legacy_run_id.json"
+            jobs_json="$work/jobs-$legacy_run_id.json"
+            gh api "repos/$GITHUB_REPOSITORY/actions/runs/$legacy_run_id" > "$run_json"
+            gh api "repos/$GITHUB_REPOSITORY/actions/runs/$legacy_run_id/jobs?per_page=100" > "$jobs_json"
+            if CURRENT_MAIN_SHA="$current_main_sha" node --input-type=module - \
+              "$run_json" "$jobs_json" "$live_pr" "$changed_files" "$synthetic_commit" "$candidate_commit" <<'NODE'
+          import fs from 'node:fs';
+          import { validateLegacyTransitionMergeGroupBootstrapGate } from './tools/verification/protected-hosted-gate.mjs';
+          const [runPath, jobsPath, livePrPath, changedFilesPath, syntheticPath, candidatePath] = process.argv.slice(2);
+          const read = (path) => JSON.parse(fs.readFileSync(path, 'utf8'));
+          const changedFiles = fs.readFileSync(changedFilesPath, 'utf8').split(/\r?\n/).filter(Boolean);
+          const result = validateLegacyTransitionMergeGroupBootstrapGate({
+            producerRun: read(runPath),
+            producerJobs: read(jobsPath),
+            livePr: read(livePrPath),
+            changedFiles,
+            expectedRepository: process.env.GITHUB_REPOSITORY,
+            expectedPrNumber: Number(process.env.ATLAS_LEGACY_CUTOVER_PR_NUMBER),
+            expectedProtectedBaseSha: process.env.ATLAS_PROTECTED_BASE_SHA,
+            expectedSyntheticHeadSha: process.env.ATLAS_CODE_REVISION,
+            currentMainSha: process.env.CURRENT_MAIN_SHA,
+            mergeGroup: {
+              baseRef: 'refs/heads/main',
+              baseSha: process.env.ATLAS_PROTECTED_BASE_SHA,
+              headRef: process.env.ATLAS_MERGE_GROUP_HEAD_REF,
+              headSha: process.env.ATLAS_CODE_REVISION,
+            },
+            syntheticCommit: read(syntheticPath),
+            candidateCommit: read(candidatePath),
+          });
+          process.stdout.write(`${JSON.stringify(result)}\n`);
+          NODE
+            then
+              selected_legacy_run="$legacy_run_id"
+              break
+            fi
+          done
+          [[ "$selected_legacy_run" =~ ^[1-9][0-9]*$ ]]
+          printf 'use_legacy_proof=true\nproducer_run_id=%s\n' "$selected_legacy_run" >> "$GITHUB_OUTPUT"
+
       - name: Prove complete protected-base browser qualification for synthetic candidate
+        if: ${{ steps.legacy-bootstrap.outputs.use_legacy_proof != 'true' }}
         shell: bash
         env:
           ATLAS_CODE_REVISION: ${{ github.event.merge_group.head_sha }}

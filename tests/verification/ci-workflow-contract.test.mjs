@@ -42,10 +42,12 @@ test('atlas-gate consumes exact hosted lifecycle evidence without executing repo
   assert.match(browserJob, /protected-hosted-fan-in\.json/);
   assert.match(browserJob, /protected-verification-state\.json/);
   assert.match(browserJob, /validateProtectedHostedGate/);
-  assert.match(browserJob, /ATLAS_LEGACY_CUTOVER_BASE_SHA: f8de8e42ca57112cf71100aa19322ef22527b168/);
+  assert.match(browserJob, /ATLAS_LEGACY_CUTOVER_BASE_SHA: e31015d0880e9f81a4b96f990658490af45e8fa6/);
   assert.match(browserJob, /ATLAS_PROTECTED_BASE_SHA.*ATLAS_LEGACY_CUTOVER_BASE_SHA/);
-  assert.match(browserJob, /commits\/\$ATLAS_CODE_REVISION\/statuses/);
-  assert.match(browserJob, /atlas-local-e2e/);
+  assert.match(browserJob, /ATLAS_LEGACY_CUTOVER_HEAD_REF: feat\/issue-179-legacy-transition-qualifier/);
+  assert.match(browserJob, /validateLegacyTransitionBootstrapGate/);
+  assert.match(browserJob, /legacy-molehill-transition-qualification\.yml/);
+  assert.doesNotMatch(browserJob, /atlas-local-e2e/);
   assert.match(browserJob, /atlas-protected-product-qualification/);
   assert.match(browserJob, /validateProtectedProductQualificationGate/);
   assert.match(browserJob, /protected-execution-promotion-qualification\.yml|protected-product-qualification/);
