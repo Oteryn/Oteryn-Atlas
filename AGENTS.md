@@ -9,6 +9,14 @@ These instructions govern `Oteryn/Oteryn-Atlas`.
 - Legacy OTBM/Tibia/Canary/Crystal inputs are migration/reference evidence only; browser runtime must never parse them as fallback authority.
 - Platform may coordinate Atlas contracts but is not an Atlas runtime data source.
 
+## External execution-skill precedence
+
+Repository and user authority govern execution. Agent skills, plugins and workflow frameworks such as Superpowers are subordinate execution aids, not independent task or lifecycle authority.
+
+For an already-authorized Oteryn programme or task with an approved canonical design, implementation plan, checkpoint, or explicit continuation directive, Superpowers workflows MUST NOT introduce additional approval gates, re-brainstorm an approved design, require duplicate planning artifacts, replace canonical authority, or interrupt autonomous continuation solely because the skill's default workflow would do so. Relevant skills MAY still be used internally for implementation, testing, debugging, review, isolation, or verification when they do not conflict with the governing Oteryn authority.
+
+A skill or plugin MUST NOT weaken repository safety, validation, review, GitHub-first, or authorization requirements. When a skill workflow conflicts with applicable user instructions, this `AGENTS.md`, repository policy, or canonical task authority, the applicable higher-priority Oteryn authority controls.
+
 ## GitHub-first execution gate
 
 GitHub is the authoritative control plane for Atlas repository identity, `main`, Issue/task status, PR, task branch, exact remote SHA, checks, reviews and merge state.
@@ -44,6 +52,11 @@ The organization baseline is META ADR 0004 plus the central agent execution/cont
 - Preserve published task history by default. When entering final integration, refresh to current `integration_main_sha` with a normal non-force merge-up, resolve only authorized conflicts, review the resulting diff and rerun every validation/review layer invalidated by the new `task_head_sha`.
 - A lost merge race returns the task to integration/reconciliation, not to implementation from scratch.
 - Invalidate affected work only when verified task cancellation/supersession/rescope, incompatible governing authority, semantic contract/API/schema/invariant conflict, an unresolvable authorized reconciliation, or required tests prove prior assumptions no longer hold. Textual overlap or a changed filename alone is not sufficient proof.
+- Before final qualification, freeze the exact candidate head. While frozen, do not change the branch solely to retrigger CI, review, mergeability, polling, status calculation or checkpoint publication; only a material finding, required integration refresh, changed authority or implementation/test repair may start a new head generation.
+- If CI, authenticated review evidence, another dependency or another external event is the only thing that can change material state, classify the task `WAITING_EXTERNAL`, persist the waiting reason/next event and end or release the active worker instead of polling.
+- Empty commits, semantic no-op edits, checkpoint-only churn and unrelated documentation changes whose purpose is only to retrigger an external system are forbidden. Re-evaluate the same exact head when supported; otherwise remain `WAITING_EXTERNAL` or `BLOCKED`.
+- Repeated unchanged failures are bounded. Use stable material progress/failure identity; when the configured retry budget is exhausted without new evidence, transition to `STALLED` rather than repeat the same action.
+- `WAITING_EXTERNAL` and `STALLED` never satisfy merge readiness. Atlas-required exact-head checks, review and fail-closed merge rules remain authoritative.
 
 ## META execution-routing policy
 
@@ -80,7 +93,6 @@ Before editing, inspect the current default-branch head, this file, the active I
 
 ## Verification execution placement
 
-
 - Verification profile is independent from data capability. The profiles `none`, `focused`, `targeted`, `broad` and `full` describe verification breadth; `qualification_fixture`, `bounded_real_world` and `real_fullworld` describe the minimum world-data capability required by an oracle. `profile=full` does not imply `real_fullworld`.
 - GitHub-hosted CI owns ordinary functional E2E, including a full functional profile when its selected groups require only `qualification_fixture` or an explicitly bounded hosted-compatible real-world source. Ordinary NPC/monster interaction, cards, inspector, search, state/history, geometry, pan/zoom, floor/LOD, accessibility, responsive, race/fault and similar tests must use the smallest immutable qualification world whenever their oracle does not depend on real complete-product bytes.
 - The immutable qualification world must traverse the same production publication manifest, floor/chunk/range, digest validation, loader, runtime, renderer and interaction seams as production. Mocks or alternate test applications that bypass those seams are not acceptable substitutes.
@@ -92,7 +104,6 @@ Before editing, inspect the current default-branch head, this file, the active I
 - Synology must not run the legacy 77-scenario matrix, broad specialist stress matrices, complete-product soak/performance depth or restricted visual-regression depth as a substitute for Molehill-PC specialist capability.
 - Nightly Molehill browser depth is additive specialist verification only. It must not duplicate a generic ordinary full functional matrix that GitHub-hosted CI already executes, and it must not become an implicit requirement for unrelated PRs.
 - If Molehill-PC is unavailable, only the explicitly selected specialist proof remains blocked. Ordinary GitHub-hosted functional E2E continues. Do not move specialist work to Synology, reuse stale evidence, weaken retries/tolerances, or publish copied evidence.
-
 - Molehill GitHub Actions steps must use the Windows PowerShell shell actually installed on the runner (powershell), not assume PowerShell 7 (pwsh).
 - Nightly specialist depth must not share Synology live-acceptance concurrency in a way that can cancel a pending deployment. It remains read-only and must fail closed unless X-Oteryn-Atlas-Revision equals the exact nightly SHA both before and after depth execution.
 
