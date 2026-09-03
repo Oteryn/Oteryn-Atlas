@@ -551,6 +551,7 @@ jobs:
             result: 'SUCCESS', disposition: 'EXECUTED', candidateHeadSha: plan.candidateHeadSha,
             planSemanticDigest: plan.planSemanticDigest, planInstanceDigest: plan.planInstanceDigest,
             authorityDigest: plan.authorityDigest, environmentDigest: plan.environmentDigest,
+            semanticDependencyDigest: plan.environmentDigest,
             productIdentities: {}, stableTestIds: [], executionPolicyDigest: plan.executionPolicyDigest,
             runProvenance: {
               repository: process.env.GITHUB_REPOSITORY, runId: Number(process.env.GITHUB_RUN_ID),
@@ -929,6 +930,7 @@ jobs:
             result: 'SUCCESS', disposition: 'EXECUTED', candidateHeadSha: plan.candidateHeadSha,
             planSemanticDigest: plan.planSemanticDigest, planInstanceDigest: plan.planInstanceDigest,
             authorityDigest: plan.authorityDigest, environmentDigest: plan.environmentDigest,
+            semanticDependencyDigest: plan.browserSemanticDependencyDigest,
             productIdentities: products, stableTestIds: summary.executedStableTestIds,
             executionPolicyDigest: plan.executionPolicyDigest,
             runProvenance: {
