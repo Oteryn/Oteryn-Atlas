@@ -129,6 +129,38 @@ jobs:
           NODE
           printf '%s\n' "$merge_base_sha" > artifacts/protected-controller/merge-base.txt
 
+      - name: Derive browser semantic content identity from exact Git objects
+        shell: bash
+        run: |
+          set -euo pipefail
+          protected_tree=artifacts/protected-controller/protected-browser-semantic-tree.bin
+          candidate_tree=artifacts/protected-controller/candidate-browser-semantic-tree.bin
+          git ls-tree -r -z --full-tree "$ATLAS_PROTECTED_BASE_SHA" > "$protected_tree"
+          git ls-tree -r -z --full-tree "$ATLAS_CANDIDATE_HEAD_SHA" > "$candidate_tree"
+          node --input-type=module - "$protected_tree" "$candidate_tree" artifacts/protected-controller/browser-semantic-content-identity.json <<'NODE'
+          import fs from 'node:fs';
+          import { buildBrowserSemanticContentIdentity } from './tools/verification/browser-semantic-content.mjs';
+          const [protectedTreePath, candidateTreePath, outputPath] = process.argv.slice(2);
+          const parseTree = (treePath) => {
+            const records = fs.readFileSync(treePath, 'utf8').split('\0');
+            if (records.at(-1) === '') records.pop();
+            return records.map((record) => {
+              const separator = record.indexOf('\t');
+              if (separator < 1) throw new Error('Malformed exact Git tree record.');
+              const metadata = record.slice(0, separator).split(' ');
+              const path = record.slice(separator + 1);
+              if (metadata.length !== 3 || !path) throw new Error('Malformed exact Git tree identity.');
+              const [mode, type, objectId] = metadata;
+              return { path, mode, type, objectId };
+            });
+          };
+          const browserSemanticContentIdentity = buildBrowserSemanticContentIdentity({
+            protectedEntries: parseTree(protectedTreePath),
+            candidateEntries: parseTree(candidateTreePath),
+          });
+          fs.writeFileSync(outputPath, `${JSON.stringify(browserSemanticContentIdentity, null, 2)}\n`);
+          NODE
+
       - name: Snapshot protected and candidate policy as inert data
         shell: bash
         run: |
@@ -236,6 +268,7 @@ jobs:
           const candidateHeadSha = process.env.ATLAS_CANDIDATE_HEAD_SHA;
           const authorityIdentity = read('artifacts/protected-controller/verification-authority-identity.json');
           const environmentIdentity = read('artifacts/protected-controller/protected-execution-environment-identity.json');
+          const browserSemanticContentIdentity = read('artifacts/protected-controller/browser-semantic-content-identity.json');
           const plan = buildProtectedHostedPlan({
             repository: process.env.GITHUB_REPOSITORY,
             prNumber: Number(process.env.ATLAS_PR_NUMBER),
@@ -258,6 +291,7 @@ jobs:
             productIdentities: read('artifacts/protected-controller/product-identities.json'),
             authorityIdentity,
             environmentIdentity,
+            browserSemanticContentDigest: browserSemanticContentIdentity.browserSemanticContentDigest,
           });
           fs.writeFileSync('artifacts/protected-controller/protected-verification-plan.json', `${JSON.stringify(plan, null, 2)}\n`);
           NODE
@@ -284,6 +318,7 @@ jobs:
             artifacts/protected-controller/product-identities.json
             artifacts/protected-controller/verification-authority-identity.json
             artifacts/protected-controller/protected-execution-environment-identity.json
+            artifacts/protected-controller/browser-semantic-content-identity.json
           if-no-files-found: error
           retention-days: 14
   handoff-base-advance:

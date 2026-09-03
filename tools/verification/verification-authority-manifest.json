@@ -19,6 +19,10 @@
       "path": "tools/verification/bounded-real-world.mjs"
     },
     {
+      "id": "browser-semantic-content",
+      "path": "tools/verification/browser-semantic-content.mjs"
+    },
+    {
       "id": "build-plan",
       "path": "tools/verification/build-verification-plan.mjs"
     },
