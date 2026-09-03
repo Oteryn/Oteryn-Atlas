@@ -31,11 +31,11 @@ test('mobile portrait/landscape resize preserves base/creature world geometry', 
   compareCreatureAnchors(aligned.base, aligned.creature).assertWithin(TOLERANCE_PX);
   await installGeometryEventLog(page);
 
-  aligned = await resizeAndAlign(page, 390, 844);
-  compareCreatureAnchors(aligned.base, aligned.creature).assertWithin(TOLERANCE_PX);
   aligned = await resizeAndAlign(page, 844, 390);
   compareCreatureAnchors(aligned.base, aligned.creature).assertWithin(TOLERANCE_PX);
   aligned = await resizeAndAlign(page, 390, 844);
+  compareCreatureAnchors(aligned.base, aligned.creature).assertWithin(TOLERANCE_PX);
+  aligned = await resizeAndAlign(page, 844, 390);
   compareCreatureAnchors(aligned.base, aligned.creature).assertWithin(TOLERANCE_PX);
 
   const log = await readGeometryEventLog(page);
