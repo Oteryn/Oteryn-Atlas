@@ -84,6 +84,14 @@ test('exact EXECUTED evidence satisfies the same versioned fan-in path', () => {
   assert.deepEqual(result.executedEvidenceIds, ['HOSTED_FUNCTIONAL:SHARD_1']);
   assert.deepEqual(result.reusedEvidenceIds, []);
   assert.deepEqual(result.executedStableTestIds, ids);
+  assert.deepEqual(result.evidenceSummary, {
+    expectedEvidenceIds: ['ENVIRONMENT_QUALIFICATION', 'HOSTED_FUNCTIONAL:SHARD_1'],
+    executedEvidenceIds: ['ENVIRONMENT_QUALIFICATION', 'HOSTED_FUNCTIONAL:SHARD_1'],
+    reusedEvidenceIds: [],
+    missingEvidenceIds: [],
+    unexpectedEvidenceIds: [],
+    stableTestIds: { planned: 1, executed: 1, reused: 0, missing: 0, unexpected: 0 },
+  });
 });
 
 test('rebound REUSED evidence satisfies the same fan-in while preserving exact current instance identity', () => {
@@ -117,6 +125,14 @@ test('rebound REUSED evidence satisfies the same fan-in while preserving exact c
   );
   assert.deepEqual(result.executedEvidenceIds, []);
   assert.deepEqual(result.reusedEvidenceIds, ['ENVIRONMENT_QUALIFICATION', 'HOSTED_FUNCTIONAL:SHARD_1']);
+  assert.deepEqual(result.evidenceSummary, {
+    expectedEvidenceIds: ['ENVIRONMENT_QUALIFICATION', 'HOSTED_FUNCTIONAL:SHARD_1'],
+    executedEvidenceIds: [],
+    reusedEvidenceIds: ['ENVIRONMENT_QUALIFICATION', 'HOSTED_FUNCTIONAL:SHARD_1'],
+    missingEvidenceIds: [],
+    unexpectedEvidenceIds: [],
+    stableTestIds: { planned: 1, executed: 0, reused: 1, missing: 0, unexpected: 0 },
+  });
   assert.ok(reused.every((manifest) => manifest.planInstanceDigest === currentPlan.planInstanceDigest));
 });
 
@@ -156,6 +172,10 @@ test('zero-work lifecycle fan-in succeeds only with an exact empty evidence set'
   assert.deepEqual(result.executedStableTestIds, []);
   assert.deepEqual(result.executedEvidenceIds, []);
   assert.deepEqual(result.reusedEvidenceIds, []);
+  assert.deepEqual(result.evidenceSummary, {
+    expectedEvidenceIds: [], executedEvidenceIds: [], reusedEvidenceIds: [], missingEvidenceIds: [], unexpectedEvidenceIds: [],
+    stableTestIds: { planned: 0, executed: 0, reused: 0, missing: 0, unexpected: 0 },
+  });
   assert.throws(() => validateProtectedHostedEvidenceFanIn(
     currentPlan, currentExecution, lifecycle, executedEvidence(plan(), planProtectedVerificationLifecycle({
       currentPlan: plan(), currentExecution: execution(), previousState: null,
