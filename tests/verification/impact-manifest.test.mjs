@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import test from 'node:test';
 
 import {
@@ -60,6 +61,26 @@ test('impact manifest accepts explicit cross-domain escalation rules with allowl
     requiredGroups: ['e2e.common-smoke'],
   }]);
   assert(Object.isFrozen(manifest));
+});
+
+test('repository policy keeps verification test bodies deterministic-only while executable verification authority remains full', () => {
+  const manifest = JSON.parse(fs.readFileSync(new URL('../../tools/verification/impact-manifest.json', import.meta.url), 'utf8'));
+  const rule = (pathPrefix) => manifest.entries.find((entry) => entry.pathPrefix === pathPrefix);
+
+  assert.deepEqual(rule('tests/verification/'), {
+    pathPrefix: 'tests/verification/',
+    domains: ['verification-governance'],
+    minimumProfile: 'focused',
+    requiredGroups: ['deterministic.core'],
+  });
+  for (const pathPrefix of ['tools/verification/', '.github/workflows/']) {
+    assert.deepEqual(rule(pathPrefix), {
+      pathPrefix,
+      domains: ['verification-governance'],
+      minimumProfile: 'full',
+      requiredGroups: ['deterministic.core', 'e2e.full'],
+    });
+  }
 });
 
 test('impact manifest rejects malformed path rules and cross-domain escalations', () => {
