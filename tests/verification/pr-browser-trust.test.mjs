@@ -32,8 +32,10 @@ test('protected hosted gate binds exact candidate, base, producer and artifact b
   assert.match(browserJob, /validateProtectedHostedGate/);
   assert.match(browserJob, /expectedCandidateHeadSha: process\.env\.ATLAS_CODE_REVISION/);
   assert.match(browserJob, /expectedProtectedBaseSha: process\.env\.ATLAS_PROTECTED_BASE_SHA/);
-  assert.match(browserJob, /ATLAS_LEGACY_CUTOVER_BASE_SHA: b285c4d57d48cbc70bca54619849b7f7cfd423f6/);
+  assert.match(browserJob, /ATLAS_LEGACY_CUTOVER_BASE_SHA: e31015d0880e9f81a4b96f990658490af45e8fa6/);
   assert.match(browserJob, /ATLAS_PROTECTED_BASE_SHA.*ATLAS_LEGACY_CUTOVER_BASE_SHA/);
-  assert.match(browserJob, /atlas-local-e2e/);
+  assert.match(browserJob, /ATLAS_LEGACY_CUTOVER_HEAD_REF: feat\/issue-179-legacy-transition-qualifier/);
+  assert.match(browserJob, /validateLegacyTransitionBootstrapGate/);
+  assert.doesNotMatch(browserJob, /atlas-local-e2e/);
   assert.doesNotMatch(browserJob, /docker\s|compose\.selfhosted|ATLAS_PUBLICATION_ORIGIN/);
 });

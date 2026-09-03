@@ -8,7 +8,8 @@ function readText(url) {
 
 const ci = readText(new URL('../../.github/workflows/ci.yml', import.meta.url));
 const nightly = readText(new URL('../../.github/workflows/verification-depth.yml', import.meta.url));
-const provenance = readText(new URL('../../.github/workflows/extraction-provenance.yml', import.meta.url));
+const mergeGroup = readText(new URL('../../.github/workflows/merge-group-gate.yml', import.meta.url));
+const provenanceWorkflow = new URL('../../.github/workflows/extraction-provenance.yml', import.meta.url);
 const synology = readText(new URL('../../.github/workflows/synology-live-acceptance.yml', import.meta.url));
 const playwrightConfig = readText(new URL('../../e2e/playwright.config.mjs', import.meta.url));
 const agents = readText(new URL('../../AGENTS.md', import.meta.url));
@@ -41,10 +42,15 @@ test('atlas-gate consumes exact hosted lifecycle evidence without executing repo
   assert.match(browserJob, /protected-hosted-fan-in\.json/);
   assert.match(browserJob, /protected-verification-state\.json/);
   assert.match(browserJob, /validateProtectedHostedGate/);
-  assert.match(browserJob, /ATLAS_LEGACY_CUTOVER_BASE_SHA: b285c4d57d48cbc70bca54619849b7f7cfd423f6/);
+  assert.match(browserJob, /ATLAS_LEGACY_CUTOVER_BASE_SHA: e31015d0880e9f81a4b96f990658490af45e8fa6/);
   assert.match(browserJob, /ATLAS_PROTECTED_BASE_SHA.*ATLAS_LEGACY_CUTOVER_BASE_SHA/);
-  assert.match(browserJob, /commits\/\$ATLAS_CODE_REVISION\/statuses/);
-  assert.match(browserJob, /atlas-local-e2e/);
+  assert.match(browserJob, /ATLAS_LEGACY_CUTOVER_HEAD_REF: feat\/issue-179-legacy-transition-qualifier/);
+  assert.match(browserJob, /validateLegacyTransitionBootstrapGate/);
+  assert.match(browserJob, /legacy-molehill-transition-qualification\.yml/);
+  assert.doesNotMatch(browserJob, /atlas-local-e2e/);
+  assert.match(browserJob, /atlas-protected-product-qualification/);
+  assert.match(browserJob, /validateProtectedProductQualificationGate/);
+  assert.match(browserJob, /protected-execution-promotion-qualification\.yml|protected-product-qualification/);
   assert.doesNotMatch(browserJob, /docker compose|compose\.selfhosted\.yml/);
   assert.match(gate, /- verification-node/);
   assert.match(gate, /- verification-browser/);
@@ -74,15 +80,21 @@ test('legacy local publisher remains exact while protected Playwright identity u
   assert.doesNotMatch(executor, /ATLAS_VERIFICATION_PLAN_SHA256/);
 });
 
-test('required workflows verify the exact pull-request head rather than a synthetic merge ref', () => {
+test('required PR and Merge Queue workflows bind to exact candidates', () => {
   const checkoutCount = (ci.match(/uses: actions\/checkout@/g) ?? []).length;
   const generalExactHeadCount = (ci.match(/ref: \${{ github\.event\.pull_request\.head\.sha \|\| github\.sha }}/g) ?? []).length;
   const prOnlyExactHeadCount = (ci.match(/ref: \${{ github\.event\.pull_request\.head\.sha }}/g) ?? []).length;
   const exactHeadCount = generalExactHeadCount + prOnlyExactHeadCount;
   assert.equal(exactHeadCount, checkoutCount);
 
-  const candidate = block(provenance, '      - name: Check out exact Atlas candidate\n', '      - name: Check out pinned legacy Atlas source as inert Git data\n');
-  assert.match(candidate, /ref: \${{ github\.event\.pull_request\.head\.sha \|\| github\.sha }}/);
+  assert.equal(fs.existsSync(provenanceWorkflow), false, 'separate provenance workflow must be retired');
+  assert.match(mergeGroup, /merge_group:\s*\n\s+types: \[checks_requested\]/);
+  assert.match(mergeGroup, /name: atlas-gate/);
+  assert.match(mergeGroup, /BASE_REF: \$\{\{ github\.event\.merge_group\.base_ref \|\| '' \}\}/);
+  assert.match(mergeGroup, /HEAD_SHA: \$\{\{ github\.event\.merge_group\.head_sha \|\| '' \}\}/);
+  assert.match(mergeGroup, /ref: \$\{\{ github\.event\.merge_group\.head_sha \}\}/);
+  assert.match(mergeGroup, /python tools\/governance\/verify_extraction_provenance\.py/);
+  assert.doesNotMatch(mergeGroup, /provenance-gate/);
 });
 
 test('nightly depth is scheduled, bounded, replayable, read-only and evidence-producing', () => {

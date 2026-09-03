@@ -1,0 +1,400 @@
+name: Atlas Merge Queue gate
+
+on:
+  merge_group:
+    types: [checks_requested]
+
+permissions:
+  contents: read
+  actions: read
+  pull-requests: read
+
+concurrency:
+  group: atlas-merge-group-${{ github.event.merge_group.head_sha }}
+  cancel-in-progress: true
+
+env:
+  ATLAS_CANDIDATE_IMAGE: mcr.microsoft.com/playwright:v1.62.0-noble@sha256:baed2032d533817f3dbe6425de795788430ba345e819a1201337009ba17c9d07
+
+jobs:
+  candidate-checks:
+    name: merge-group-candidate-checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact merge-group candidate for isolated candidate checks
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.merge_group.head_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Validate candidate range and inert repository contract
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.merge_group.base_sha }}
+          HEAD_SHA: ${{ github.event.merge_group.head_sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$HEAD_SHA"
+          git cat-file -e "${BASE_SHA}^{commit}"
+          git diff --check "$BASE_SHA" "$HEAD_SHA"
+          test -s README.md
+          test -s AGENTS.md
+          test -s SECURITY.md
+          test -s .github/CODEOWNERS
+          test -s web/proof/semantic/manifest.json
+          test -s web/proof/pixels/manifest.json
+          test -s web/proof/pixels/pack.rgba
+          test -s docs/migration/legacy-atlas-extraction-provenance.json
+          test -s tools/governance/verify_extraction_provenance.py
+          if find . -type f \( -name '*.otbm' -o -name '*.otb' -o -name '*.spr' -o -name '*.dat' \) -print -quit | grep -q .; then
+            echo 'Forbidden raw legacy/proprietary runtime input committed to repository.' >&2
+            exit 1
+          fi
+          if grep -R --line-number --include='*.ts' --include='*.js' --include='*.mjs' --include='*.svelte' -E '(\.otbm|Legacy IR|world\.otbm)' src web 2>/dev/null; then
+            echo 'Browser source must not reference legacy world formats.' >&2
+            exit 1
+          fi
+          test ! -f package.json || { echo 'Root package.json requires a separately reviewed isolated dependency-install contract.' >&2; exit 1; }
+
+      - name: Run candidate executable contracts in networkless sandbox
+        shell: bash
+        env:
+          ATLAS_CODE_REVISION: ${{ github.event.merge_group.head_sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$ATLAS_CODE_REVISION"
+          timeout --signal=KILL 600s docker run --rm \
+            --network none \
+            --read-only \
+            --cap-drop ALL \
+            --security-opt no-new-privileges \
+            --pids-limit 256 \
+            --memory 2g \
+            --cpus 2 \
+            --user 1000:1000 \
+            --tmpfs /tmp:rw,nosuid,nodev,size=256m \
+            --mount "type=bind,src=$PWD,dst=/candidate,readonly" \
+            "$ATLAS_CANDIDATE_IMAGE" \
+            bash -lc '
+              set -euo pipefail
+              mkdir -p /tmp/bin /tmp/pycache
+              ln -s /usr/bin/python3 /tmp/bin/python
+              export PATH="/tmp/bin:$PATH" PYTHONPYCACHEPREFIX=/tmp/pycache
+              cd /candidate
+              python -m py_compile \
+                tools/dyn-atlas-semantic/compiler.py \
+                tools/dyn-atlas-semantic/verify.py \
+                tools/dyn-atlas-semantic/self_test.py \
+                tools/dyn-atlas-semantic/benchmark.py \
+                tools/dyn-atlas-pixels/measure_metadata.py \
+                tools/dyn-atlas-pixels/publish_store.py
+              python tools/dyn-atlas-semantic/self_test.py
+              files=(
+                tests/animation-runtime.mjs
+                tests/browser-semantic.mjs
+                tests/deployment-policy.mjs
+                tests/creature-presentation-geometry.mjs
+                tests/creature-interaction.mjs
+                tests/creature-interaction-target.mjs
+                tests/map-activation.mjs
+                tests/creature-map-activation-contract.mjs
+                tests/creature-interaction-runtime-contract.mjs
+                tests/creature-gameplay-profiles.mjs
+                tests/creature-inspector-state.mjs
+                tests/creature-gameplay-model.mjs
+                tests/creature-gameplay-runtime-contract.mjs
+                tests/gui-contract.mjs
+                tests/npc-markers.mjs
+                tests/pixel-store.mjs
+                tests/semantic-search.mjs
+                tests/semantic-search-creatures.mjs
+                tests/synology-live-workflow.mjs
+                tests/fullworld-layers/*.test.mjs
+                tests/fullworld-runtime/*.test.mjs
+                tests/properties/*.test.mjs
+                tests/verification/*.test.mjs
+              )
+              node --test "${files[@]}"
+            '
+
+      - name: Run real Chrome WebGL2 parity and GUI smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          CHROME="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || true)"
+          test -n "$CHROME"
+          python -m http.server 8765 --bind 127.0.0.1 >/tmp/atlas-http.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
+          for _ in $(seq 1 30); do curl -fsS http://127.0.0.1:8765/tests/browser-proof.html >/dev/null && break; sleep 1; done
+          rm -rf /tmp/chrome-browser-proof /tmp/chrome-app-proof /tmp/chrome-shot-proof
+          "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage --use-angle=swiftshader --enable-unsafe-swiftshader --force-device-scale-factor=1 --window-size=800,600 --virtual-time-budget=30000 --user-data-dir=/tmp/chrome-browser-proof --dump-dom http://127.0.0.1:8765/tests/browser-proof.html > /tmp/browser-proof.html
+          grep -q 'data-status="PASS"' /tmp/browser-proof.html
+          test "$(grep -c '"maxAbs": 0' /tmp/browser-proof.html)" -eq 5
+          "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage --use-angle=swiftshader --enable-unsafe-swiftshader --force-device-scale-factor=1 --window-size=1920,1080 --virtual-time-budget=30000 --user-data-dir=/tmp/chrome-app-proof --dump-dom 'http://127.0.0.1:8765/web/index.html?x=32377&y=32238&floor=-7&zoom=2' > /tmp/app-dom.html
+          grep -q 'VERIFIED' /tmp/app-dom.html
+          grep -q 'WEBGL2' /tmp/app-dom.html
+          grep -q '>30 / 30<' /tmp/app-dom.html
+          grep -q '<strong id="diag-draws">1</strong>' /tmp/app-dom.html
+          "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage --use-angle=swiftshader --enable-unsafe-swiftshader --hide-scrollbars --force-device-scale-factor=1 --window-size=1920,1080 --virtual-time-budget=30000 --user-data-dir=/tmp/chrome-shot-proof --screenshot=/tmp/gui.png 'http://127.0.0.1:8765/web/index.html?x=32377&y=32238&floor=-7&zoom=2'
+          python - <<'PY'
+          import struct
+          from pathlib import Path
+          data = Path('/tmp/gui.png').read_bytes()
+          assert data[:8] == b'\x89PNG\r\n\x1a\n'
+          assert struct.unpack('>II', data[16:24]) == (1920, 1080)
+          PY
+
+  atlas-gate:
+    name: atlas-gate
+    needs: candidate-checks
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Require isolated candidate checks to pass
+        shell: bash
+        env:
+          CANDIDATE_CHECKS_RESULT: ${{ needs.candidate-checks.result }}
+        run: |
+          set -euo pipefail
+          [[ "$CANDIDATE_CHECKS_RESULT" == success ]]
+
+      - name: Validate exact merge-group identity
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_ACTION: ${{ github.event.action }}
+          BASE_REF: ${{ github.event.merge_group.base_ref || '' }}
+          BASE_SHA: ${{ github.event.merge_group.base_sha || '' }}
+          HEAD_SHA: ${{ github.event.merge_group.head_sha || '' }}
+          GITHUB_SHA_VALUE: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          [[ "$EVENT_NAME" == merge_group ]]
+          [[ "$EVENT_ACTION" == checks_requested ]]
+          [[ "$BASE_REF" == refs/heads/main ]]
+          [[ "$BASE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$HEAD_SHA" == "$GITHUB_SHA_VALUE" ]]
+          [[ "$HEAD_SHA" != "$BASE_SHA" ]]
+
+      - name: Check out exact merge-group candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.merge_group.head_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify exact pinned extraction provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m py_compile tools/governance/verify_extraction_provenance.py tools/governance/test_verify_extraction_provenance.py
+          python tools/governance/test_verify_extraction_provenance.py
+          python tools/governance/verify_extraction_provenance.py
+
+      - name: Check out exact protected merge-group base
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.merge_group.base_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+          path: trusted-base
+
+      - name: Validate one-shot PR 303 merge-group bootstrap proof
+        id: legacy-bootstrap
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ATLAS_CODE_REVISION: ${{ github.event.merge_group.head_sha }}
+          ATLAS_PROTECTED_BASE_SHA: ${{ github.event.merge_group.base_sha }}
+          ATLAS_MERGE_GROUP_HEAD_REF: ${{ github.event.merge_group.head_ref || '' }}
+          ATLAS_LEGACY_CUTOVER_BASE_SHA: e31015d0880e9f81a4b96f990658490af45e8fa6
+          ATLAS_LEGACY_CUTOVER_PR_NUMBER: '303'
+          ATLAS_LEGACY_CUTOVER_HEAD_REF: feat/issue-179-legacy-transition-qualifier
+        run: |
+          set -euo pipefail
+          printf 'use_legacy_proof=false\n' >> "$GITHUB_OUTPUT"
+          expected_queue_ref="refs/heads/gh-readonly-queue/main/pr-$ATLAS_LEGACY_CUTOVER_PR_NUMBER-$ATLAS_LEGACY_CUTOVER_BASE_SHA"
+          if [[ "$ATLAS_PROTECTED_BASE_SHA" != "$ATLAS_LEGACY_CUTOVER_BASE_SHA" \
+            || "$ATLAS_MERGE_GROUP_HEAD_REF" != "$expected_queue_ref" ]]; then
+            exit 0
+          fi
+          test "$GITHUB_REPOSITORY" = Oteryn/Oteryn-Atlas
+          work="$RUNNER_TEMP/atlas-merge-group-legacy-bootstrap"
+          rm -rf "$work"
+          mkdir -p "$work"
+          live_pr="$work/live-pr.json"
+          changed_files="$work/changed-files.txt"
+          synthetic_commit="$work/synthetic-commit.json"
+          candidate_commit="$work/candidate-commit.json"
+          gh api "repos/$GITHUB_REPOSITORY/pulls/$ATLAS_LEGACY_CUTOVER_PR_NUMBER" > "$live_pr"
+          candidate_head_sha="$(jq -r '.head.sha' "$live_pr")"
+          [[ "$candidate_head_sha" =~ ^[0-9a-f]{40}$ ]]
+          gh api "repos/$GITHUB_REPOSITORY/git/commits/$ATLAS_CODE_REVISION" > "$synthetic_commit"
+          gh api "repos/$GITHUB_REPOSITORY/git/commits/$candidate_head_sha" > "$candidate_commit"
+          current_main_sha="$(gh api "repos/$GITHUB_REPOSITORY/branches/main" --jq '.commit.sha')"
+          [[ "$current_main_sha" =~ ^[0-9a-f]{40}$ ]]
+          gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$ATLAS_LEGACY_CUTOVER_PR_NUMBER/files?per_page=100" \
+            --jq '.[].filename' | sort > "$changed_files"
+          runs="$work/legacy-transition-runs.json"
+          gh api "repos/$GITHUB_REPOSITORY/actions/workflows/legacy-molehill-transition-qualification.yml/runs?event=pull_request&branch=$ATLAS_LEGACY_CUTOVER_HEAD_REF&per_page=100" > "$runs"
+          mapfile -t legacy_run_ids < <(node --input-type=module - "$runs" "$candidate_head_sha" <<'NODE'
+          import fs from 'node:fs';
+          const [runsPath, candidateHeadSha] = process.argv.slice(2);
+          const runs = JSON.parse(fs.readFileSync(runsPath, 'utf8')).workflow_runs ?? [];
+          const ids = runs
+            .filter((run) => run.status === 'completed'
+              && run.path === '.github/workflows/legacy-molehill-transition-qualification.yml'
+              && run.event === 'pull_request'
+              && run.head_branch === process.env.ATLAS_LEGACY_CUTOVER_HEAD_REF
+              && run.head_sha === candidateHeadSha
+              && run.repository?.full_name === process.env.GITHUB_REPOSITORY
+              && Number(run.run_attempt) === 1)
+            .map((run) => Number(run.id))
+            .filter((id) => Number.isSafeInteger(id) && id > 0)
+            .sort((left, right) => right - left);
+          for (const id of ids) process.stdout.write(`${id}\n`);
+          NODE
+          )
+          selected_legacy_run=''
+          for legacy_run_id in "${legacy_run_ids[@]}"; do
+            run_json="$work/run-$legacy_run_id.json"
+            jobs_json="$work/jobs-$legacy_run_id.json"
+            gh api "repos/$GITHUB_REPOSITORY/actions/runs/$legacy_run_id" > "$run_json"
+            gh api "repos/$GITHUB_REPOSITORY/actions/runs/$legacy_run_id/jobs?per_page=100" > "$jobs_json"
+            if CURRENT_MAIN_SHA="$current_main_sha" node --input-type=module - \
+              "$run_json" "$jobs_json" "$live_pr" "$changed_files" "$synthetic_commit" "$candidate_commit" <<'NODE'
+          import fs from 'node:fs';
+          import { validateLegacyTransitionMergeGroupBootstrapGate } from './tools/verification/protected-hosted-gate.mjs';
+          const [runPath, jobsPath, livePrPath, changedFilesPath, syntheticPath, candidatePath] = process.argv.slice(2);
+          const read = (path) => JSON.parse(fs.readFileSync(path, 'utf8'));
+          const changedFiles = fs.readFileSync(changedFilesPath, 'utf8').split(/\r?\n/).filter(Boolean);
+          const result = validateLegacyTransitionMergeGroupBootstrapGate({
+            producerRun: read(runPath),
+            producerJobs: read(jobsPath),
+            livePr: read(livePrPath),
+            changedFiles,
+            expectedRepository: process.env.GITHUB_REPOSITORY,
+            expectedPrNumber: Number(process.env.ATLAS_LEGACY_CUTOVER_PR_NUMBER),
+            expectedProtectedBaseSha: process.env.ATLAS_PROTECTED_BASE_SHA,
+            expectedSyntheticHeadSha: process.env.ATLAS_CODE_REVISION,
+            currentMainSha: process.env.CURRENT_MAIN_SHA,
+            mergeGroup: {
+              baseRef: 'refs/heads/main',
+              baseSha: process.env.ATLAS_PROTECTED_BASE_SHA,
+              headRef: process.env.ATLAS_MERGE_GROUP_HEAD_REF,
+              headSha: process.env.ATLAS_CODE_REVISION,
+            },
+            syntheticCommit: read(syntheticPath),
+            candidateCommit: read(candidatePath),
+          });
+          process.stdout.write(`${JSON.stringify(result)}\n`);
+          NODE
+            then
+              selected_legacy_run="$legacy_run_id"
+              break
+            fi
+          done
+          [[ "$selected_legacy_run" =~ ^[1-9][0-9]*$ ]]
+          printf 'use_legacy_proof=true\nproducer_run_id=%s\n' "$selected_legacy_run" >> "$GITHUB_OUTPUT"
+
+      - name: Prove complete protected-base browser qualification for synthetic candidate
+        if: ${{ steps.legacy-bootstrap.outputs.use_legacy_proof != 'true' }}
+        shell: bash
+        env:
+          ATLAS_CODE_REVISION: ${{ github.event.merge_group.head_sha }}
+          ATLAS_PROTECTED_BASE_SHA: ${{ github.event.merge_group.base_sha }}
+          ATLAS_E2E_WORKERS: '1'
+          ATLAS_E2E_SHARD: '1/1'
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$ATLAS_CODE_REVISION"
+          test "$(git -C trusted-base rev-parse HEAD)" = "$ATLAS_PROTECTED_BASE_SHA"
+          grep -Fq -- '--retries=0' trusted-base/e2e/compose.protected-hosted-executor.yml
+
+          npm ci --prefix trusted-base/e2e --ignore-scripts --no-audit --no-fund
+          protected_list="$RUNNER_TEMP/atlas-merge-group-protected-list.txt"
+          qualification_list="$RUNNER_TEMP/atlas-merge-group-qualification-list.txt"
+          (
+            cd trusted-base
+            ATLAS_ARTIFACTS_DIR="$RUNNER_TEMP/atlas-merge-group-list-artifacts" \
+              npm exec --prefix e2e -- playwright test --config=e2e/playwright.config.mjs --list
+          ) > "$protected_list"
+
+          PROTECTED_LIST="$protected_list" QUALIFICATION_LIST="$qualification_list" node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const catalog = JSON.parse(fs.readFileSync('./trusted-base/tools/verification/verification-catalog.json', 'utf8'));
+          const specs = new Set(catalog.groups?.['e2e.full']?.specs ?? []);
+          if (!specs.size) throw new TypeError('protected e2e.full qualification catalog is empty');
+          const rows = fs.readFileSync(process.env.PROTECTED_LIST, 'utf8').split(/\r?\n/);
+          const selected = [];
+          for (const line of rows) {
+            const match = line.match(/^\s*\[([^\]]+)\]\s+›\s+([^:]+):\d+:\d+\s+›\s+(.+)$/);
+            if (!match) continue;
+            const spec = `e2e/tests/${match[2]}`;
+            if (specs.has(spec)) selected.push(line.trim());
+          }
+          if (!selected.length) throw new TypeError('protected e2e.full qualification selection is empty');
+          fs.writeFileSync(process.env.QUALIFICATION_LIST, `${selected.join('\n')}\n`, 'utf8');
+          NODE
+          test -s "$qualification_list"
+
+          source_root="$RUNNER_TEMP/atlas-merge-group-qualification-world"
+          trust_path="$RUNNER_TEMP/atlas-merge-group-qualification-trust.json"
+          rm -rf "$source_root"
+          SOURCE_ROOT="$source_root" TRUST_PATH="$trust_path" node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import { buildQualificationWorld, qualificationTrustDescriptor, verifyQualificationWorld } from './trusted-base/tools/verification/qualification-world.mjs';
+          await buildQualificationWorld(process.env.SOURCE_ROOT);
+          const verified = await verifyQualificationWorld(process.env.SOURCE_ROOT);
+          fs.writeFileSync(process.env.TRUST_PATH, `${JSON.stringify(qualificationTrustDescriptor(verified))}\n`, 'utf8');
+          NODE
+          test -s "$trust_path"
+
+          execution_context="$RUNNER_TEMP/atlas-merge-group-execution-context"
+          artifacts="$RUNNER_TEMP/atlas-merge-group-browser-artifacts"
+          rm -rf "$execution_context" "$artifacts"
+          mkdir -p "$execution_context" "$artifacts"
+          rsync -a --delete --exclude='.git' --exclude='trusted-base' ./ "$execution_context/"
+          for path in web src; do
+            test -d "$execution_context/$path"
+            test ! -L "$execution_context/$path"
+          done
+          rm -rf "$execution_context/e2e"
+          cp -a trusted-base/e2e "$execution_context/e2e"
+          rm -rf "$execution_context/e2e/node_modules"
+          rm -f "$execution_context/.dockerignore" "$execution_context/e2e/Dockerfile.dockerignore"
+          mkdir -p "$execution_context/tools/verification"
+          cp trusted-base/tools/verification/stable-id.mjs "$execution_context/tools/verification/stable-id.mjs"
+
+          digest() {
+            printf '%s' "$1" | sha256sum | awk '{print "sha256:" $1}'
+          }
+          export ATLAS_PLAN_SEMANTIC_DIGEST="$(digest "merge-group-semantic:$ATLAS_CODE_REVISION")"
+          export ATLAS_PLAN_INSTANCE_DIGEST="$(digest "merge-group-instance:$ATLAS_PROTECTED_BASE_SHA:$ATLAS_CODE_REVISION")"
+          export ATLAS_AUTHORITY_DIGEST="$(digest "merge-group-authority:$ATLAS_PROTECTED_BASE_SHA")"
+          export ATLAS_ENVIRONMENT_DIGEST="$(digest 'merge-group-github-hosted-ubuntu-24.04')"
+          export ATLAS_QUALIFICATION_PUBLICATION_HOST="$source_root"
+          export ATLAS_QUALIFICATION_TRUST_JSON="$(cat "$trust_path")"
+          export ATLAS_EXECUTION_CONTEXT="$execution_context"
+          export ATLAS_E2E_ARTIFACTS_HOST="$artifacts"
+          export ATLAS_PROTECTED_TEST_LIST="$qualification_list"
+          export COMPOSE_PROJECT_NAME="atlas-merge-group-$GITHUB_RUN_ID"
+
+          compose() {
+            docker compose \
+              -f trusted-base/e2e/compose.protected-hosted-executor.yml \
+              -f trusted-base/e2e/compose.github-hosted.yml \
+              "$@"
+          }
+          cleanup() {
+            compose down -v --remove-orphans >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+          compose config -q
+          compose up -d --wait atlas-publication atlas-web
+          compose run --no-deps --rm e2e

@@ -13,7 +13,8 @@ test('protected execution promotion qualification is GitHub-hosted, exact-head, 
   const workflow = fs.readFileSync(workflowPath, 'utf8');
   const legacy = fs.readFileSync(legacyWorkflowPath, 'utf8');
   const heavy = legacy.split('  legacy-qualification:')[1]?.split('  protected-census-bootstrap:')[0] ?? '';
-  assert.match(workflow, /pull_request:\s*\n\s*types:\s*\[labeled\]/);
+  assert.match(workflow, /pull_request_target:\s*\n\s*types:\s*\[labeled\]/);
+  assert.doesNotMatch(workflow, /^\s{2}pull_request:\s*$/m);
   assert.match(workflow, /github\.event\.label\.name == 'atlas-legacy-transition-qualification'/);
   assert.match(workflow, /fix\/issue-179-protected-execution-contract-promotion/);
   assert.doesNotMatch(heavy, /fix\/issue-179-protected-execution-contract-promotion/);
@@ -164,7 +165,8 @@ test('protected execution promotion preauthorizes the functional qualification f
   assert.match(job, /--retries=0/);
   assert.match(job, /assert-current-pr-head\.mjs/);
   assert.match(job, /statuses:\s*write/);
-  assert.match(job, /context='atlas-local-e2e'|context.*atlas-local-e2e/s);
+  assert.match(job, /context='atlas-protected-product-qualification'|context.*atlas-protected-product-qualification/s);
+  assert.doesNotMatch(job, /context='atlas-local-e2e'/);
   assert.doesNotMatch(job, /group:\s*atlas-runners|labels:\s*oteryn-atlas-pc|visual-review\.json|synology|real_fullworld/i);
 });
 

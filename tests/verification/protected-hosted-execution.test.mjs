@@ -310,6 +310,7 @@ test('protected promotion qualification registry binds exact functional qualific
       'e2e/tests/stress-desktop.spec.mjs',
       'e2e/tests/visual-desktop.spec.mjs',
       'e2e/tests/visual-mobile.spec.mjs',
+      'src/browser/animation-runtime-service.mjs',
       'src/browser/semantic-search.mjs',
       'tests/verification/protected-hosted-product-identities.test.mjs',
       'tests/verification/qualification-semantic-source-trust.test.mjs',
@@ -320,7 +321,7 @@ test('protected promotion qualification registry binds exact functional qualific
       'web/fullworld-farm-explorer.mjs',
       'web/fullworld-search.mjs',
     ],
-    expectedProductDigest: 'sha256:7bac8358ecb8e44d05636f9657c318fa6bb6f22445143237c8fa207d45be820b',
+    expectedProductDigest: 'sha256:2f457583f21cd3ebf8d995c1cc520ea099b277dace69453db08d568de7584613',
     candidateCensusMount: {
       sourceTree: 'exact-candidate-checkout',
       containerRoot: '/candidate',
@@ -336,6 +337,14 @@ test('protected promotion qualification registry binds exact functional qualific
       pycacheRoot: '/tmp/atlas-python-pycache',
       network: 'none',
       rootFilesystem: 'read-only',
+    },
+    gateProof: {
+      kind: 'complete-hosted-browser-v1',
+      workflowPath: '.github/workflows/protected-execution-promotion-qualification.yml',
+      event: 'pull_request_target',
+      jobName: 'Publish functional qualification fixture compatibility evidence',
+      statusContext: 'atlas-protected-product-qualification',
+      statusDescription: 'Protected GitHub-hosted complete qualification functional safety net',
     },
   });
   assert.equal(Object.isFrozen(spec), true);

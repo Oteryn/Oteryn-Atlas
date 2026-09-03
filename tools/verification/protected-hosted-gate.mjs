@@ -7,6 +7,7 @@ import {
 } from './anti-loop-common.mjs';
 import { validateEvidenceManifest } from './evidence-manifest.mjs';
 import { validateProtectedExecutionEnvironmentQualification } from './protected-execution-environment.mjs';
+import { resolveProtectedAuthorityRepinQualification, resolveProtectedPromotionQualification } from './protected-hosted-execution.mjs';
 import { validateProtectedHostedEvidenceFanIn } from './protected-hosted-fan-in.mjs';
 import {
   validateProtectedVerificationState,
@@ -15,7 +16,7 @@ import {
 import { canonicalJson } from './verification-plan-schema.mjs';
 
 const EXECUTOR_WORKFLOW_PATH = '.github/workflows/protected-hosted-executor.yml';
-const PRODUCER_EVENTS = new Set(['workflow_run']);
+const PRODUCER_EVENTS = new Set(['workflow_run', 'workflow_dispatch']);
 const SUCCESS_PROGRESS = new Set(['QUALIFIED', 'MERGE_READY']);
 
 function exactPositiveInteger(value, label) {
@@ -38,6 +39,7 @@ function validateLivePr(pr, {
   prNumber,
   candidateHeadSha,
   protectedBaseSha,
+  requireBaseSha = true,
 }) {
   if (!isPlainObject(pr)
     || pr.number !== prNumber
@@ -51,7 +53,7 @@ function validateLivePr(pr, {
   if (exactSha(pr.head.sha, 'protected hosted gate live PR head') !== candidateHeadSha) {
     throw new TypeError('protected hosted gate live PR head is stale');
   }
-  if (exactSha(pr.base.sha, 'protected hosted gate live PR base') !== protectedBaseSha) {
+  if (requireBaseSha && exactSha(pr.base.sha, 'protected hosted gate live PR base') !== protectedBaseSha) {
     throw new TypeError('protected hosted gate live PR base is stale');
   }
   return undefined;
@@ -160,7 +162,7 @@ export function validateProtectedHostedGate(input) {
     throw new TypeError('protected hosted gate state is not qualified or merge-ready');
   }
   validateLivePr(input.livePr, {
-    repository, prNumber, candidateHeadSha, protectedBaseSha,
+    repository, prNumber, candidateHeadSha, protectedBaseSha, requireBaseSha: false,
   });
   validateProducerRun(input.producerRun, state, repository);
   if (state.plan.controller?.sourceSha !== protectedBaseSha) throw new TypeError('protected hosted gate controller authority is not the protected base');
@@ -228,5 +230,277 @@ export function validateProtectedHostedGate(input) {
     reusedEvidenceIds: result.reusedEvidenceIds,
     stateDigest: state.stateDigest,
     fanInEvidenceDigest: payload.evidenceManifest.evidenceDigest,
+  });
+}
+
+
+export function validateProtectedProductQualificationGate(input) {
+  if (!isPlainObject(input)) throw new TypeError('protected product qualification gate input is invalid');
+  const repository = nonEmptyString(input.expectedRepository, 'protected product qualification gate repository');
+  if (repository !== 'Oteryn/Oteryn-Atlas') throw new TypeError('protected product qualification gate repository is invalid');
+  const prNumber = exactPositiveInteger(input.expectedPrNumber, 'protected product qualification gate PR number');
+  const candidateHeadSha = exactSha(input.expectedCandidateHeadSha, 'protected product qualification gate candidate head');
+  const protectedBaseSha = exactSha(input.expectedProtectedBaseSha, 'protected product qualification gate protected base');
+
+  validateLivePr(input.livePr, {
+    repository, prNumber, candidateHeadSha, protectedBaseSha,
+  });
+  const headRef = nonEmptyString(input.livePr.head?.ref, 'protected product qualification gate head ref');
+  let qualification;
+  let mode = 'protected-product-qualification';
+  try {
+    qualification = resolveProtectedPromotionQualification(headRef);
+  } catch (promotionError) {
+    try {
+      qualification = resolveProtectedAuthorityRepinQualification(headRef);
+      mode = 'protected-authority-repin-qualification';
+    } catch {
+      throw promotionError;
+    }
+  }
+  const proof = qualification.gateProof;
+  const expectedProofKind = mode === 'protected-authority-repin-qualification'
+    ? 'complete-hosted-browser-authority-repin-v1'
+    : 'complete-hosted-browser-v1';
+  if (!isPlainObject(proof) || proof.kind !== expectedProofKind) {
+    throw new TypeError('protected product qualification is not an authoritative complete hosted browser gate proof');
+  }
+  if (qualification.headRef !== headRef) throw new TypeError('protected product qualification head ref mismatch');
+
+  const status = input.status;
+  if (!isPlainObject(status)
+    || status.state !== 'success'
+    || status.context !== proof.statusContext
+    || status.description !== proof.statusDescription
+    || status.creator?.login !== 'github-actions[bot]') {
+    throw new TypeError('protected product qualification commit status is not authoritative');
+  }
+
+  const run = input.producerRun;
+  if (!isPlainObject(run)
+    || run.status !== 'completed'
+    || run.conclusion !== 'success'
+    || run.path !== proof.workflowPath
+    || run.event !== proof.event
+    || run.repository?.full_name !== repository
+    || run.head_branch !== 'main') {
+    throw new TypeError('protected product qualification producer run is not authoritative');
+  }
+  const runId = exactPositiveInteger(Number(run.id), 'protected product qualification producer run ID');
+  const runAttempt = exactPositiveInteger(Number(run.run_attempt), 'protected product qualification producer run attempt');
+  if (runAttempt !== 1) throw new TypeError('protected product qualification producer run must be attempt 1');
+  if (exactSha(run.head_sha, 'protected product qualification producer base') !== protectedBaseSha) {
+    throw new TypeError('protected product qualification producer base is stale');
+  }
+  const expectedTarget = `https://github.com/${repository}/actions/runs/${runId}`;
+  if (status.target_url !== expectedTarget) throw new TypeError('protected product qualification status target run mismatch');
+
+  const associations = Array.isArray(run.pull_requests) ? run.pull_requests : [];
+  const association = associations.find((item) => item?.number === prNumber);
+  if (!association
+    || association.head?.repo?.full_name !== repository
+    || association.base?.repo?.full_name !== repository
+    || exactSha(association.head?.sha, 'protected product qualification associated head') !== candidateHeadSha
+    || exactSha(association.base?.sha, 'protected product qualification associated base') !== protectedBaseSha) {
+    throw new TypeError('protected product qualification producer PR association mismatch');
+  }
+
+  const jobs = input.producerJobs?.jobs;
+  if (!Array.isArray(jobs)) throw new TypeError('protected product qualification producer jobs are invalid');
+  const proofJobs = jobs.filter((job) => job?.name === proof.jobName);
+  if (proofJobs.length !== 1
+    || proofJobs[0].status !== 'completed'
+    || proofJobs[0].conclusion !== 'success') {
+    throw new TypeError('protected product qualification complete browser proof job is not successful');
+  }
+
+  return deepFreeze({
+    schemaVersion: 1,
+    status: 'success',
+    mode,
+    repository,
+    prNumber,
+    protectedBaseSha,
+    candidateHeadSha,
+    qualificationId: qualification.id,
+    ...(mode === 'protected-authority-repin-qualification'
+      ? { sourceHeadRef: qualification.sourceHeadRef }
+      : { productDigest: qualification.expectedProductDigest }),
+    producerRunId: runId,
+    producerRunAttempt: runAttempt,
+  });
+}
+
+const LEGACY_TRANSITION_BOOTSTRAP = deepFreeze({
+  id: 'authority-repin-recovery-stabilization-v1',
+  protectedBaseSha: 'e31015d0880e9f81a4b96f990658490af45e8fa6',
+  headRef: 'feat/issue-179-legacy-transition-qualifier',
+  workflowPath: '.github/workflows/legacy-molehill-transition-qualification.yml',
+  event: 'pull_request',
+  heavyJobName: 'Capture exact-head legacy transition evidence',
+  allowedNonEvidenceFailureJobName: 'Publish reviewed atlas-local-e2e transition status',
+  prNumber: 303,
+  changedFiles: [
+    '.github/workflows/ci.yml',
+    '.github/workflows/merge-authority-audit.yml',
+    '.github/workflows/merge-group-gate.yml',
+    '.github/workflows/protected-execution-promotion-qualification.yml',
+    'docs/migration/legacy-atlas-extraction-provenance.json',
+    'tests/verification/ci-workflow-contract.test.mjs',
+    'tests/verification/merge-queue-gate-contract.test.mjs',
+    'tests/verification/pr-browser-trust.test.mjs',
+    'tests/verification/protected-anti-loop-workflow-integration.test.mjs',
+    'tests/verification/protected-authority-repin-recovery.test.mjs',
+    'tests/verification/protected-hosted-execution.test.mjs',
+    'tests/verification/selfhosted-compose-contract.test.mjs',
+    'tools/governance/verify_extraction_provenance.py',
+    'tools/verification/protected-hosted-execution.mjs',
+    'tools/verification/protected-hosted-gate.mjs',
+  ],
+});
+
+export function validateLegacyTransitionBootstrapGate(input) {
+  if (!isPlainObject(input)) throw new TypeError('legacy transition bootstrap gate input is invalid');
+  const repository = nonEmptyString(input.expectedRepository, 'legacy transition bootstrap repository');
+  if (repository !== 'Oteryn/Oteryn-Atlas') throw new TypeError('legacy transition bootstrap repository is invalid');
+  const prNumber = exactPositiveInteger(input.expectedPrNumber, 'legacy transition bootstrap PR number');
+  const candidateHeadSha = exactSha(input.expectedCandidateHeadSha, 'legacy transition bootstrap candidate head');
+  const protectedBaseSha = exactSha(input.expectedProtectedBaseSha, 'legacy transition bootstrap protected base');
+  if (protectedBaseSha !== LEGACY_TRANSITION_BOOTSTRAP.protectedBaseSha) {
+    throw new TypeError('legacy transition bootstrap protected base is not the one-shot authority base');
+  }
+  validateLivePr(input.livePr, { repository, prNumber, candidateHeadSha, protectedBaseSha });
+  if (input.livePr.head?.ref !== LEGACY_TRANSITION_BOOTSTRAP.headRef) {
+    throw new TypeError('legacy transition bootstrap head ref is not preauthorized');
+  }
+  const changedFiles = exactArray(input.changedFiles, 'legacy transition bootstrap changed files');
+  exactObject(changedFiles, LEGACY_TRANSITION_BOOTSTRAP.changedFiles, 'legacy transition bootstrap exact changed files');
+
+  const run = input.producerRun;
+  if (!isPlainObject(run)
+    || run.status !== 'completed'
+    || !new Set(['success', 'failure']).has(run.conclusion)
+    || run.path !== LEGACY_TRANSITION_BOOTSTRAP.workflowPath
+    || run.event !== LEGACY_TRANSITION_BOOTSTRAP.event
+    || run.repository?.full_name !== repository
+    || run.head_branch !== LEGACY_TRANSITION_BOOTSTRAP.headRef) {
+    throw new TypeError('legacy transition bootstrap producer run is not authoritative');
+  }
+  const runId = exactPositiveInteger(Number(run.id), 'legacy transition bootstrap producer run ID');
+  const runAttempt = exactPositiveInteger(Number(run.run_attempt), 'legacy transition bootstrap producer run attempt');
+  if (runAttempt !== 1) throw new TypeError('legacy transition bootstrap producer run must be attempt 1');
+  if (exactSha(run.head_sha, 'legacy transition bootstrap producer head') !== candidateHeadSha) {
+    throw new TypeError('legacy transition bootstrap producer head is stale');
+  }
+  const runRepositoryId = exactPositiveInteger(Number(run.repository?.id), 'legacy transition bootstrap producer repository ID');
+  const association = (Array.isArray(run.pull_requests) ? run.pull_requests : []).find((item) => item?.number === prNumber);
+  if (!association
+    || Number(association.head?.repo?.id) !== runRepositoryId
+    || Number(association.base?.repo?.id) !== runRepositoryId
+    || association.head?.ref !== LEGACY_TRANSITION_BOOTSTRAP.headRef
+    || association.base?.ref !== 'main'
+    || exactSha(association.head?.sha, 'legacy transition bootstrap associated head') !== candidateHeadSha
+    || exactSha(association.base?.sha, 'legacy transition bootstrap associated base') !== protectedBaseSha) {
+    throw new TypeError('legacy transition bootstrap producer PR association mismatch');
+  }
+
+  const jobs = input.producerJobs?.jobs;
+  if (!Array.isArray(jobs)) throw new TypeError('legacy transition bootstrap producer jobs are invalid');
+  const heavy = jobs.filter((job) => job?.name === LEGACY_TRANSITION_BOOTSTRAP.heavyJobName);
+  if (heavy.length !== 1 || heavy[0].status !== 'completed' || heavy[0].conclusion !== 'success') {
+    throw new TypeError('legacy transition bootstrap heavy exact-head proof is not successful');
+  }
+  const unexpectedFailures = jobs.filter((job) => job?.status === 'completed' && job?.conclusion === 'failure'
+    && job?.name !== LEGACY_TRANSITION_BOOTSTRAP.allowedNonEvidenceFailureJobName);
+  if (unexpectedFailures.length !== 0) {
+    throw new TypeError('legacy transition bootstrap has an unexpected failed producer job');
+  }
+  if (run.conclusion === 'failure') {
+    const allowedFailures = jobs.filter((job) => job?.status === 'completed' && job?.conclusion === 'failure'
+      && job?.name === LEGACY_TRANSITION_BOOTSTRAP.allowedNonEvidenceFailureJobName);
+    if (allowedFailures.length !== 1) {
+      throw new TypeError('legacy transition bootstrap failed run is not visual-review-only');
+    }
+  }
+
+  return deepFreeze({
+    schemaVersion: 1,
+    status: 'success',
+    mode: 'legacy-transition-heavy-proof-exact-base-only',
+    repository,
+    prNumber,
+    protectedBaseSha,
+    candidateHeadSha,
+    headRef: LEGACY_TRANSITION_BOOTSTRAP.headRef,
+    producerRunId: runId,
+    producerRunAttempt: runAttempt,
+  });
+}
+
+export function validateLegacyTransitionMergeGroupBootstrapGate(input) {
+  if (!isPlainObject(input)) throw new TypeError('legacy transition merge-group bootstrap input is invalid');
+  const repository = nonEmptyString(input.expectedRepository, 'legacy transition merge-group repository');
+  if (repository !== 'Oteryn/Oteryn-Atlas') throw new TypeError('legacy transition merge-group repository is invalid');
+  const prNumber = exactPositiveInteger(input.expectedPrNumber, 'legacy transition merge-group PR number');
+  if (prNumber !== LEGACY_TRANSITION_BOOTSTRAP.prNumber) {
+    throw new TypeError('legacy transition merge-group PR number is not preauthorized');
+  }
+  const protectedBaseSha = exactSha(input.expectedProtectedBaseSha, 'legacy transition merge-group protected base');
+  if (protectedBaseSha !== LEGACY_TRANSITION_BOOTSTRAP.protectedBaseSha) {
+    throw new TypeError('legacy transition merge-group protected base is not preauthorized');
+  }
+  const syntheticHeadSha = exactSha(input.expectedSyntheticHeadSha, 'legacy transition merge-group synthetic head');
+  const currentMainSha = exactSha(input.currentMainSha, 'legacy transition merge-group current main');
+  if (currentMainSha !== protectedBaseSha) {
+    throw new TypeError('legacy transition merge-group current main is stale');
+  }
+
+  const mergeGroup = input.mergeGroup;
+  const expectedQueueHeadRef = `refs/heads/gh-readonly-queue/main/pr-${prNumber}-${protectedBaseSha}`;
+  if (!isPlainObject(mergeGroup)
+    || mergeGroup.baseRef !== 'refs/heads/main'
+    || mergeGroup.headRef !== expectedQueueHeadRef
+    || exactSha(mergeGroup.baseSha, 'legacy transition merge-group event base') !== protectedBaseSha
+    || exactSha(mergeGroup.headSha, 'legacy transition merge-group event head') !== syntheticHeadSha) {
+    throw new TypeError('legacy transition merge-group queue head ref or event identity mismatch');
+  }
+
+  const syntheticCommit = input.syntheticCommit;
+  if (!isPlainObject(syntheticCommit)
+    || exactSha(syntheticCommit.sha, 'legacy transition synthetic commit') !== syntheticHeadSha
+    || !Array.isArray(syntheticCommit.parents)
+    || syntheticCommit.parents.length !== 1
+    || exactSha(syntheticCommit.parents[0]?.sha, 'legacy transition synthetic parent') !== protectedBaseSha) {
+    throw new TypeError('legacy transition synthetic commit parent identity mismatch');
+  }
+  const syntheticTreeSha = exactSha(syntheticCommit.tree?.sha, 'legacy transition synthetic tree');
+
+  const candidateHeadSha = exactSha(input.livePr?.head?.sha, 'legacy transition merge-group candidate head');
+  const candidateCommit = input.candidateCommit;
+  if (!isPlainObject(candidateCommit)
+    || exactSha(candidateCommit.sha, 'legacy transition candidate commit') !== candidateHeadSha) {
+    throw new TypeError('legacy transition merge-group candidate commit identity mismatch');
+  }
+  const candidateTreeSha = exactSha(candidateCommit.tree?.sha, 'legacy transition candidate tree');
+  if (candidateTreeSha !== syntheticTreeSha) {
+    throw new TypeError('legacy transition merge-group synthetic tree does not equal exact candidate tree');
+  }
+
+  const protectedProof = validateLegacyTransitionBootstrapGate({
+    producerRun: input.producerRun,
+    producerJobs: input.producerJobs,
+    livePr: input.livePr,
+    changedFiles: input.changedFiles,
+    expectedRepository: repository,
+    expectedPrNumber: prNumber,
+    expectedCandidateHeadSha: candidateHeadSha,
+    expectedProtectedBaseSha: protectedBaseSha,
+  });
+
+  return deepFreeze({
+    ...protectedProof,
+    mode: 'legacy-transition-merge-group-heavy-proof-exact-base-only',
+    syntheticHeadSha,
+    treeSha: syntheticTreeSha,
   });
 }
