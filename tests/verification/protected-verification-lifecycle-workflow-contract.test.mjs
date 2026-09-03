@@ -32,6 +32,16 @@ test('base-advance workflow dispatch resolves current protected main instead of 
   assert.match(controller, /candidate_head_sha:\s*pr\.head\.sha/, 'candidate identity must remain bound to the live PR head');
 });
 
+test('protected controller derives browser semantic content from exact protected and candidate Git objects without executing candidate code', () => {
+  assert.match(controller, /git ls-tree -r -z --full-tree "\$ATLAS_PROTECTED_BASE_SHA"/);
+  assert.match(controller, /git ls-tree -r -z --full-tree "\$ATLAS_CANDIDATE_HEAD_SHA"/);
+  assert.match(controller, /browser-semantic-content\.mjs/);
+  assert.match(controller, /buildBrowserSemanticContentIdentity/);
+  assert.match(controller, /browser-semantic-content-identity\.json/);
+  assert.match(controller, /browserSemanticContentDigest:\s*browserSemanticContentIdentity\.browserSemanticContentDigest/);
+  assert.equal(authorityPaths.has('tools/verification/browser-semantic-content.mjs'), true);
+});
+
 test('base-advance changed paths are captured without multiplexing pipeline stdin with the Node program', () => {
   assert.doesNotMatch(
     executor,
@@ -90,7 +100,9 @@ test('protected authority cannot be promoted by candidate-controlled executor co
 test('authority closure includes the active lifecycle and base-advance dispatcher', () => {
   assert.equal(authorityPaths.has('tools/verification/protected-verification-lifecycle.mjs'), true);
   assert.equal(authorityPaths.has('.github/workflows/protected-base-advance-dispatcher.yml'), true);
-});test('zero-work fan-in permits no environment qualification while preserving exact state publication', () => {
+});
+
+test('zero-work fan-in permits no environment qualification while preserving exact state publication', () => {
   assert.match(executor, /lifecycle\.expectedEvidence\.length === 0/);
   assert.match(executor, /environmentQualification:\s*zeroWork\s*\?\s*null/);
   assert.match(executor, /qualificationFiles\.length !== \(zeroWork \? 0 : 1\)/);
