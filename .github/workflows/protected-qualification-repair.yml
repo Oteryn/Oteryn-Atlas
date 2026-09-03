@@ -164,7 +164,7 @@ jobs:
           if (built.productDigest !== verified.productDigest) throw new TypeError('qualification repair product is not deterministic');
           const descriptor = qualificationTrustDescriptor(verified);
           const trust = resolveFullWorldTrust({ __OTERYN_ATLAS_QUALIFICATION_TRUST__: descriptor });
-          if (trust.qualificationFixtureId !== descriptor.fixtureId || trust.qualificationProductDigest !== verified.productDigest) {
+          if (descriptor.dataCapability !== 'qualification_fixture' || trust.qualificationFixtureId !== descriptor.fixtureId || trust.qualificationProductDigest !== verified.productDigest) {
             throw new TypeError('protected trust rejected qualification repair fixture');
           }
           fs.writeFileSync('/out/qualification_fixture.json', `${JSON.stringify(descriptor)}\n`, 'utf8');
