@@ -11,6 +11,7 @@ const protectedBaseSha = 'a'.repeat(40);
 const candidateHeadSha = 'b'.repeat(40);
 const mergeBaseSha = 'c'.repeat(40);
 const productDigest = `sha256:${'1'.repeat(64)}`;
+const browserSemanticContentDigest = `sha256:${'2'.repeat(64)}`;
 
 const authorityIdentity = await buildVerificationAuthorityIdentity({
   manifest: {
@@ -107,6 +108,7 @@ function build(overrides = {}) {
     protectedBaseSha,
     candidateHeadSha,
     mergeBaseSha,
+    browserSemanticContentDigest,
     changedFiles: [{ path: 'src/browser/app.mjs' }],
     trustedImpactManifest: impact(),
     candidateImpactManifest: impact(),
@@ -154,7 +156,8 @@ test('protected hosted plan preserves protected IDs and accepts candidate additi
     'stableIdAlgorithmDigest', 'protectedCensusDigest', 'candidateCensusDigest',
     'workerPolicyDigest', 'productIdentitiesDigest', 'expectedStableTestIdsDigest',
     'executionPolicyDigest', 'candidateDigest', 'changeSetDigest', 'authorityDigest',
-    'authorityManifestDigest', 'environmentDigest', 'planSemanticDigest', 'planInstanceDigest',
+    'authorityManifestDigest', 'environmentDigest', 'browserSemanticContentDigest',
+    'browserSemanticDependencyDigest', 'planSemanticDigest', 'planInstanceDigest',
   ]) assert.match(plan[field], /^sha256:[a-f0-9]{64}$/, field);
 });
 
@@ -167,15 +170,23 @@ test('candidate SHA is provenance and does not change protected plan semantic id
   });
 
   assert.equal(left.planSemanticDigest, right.planSemanticDigest);
+  assert.equal(left.browserSemanticDependencyDigest, right.browserSemanticDependencyDigest);
   assert.notEqual(left.planInstanceDigest, right.planInstanceDigest);
   assert.notEqual(left.candidateDigest, right.candidateDigest);
+});
+
+test('browser content identity changes browser semantic dependency identity', () => {
+  const baseline = build();
+  const contentChanged = build({ browserSemanticContentDigest: `sha256:${'9'.repeat(64)}` });
+  assert.notEqual(baseline.browserSemanticDependencyDigest, contentChanged.browserSemanticDependencyDigest);
+  assert.notEqual(baseline.planSemanticDigest, contentChanged.planSemanticDigest);
 });
 
 test('qualification product identity remains part of protected plan semantic identity', () => {
   const baseline = build();
   const productChanged = build({
     productIdentities: {
-      qualification_fixture: { id: 'atlas-qualification-world-v2', digest: `sha256:${'2'.repeat(64)}` },
+      qualification_fixture: { id: 'atlas-qualification-world-v2', digest: `sha256:${'3'.repeat(64)}` },
     },
   });
 
