@@ -23,6 +23,32 @@ function stableIds(value, label, allowEmpty = false) {
   return [...value];
 }
 
+function buildEvidenceSummary(expectedEvidenceIds, manifests, plannedStableTestIds) {
+  const executedEvidenceIds = manifests.filter(({ disposition }) => disposition === 'EXECUTED').map(({ evidenceId }) => evidenceId).sort();
+  const reusedEvidenceIds = manifests.filter(({ disposition }) => disposition === 'REUSED').map(({ evidenceId }) => evidenceId).sort();
+  const actualEvidenceIds = manifests.map(({ evidenceId }) => evidenceId).sort();
+  const expectedSet = new Set(expectedEvidenceIds);
+  const actualSet = new Set(actualEvidenceIds);
+  const missingEvidenceIds = expectedEvidenceIds.filter((id) => !actualSet.has(id)).sort();
+  const unexpectedEvidenceIds = actualEvidenceIds.filter((id) => !expectedSet.has(id)).sort();
+  const planned = new Set(plannedStableTestIds);
+  const executed = new Set(manifests.filter(({ disposition }) => disposition === 'EXECUTED').flatMap(({ stableTestIds }) => stableTestIds));
+  const reused = new Set(manifests.filter(({ disposition }) => disposition === 'REUSED').flatMap(({ stableTestIds }) => stableTestIds));
+  const proven = new Set([...executed, ...reused]);
+  const missing = [...planned].filter((id) => !proven.has(id));
+  const unexpected = [...proven].filter((id) => !planned.has(id));
+  return Object.freeze({
+    expectedEvidenceIds: Object.freeze([...expectedEvidenceIds].sort()),
+    executedEvidenceIds: Object.freeze(executedEvidenceIds),
+    reusedEvidenceIds: Object.freeze(reusedEvidenceIds),
+    missingEvidenceIds: Object.freeze(missingEvidenceIds),
+    unexpectedEvidenceIds: Object.freeze(unexpectedEvidenceIds),
+    stableTestIds: Object.freeze({
+      planned: planned.size, executed: executed.size, reused: reused.size, missing: missing.length, unexpected: unexpected.length,
+    }),
+  });
+}
+
 function sameIdentity(summary, plan, field, label) {
   const planned = exactDigest(plan[field], `plan ${label}`);
   const actual = exactDigest(summary[field], `summary ${label}`);
@@ -205,6 +231,7 @@ export function validateProtectedHostedEvidenceFanIn(plan, execution, lifecycle,
       executedStableTestIds: Object.freeze([]),
       executedEvidenceIds: Object.freeze([]),
       reusedEvidenceIds: Object.freeze([]),
+      evidenceSummary: buildEvidenceSummary(expectedIds, manifests, execution.hosted?.stableTestIds ?? []),
     });
   }
   if (!environment) throw new TypeError('evidence fan-in environment evidence is missing');
@@ -257,5 +284,6 @@ export function validateProtectedHostedEvidenceFanIn(plan, execution, lifecycle,
     executedStableTestIds: Object.freeze([...execution.hosted.stableTestIds].sort()),
     executedEvidenceIds: Object.freeze(hosted.filter(({ disposition }) => disposition === 'EXECUTED').map(({ evidenceId }) => evidenceId).sort()),
     reusedEvidenceIds: Object.freeze(manifests.filter(({ disposition }) => disposition === 'REUSED').map(({ evidenceId }) => evidenceId).sort()),
+    evidenceSummary: buildEvidenceSummary(expectedIds, manifests, execution.hosted.stableTestIds),
   });
 }
