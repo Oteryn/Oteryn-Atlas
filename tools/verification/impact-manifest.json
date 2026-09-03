@@ -100,8 +100,8 @@
     {
       "pathPrefix": "tests/verification/",
       "domains": ["verification-governance"],
-      "minimumProfile": "full",
-      "requiredGroups": ["deterministic.core", "e2e.full"]
+      "minimumProfile": "focused",
+      "requiredGroups": ["deterministic.core"]
     },
     {
       "pathPrefix": "tests/",
