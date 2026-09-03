@@ -12,8 +12,6 @@ const workflowPath = path.join(ROOT, '.github/workflows/protected-execution-prom
 const REPOSITORY = 'Oteryn/Oteryn-Atlas';
 const AUTHORITY_HEAD_REF = 'fix/issue-179-qualification-live-digest-authority';
 const SOURCE_HEAD_REF = 'fix/issue-179-qualification-functional-fixture';
-const OLD_DIGEST = 'sha256:2f457583f21cd3ebf8d995c1cc520ea099b277dace69453db08d568de7584613';
-const NEW_DIGEST = 'sha256:c36ed503f8ada27a673ba96780b70cb361fa2fe2ce08240e372dbff664a2866a';
 const sha = (character) => character.repeat(40);
 const BOOTSTRAP_CHANGED_FILES = [
   '.github/workflows/ci.yml',
@@ -115,10 +113,17 @@ test('authority-only qualification repin has an exact protected recovery contrac
 
 test('authority-only repin verifier accepts only the same digest literal replacement in authority and mirror test bytes', () => {
   assert.equal(typeof protectedExecution.validateProtectedAuthorityRepinSources, 'function');
-  const trustedModuleSource = `before\nexpectedProductDigest: '${OLD_DIGEST}',\nafter\n`;
-  const candidateModuleSource = `before\nexpectedProductDigest: '${NEW_DIGEST}',\nafter\n`;
-  const trustedTestSource = `assert.equal(value, '${OLD_DIGEST}');\n`;
-  const candidateTestSource = `assert.equal(value, '${NEW_DIGEST}');\n`;
+  const currentProductDigest = protectedExecution.resolveProtectedPromotionQualification(SOURCE_HEAD_REF).expectedProductDigest;
+  const nextProductDigest = currentProductDigest === `sha256:${'f'.repeat(64)}`
+    ? `sha256:${'e'.repeat(64)}`
+    : `sha256:${'f'.repeat(64)}`;
+  assert.match(currentProductDigest, /^sha256:[a-f0-9]{64}$/);
+  assert.notEqual(nextProductDigest, currentProductDigest);
+
+  const trustedModuleSource = `before\nexpectedProductDigest: '${currentProductDigest}',\nafter\n`;
+  const candidateModuleSource = `before\nexpectedProductDigest: '${nextProductDigest}',\nafter\n`;
+  const trustedTestSource = `assert.equal(value, '${currentProductDigest}');\n`;
+  const candidateTestSource = `assert.equal(value, '${nextProductDigest}');\n`;
 
   const result = protectedExecution.validateProtectedAuthorityRepinSources({
     authorityHeadRef: AUTHORITY_HEAD_REF,
@@ -128,8 +133,8 @@ test('authority-only repin verifier accepts only the same digest literal replace
     candidateTestSource,
   });
   assert.equal(result.sourceHeadRef, SOURCE_HEAD_REF);
-  assert.equal(result.previousProductDigest, OLD_DIGEST);
-  assert.equal(result.expectedProductDigest, NEW_DIGEST);
+  assert.equal(result.previousProductDigest, currentProductDigest);
+  assert.equal(result.expectedProductDigest, nextProductDigest);
 
   assert.throws(() => protectedExecution.validateProtectedAuthorityRepinSources({
     authorityHeadRef: AUTHORITY_HEAD_REF,
