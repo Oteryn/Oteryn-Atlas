@@ -59,7 +59,7 @@ export const QUALIFICATION_SEMANTIC_RECORD = Object.freeze({
   label: 'Fixture Harbor',
   aliases: Object.freeze(['Qualification Harbor']),
   capabilities: Object.freeze(['navigation', 'overlay-point']),
-  position: QUALIFICATION_CENTER,
+  position: Object.freeze({ x: QUALIFICATION_CENTER.x, y: QUALIFICATION_CENTER.y + 1, floor: QUALIFICATION_CENTER.floor }),
   bounds: null,
   provenance: Object.freeze({ authority: 'Oteryn/Oteryn-Atlas', source_capability: 'qualification-semantic-search-v1', fixture_id: QUALIFICATION_FIXTURE_ID }),
   search_terms: Object.freeze({ label: 'fixture harbor', aliases: Object.freeze(['qualification harbor']) }),
