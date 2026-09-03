@@ -67,6 +67,16 @@ test('executor makes lifecycle decisions before expensive work and persists a st
   assert.match(executor, /reuseEvidenceIds/);
 });
 
+test('executor restores the latest authoritative PR lifecycle state before candidate-SHA semantic compatibility is evaluated', () => {
+  const restore = executor.split('      - name: Restore latest authoritative')[1]?.split('      - name: Decide active')[0] ?? '';
+  assert.match(restore, /state_prefix="protected-verification-state-pr-\$PR_NUMBER-"/);
+  assert.match(restore, /actions\/artifacts\?per_page=100/);
+  assert.match(restore, /startsWith\(statePrefix\)/);
+  assert.doesNotMatch(restore, /actions\/artifacts\?name=\$state_name/);
+  assert.doesNotMatch(restore, /state\.candidateHeadSha !== candidateHeadSha/);
+  assert.match(restore, /state\.prNumber !== Number\(prValue\)/);
+});
+
 test('executed and reused evidence use schema v2 and converge through one exact fan-in validator', () => {
   assert.match(executor, /evidenceSemanticDigest/);
   assert.match(executor, /evidenceSemanticDigests/);
