@@ -146,9 +146,10 @@ test('desktop monster activation opens Monster spawn card and survives canonical
   await expect.poll(() => page.evaluate(() => globalThis.__OTERYN_ATLAS_CREATURES__?.cardState)).toBe('chooser');
   const choices = page.locator('#creature-card-choices button');
   expect(await choices.count()).toBeGreaterThanOrEqual(3);
-  await expect(choices.first()).toContainText(OVERLAP_MONSTER_FIXTURE.label);
-  await choices.first().click();
-  expect(OVERLAP_MONSTER_FIXTURE.record_ids).toContain((await creatureState(page)).cardRecordId);
+  const expectedChoice = choices.filter({ hasText: OVERLAP_MONSTER_FIXTURE.label }).first();
+  await expect(expectedChoice).toBeVisible();
+  await expectedChoice.click();
+  expect((await creatureState(page)).cardRecordId).toBe(OVERLAP_MONSTER_FIXTURE.record_id);
   await expect(page.locator('#creature-card-kind')).toHaveText('Monster spawn');
   assertNoRuntimeFailures(runtime);
 });
