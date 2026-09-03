@@ -22,7 +22,13 @@ export function resolveReusableEvidence(expected, candidateEvidence) {
   if (evidence.evidenceId !== expected.evidenceId) return reject('EVIDENCE_ID_MISMATCH');
   if (expected.allowPlanSemanticRebinding !== true
     && evidence.planSemanticDigest !== expected.planSemanticDigest) return reject('SEMANTIC_PLAN_MISMATCH');
-  if (evidence.authorityDigest !== expected.authorityDigest) return reject('AUTHORITY_IDENTITY_MISMATCH');
+  const expectedSemanticDependencyDigest = expected.semanticDependencyDigest ?? expected.authorityDigest;
+  if (!/^sha256:[a-f0-9]{64}$/.test(expectedSemanticDependencyDigest ?? '')) {
+    return reject('EXPECTED_SEMANTIC_DEPENDENCY_IDENTITY_INVALID');
+  }
+  if (evidence.semanticDependencyDigest !== expectedSemanticDependencyDigest) {
+    return reject('SEMANTIC_DEPENDENCY_IDENTITY_MISMATCH');
+  }
   if (evidence.environmentDigest !== expected.environmentDigest) return reject('ENVIRONMENT_IDENTITY_MISMATCH');
   if (canonicalJson(evidence.productIdentities) !== canonicalJson(expected.productIdentities ?? {})) {
     return reject('PRODUCT_IDENTITY_MISMATCH');

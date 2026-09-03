@@ -128,8 +128,7 @@ export function classifyBaseAdvance(input) {
       throw new TypeError(`authority closure escaped canonical identity: ${changedAuthorityPaths.join(', ')}`);
     }
 
-    if (authorityChanged || environmentChanged) disposition = 'FULL_RERUN';
-    else if (affected.size === evidence.length && affected.size > 0) disposition = 'FULL_RERUN';
+    if (affected.size === evidence.length && affected.size > 0) disposition = 'FULL_RERUN';
     else if (affected.size > 0) disposition = 'PARTIAL_RERUN';
   }
 

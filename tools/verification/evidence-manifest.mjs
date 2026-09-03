@@ -73,7 +73,7 @@ function normalizeAvailability(value) {
 function semanticCore({
   evidenceId,
   evidenceType,
-  authorityDigest,
+  semanticDependencyDigest,
   environmentDigest,
   productIdentities,
   stableTestIdsDigest,
@@ -84,7 +84,7 @@ function semanticCore({
     schemaVersion: 1,
     evidenceId,
     evidenceType,
-    authorityDigest,
+    semanticDependencyDigest,
     environmentDigest,
     productIdentities,
     stableTestIdsDigest,
@@ -95,6 +95,12 @@ function semanticCore({
   };
 }
 
+function semanticDependency(input, authorityDigest) {
+  return input.semanticDependencyDigest === undefined
+    ? authorityDigest
+    : exactDigest(input.semanticDependencyDigest, 'evidence semantic dependency digest');
+}
+
 export function buildEvidenceSemanticDigest(input) {
   if (!isPlainObject(input)
     || typeof input.evidenceId !== 'string' || input.evidenceId.length === 0
@@ -103,11 +109,12 @@ export function buildEvidenceSemanticDigest(input) {
   }
   const stableTestIds = sortedUniqueStrings(input.stableTestIds ?? [], 'evidence stable test IDs', { validate: stableId });
   const dependencies = normalizeDependencies(input.dependencies ?? {});
+  exactSha(input.candidateHeadSha, 'evidence candidate head SHA');
+  const authorityDigest = exactDigest(input.authorityDigest, 'evidence authority digest');
   return canonicalDigest(semanticCore({
     evidenceId: input.evidenceId,
     evidenceType: input.evidenceType,
-    candidateHeadSha: exactSha(input.candidateHeadSha, 'evidence candidate head SHA'),
-    authorityDigest: exactDigest(input.authorityDigest, 'evidence authority digest'),
+    semanticDependencyDigest: semanticDependency(input, authorityDigest),
     environmentDigest: input.environmentDigest === null
       ? null
       : exactDigest(input.environmentDigest, 'evidence environment digest'),
@@ -144,6 +151,7 @@ function normalizeCore(input) {
   const dependencies = normalizeDependencies(input.dependencies);
   const candidateHeadSha = exactSha(input.candidateHeadSha, 'evidence candidate head SHA');
   const authorityDigest = exactDigest(input.authorityDigest, 'evidence authority digest');
+  const semanticDependencyDigest = semanticDependency(input, authorityDigest);
   const environmentDigest = input.environmentDigest === null
     ? null
     : exactDigest(input.environmentDigest, 'evidence environment digest');
@@ -152,8 +160,7 @@ function normalizeCore(input) {
   const evidenceSemanticDigest = canonicalDigest(semanticCore({
     evidenceId: input.evidenceId,
     evidenceType: input.evidenceType,
-    candidateHeadSha,
-    authorityDigest,
+    semanticDependencyDigest,
     environmentDigest,
     productIdentities,
     stableTestIdsDigest,
@@ -170,6 +177,7 @@ function normalizeCore(input) {
     planSemanticDigest: exactDigest(input.planSemanticDigest, 'evidence semantic plan digest'),
     planInstanceDigest: exactDigest(input.planInstanceDigest, 'evidence instance plan digest'),
     authorityDigest,
+    semanticDependencyDigest,
     environmentDigest,
     productIdentities,
     stableTestIds,

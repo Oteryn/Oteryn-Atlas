@@ -1,4 +1,4 @@
-﻿import {
+import {
   canonicalDigest,
   deepFreeze,
   exactDigest,
@@ -29,6 +29,9 @@ function validatePlan(plan) {
   exactDigest(plan.authorityDigest, 'lifecycle authority digest');
   exactDigest(plan.environmentDigest, 'lifecycle environment digest');
   exactDigest(plan.executionPolicyDigest, 'lifecycle execution policy digest');
+  if (plan.browserSemanticDependencyDigest !== undefined) {
+    exactDigest(plan.browserSemanticDependencyDigest, 'lifecycle browser semantic dependency digest');
+  }
   if (!isPlainObject(plan.productIdentities)) throw new TypeError('lifecycle product identities are invalid');
   return plan;
 }
@@ -61,6 +64,9 @@ function buildExpectedEvidence(plan, execution) {
     evidenceType: 'ENVIRONMENT_QUALIFICATION',
     candidateHeadSha: plan.candidateHeadSha,
     authorityDigest: plan.authorityDigest,
+    semanticDependencyDigest: plan.environmentDigest,
+    dependsOnAuthority: false,
+    dependsOnEnvironment: true,
     environmentDigest: plan.environmentDigest,
     productIdentities: {},
     stableTestIds: [],
@@ -93,6 +99,8 @@ function buildExpectedEvidence(plan, execution) {
     if (!capabilityByStableId.has(id)) throw new TypeError(`lifecycle stable ID has no data-capability placement: ${id}`);
   }
 
+  const browserSemanticDependencyDigest = plan.browserSemanticDependencyDigest ?? plan.authorityDigest;
+  const scopedBrowserSemantics = plan.browserSemanticDependencyDigest !== undefined;
   const shards = [];
   for (let index = 0; index < shardCount; index += 1) {
     const stableTestIds = hostedStableTestIds.filter((_, stableIndex) => stableIndex % shardCount === index);
@@ -103,6 +111,9 @@ function buildExpectedEvidence(plan, execution) {
       evidenceType: 'HOSTED_FUNCTIONAL',
       candidateHeadSha: plan.candidateHeadSha,
       authorityDigest: plan.authorityDigest,
+      semanticDependencyDigest: browserSemanticDependencyDigest,
+      dependsOnAuthority: !scopedBrowserSemantics,
+      dependsOnEnvironment: true,
       environmentDigest: plan.environmentDigest,
       productIdentities: selectedProducts(plan, capabilities),
       stableTestIds,
@@ -124,8 +135,8 @@ function evidenceDeclaration(node) {
   return {
     id: node.evidenceId,
     dependencyPaths: node.dependencies.paths,
-    dependsOnAuthority: true,
-    dependsOnEnvironment: true,
+    dependsOnAuthority: node.dependsOnAuthority === true,
+    dependsOnEnvironment: node.dependsOnEnvironment === true,
     productCapabilities: node.dependencies.dataCapabilities,
   };
 }
@@ -396,6 +407,7 @@ export function materializeReusedEvidence(input) {
         planSemanticDigest: currentPlan.planSemanticDigest,
         planInstanceDigest: currentPlan.planInstanceDigest,
         authorityDigest: currentPlan.authorityDigest,
+        semanticDependencyDigest: expected.semanticDependencyDigest,
         environmentDigest: expected.environmentDigest,
         productIdentities: expected.productIdentities,
         stableTestIds: expected.stableTestIds,
