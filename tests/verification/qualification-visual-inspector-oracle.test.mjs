@@ -24,7 +24,7 @@ test('qualification visual acceptance compares explicit required chrome independ
   assert.match(helper, /'desktop-inspector\.png':\s*Object\.freeze\(\['\.inspector-heading', '\.creature-inspector-tabs'\]\)/);
   assert.match(helper, /'mobile-inspector-panel\.png':\s*Object\.freeze\(\['\.inspector-heading', '\.creature-inspector-tabs'\]\)/);
   assert.match(helper, /locator\.count\(\) !== 1/, 'every reviewed stable selector must resolve exactly once');
-  assert.match(helper, /stable chrome locator is not visible/, 'hidden reviewed chrome must fail closed');
+  assert.match(helper, /if \(!box\) throw new TypeError\(`reviewed snapshot \$\{kind\} locator is not visible:/, 'hidden reviewed chrome must fail closed');
   assert.doesNotMatch(helper, /if \(!box\) continue;/, 'missing stable chrome must never be silently omitted');
   assert.match(helper, /stableRectangles/, 'stable chrome rectangles must be modeled separately from fixture-owned rectangles');
   assert.match(helper, /dynamicRectangles/, 'fixture-owned rectangles must retain a separate comparison channel');
