@@ -81,15 +81,26 @@ export async function comparePngOutsideRects(page, before, after, rectangles) {
 export async function compareReviewedSnapshotOutsideLocators(page, testInfo, containerSelector, snapshotName, dynamicSelectors) {
   if (!Array.isArray(dynamicSelectors) || dynamicSelectors.length === 0) throw new TypeError('reviewed snapshot dynamic selectors are required');
   const container = page.locator(containerSelector);
-  const containerBox = await container.boundingBox();
-  if (!containerBox) throw new TypeError(`reviewed snapshot container is not visible: ${containerSelector}`);
-  const rectangles = [];
-  for (const selector of dynamicSelectors) {
-    const box = await page.locator(selector).boundingBox();
-    if (!box) throw new TypeError(`reviewed snapshot dynamic locator is not visible: ${selector}`);
-    rectangles.push({ x: box.x - containerBox.x, y: box.y - containerBox.y, width: box.width, height: box.height });
+  const normalizationClass = 'atlas-reviewed-snapshot-normalize-scrollbars';
+  const normalizationStyle = await page.addStyleTag({ content: `
+    .${normalizationClass} { scrollbar-width: none !important; }
+    .${normalizationClass}::-webkit-scrollbar { display: none !important; width: 0 !important; height: 0 !important; }
+  ` });
+  await container.evaluate((node, className) => node.classList.add(className), normalizationClass);
+  try {
+    const containerBox = await container.boundingBox();
+    if (!containerBox) throw new TypeError(`reviewed snapshot container is not visible: ${containerSelector}`);
+    const rectangles = [];
+    for (const selector of dynamicSelectors) {
+      const box = await page.locator(selector).boundingBox();
+      if (!box) throw new TypeError(`reviewed snapshot dynamic locator is not visible: ${selector}`);
+      rectangles.push({ x: box.x - containerBox.x, y: box.y - containerBox.y, width: box.width, height: box.height });
+    }
+    const expected = await readFile(testInfo.snapshotPath(snapshotName));
+    const actual = await container.screenshot({ animations: 'disabled', caret: 'hide', scale: 'css' });
+    return await comparePngOutsideRects(page, expected, actual, rectangles);
+  } finally {
+    await container.evaluate((node, normalizationClass) => node.classList.remove(normalizationClass), normalizationClass);
+    await normalizationStyle.evaluate((node) => node.remove());
   }
-  const expected = await readFile(testInfo.snapshotPath(snapshotName));
-  const actual = await container.screenshot({ animations: 'disabled', caret: 'hide', scale: 'css' });
-  return comparePngOutsideRects(page, expected, actual, rectangles);
 }
