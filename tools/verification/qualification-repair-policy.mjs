@@ -12,8 +12,18 @@ export const QUALIFICATION_REPAIR_PATHS = Object.freeze([
   'web/fullworld-search.mjs',
 ]);
 
+export const QUALIFICATION_REPAIR_BROWSER_PROOF = Object.freeze({
+  project: 'desktop-chromium',
+  spec: 'e2e/tests/creatures-desktop.spec.mjs',
+  title: 'desktop shipped creature controls persist independently and expose bounded diagnostics',
+  dataCapability: 'qualification_fixture',
+  workers: 1,
+  retries: 0,
+});
+
 const ALLOWED_PATHS = new Set(QUALIFICATION_REPAIR_PATHS);
-const REQUIRED_HOSTED_GROUPS = Object.freeze(['deterministic.core', 'e2e.full']);
+const REQUIRED_PLAN_FLOOR = Object.freeze(['deterministic.core', 'e2e.full']);
+const EXECUTED_DETERMINISTIC_GROUPS = Object.freeze(['deterministic.core']);
 const REQUIRED_DATA_CAPABILITIES = Object.freeze(['qualification_fixture']);
 const VERIFICATION_REGRESSION = /^tests\/verification\/[A-Za-z0-9][A-Za-z0-9._-]*\.test\.mjs$/;
 
@@ -72,7 +82,7 @@ export function validateQualificationRepairTransition({ changedPaths, protectedP
   }
   requireSuperset(candidateState.requiredGroupIds, protectedState.requiredGroupIds, 'required groups');
   requireSuperset(candidateState.requiredDataCapabilities, protectedState.requiredDataCapabilities, 'data capabilities');
-  requireSuperset(candidateState.requiredGroupIds, REQUIRED_HOSTED_GROUPS, 'hosted safety groups');
+  requireSuperset(candidateState.requiredGroupIds, REQUIRED_PLAN_FLOOR, 'plan safety groups');
 
   if (candidateState.requiredDataCapabilities.length !== REQUIRED_DATA_CAPABILITIES.length
     || candidateState.requiredDataCapabilities[0] !== REQUIRED_DATA_CAPABILITIES[0]) {
@@ -84,7 +94,9 @@ export function validateQualificationRepairTransition({ changedPaths, protectedP
     eligible: true,
     changedPaths: paths,
     profile: candidateState.profile,
-    requiredGroupIds: REQUIRED_HOSTED_GROUPS,
+    planFloorGroupIds: REQUIRED_PLAN_FLOOR,
+    requiredGroupIds: EXECUTED_DETERMINISTIC_GROUPS,
+    browserProof: QUALIFICATION_REPAIR_BROWSER_PROOF,
     requiredDataCapabilities: REQUIRED_DATA_CAPABILITIES,
     retryPolicy: { retries: 0 },
   });
