@@ -81,26 +81,43 @@ export async function comparePngOutsideRects(page, before, after, rectangles) {
 export async function compareReviewedSnapshotOutsideLocators(page, testInfo, containerSelector, snapshotName, dynamicSelectors) {
   if (!Array.isArray(dynamicSelectors) || dynamicSelectors.length === 0) throw new TypeError('reviewed snapshot dynamic selectors are required');
   const container = page.locator(containerSelector);
-  const normalizationClass = 'atlas-reviewed-snapshot-normalize-scrollbars';
-  const normalizationStyle = await page.addStyleTag({ content: `
-    .${normalizationClass} { scrollbar-width: none !important; }
-    .${normalizationClass}::-webkit-scrollbar { display: none !important; width: 0 !important; height: 0 !important; }
-  ` });
-  await container.evaluate((node, className) => node.classList.add(className), normalizationClass);
-  try {
-    const containerBox = await container.boundingBox();
-    if (!containerBox) throw new TypeError(`reviewed snapshot container is not visible: ${containerSelector}`);
-    const rectangles = [];
-    for (const selector of dynamicSelectors) {
-      const box = await page.locator(selector).boundingBox();
-      if (!box) throw new TypeError(`reviewed snapshot dynamic locator is not visible: ${selector}`);
-      rectangles.push({ x: box.x - containerBox.x, y: box.y - containerBox.y, width: box.width, height: box.height });
-    }
-    const expected = await readFile(testInfo.snapshotPath(snapshotName));
-    const actual = await container.screenshot({ animations: 'disabled', caret: 'hide', scale: 'css' });
-    return await comparePngOutsideRects(page, expected, actual, rectangles);
-  } finally {
-    await container.evaluate((node, normalizationClass) => node.classList.remove(normalizationClass), normalizationClass);
-    await normalizationStyle.evaluate((node) => node.remove());
+  const containerBox = await container.boundingBox();
+  if (!containerBox) throw new TypeError(`reviewed snapshot container is not visible: ${containerSelector}`);
+
+  const dynamicRectangles = [];
+  for (const selector of dynamicSelectors) {
+    const locator = container.locator(selector);
+    if (await locator.count() !== 1) throw new TypeError(`reviewed snapshot dynamic locator must resolve exactly once: ${selector}`);
+    const box = await locator.boundingBox();
+    if (!box) throw new TypeError(`reviewed snapshot dynamic locator is not visible: ${selector}`);
+    dynamicRectangles.push({ x: box.x - containerBox.x, y: box.y - containerBox.y, width: box.width, height: box.height });
   }
+
+  const stableRectangles = [];
+  const stableChildren = container.locator(':scope > *');
+  for (let index = 0; index < await stableChildren.count(); index += 1) {
+    const child = stableChildren.nth(index);
+    const isDynamic = await child.evaluate((node, selectors) => selectors.some((selector) => node.matches(selector) || node.querySelector(selector)), dynamicSelectors);
+    if (isDynamic) continue;
+    const box = await child.boundingBox();
+    if (!box) continue;
+    stableRectangles.push({ x: box.x - containerBox.x, y: box.y - containerBox.y, width: box.width, height: box.height });
+  }
+  if (stableRectangles.length === 0) throw new TypeError(`reviewed snapshot has no visible stable chrome children: ${containerSelector}`);
+
+  const expected = await readFile(testInfo.snapshotPath(snapshotName));
+  const actual = await container.screenshot({ animations: 'disabled', caret: 'hide', scale: 'css' });
+  const stableComparison = await comparePngOutsideRects(page, expected, actual, stableRectangles);
+  const dynamicComparison = await comparePngOutsideRects(page, expected, actual, dynamicRectangles);
+  return {
+    width: stableComparison.width,
+    height: stableComparison.height,
+    changedOutside: stableComparison.changedInside,
+    changedInside: dynamicComparison.changedInside,
+    allowedPixels: stableComparison.allowedPixels + dynamicComparison.allowedPixels,
+    stablePixels: stableComparison.allowedPixels,
+    dynamicPixels: dynamicComparison.allowedPixels,
+    maskPng: stableComparison.maskPng,
+    diffPng: stableComparison.diffPng,
+  };
 }
