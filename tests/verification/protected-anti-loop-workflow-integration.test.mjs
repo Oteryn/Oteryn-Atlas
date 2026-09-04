@@ -32,6 +32,7 @@ test('protected authority manifest covers every file that can alter hosted execu
   for (const path of [
     '.github/workflows/ci.yml',
     '.github/workflows/protected-hosted-executor.yml',
+    '.github/workflows/protected-qualification-repair.yml',
     '.github/workflows/protected-verification-controller.yml',
     'e2e/compose.github-hosted.yml',
     'e2e/compose.protected-hosted-executor.yml',
@@ -41,6 +42,7 @@ test('protected authority manifest covers every file that can alter hosted execu
     'tools/verification/parse-playwright-test-list.mjs',
     'tools/verification/protected-execution-environment-probe.mjs',
     'tools/verification/protected-playwright-selection.mjs',
+    'tools/verification/qualification-repair-policy.mjs',
   ]) assert.equal(paths.has(path), true, path);
 });
 
