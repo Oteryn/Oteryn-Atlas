@@ -39,5 +39,12 @@ test('qualification repair proof validates the actual runtime-trust contract', (
   assert.doesNotMatch(workflow, /trust\.dataCapability/);
   assert.match(workflow, /descriptor\.dataCapability\s*!==\s*'qualification_fixture'/);
   assert.match(workflow, /trust\.qualificationFixtureId\s*!==\s*descriptor\.fixtureId/);
-  assert.match(workflow, /trust\.qualificationProductDigest\s*!==\s*verified\.productDigest/);
+  assert.match(workflow, /trust\.qualificationProductDigest\s*!==\s*independent\.productDigest/);
 });
+
+ test('repair digest is independently derived under protected authority', () => {
+  const workflow = fs.readFileSync(path.join(ROOT, '.github/workflows/protected-qualification-repair.yml'), 'utf8');
+  assert.match(workflow, /independentlyVerifyQualificationProduct/);
+  assert.doesNotMatch(workflow, /verifyQualificationWorld } from '\/candidate/);
+});
+

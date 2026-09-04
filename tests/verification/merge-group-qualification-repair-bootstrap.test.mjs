@@ -44,16 +44,25 @@ test('merge queue consumes exact protected qualification repair evidence before 
 test('protected repair producer executes the entire protected e2e.full stable-ID census', () => {
   const repairWorkflow = fs.readFileSync(path.join(ROOT, '.github/workflows/protected-qualification-repair.yml'), 'utf8');
   assert.match(repairWorkflow, /catalog\.groups\?\.\['e2e\.full'\]/);
-  assert.match(repairWorkflow, /candidateCensus\.stableIds/);
-  assert.match(repairWorkflow, /protectedCensus\.stableIds/);
+  assert.match(repairWorkflow, /selected\.length !== 68/);
+  assert.doesNotMatch(repairWorkflow, /candidateCensus|candidate-list-artifacts/);
   assert.doesNotMatch(repairWorkflow, /selected\.length\s*!==\s*1/);
   assert.match(repairWorkflow, /--workers=1 --retries=0/);
 });
 
 test('self-retiring bootstrap remains a closed control-plane-only path', () => {
   const repair = stepBody('Validate exact protected qualification repair bootstrap evidence');
-  assert.match(repair, /validateQualificationRepairControlPlaneBootstrap/);
+  assert.match(repair, /from '\.\/trusted-base\/tools\/verification\/qualification-repair-policy\.mjs'/);
+  assert.doesNotMatch(repair, /from '\.\/tools\/verification\/qualification-repair-policy\.mjs'/);
+  assert.match(repair, /candidate provenance verifier is not an exact gate-pin rotation/);
   assert.match(repair, /creatureRegionCount/);
   assert.match(repair, /semanticRecordCount/);
   assert.match(repair, /self-retiring-control-plane-bootstrap/);
 });
+
+test('candidate policy bytes cannot self-authorize bootstrap', () => {
+  const repair = stepBody('Validate exact protected qualification repair bootstrap evidence');
+  assert.doesNotMatch(repair, /import .* from '\.\/tools\/verification\/qualification-repair-policy\.mjs'/);
+  assert.match(repair, /trusted-base\/tools\/verification\/qualification-repair-policy\.mjs/);
+});
+

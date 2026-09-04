@@ -171,8 +171,8 @@ test('D/E: protected qualification repair resolves the exact complete protected 
   assert.match(job, /validateQualificationRepairTransition/);
   assert.match(job, /requiredGroupFloor:\s*\['deterministic\.core', 'e2e\.full'\]/);
   assert.match(job, /catalog\.groups\?\.\['e2e\.full'\]\?\.specs/);
-  assert.match(job, /candidateCensus\.stableIds/);
-  assert.match(job, /protectedCensus\.stableIds/);
+  assert.match(job, /selected\.length !== 68/);
+  assert.doesNotMatch(job, /candidateCensus|candidate-list-artifacts/);
   assert.doesNotMatch(job, /selected\.length !== 1/);
   assert.match(job, /runs-on:\s*ubuntu-24\.04/);
   assert.match(job, /--network none/);
@@ -257,3 +257,4 @@ test('G: genuine runtime-impacting browser changes retain full plan floor while 
   assert.equal(QUALIFICATION_REPAIR_BROWSER_PROOF.workers, 1);
   assert.equal(QUALIFICATION_REPAIR_BROWSER_PROOF.retries, 0);
 });
+

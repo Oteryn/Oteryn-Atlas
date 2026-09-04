@@ -1,3 +1,7 @@
+import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
+
 import { canonicalJson, profileRank } from './verification-plan-schema.mjs';
 
 export const QUALIFICATION_REPAIR_PATHS = Object.freeze([
@@ -19,28 +23,6 @@ export const QUALIFICATION_REPAIR_BROWSER_PROOF = Object.freeze({
   retries: 0,
 });
 
-export const QUALIFICATION_REPAIR_ADAPTER_PATHS = Object.freeze([
-  'e2e/support/creature-presentation-fixtures.mjs',
-  'e2e/tests/runtime.mjs',
-  'e2e/tests/audit-desktop.spec.mjs',
-  'e2e/tests/creature-interaction-desktop.spec.mjs',
-  'e2e/tests/creature-presentation-desktop.spec.mjs',
-  'e2e/tests/creatures-desktop.spec.mjs',
-  'e2e/tests/desktop.spec.mjs',
-  'e2e/tests/farm-explorer-desktop.spec.mjs',
-  'e2e/tests/farm-explorer-mobile.spec.mjs',
-  'e2e/tests/geometry-desktop.spec.mjs',
-  'e2e/tests/geometry-mobile.spec.mjs',
-  'e2e/tests/mobile.spec.mjs',
-  'e2e/tests/performance-desktop.spec.mjs',
-  'e2e/tests/race-desktop.spec.mjs',
-  'e2e/tests/soak-desktop.spec.mjs',
-  'e2e/tests/state-desktop.spec.mjs',
-  'e2e/tests/stress-desktop.spec.mjs',
-  'e2e/tests/visual-desktop.spec.mjs',
-  'e2e/tests/visual-mobile.spec.mjs',
-]);
-
 export const QUALIFICATION_REPAIR_PRODUCT_IDENTITY_PATHS = Object.freeze([
   'tools/verification/protected-hosted-product-identities.json',
   'tests/verification/protected-hosted-product-identities.test.mjs',
@@ -48,7 +30,6 @@ export const QUALIFICATION_REPAIR_PRODUCT_IDENTITY_PATHS = Object.freeze([
 
 const ALLOWED_PATHS = new Set([
   ...QUALIFICATION_REPAIR_PATHS,
-  ...QUALIFICATION_REPAIR_ADAPTER_PATHS,
   ...QUALIFICATION_REPAIR_PRODUCT_IDENTITY_PATHS,
 ]);
 const REQUIRED_PLAN_FLOOR = Object.freeze(['deterministic.core', 'e2e.full']);
@@ -131,14 +112,49 @@ export function validateQualificationRepairTransition({ changedPaths, protectedP
   });
 }
 
-export function validateQualificationRepairProductRepin({ protectedIdentities, candidateIdentities, rebuiltProductDigest, mirrorDigest } = {}) {
+export function classifyQualificationRepairStatuses(statuses) {
+  if (!Array.isArray(statuses)) throw new TypeError('qualification repair statuses must be an array');
+  const matches = statuses.filter((status) => status?.context === 'atlas-protected-product-qualification');
+  if (matches.length === 0) return freeze({ applicable: false });
+  if (matches.length !== 1 || matches[0]?.state !== 'success') {
+    throw new TypeError('qualification repair evidence is present but not one authoritative success');
+  }
+  return freeze({ applicable: true, status: matches[0] });
+}
+
+export function independentlyVerifyQualificationProduct(root, manifest) {
+  if (!root || !manifest || typeof manifest !== 'object') throw new TypeError('qualification product proof is invalid');
+  const entries = [];
+  const walk = (directory) => {
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      const absolute = path.join(directory, entry.name);
+      const relative = path.relative(root, absolute).split(path.sep).join('/');
+      if (entry.isSymbolicLink()) throw new TypeError(`qualification product contains symlink: ${relative}`);
+      if (entry.isDirectory()) walk(absolute);
+      else if (entry.isFile() && relative !== 'fixture-manifest.json') {
+        const bytes = fs.readFileSync(absolute);
+        entries.push({ path: relative, bytes: bytes.length, digest: `sha256:${crypto.createHash('sha256').update(bytes).digest('hex')}` });
+      } else if (!entry.isFile()) throw new TypeError(`qualification product contains unsupported entry: ${relative}`);
+    }
+  };
+  walk(root);
+  entries.sort((left, right) => left.path.localeCompare(right.path));
+  const productDigest = `sha256:${crypto.createHash('sha256').update(Buffer.from(canonicalJson(entries))).digest('hex')}`;
+  if (canonicalJson(entries) !== canonicalJson(manifest.files) || productDigest !== manifest.productDigest) {
+    throw new TypeError('qualification product manifest does not match independently enumerated bytes');
+  }
+  return freeze({ entries, productDigest });
+}
+
+export function validateQualificationRepairProductRepin({ protectedIdentities, candidateIdentities, rebuiltProductDigest, protectedMirrorText, candidateMirrorText } = {}) {
   const protectedProducts = structuredClone(protectedIdentities);
   const candidateProducts = structuredClone(candidateIdentities);
   const digest = /^sha256:[0-9a-f]{64}$/.test(rebuiltProductDigest ?? '') ? rebuiltProductDigest : null;
-  if (!protectedProducts || !candidateProducts || !digest || mirrorDigest !== digest) {
+  if (!protectedProducts || !candidateProducts || !digest || typeof protectedMirrorText !== 'string' || typeof candidateMirrorText !== 'string') {
     throw new TypeError('qualification repair product repin does not match rebuilt candidate product');
   }
-  if (candidateProducts.qualification_fixture?.digest !== digest) {
+  const oldDigest = protectedProducts.qualification_fixture?.digest;
+  if (!/^sha256:[0-9a-f]{64}$/.test(oldDigest ?? '') || candidateProducts.qualification_fixture?.digest !== digest) {
     throw new TypeError('qualification repair candidate digest is not the rebuilt product digest');
   }
   const expected = structuredClone(protectedProducts);
@@ -146,8 +162,13 @@ export function validateQualificationRepairProductRepin({ protectedIdentities, c
   if (canonicalJson(candidateProducts) !== canonicalJson(expected)) {
     throw new TypeError('qualification repair product identity repin changes more than qualification_fixture.digest');
   }
+  const occurrences = protectedMirrorText.split(oldDigest).length - 1;
+  if (occurrences !== 1 || candidateMirrorText !== protectedMirrorText.replace(oldDigest, digest)) {
+    throw new TypeError('qualification repair identity mirror changes more than the exact digest');
+  }
   return freeze({ schemaVersion: 1, productDigest: digest });
 }
+
 
 const CONTROL_PLANE_BOOTSTRAP_PATHS = new Set([
   '.github/workflows/merge-group-gate.yml',
@@ -170,3 +191,30 @@ export function validateQualificationRepairControlPlaneBootstrap({ changedPaths,
   }
   return freeze({ schemaVersion: 1, eligible: true, mode: 'self-retiring-narrow-fixture-control-plane-bootstrap', changedPaths: paths });
 }
+
+
+const GIT_BLOB = /^[0-9a-f]{40}$/;
+function replaceExactlyOnce(source, pattern, replacement, label) {
+  const matches = source.match(new RegExp(pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) ?? [];
+  if (matches.length !== 1) throw new TypeError(`${label} must occur exactly once`);
+  return source.replace(pattern, replacement);
+}
+
+export function validateQualificationRepairBootstrapPinRotations({ protectedVerifierText, candidateVerifierText, protectedAuditText, candidateAuditText, candidateGateText, candidateGateBlob, candidateVerifierBlob } = {}) {
+  for (const [label, value] of Object.entries({ candidateGateBlob, candidateVerifierBlob })) {
+    if (!GIT_BLOB.test(value ?? '')) throw new TypeError(`${label} must be a lowercase 40-character git blob`);
+  }
+  const gitBlob = (text) => crypto.createHash('sha1').update(Buffer.concat([Buffer.from(`blob ${Buffer.byteLength(text)}\0`), Buffer.from(text)])).digest('hex');
+  if (gitBlob(candidateGateText) !== candidateGateBlob || gitBlob(candidateVerifierText) !== candidateVerifierBlob) throw new TypeError('candidate pin blob does not match supplied bytes');
+  const verifierMatch = protectedVerifierText.match(/MERGE_GROUP_GATE_BLOB = "([0-9a-f]{40})"/g) ?? [];
+  if (verifierMatch.length !== 1) throw new TypeError('protected verifier gate pin must occur exactly once');
+  const expectedVerifier = replaceExactlyOnce(protectedVerifierText, verifierMatch[0], `MERGE_GROUP_GATE_BLOB = "${candidateGateBlob}"`, 'protected verifier gate pin');
+  if (candidateVerifierText !== expectedVerifier) throw new TypeError('candidate provenance verifier changes more than the exact gate pin');
+  const gateMatches = protectedAuditText.match(/EXPECTED_MERGE_GROUP_GATE_BLOB: "([0-9a-f]{40})"/g) ?? [];
+  const verifierMatches = protectedAuditText.match(/EXPECTED_PROVENANCE_VERIFIER_BLOB: "([0-9a-f]{40})"/g) ?? [];
+  if (gateMatches.length !== 1 || verifierMatches.length !== 1) throw new TypeError('protected audit pins must each occur exactly once');
+  const expectedAudit = replaceExactlyOnce(replaceExactlyOnce(protectedAuditText, gateMatches[0], `EXPECTED_MERGE_GROUP_GATE_BLOB: "${candidateGateBlob}"`, 'audit gate pin'), verifierMatches[0], `EXPECTED_PROVENANCE_VERIFIER_BLOB: "${candidateVerifierBlob}"`, 'audit verifier pin');
+  if (candidateAuditText !== expectedAudit) throw new TypeError('candidate merge authority audit changes more than exact pin rotations');
+  return freeze({ schemaVersion: 1, eligible: true, candidateGateBlob, candidateVerifierBlob });
+}
+

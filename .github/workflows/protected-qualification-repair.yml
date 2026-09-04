@@ -13,25 +13,6 @@ on:
       - web/fullworld-creatures.mjs
       - web/fullworld-farm-explorer.mjs
       - web/fullworld-search.mjs
-      - e2e/support/creature-presentation-fixtures.mjs
-      - e2e/tests/runtime.mjs
-      - e2e/tests/audit-desktop.spec.mjs
-      - e2e/tests/creature-interaction-desktop.spec.mjs
-      - e2e/tests/creature-presentation-desktop.spec.mjs
-      - e2e/tests/creatures-desktop.spec.mjs
-      - e2e/tests/desktop.spec.mjs
-      - e2e/tests/farm-explorer-desktop.spec.mjs
-      - e2e/tests/farm-explorer-mobile.spec.mjs
-      - e2e/tests/geometry-desktop.spec.mjs
-      - e2e/tests/geometry-mobile.spec.mjs
-      - e2e/tests/mobile.spec.mjs
-      - e2e/tests/performance-desktop.spec.mjs
-      - e2e/tests/race-desktop.spec.mjs
-      - e2e/tests/soak-desktop.spec.mjs
-      - e2e/tests/state-desktop.spec.mjs
-      - e2e/tests/stress-desktop.spec.mjs
-      - e2e/tests/visual-desktop.spec.mjs
-      - e2e/tests/visual-mobile.spec.mjs
       - tools/verification/protected-hosted-product-identities.json
       - tests/verification/protected-hosted-product-identities.test.mjs
 
@@ -181,14 +162,15 @@ jobs:
           cat > "$proof" <<'NODE'
           import fs from 'node:fs';
           import { resolveFullWorldTrust } from '/trusted/src/browser/fullworld-trust.mjs';
-          import { buildQualificationWorld, qualificationTrustDescriptor, verifyQualificationWorld } from '/candidate/tools/verification/qualification-world.mjs';
-          const built = await buildQualificationWorld('/out/product');
-          const verified = await verifyQualificationWorld('/out/product');
-          if (built.productDigest !== verified.productDigest) throw new TypeError('qualification repair product is not deterministic');
-          const descriptor = qualificationTrustDescriptor(verified);
+          import { independentlyVerifyQualificationProduct } from '/trusted/tools/verification/qualification-repair-policy.mjs';
+          import { buildQualificationWorld, qualificationTrustDescriptor } from '/candidate/tools/verification/qualification-world.mjs';
+          await buildQualificationWorld('/out/product');
+          const manifest = JSON.parse(fs.readFileSync('/out/product/fixture-manifest.json', 'utf8'));
+          const independent = independentlyVerifyQualificationProduct('/out/product', manifest);
+          const descriptor = qualificationTrustDescriptor(manifest);
           const trust = resolveFullWorldTrust({ __OTERYN_ATLAS_QUALIFICATION_TRUST__: descriptor });
-          if (descriptor.dataCapability !== 'qualification_fixture' || trust.qualificationFixtureId !== descriptor.fixtureId || trust.qualificationProductDigest !== verified.productDigest) {
-            throw new TypeError('protected trust rejected qualification repair fixture');
+          if (descriptor.dataCapability !== 'qualification_fixture' || trust.qualificationFixtureId !== descriptor.fixtureId || trust.qualificationProductDigest !== independent.productDigest) {
+            throw new TypeError('protected trust rejected independently verified qualification repair fixture');
           }
           fs.writeFileSync('/out/qualification_fixture.json', `${JSON.stringify(descriptor)}\n`, 'utf8');
           NODE
@@ -208,14 +190,9 @@ jobs:
           import { validateQualificationRepairProductRepin } from './trusted-base/tools/verification/qualification-repair-policy.mjs';
           const protectedIdentities = JSON.parse(fs.readFileSync('./trusted-base/tools/verification/protected-hosted-product-identities.json'));
           const candidateIdentities = JSON.parse(fs.readFileSync('./candidate/tools/verification/protected-hosted-product-identities.json'));
-          const mirror = fs.readFileSync('./candidate/tests/verification/protected-hosted-product-identities.test.mjs', 'utf8');
-          const matches = [...mirror.matchAll(/digest:\s*'(sha256:[0-9a-f]{64})'/g)].map((match) => match[1]);
-          validateQualificationRepairProductRepin({
-            protectedIdentities,
-            candidateIdentities,
-            rebuiltProductDigest: process.env.REBUILT_DIGEST,
-            mirrorDigest: matches[0],
-          });
+          const protectedMirrorText = fs.readFileSync('./trusted-base/tests/verification/protected-hosted-product-identities.test.mjs', 'utf8');
+          const candidateMirrorText = fs.readFileSync('./candidate/tests/verification/protected-hosted-product-identities.test.mjs', 'utf8');
+          validateQualificationRepairProductRepin({ protectedIdentities, candidateIdentities, rebuiltProductDigest: process.env.REBUILT_DIGEST, protectedMirrorText, candidateMirrorText });
           NODE
           printf 'source_root=%s\ntrust_path=%s\n' "$source_root/product" "$trust_path" >> "$GITHUB_OUTPUT"
 
@@ -245,47 +222,24 @@ jobs:
           set -euo pipefail
           npm ci --prefix trusted-base/e2e --ignore-scripts --no-audit --no-fund
           full_list="$RUNNER_TEMP/atlas-qualification-repair-full-list.txt"
-          candidate_list="$RUNNER_TEMP/atlas-qualification-repair-candidate-list.txt"
           qualification_list="$RUNNER_TEMP/atlas-qualification-repair-full-census.txt"
           (
             cd trusted-base
             ATLAS_ARTIFACTS_DIR="$RUNNER_TEMP/atlas-qualification-repair-list-artifacts" \
               npm exec --prefix e2e -- playwright test --config=e2e/playwright.config.mjs --list
           ) > "$full_list"
-          ln -s "$GITHUB_WORKSPACE/trusted-base/e2e/node_modules" "${{ steps.context.outputs.execution_context }}/e2e/node_modules"
-          (
-            cd "${{ steps.context.outputs.execution_context }}"
-            ATLAS_ARTIFACTS_DIR="$RUNNER_TEMP/atlas-qualification-repair-candidate-list-artifacts" \
-              npm exec --prefix "$GITHUB_WORKSPACE/trusted-base/e2e" -- playwright test --config=e2e/playwright.config.mjs --list
-          ) > "$candidate_list"
-          rm "${{ steps.context.outputs.execution_context }}/e2e/node_modules"
-          FULL_LIST="$full_list" CANDIDATE_LIST="$candidate_list" QUALIFICATION_LIST="$qualification_list" node --input-type=module <<'NODE'
+          FULL_LIST="$full_list" QUALIFICATION_LIST="$qualification_list" node --input-type=module <<'NODE'
           import fs from 'node:fs';
           const catalog = JSON.parse(fs.readFileSync('./trusted-base/tools/verification/verification-catalog.json'));
           const specs = new Set(catalog.groups?.['e2e.full']?.specs ?? []);
           if (!specs.size) throw new TypeError('protected e2e.full qualification catalog is empty');
-          function census(target) {
-            const selected = [];
-            const stableIds = [];
-            for (const line of fs.readFileSync(target, 'utf8').split(/\r?\n/)) {
+          const selected = [];
+          for (const line of fs.readFileSync(process.env.FULL_LIST, 'utf8').split(/\r?\n/)) {
             const match = line.match(/^\s*\[([^\]]+)\]\s+›\s+([^:]+):\d+:\d+\s+›\s+(.+)$/);
-            if (!match) continue;
-            const [project, relativeSpec, title] = match.slice(1);
-            const spec = `e2e/tests/${relativeSpec}`;
-            if (specs.has(spec)) {
-              selected.push(line.trim());
-              stableIds.push(`${project}::${spec}::${title}`);
-            }
-            }
-            return { selected, stableIds: stableIds.sort() };
+            if (match && specs.has(`e2e/tests/${match[2]}`)) selected.push(line.trim());
           }
-          const protectedCensus = census(process.env.FULL_LIST);
-          const candidateCensus = census(process.env.CANDIDATE_LIST);
-          if (!protectedCensus.selected.length) throw new TypeError('protected e2e.full qualification census is empty');
-          if (JSON.stringify(candidateCensus.stableIds) !== JSON.stringify(protectedCensus.stableIds)) {
-            throw new TypeError('candidate E2E stable-ID census differs from protected e2e.full authority');
-          }
-          fs.writeFileSync(process.env.QUALIFICATION_LIST, `${candidateCensus.selected.join('\n')}\n`, 'utf8');
+          if (selected.length !== 68) throw new TypeError(`protected e2e.full qualification census must contain exactly 68 scenarios, received ${selected.length}`);
+          fs.writeFileSync(process.env.QUALIFICATION_LIST, `${selected.join('\n')}\n`, 'utf8');
           NODE
           test -s "$qualification_list"
           printf 'qualification_list=%s\n' "$qualification_list" >> "$GITHUB_OUTPUT"
@@ -411,3 +365,4 @@ jobs:
             -f context='atlas-protected-product-qualification' \
             -f description='Protected GitHub-hosted qualification repair safety net' \
             -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+

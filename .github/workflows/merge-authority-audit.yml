@@ -26,8 +26,8 @@ jobs:
       pull-requests: read
     env:
       EXPECTED_PR_CI_BLOB: "6d1ca9d28fc1f73d284fa140d2917694b4c0a3fe"
-      EXPECTED_MERGE_GROUP_GATE_BLOB: "e9e8d45dc2bb5ef2d045cc5a4606f0cf3d58422c"
-      EXPECTED_PROVENANCE_VERIFIER_BLOB: "ced468aadb792ffaf759679ee20d40dacbba1de6"
+      EXPECTED_MERGE_GROUP_GATE_BLOB: "77a520ab25b609e55be40da9454f67eda922a371"
+      EXPECTED_PROVENANCE_VERIFIER_BLOB: "5c2e51a2d6bb6c708f24ab7829ad555af1a0c340"
       EXPECTED_PROVENANCE_TEST_BLOB: "0e2dda25befd0b66ab870ffe05416986c27ceb61"
       EXPECTED_PROVENANCE_MAP_BLOB: "763c797cf23f18a157b2c8ca51f0b7b279ae5ac5"
     steps:
@@ -274,3 +274,4 @@ jobs:
               f'{expected_head}; pinned_paths={len(pins)}.'
           )
           PY
+

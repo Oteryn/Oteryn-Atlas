@@ -16,7 +16,7 @@ HEX40 = re.compile(r"^[0-9a-f]{40}$")
 SOURCE_REPOSITORY = "https://github.com/blakinio/Otheryn.git"
 SOURCE_PREFIXES = ("tools/otbm_atlas/", "tools/otbm_atlas_facts/", ".github/workflows/otbm-atlas-")
 MERGE_GROUP_GATE_PATH = ".github/workflows/merge-group-gate.yml"
-MERGE_GROUP_GATE_BLOB = "e9e8d45dc2bb5ef2d045cc5a4606f0cf3d58422c"
+MERGE_GROUP_GATE_BLOB = "77a520ab25b609e55be40da9454f67eda922a371"
 ALLOWED = {
     "GAME_OWNED_LEGACY_REFERENCE",
     "SPLIT_REWRITE_WORKFLOW",
@@ -192,3 +192,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

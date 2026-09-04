@@ -339,14 +339,30 @@ jobs:
           # This narrowly bootstraps the control-plane fix itself, and retires as
           # soon as protected main no longer has the one-region/one-search fixture.
           if CHANGES="$work/changed-files.txt" node --input-type=module <<'NODE'
+          import crypto from 'node:crypto';
           import fs from 'node:fs';
           import { QUALIFICATION_CREATURES, QUALIFICATION_FIXTURE_ID, QUALIFICATION_SEMANTIC_RECORD } from './trusted-base/tools/verification/qualification-fixture-definition.mjs';
-          import { validateQualificationRepairControlPlaneBootstrap } from './tools/verification/qualification-repair-policy.mjs';
+          import { validateQualificationRepairControlPlaneBootstrap } from './trusted-base/tools/verification/qualification-repair-policy.mjs';
+          const changedPaths = fs.readFileSync(process.env.CHANGES, 'utf8').trim().split(/\r?\n/).filter(Boolean);
           const regions = new Set(QUALIFICATION_CREATURES.map(({ position }) => `${Math.floor(position.x / 32)}:${Math.floor(position.y / 32)}:${position.floor}`));
-          validateQualificationRepairControlPlaneBootstrap({
-            changedPaths: fs.readFileSync(process.env.CHANGES, 'utf8').trim().split(/\r?\n/).filter(Boolean),
-            protectedFixtureShape: { fixtureId: QUALIFICATION_FIXTURE_ID, creatureCount: QUALIFICATION_CREATURES.length, creatureRegionCount: regions.size, semanticRecordCount: QUALIFICATION_SEMANTIC_RECORD ? 1 : 0 },
-          });
+          validateQualificationRepairControlPlaneBootstrap({ changedPaths, protectedFixtureShape: { fixtureId: QUALIFICATION_FIXTURE_ID, creatureCount: QUALIFICATION_CREATURES.length, creatureRegionCount: regions.size, semanticRecordCount: QUALIFICATION_SEMANTIC_RECORD ? 1 : 0 } });
+          const read = (root, relative) => fs.readFileSync(`${root}/${relative}`, 'utf8');
+          const blob = (text) => crypto.createHash('sha1').update(Buffer.concat([Buffer.from(`blob ${Buffer.byteLength(text)}\0`), Buffer.from(text)])).digest('hex');
+          const exactOne = (text, expression, label) => { const matches = text.match(expression) ?? []; if (matches.length !== 1) throw new TypeError(`${label} must occur exactly once`); return matches[0]; };
+          const gateText = read('.', '.github/workflows/merge-group-gate.yml');
+          const verifierProtected = read('trusted-base', 'tools/governance/verify_extraction_provenance.py');
+          const verifierCandidate = read('.', 'tools/governance/verify_extraction_provenance.py');
+          const auditProtected = read('trusted-base', '.github/workflows/merge-authority-audit.yml');
+          const auditCandidate = read('.', '.github/workflows/merge-authority-audit.yml');
+          const gateBlob = blob(gateText);
+          const oldVerifierPin = exactOne(verifierProtected, /MERGE_GROUP_GATE_BLOB = "[0-9a-f]{40}"/g, 'protected verifier gate pin');
+          const expectedVerifier = verifierProtected.replace(oldVerifierPin, `MERGE_GROUP_GATE_BLOB = "${gateBlob}"`);
+          if (verifierCandidate !== expectedVerifier) throw new TypeError('candidate provenance verifier is not an exact gate-pin rotation');
+          const verifierBlob = blob(verifierCandidate);
+          const oldAuditGate = exactOne(auditProtected, /EXPECTED_MERGE_GROUP_GATE_BLOB: "[0-9a-f]{40}"/g, 'protected audit gate pin');
+          const oldAuditVerifier = exactOne(auditProtected, /EXPECTED_PROVENANCE_VERIFIER_BLOB: "[0-9a-f]{40}"/g, 'protected audit verifier pin');
+          const expectedAudit = auditProtected.replace(oldAuditGate, `EXPECTED_MERGE_GROUP_GATE_BLOB: "${gateBlob}"`).replace(oldAuditVerifier, `EXPECTED_PROVENANCE_VERIFIER_BLOB: "${verifierBlob}"`);
+          if (auditCandidate !== expectedAudit) throw new TypeError('candidate merge authority audit is not an exact pin rotation');
           NODE
           then
             printf 'use_repair_proof=true\nproof_mode=self-retiring-control-plane-bootstrap\n' >> "$GITHUB_OUTPUT"
@@ -354,8 +370,13 @@ jobs:
           fi
 
           gh api "repos/$GITHUB_REPOSITORY/commits/$candidate_head_sha/status" > "$work/statuses.json"
+          repair_status_count="$(jq '[.statuses[] | select(.context == "atlas-protected-product-qualification")] | length' "$work/statuses.json")"
+          if test "$repair_status_count" = 0; then
+            exit 0
+          fi
+          test "$repair_status_count" = 1
           jq -e '[.statuses[] | select(.context == "atlas-protected-product-qualification" and .state == "success")] | length == 1' "$work/statuses.json" >/dev/null
-          jq '[.statuses[] | select(.context == "atlas-protected-product-qualification" and .state == "success")][0]' "$work/statuses.json" > "$work/status.json"
+          jq '[.statuses[] | select(.context == "atlas-protected-product-qualification")][0]' "$work/statuses.json" > "$work/status.json"
           target_url="$(jq -er '.target_url' "$work/status.json")"
           [[ "$target_url" =~ ^https://github.com/$GITHUB_REPOSITORY/actions/runs/([1-9][0-9]*)$ ]]
           producer_run_id="${BASH_REMATCH[1]}"
@@ -500,3 +521,4 @@ jobs:
           compose config -q
           compose up -d --wait atlas-publication atlas-web
           compose run --no-deps --rm e2e
+
