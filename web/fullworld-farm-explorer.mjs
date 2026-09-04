@@ -1,12 +1,13 @@
 import { findCreatureById, validateCreatureSearchRecords } from '../src/browser/creature-search.mjs';
 import { estimateKillTarget } from '../src/browser/farm-intelligence.mjs';
 import { parseFarmState, serializeFarmState } from '../src/browser/farm-state.mjs';
+import { ancillarySourceExpectations, FULLWORLD_TRUST } from '../src/browser/fullworld-trust.mjs';
 
 const CREATURE_SEARCH_URL = new URL('./semantic-search/creatures.json', import.meta.url);
-const EXPECTED_CREATURE_DIGEST = 'sha256:81505e91d7089f91e71813ec43f97118932db9cc7fd76d291fa399447ee2dfa4';
 const MAX_CATALOG_BYTES = 2 * 1024 * 1024;
 const MAX_RESULTS = 10;
 const TIME_BASES = new Set(['active_hunt', 'hunt_wall', 'trip_wall']);
+const SOURCE_EXPECTATIONS = ancillarySourceExpectations(FULLWORLD_TRUST);
 
 function requireValue(condition, message) {
   if (!condition) throw new Error(message);
@@ -29,13 +30,16 @@ export function buildFarmUiReadiness({ farmPublicationAvailable = false, interac
     custom_kill: frozenState('AVAILABLE', 'ESTIMATE', 'Custom kill estimate uses an explicit manual credited-progress KPH assumption.') });
 }
 
-export function validateFarmCreatureCatalog(catalog) {
+export function validateFarmCreatureCatalog(catalog, expectedSource = SOURCE_EXPECTATIONS.semanticSearch) {
   requireValue(catalog && typeof catalog === 'object' && !Array.isArray(catalog), 'creature catalog must be an object');
+  requireValue(expectedSource && typeof expectedSource === 'object' && !Array.isArray(expectedSource), 'creature catalog source expectations invalid');
   requireValue(catalog.schema_version === 1, 'creature catalog schema unsupported');
-  requireValue(catalog.source?.contract_id === 'oteryn-game-atlas-export-v1', 'creature catalog contract unsupported');
-  requireValue(catalog.source?.capability === 'static-creatures-v1', 'creature catalog capability unsupported');
-  requireValue(catalog.source?.semantic_digest === EXPECTED_CREATURE_DIGEST, 'creature catalog semantic digest untrusted');
+  requireValue(catalog.source?.contract_id === expectedSource.creatureContractId, 'creature catalog contract unsupported');
+  requireValue(catalog.source?.capability === expectedSource.creatureCapability, 'creature catalog capability unsupported');
+  requireValue(catalog.source?.semantic_digest === expectedSource.creatureSemanticDigest, 'creature catalog semantic digest untrusted');
   requireValue(catalog.source?.coordinate_profile === 'oteryn-native-floor-v1', 'creature catalog coordinate profile unsupported');
+  if (expectedSource.fixtureId == null) requireValue(catalog.source?.fixture_id == null, 'production creature catalog must not claim fixture identity');
+  else requireValue(catalog.source?.fixture_id === expectedSource.fixtureId, 'creature catalog fixture identity invalid');
   return validateCreatureSearchRecords(catalog.records);
 }
 

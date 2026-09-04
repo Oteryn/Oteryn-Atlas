@@ -9,13 +9,14 @@ import {
   searchCreatureRecords,
   validateCreatureSearchRecords,
 } from '../src/browser/creature-search.mjs';
+import { ancillarySourceExpectations, FULLWORLD_TRUST } from '../src/browser/fullworld-trust.mjs';
 
 const INDEX_URL = new URL('./semantic-search/index.json', import.meta.url);
 const CREATURE_SEARCH_URL = new URL('./semantic-search/creatures.json', import.meta.url);
 const MAX_INDEX_BYTES = 2 * 1024 * 1024;
-const EXPECTED_CREATURE_SEMANTIC_DIGEST = 'sha256:81505e91d7089f91e71813ec43f97118932db9cc7fd76d291fa399447ee2dfa4';
 const MAX_CREATURE_SEARCH_BYTES = 2 * 1024 * 1024;
 const MAX_RESULTS = 12;
+const SOURCE_EXPECTATIONS = ancillarySourceExpectations(FULLWORLD_TRUST);
 const state = { index: null, creatureSearch: [], active: null, lastQuery: '', lastResults: 0, status: 'LOADING', error: null };
 
 function requireValue(condition, message) {
@@ -245,10 +246,13 @@ function renderActiveInspector() {
 
 async function loadCreatureSearch() {
   const catalog = await boundedJson(CREATURE_SEARCH_URL, MAX_CREATURE_SEARCH_BYTES);
+  const expected = SOURCE_EXPECTATIONS.semanticSearch;
   requireValue(catalog.schema_version === 1, 'unsupported creature search catalog schema');
-  requireValue(catalog.source?.contract_id === 'oteryn-game-atlas-export-v1' && catalog.source?.capability === 'static-creatures-v1', 'creature search source unsupported');
-  requireValue(catalog.source?.semantic_digest === EXPECTED_CREATURE_SEMANTIC_DIGEST, 'untrusted creature search semantic digest');
+  requireValue(catalog.source?.contract_id === expected.creatureContractId && catalog.source?.capability === expected.creatureCapability, 'creature search source unsupported');
+  requireValue(catalog.source?.semantic_digest === expected.creatureSemanticDigest, 'untrusted creature search semantic digest');
   requireValue(catalog.source?.coordinate_profile === 'oteryn-native-floor-v1', 'creature search coordinate profile unsupported');
+  if (expected.fixtureId == null) requireValue(catalog.source?.fixture_id == null, 'production creature search source must not claim fixture identity');
+  else requireValue(catalog.source?.fixture_id === expected.fixtureId, 'creature search fixture identity invalid');
   return validateCreatureSearchRecords(catalog.records);
 }
 
@@ -257,7 +261,7 @@ async function boot() {
   wireForm('#search-form', '#search-input', 'desktop');
   wireForm('#mobile-search-form', '#mobile-search-input', 'mobile');
   const raw = await boundedJson(INDEX_URL, MAX_INDEX_BYTES);
-  state.index = validateSemanticSearchIndex(raw);
+  state.index = validateSemanticSearchIndex(raw, SOURCE_EXPECTATIONS.semanticSearch);
   state.creatureSearch = await loadCreatureSearch();
   const params = new URLSearchParams(location.search);
   const activeId = params.get('semantic');
