@@ -51,7 +51,7 @@ test('Issue #314 bootstrap: pure verification regressions remain deterministic-o
 
 test('Issue #314 bootstrap: generic repair authority is protected and branch agnostic', () => {
   const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'tools/verification/verification-authority-manifest.json'), 'utf8'));
-  const paths = new Set(manifest.files.map(({ path: pathname }) => pathname));
+  const paths = new Set(manifest.components.map(({ path: pathname }) => pathname));
   assert.equal(paths.has('.github/workflows/protected-qualification-repair.yml'), true);
   assert.equal(paths.has('tools/verification/qualification-repair-policy.mjs'), true);
 
