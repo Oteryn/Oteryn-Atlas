@@ -64,3 +64,22 @@ test('Issue #314 bootstrap: generic repair authority is protected and branch agn
   assert.match(workflow, /--retries=0/);
   assert.doesNotMatch(workflow, /ATLAS_HEAD_REF|head\.ref\s*==|fix\/issue-/);
 });
+
+test('Issue #314 bootstrap: creature overlay source contract accepts exactly one complete authority form', () => {
+  const workflow = fs.readFileSync(path.join(ROOT, '.github/workflows/creature-overlays.yml'), 'utf8');
+  for (const marker of [
+    'legacy_markers=(',
+    'trust_markers=(',
+    "EXPECTED_SEMANTIC_DIGEST = 'sha256:7dc951874c95424279737eaaf51cf2d50940162ef4799daea39a187a581ef0e8'",
+    "EXPECTED_CAPABILITY = 'animated-creatures-v1'",
+    'EXPECTED_NPC_ROLE_SCHEMA = 1',
+    'const SOURCE_EXPECTATIONS = ancillarySourceExpectations(FULLWORLD_TRUST);',
+    'SOURCE_EXPECTATIONS.animation,',
+    'const expected = SOURCE_EXPECTATIONS.creatures;',
+    'index.source?.semantic_digest === expected.semanticDigest',
+    'index.source?.npc_role_schema_version === expected.npcRoleSchemaVersion',
+    'all_markers_present "${legacy_markers[@]}" && no_markers_present "${trust_markers[@]}"',
+    'all_markers_present "${trust_markers[@]}" && no_markers_present "${legacy_markers[@]}"',
+  ]) assert.equal(workflow.includes(marker), true, marker);
+  assert.match(workflow, /Creature source authority contract is incomplete or mixed/);
+});
