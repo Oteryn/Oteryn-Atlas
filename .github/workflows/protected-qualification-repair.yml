@@ -77,11 +77,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          pages="$RUNNER_TEMP/atlas-qualification-repair-change-pages.json"
           changes="$RUNNER_TEMP/atlas-qualification-repair-changes.json"
           admission="$RUNNER_TEMP/atlas-qualification-repair-admission.json"
           gh api --paginate --slurp \
-            "repos/$GITHUB_REPOSITORY/pulls/$ATLAS_PR_NUMBER/files?per_page=100" \
-            --jq '[.[][] | {path: .filename, previousPath: (.previous_filename // null)}]' > "$changes"
+            "repos/$GITHUB_REPOSITORY/pulls/$ATLAS_PR_NUMBER/files?per_page=100" > "$pages"
+          jq '[.[][] | {path: .filename, previousPath: (.previous_filename // null)}]' "$pages" > "$changes"
           test "$(jq 'length' "$changes")" = "$ATLAS_CHANGED_FILE_COUNT"
           merge_base="$(git -C candidate merge-base HEAD "$ATLAS_BASE_SHA")"
           [[ "$merge_base" =~ ^[a-f0-9]{40}$ ]]
@@ -202,14 +203,14 @@ jobs:
               export PYTHONPYCACHEPREFIX=/tmp/atlas-python-pycache
               node --test tests/verification/*.test.mjs'
 
-      - name: Resolve exact protected e2e.full stable test list
+      - name: Resolve exact protected qualification repair browser proof
         id: tests
         shell: bash
         run: |
           set -euo pipefail
           npm ci --prefix trusted-base/e2e --ignore-scripts --no-audit --no-fund
           full_list="$RUNNER_TEMP/atlas-qualification-repair-full-list.txt"
-          qualification_list="$RUNNER_TEMP/atlas-qualification-repair-e2e-full.txt"
+          qualification_list="$RUNNER_TEMP/atlas-qualification-repair-browser-proof.txt"
           (
             cd trusted-base
             ATLAS_ARTIFACTS_DIR="$RUNNER_TEMP/atlas-qualification-repair-list-artifacts" \
@@ -217,19 +218,22 @@ jobs:
           ) > "$full_list"
           FULL_LIST="$full_list" QUALIFICATION_LIST="$qualification_list" node --input-type=module <<'NODE'
           import fs from 'node:fs';
-          const catalog = JSON.parse(fs.readFileSync('./trusted-base/tools/verification/verification-catalog.json', 'utf8'));
-          const specs = new Set(catalog.groups?.['e2e.full']?.specs ?? []);
-          if (!specs.size) throw new TypeError('protected e2e.full qualification catalog is empty');
+          import { QUALIFICATION_REPAIR_BROWSER_PROOF } from './trusted-base/tools/verification/qualification-repair-policy.mjs';
+          const proof = QUALIFICATION_REPAIR_BROWSER_PROOF;
           const selected = [];
           for (const line of fs.readFileSync(process.env.FULL_LIST, 'utf8').split(/\r?\n/)) {
             const match = line.match(/^\s*\[([^\]]+)\]\s+›\s+([^:]+):\d+:\d+\s+›\s+(.+)$/);
             if (!match) continue;
-            if (specs.has(`e2e/tests/${match[2]}`)) selected.push(line.trim());
+            const [project, relativeSpec, title] = match.slice(1);
+            if (project === proof.project && `e2e/tests/${relativeSpec}` === proof.spec && title === proof.title) {
+              selected.push(line.trim());
+            }
           }
-          if (!selected.length) throw new TypeError('protected e2e.full qualification selection is empty');
-          fs.writeFileSync(process.env.QUALIFICATION_LIST, `${selected.join('\n')}\n`, 'utf8');
+          if (selected.length !== 1) throw new TypeError(`protected qualification repair browser proof must resolve exactly once; got ${selected.length}`);
+          fs.writeFileSync(process.env.QUALIFICATION_LIST, `${selected[0]}\n`, 'utf8');
           NODE
           test -s "$qualification_list"
+          test "$(wc -l < "$qualification_list" | tr -d ' ')" = 1
           printf 'qualification_list=%s\n' "$qualification_list" >> "$GITHUB_OUTPUT"
 
       - name: Bind protected authority and exact repair instance identities
@@ -289,7 +293,7 @@ jobs:
           NODE
           printf 'identity_dir=%s\n' "$identity_dir" >> "$GITHUB_OUTPUT"
 
-      - name: Prove complete protected qualification safety net in Chromium
+      - name: Prove bounded protected qualification repair in Chromium
         shell: bash
         run: |
           set -euo pipefail
