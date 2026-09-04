@@ -51,3 +51,22 @@ test('Issue #314: protected hosted gate wait budget covers the producer critical
     'verification-browser timeout must include polling plus setup/validation headroom',
   );
 });
+
+test('Issue #314: every hosted polling iteration checks exact generic qualification before standard fan-in', () => {
+  const ci = fs.readFileSync(path.join(ROOT, '.github/workflows/ci.yml'), 'utf8');
+  const consumer = workflowJob(ci, 'verification-browser');
+  const attemptsMatch = consumer.match(/for attempt in \{1\.\.(\d+)\}; do/);
+  assert(attemptsMatch, 'verification-browser must declare a bounded polling loop');
+
+  const loopStart = consumer.indexOf(attemptsMatch[0]);
+  const helperStart = consumer.indexOf('accept_generic_repair() {');
+  const statusQuery = consumer.indexOf('commits/$ATLAS_CODE_REVISION/statuses?per_page=100', helperStart);
+  const loopCall = consumer.indexOf('if accept_generic_repair; then', loopStart);
+  const artifactQuery = consumer.indexOf('actions/artifacts?name=$expected_name&per_page=100', loopStart);
+
+  assert(helperStart >= 0 && helperStart < loopStart, 'generic repair validator must be defined before polling');
+  assert(statusQuery > helperStart && statusQuery < loopStart, 'generic repair helper must refresh exact-head commit status');
+  assert(loopCall > loopStart, 'generic repair helper must run inside every polling iteration');
+  assert(artifactQuery > loopCall, 'generic repair evidence must be checked before standard hosted fan-in each iteration');
+  assert.match(consumer.slice(loopCall, artifactQuery), /if accept_generic_repair; then\s+exit 0\s+fi/);
+});
