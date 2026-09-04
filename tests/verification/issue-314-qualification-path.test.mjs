@@ -14,6 +14,8 @@ const impactManifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'tools/verific
 const verificationCatalog = JSON.parse(fs.readFileSync(path.join(ROOT, 'tools/verification/verification-catalog.json'), 'utf8'));
 const classifierPath = path.join(ROOT, 'tools/verification/classify-pr-changes.mjs');
 const creatureSource = fs.readFileSync(path.join(ROOT, 'web/fullworld-creatures.mjs'), 'utf8');
+const searchSource = fs.readFileSync(path.join(ROOT, 'web/fullworld-search.mjs'), 'utf8');
+const farmSource = fs.readFileSync(path.join(ROOT, 'web/fullworld-farm-explorer.mjs'), 'utf8');
 
 function classify(paths) {
   const result = spawnSync(process.execPath, [classifierPath], {
@@ -86,9 +88,9 @@ test('C: verification profile remains independent from product data capability',
   assert.equal(planFor('web/fullworld-creatures.mjs').profile, 'broad');
 });
 
-test('D/E: qualification repair admission is branch-agnostic, exact-scope and monotonic', async () => {
+test('D/E: qualification repair admission is branch-agnostic, exact-scope and monotonic without recursively executing e2e.full', async () => {
   const policyUrl = pathToFileURL(path.join(ROOT, 'tools/verification/qualification-repair-policy.mjs')).href;
-  const { validateQualificationRepairTransition } = await import(policyUrl);
+  const { QUALIFICATION_REPAIR_BROWSER_PROOF, validateQualificationRepairTransition } = await import(policyUrl);
   const protectedPlan = {
     profile: 'full',
     requiredGroupIds: ['deterministic.core', 'e2e.full'],
@@ -103,8 +105,17 @@ test('D/E: qualification repair admission is branch-agnostic, exact-scope and mo
     candidatePlan,
   });
   assert.equal(accepted.eligible, true);
-  assert.deepEqual(accepted.requiredGroupIds, ['deterministic.core', 'e2e.full']);
-  assert.equal(JSON.stringify(accepted).includes('issue-'), false);
+  assert.deepEqual(accepted.planFloorGroupIds, ['deterministic.core', 'e2e.full']);
+  assert.deepEqual(accepted.requiredGroupIds, ['deterministic.core']);
+  assert.deepEqual(accepted.browserProof, QUALIFICATION_REPAIR_BROWSER_PROOF);
+  assert.deepEqual(accepted.browserProof, {
+    project: 'desktop-chromium',
+    spec: 'e2e/tests/creatures-desktop.spec.mjs',
+    title: 'desktop shipped creature controls persist independently and expose bounded diagnostics',
+    dataCapability: 'qualification_fixture',
+    workers: 1,
+    retries: 0,
+  });
   assert.equal(JSON.stringify(accepted).includes('branch'), false);
   assert.equal(JSON.stringify(accepted).includes('prNumber'), false);
 
@@ -112,7 +123,7 @@ test('D/E: qualification repair admission is branch-agnostic, exact-scope and mo
     changedPaths: ['tools/verification/qualification-fixture-definition.mjs'],
     protectedPlan,
     candidatePlan: { ...candidatePlan, requiredGroupIds: ['deterministic.core'] },
-  }), /narrow|monotonic|protected/i);
+  }), /narrow|protected|safety/i);
 
   assert.throws(() => validateQualificationRepairTransition({
     changedPaths: ['.github/workflows/protected-hosted-executor.yml'],
@@ -121,7 +132,7 @@ test('D/E: qualification repair admission is branch-agnostic, exact-scope and mo
   }), /scope|eligible|repair/i);
 });
 
-test('D/E: generic qualification repair admits regression companions and the shared FullWorld app caller', async () => {
+test('D/E: generic qualification repair admits regression companions and all trust-bound FullWorld ancillary callers', async () => {
   const policyUrl = pathToFileURL(path.join(ROOT, 'tools/verification/qualification-repair-policy.mjs')).href;
   const { validateQualificationRepairTransition } = await import(policyUrl);
   const plan = {
@@ -137,6 +148,8 @@ test('D/E: generic qualification repair admits regression companions and the sha
       'tests/verification/issue-314-animation-trust-callers.test.mjs',
       'web/fullworld-app.mjs',
       'web/fullworld-creatures.mjs',
+      'web/fullworld-farm-explorer.mjs',
+      'web/fullworld-search.mjs',
     ],
     protectedPlan: plan,
     candidatePlan: plan,
@@ -145,9 +158,11 @@ test('D/E: generic qualification repair admits regression companions and the sha
   assert.equal(accepted.eligible, true);
   assert(accepted.changedPaths.includes('tests/verification/issue-314-animation-trust-callers.test.mjs'));
   assert(accepted.changedPaths.includes('web/fullworld-app.mjs'));
+  assert(accepted.changedPaths.includes('web/fullworld-search.mjs'));
+  assert(accepted.changedPaths.includes('web/fullworld-farm-explorer.mjs'));
 });
 
-test('D/E: protected qualification repair is an active generic hosted proof rather than a branch registry', () => {
+test('D/E: protected qualification repair resolves one exact protected browser oracle instead of the complete matrix', () => {
   const workflowPath = path.join(ROOT, '.github/workflows/protected-qualification-repair.yml');
   assert.equal(fs.existsSync(workflowPath), true, 'generic protected qualification repair workflow must exist');
   const workflow = fs.readFileSync(workflowPath, 'utf8');
@@ -156,6 +171,10 @@ test('D/E: protected qualification repair is an active generic hosted proof rath
 
   assert.match(workflow, /pull_request_target:/);
   assert.match(job, /validateQualificationRepairTransition/);
+  assert.match(job, /requiredGroupFloor:\s*\['deterministic\.core', 'e2e\.full'\]/);
+  assert.match(job, /QUALIFICATION_REPAIR_BROWSER_PROOF/);
+  assert.match(job, /selected\.length !== 1/);
+  assert.doesNotMatch(job, /catalog\.groups\?\.\['e2e\.full'\]\?\.specs/);
   assert.match(job, /runs-on:\s*ubuntu-24\.04/);
   assert.match(job, /--network none/);
   assert.match(job, /--read-only/);
@@ -168,9 +187,19 @@ test('D/E: protected qualification repair is an active generic hosted proof rath
   assert.doesNotMatch(gateSource, /resolveProtectedPromotionQualification|resolveProtectedAuthorityRepinQualification/);
 });
 
-test('F: creature runtime consumes trust-bound ancillary source expectations instead of production constants', () => {
+test('F: FullWorld ancillary browser consumers derive exact source authority from active trust', () => {
   assert.match(creatureSource, /ancillarySourceExpectations\(FULLWORLD_TRUST\)/);
   assert.doesNotMatch(creatureSource, /validateCreatureIndex\(index,\s*\{[\s\S]*EXPECTED_GAME_SHA256/);
+
+  for (const [source, label] of [[searchSource, 'search'], [farmSource, 'farm']]) {
+    assert.match(source, /ancillarySourceExpectations\(FULLWORLD_TRUST\)/, label);
+    assert.match(source, /SOURCE_EXPECTATIONS\.semanticSearch/, label);
+    assert.match(source, /creatureContractId/, label);
+    assert.match(source, /creatureCapability/, label);
+    assert.match(source, /creatureSemanticDigest/, label);
+    assert.match(source, /fixture_id/, label);
+  }
+  assert.match(searchSource, /validateSemanticSearchIndex\(raw, SOURCE_EXPECTATIONS\.semanticSearch\)/);
 });
 
 test('F2: implicit and explicit production animation authority share one singleton identity', async () => {
@@ -214,7 +243,7 @@ test('F2: implicit and explicit production animation authority share one singlet
   }), /identity changed/i);
 });
 
-test('G: genuine runtime-impacting browser changes still require hosted qualification-fixture evidence', () => {
+test('G: genuine runtime-impacting browser changes retain full plan floor while generic repair proof stays fixture-bound', async () => {
   const plan = planFor('web/fullworld-creatures.mjs');
   assert.equal(plan.profile, 'broad');
   assert(plan.requiredGroupIds.includes('e2e.full'));
@@ -222,4 +251,10 @@ test('G: genuine runtime-impacting browser changes still require hosted qualific
   assert.equal(group.capabilities.browser, true);
   assert.equal(group.capabilities.hosted, true);
   assert.equal(group.capabilities.dataCapability, 'qualification_fixture');
+
+  const policyUrl = pathToFileURL(path.join(ROOT, 'tools/verification/qualification-repair-policy.mjs')).href;
+  const { QUALIFICATION_REPAIR_BROWSER_PROOF } = await import(policyUrl);
+  assert.equal(QUALIFICATION_REPAIR_BROWSER_PROOF.dataCapability, 'qualification_fixture');
+  assert.equal(QUALIFICATION_REPAIR_BROWSER_PROOF.workers, 1);
+  assert.equal(QUALIFICATION_REPAIR_BROWSER_PROOF.retries, 0);
 });
