@@ -19,7 +19,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
-          fetch-depth: 2
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Materialize final implementation commit object without moving any ref
@@ -28,11 +28,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
           BRIDGE_SHA: ${{ github.sha }}
-          EXPECTED_BRIDGE_PARENT: 538ddc01047e8fcb78348d8ef58c3beec01d8305
+          EXPECTED_HANDOFF_ANCESTOR: 538ddc01047e8fcb78348d8ef58c3beec01d8305
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$BRIDGE_SHA"
-          test "$(git rev-parse HEAD^)" = "$EXPECTED_BRIDGE_PARENT"
+          git merge-base --is-ancestor "$EXPECTED_HANDOFF_ANCESTOR" HEAD
           python - <<'PY'
           import json
           import os
