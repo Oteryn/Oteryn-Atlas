@@ -9,6 +9,7 @@ on:
       - src/browser/semantic-search.mjs
       - tools/verification/qualification-fixture-definition.mjs
       - tools/verification/qualification-world.mjs
+      - web/fullworld-app.mjs
       - web/fullworld-creatures.mjs
       - web/fullworld-farm-explorer.mjs
       - web/fullworld-search.mjs
