@@ -77,11 +77,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          pages="$RUNNER_TEMP/atlas-qualification-repair-change-pages.json"
           changes="$RUNNER_TEMP/atlas-qualification-repair-changes.json"
           admission="$RUNNER_TEMP/atlas-qualification-repair-admission.json"
           gh api --paginate --slurp \
-            "repos/$GITHUB_REPOSITORY/pulls/$ATLAS_PR_NUMBER/files?per_page=100" \
-            --jq '[.[][] | {path: .filename, previousPath: (.previous_filename // null)}]' > "$changes"
+            "repos/$GITHUB_REPOSITORY/pulls/$ATLAS_PR_NUMBER/files?per_page=100" > "$pages"
+          jq '[.[][] | {path: .filename, previousPath: (.previous_filename // null)}]' "$pages" > "$changes"
           test "$(jq 'length' "$changes")" = "$ATLAS_CHANGED_FILE_COUNT"
           merge_base="$(git -C candidate merge-base HEAD "$ATLAS_BASE_SHA")"
           [[ "$merge_base" =~ ^[a-f0-9]{40}$ ]]
