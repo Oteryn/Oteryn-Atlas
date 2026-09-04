@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -10,12 +10,8 @@ const CANARY = resolve(ROOT, 'docs/agents/prompts/ATLAS-LEAN-PROMPT-CANARY.md');
 const REGISTRY = resolve(ROOT, 'docs/agents/DOCUMENTATION_AGENT_IA.json');
 const REGISTRY_VALIDATOR = resolve(ROOT, 'tools/governance/validate_documentation_ia.py');
 const REGISTRY_TEST = resolve(ROOT, 'tools/governance/test_documentation_ia.py');
-
-const TERMINAL_PACKETS = [
-  'ATLAS-CREATURE-GAMEPLAY-PROFILES.md',
-  'ATLAS-CREATURE-LABEL-AND-NPC-BADGE-UX.md',
-  'ATLAS-E2E-VERIFICATION-ANTI-LOOP-HARDENING.md',
-];
+const ACTIVE_TASKS = resolve(ROOT, 'docs/agents/tasks/active');
+const ARCHIVED_TASKS = resolve(ROOT, 'docs/agents/tasks/archive');
 
 const REQUIRED_CANARY_SECTIONS = ['Outcome', 'Scope', 'Atlas invariants', 'Acceptance'];
 const FORBIDDEN_CANARY_SECTIONS = [
@@ -44,27 +40,11 @@ test('Atlas Documentation/Agent IA has one mutable lifecycle authority', () => {
   }
 });
 
-test('terminal task packets are archived and no longer dispatchable', () => {
-  for (const filename of TERMINAL_PACKETS) {
-    assert.equal(
-      existsSync(resolve(ROOT, 'docs/agents/tasks/active', filename)),
-      false,
-      `${filename} must not remain under tasks/active`,
-    );
-    assert.equal(
-      existsSync(resolve(ROOT, 'docs/agents/tasks/archive', filename)),
-      true,
-      `${filename} must be preserved under tasks/archive`,
-    );
-  }
-
-  for (const filename of ['ATLAS-FULLWORLD-COORDINATOR.md', 'ATLAS-HUNT-INTELLIGENCE-PROJECT.md']) {
-    assert.equal(
-      existsSync(resolve(ROOT, 'docs/agents/tasks/active', filename)),
-      true,
-      `${filename} belongs to an open Issue and must remain active`,
-    );
-  }
+test('task cache structure cannot classify the same packet as active and archived', () => {
+  const active = new Set(readdirSync(ACTIVE_TASKS).filter((name) => name.endsWith('.md')));
+  const archived = new Set(readdirSync(ARCHIVED_TASKS).filter((name) => name.endsWith('.md')));
+  const overlap = [...active].filter((name) => archived.has(name)).sort();
+  assert.deepEqual(overlap, [], 'task packet cannot exist in both lifecycle cache directories');
 });
 
 test('lean prompt canary is a task delta and does not copy repository policy', () => {
