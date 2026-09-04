@@ -1,3 +1,4 @@
+// Steady-state qualification canary: intentionally no runtime behavior change.
 import {
   displayFloor,
   navigationSearchParams,
