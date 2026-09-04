@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { MOBILE_ENTRY, assertNoRuntimeFailures, captureRuntimeFailures, gotoAtlas, isQualificationFixtureExecution, waitForAtlas } from './runtime.mjs';
-import { canvasPng, exactPngPixelsEqual } from '../support/visual-oracle.mjs';
+import { canvasPng, compareReviewedSnapshotOutsideLocators, exactPngPixelsEqual } from '../support/visual-oracle.mjs';
 
 const MONSTER_PLAYBACK_ENTRY = isQualificationFixtureExecution()
   ? '/web/fullworld.html?x=32369&y=32241&floor=-7&zoom=2&mode=minimap&perf=reference&animation=off&creatures=npc,monster'
@@ -91,9 +91,15 @@ test('mobile Atlas-owned chrome and drawers retain reviewed user-facing visual c
       { selector: '#inspector-content', label: 'inspector facts' },
     ],
   });
-  await expect(page.locator('#mobile-inspector-panel')).toHaveScreenshot('mobile-inspector-panel.png', {
-    animations: 'disabled', caret: 'hide', scale: 'css',
-  });
+  if (isQualificationFixtureExecution()) {
+    const comparison = await compareReviewedSnapshotOutsideLocators(page, testInfo, '#mobile-inspector-panel', 'mobile-inspector-panel.png', ['#inspector-content']);
+    expect(comparison.changedOutside, 'qualification mobile inspector chrome drifted outside fixture-owned facts').toBe(0);
+    expect(comparison.changedInside, 'qualification mobile inspector facts unexpectedly matched the production golden').toBeGreaterThan(0);
+  } else {
+    await expect(page.locator('#mobile-inspector-panel')).toHaveScreenshot('mobile-inspector-panel.png', {
+      animations: 'disabled', caret: 'hide', scale: 'css',
+    });
+  }
   await captureUserVisualEvidence(page, testInfo, 'mobile.inspector', {
     surfaceMetrics: inspectorMetrics,
     note: 'Mobile inspector drawer after a real semantic navigation.',

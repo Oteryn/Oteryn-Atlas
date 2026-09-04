@@ -1,3 +1,5 @@
+import { readFile } from 'node:fs/promises';
+
 export async function canvasAlphaCount(page, selector) {
   return page.locator(selector).evaluate((canvas) => {
     const data = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
@@ -74,4 +76,23 @@ export async function comparePngOutsideRects(page, before, after, rectangles) {
       diffPng: diffCanvas.toDataURL('image/png').split(',')[1],
     };
   }, { before64: before.toString('base64'), after64: after.toString('base64'), rectangles });
+}
+
+export async function compareReviewedSnapshotOutsideLocators(page, testInfo, containerSelector, snapshotName, dynamicSelectors) {
+  if (!Array.isArray(dynamicSelectors) || dynamicSelectors.length === 0) throw new TypeError('reviewed snapshot dynamic selectors are required');
+  const container = page.locator(containerSelector);
+  const containerBox = await container.boundingBox();
+  if (!containerBox) throw new TypeError(`reviewed snapshot container is not visible: ${containerSelector}`);
+  const rectangles = [];
+  for (const selector of dynamicSelectors) {
+    const box = await page.locator(selector).boundingBox();
+    if (!box) throw new TypeError(`reviewed snapshot dynamic locator is not visible: ${selector}`);
+    rectangles.push({ x: box.x - containerBox.x, y: box.y - containerBox.y, width: box.width, height: box.height });
+  }
+  const extensionOffset = snapshotName.lastIndexOf('.');
+  if (extensionOffset <= 0) throw new TypeError(`reviewed snapshot name is invalid: ${snapshotName}`);
+  const reviewedName = `${snapshotName.slice(0, extensionOffset)}-${testInfo.project.name}-${process.platform}${snapshotName.slice(extensionOffset)}`;
+  const expected = await readFile(testInfo.snapshotPath(reviewedName));
+  const actual = await container.screenshot({ animations: 'disabled', caret: 'hide', scale: 'css' });
+  return comparePngOutsideRects(page, expected, actual, rectangles);
 }

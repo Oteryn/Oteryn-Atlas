@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { DESKTOP_ENTRY, assertNoRuntimeFailures, captureRuntimeFailures, gotoAtlas, isQualificationFixtureExecution, waitForAtlas } from './runtime.mjs';
-import { canvasAlphaCount, comparePngOutsideRects } from '../support/visual-oracle.mjs';
+import { canvasAlphaCount, comparePngOutsideRects, compareReviewedSnapshotOutsideLocators } from '../support/visual-oracle.mjs';
 import { assertUserVisibleSurface, captureUserVisualEvidence } from '../support/user-acceptance.mjs';
 const ENTRY = `${DESKTOP_ENTRY}&creatures=npc,monster&animation=off`;
 const VISUAL_ENTRY = `${DESKTOP_ENTRY}&animation=off`;
@@ -125,9 +125,15 @@ test('desktop Atlas-owned chrome and user journey retain reviewed visual contrac
       { selector: '#search-input', label: 'global search', interactive: true, minHeight: 30 },
     ],
   });
-  await expect(page.locator('#mobile-inspector-panel')).toHaveScreenshot('desktop-inspector.png', {
-    animations: 'disabled', caret: 'hide', scale: 'css',
-  });
+  if (isQualificationFixtureExecution()) {
+    const comparison = await compareReviewedSnapshotOutsideLocators(page, testInfo, '#mobile-inspector-panel', 'desktop-inspector.png', ['#inspector-content']);
+    expect(comparison.changedOutside, 'qualification desktop inspector chrome drifted outside fixture-owned facts').toBe(0);
+    expect(comparison.changedInside, 'qualification desktop inspector facts unexpectedly matched the production golden').toBeGreaterThan(0);
+  } else {
+    await expect(page.locator('#mobile-inspector-panel')).toHaveScreenshot('desktop-inspector.png', {
+      animations: 'disabled', caret: 'hide', scale: 'css',
+    });
+  }
   await captureUserVisualEvidence(page, testInfo, 'desktop.search-inspector', {
     surfaceMetrics: inspectorMetrics,
     note: 'Semantic search selection with the resulting user-visible inspector and map state.',
