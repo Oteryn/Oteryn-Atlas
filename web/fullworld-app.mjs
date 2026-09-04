@@ -14,7 +14,7 @@ import {
   serializeFullWorldViewState,
   viewportTileBounds,
 } from '../src/browser/fullworld.mjs';
-import { FULLWORLD_CAPABILITIES, FULLWORLD_PATHS, FULLWORLD_TRUST } from '../src/browser/fullworld-trust.mjs';
+import { ancillarySourceExpectations, FULLWORLD_CAPABILITIES, FULLWORLD_PATHS, FULLWORLD_TRUST } from '../src/browser/fullworld-trust.mjs';
 import { loadFullWorldPixelCatalog } from '../src/browser/fullworld-pixels.mjs';
 import { loadRuntimePixelBuckets, loadVerifiedPixelBucket, loadVerifiedPixelBundle, requiredRuntimePixelBuckets } from '../src/browser/fullworld-pixel-buckets.mjs';
 import { recordsForResidentBuckets } from '../src/browser/fullworld-progressive.mjs';
@@ -35,6 +35,7 @@ const PREFETCH_TILES = performanceProfile.prefetchTiles;
 const GROUP_CONCURRENCY = performanceProfile.groupConcurrency;
 const OVERVIEW_CONCURRENCY = performanceProfile.overviewConcurrency;
 const PIXEL_BUCKET_CONCURRENCY = performanceProfile.pixelBucketConcurrency;
+const SOURCE_EXPECTATIONS = ancillarySourceExpectations(FULLWORLD_TRUST);
 const $ = (selector) => document.querySelector(selector);
 const canvas = $('#atlas');
 const overlayCanvas = $('#overview-overlay');
@@ -196,7 +197,6 @@ function populateFloors() {
     select.append(option);
   }
 }
-
 function clampView(next) {
   const entry = floorEntry(runtimeWorld, next.floor);
   const bounds = entry.bounds;
@@ -950,8 +950,13 @@ async function boot() {
   const overviewBase = new URL(FULLWORLD_PATHS.overview, location.href);
   const pixelBucketBase = new URL(FULLWORLD_PATHS.pixelBuckets, location.href);
   const animationBase = new URL(FULLWORLD_PATHS.animation, location.href);
-  try { animationRuntime = await getAnimationRuntime(animationBase); }
-  catch (error) { animationRuntimeError = error; animationRuntime = null; }
+  try {
+    animationRuntime = await getAnimationRuntime(
+      animationBase,
+      fetch,
+      SOURCE_EXPECTATIONS.animation,
+    );
+  } catch (error) { animationRuntimeError = error; animationRuntime = null; }
   $('#animation-toggle').disabled = !animationRuntime;
   if (animationRuntimeError) $('#animation-note').textContent = `Static fallback: ${animationRuntimeError.message}`;
   publication = await loadFullWorldPublication(publicationBase, FULLWORLD_TRUST);
