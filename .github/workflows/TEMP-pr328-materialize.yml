@@ -1,0 +1,131 @@
+name: TEMP PR328 materialize handoff
+
+on:
+  push:
+    branches:
+      - fix/issue-315-merge-queue-repair-consumption
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    name: Materialize reviewed PR328 handoff as inert Git objects
+    if: github.repository == 'Oteryn/Oteryn-Atlas'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact temporary bridge head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Materialize final implementation commit object without moving any ref
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          BRIDGE_SHA: ${{ github.sha }}
+          EXPECTED_BRIDGE_PARENT: 538ddc01047e8fcb78348d8ef58c3beec01d8305
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$BRIDGE_SHA"
+          test "$(git rev-parse HEAD^)" = "$EXPECTED_BRIDGE_PARENT"
+          python - <<'PY'
+          import json
+          import os
+          import re
+          import urllib.request
+          from pathlib import Path
+
+          repository = os.environ['REPOSITORY']
+          bridge_sha = os.environ['BRIDGE_SHA'].strip().lower()
+          handoff_path = Path('docs/evidence/TEMP-PR328-PUBLICATION-HANDOFF.md')
+          materializer_path = '.github/workflows/TEMP-pr328-materialize.yml'
+          handoff_text = handoff_path.read_text(encoding='utf-8')
+
+          expected_paths = {
+              '.github/workflows/merge-authority-audit.yml',
+              '.github/workflows/merge-group-gate.yml',
+              '.github/workflows/protected-qualification-repair.yml',
+              'tests/verification/issue-314-qualification-path.test.mjs',
+              'tests/verification/issue-314-qualification-repair-trust.test.mjs',
+              'tests/verification/merge-group-qualification-repair-bootstrap.test.mjs',
+              'tests/verification/qualification-repair-policy.test.mjs',
+              'tools/governance/verify_extraction_provenance.py',
+              'tools/verification/qualification-repair-policy.mjs',
+          }
+
+          blocks = {}
+          pattern = re.compile(r"^## `([^`]+)`\n\n````text\n(.*?)\n````(?:\n|\Z)", re.MULTILINE | re.DOTALL)
+          for match in pattern.finditer(handoff_text):
+              path, content = match.group(1), match.group(2)
+              if path in blocks:
+                  raise SystemExit(f'duplicate handoff block: {path}')
+              blocks[path] = content + '\n'
+
+          if set(blocks) != expected_paths:
+              raise SystemExit(
+                  f'handoff path set mismatch: missing={sorted(expected_paths - set(blocks))!r} '
+                  f'extra={sorted(set(blocks) - expected_paths)!r}'
+              )
+
+          headers = {
+              'Accept': 'application/vnd.github+json',
+              'Authorization': f"Bearer {os.environ['GH_TOKEN']}",
+              'X-GitHub-Api-Version': '2022-11-28',
+              'User-Agent': 'Oteryn-Atlas-PR328-temporary-materializer',
+              'Content-Type': 'application/json',
+          }
+
+          def api(method, path, payload=None):
+              data = None if payload is None else json.dumps(payload).encode('utf-8')
+              req = urllib.request.Request(
+                  f'https://api.github.com/repos/{repository}{path}',
+                  data=data,
+                  headers=headers,
+                  method=method,
+              )
+              with urllib.request.urlopen(req, timeout=30) as response:
+                  return json.load(response)
+
+          commit = api('GET', f'/git/commits/{bridge_sha}')
+          base_tree = commit.get('tree', {}).get('sha', '')
+          if re.fullmatch(r'[0-9a-f]{40}', base_tree) is None:
+              raise SystemExit('bridge commit tree SHA invalid')
+
+          tree = []
+          for path in sorted(blocks):
+              blob = api('POST', '/git/blobs', {'content': blocks[path], 'encoding': 'utf-8'})
+              sha = blob.get('sha', '')
+              if re.fullmatch(r'[0-9a-f]{40}', sha) is None:
+                  raise SystemExit(f'invalid created blob SHA for {path}')
+              tree.append({'path': path, 'mode': '100644', 'type': 'blob', 'sha': sha})
+              print(f'MATERIALIZED_BLOB {path} {sha}')
+
+          tree.extend([
+              {'path': str(handoff_path), 'mode': '100644', 'type': 'blob', 'sha': None},
+              {'path': materializer_path, 'mode': '100644', 'type': 'blob', 'sha': None},
+          ])
+          new_tree = api('POST', '/git/trees', {'base_tree': base_tree, 'tree': tree})
+          tree_sha = new_tree.get('sha', '')
+          if re.fullmatch(r'[0-9a-f]{40}', tree_sha) is None:
+              raise SystemExit('invalid materialized tree SHA')
+
+          final_commit = api('POST', '/git/commits', {
+              'message': 'fix(verification): harden qualification repair authority',
+              'tree': tree_sha,
+              'parents': [bridge_sha],
+          })
+          final_sha = final_commit.get('sha', '')
+          if re.fullmatch(r'[0-9a-f]{40}', final_sha) is None:
+              raise SystemExit('invalid final commit SHA')
+          verify = api('GET', f'/git/commits/{final_sha}')
+          parents = [item.get('sha') for item in verify.get('parents', [])]
+          if parents != [bridge_sha] or verify.get('tree', {}).get('sha') != tree_sha:
+              raise SystemExit('materialized commit readback mismatch')
+          print(f'FINAL_COMMIT_SHA={final_sha}')
+          print(f'FINAL_TREE_SHA={tree_sha}')
+          PY
