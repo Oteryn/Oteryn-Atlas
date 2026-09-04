@@ -20,6 +20,10 @@ test('qualification inspector visual acceptance preserves reviewed chrome while 
   assert.match(helper, /readFile\(testInfo\.snapshotPath\(snapshotName\)\)/, 'Playwright snapshotPath must own project/platform suffixing exactly once');
   assert.doesNotMatch(helper, /testInfo\.project\.name|process\.platform/, 'reviewed snapshot helper must not duplicate Playwright project/platform suffixes');
   assert.match(helper, /comparePngOutsideRects/);
+  assert.match(helper, /atlas-reviewed-snapshot-normalize-scrollbars/, 'qualification comparison must normalize only data-dependent scrollbars before measuring dynamic locators');
+  assert.match(helper, /scrollbar-width:\s*none\s*!important/, 'qualification comparison must hide standards-based scrollbars without changing product CSS');
+  assert.match(helper, /::-webkit-scrollbar/, 'qualification comparison must also hide Chromium WebKit-style scrollbars deterministically');
+  assert.match(helper, /classList\.remove\(normalizationClass\)/, 'qualification comparison must restore the inspected DOM after capture');
 
   assert.ok(desktop.includes(desktopTopbarCall), 'desktop qualification must isolate only fixture-owned coordinate text inside the reviewed topbar');
   assert.ok(desktop.includes(desktopCall), 'desktop qualification must compare the reviewed production inspector outside fixture-owned facts');
