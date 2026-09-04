@@ -403,7 +403,7 @@ jobs:
       - verification-node
       - change-classification
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 12
     permissions:
       contents: read
       actions: read
@@ -547,7 +547,7 @@ jobs:
           selected_artifact_id=''
           selected_run_id=''
           selected_run_json=''
-          for attempt in {1..113}; do
+          for attempt in {1..60}; do
             payload="$RUNNER_TEMP/protected-hosted-artifacts.json"
             gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?name=$expected_name&per_page=100" > "$payload"
             mapfile -t candidates < <(node --input-type=module - "$payload" "$expected_name" <<'NODE'
@@ -581,7 +581,7 @@ jobs:
                 break 2
               fi
             done
-            (( attempt < 113 )) && sleep 30
+            (( attempt < 60 )) && sleep 10
           done
           [[ "$selected_artifact_id" =~ ^[0-9]+$ && "$selected_run_id" =~ ^[0-9]+$ ]]
           cp "$selected_run_json" "$work/producer-run.json"
