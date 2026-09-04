@@ -6,6 +6,7 @@ export const QUALIFICATION_REPAIR_PATHS = Object.freeze([
   'src/browser/semantic-search.mjs',
   'tools/verification/qualification-fixture-definition.mjs',
   'tools/verification/qualification-world.mjs',
+  'web/fullworld-app.mjs',
   'web/fullworld-creatures.mjs',
   'web/fullworld-farm-explorer.mjs',
   'web/fullworld-search.mjs',
@@ -14,6 +15,7 @@ export const QUALIFICATION_REPAIR_PATHS = Object.freeze([
 const ALLOWED_PATHS = new Set(QUALIFICATION_REPAIR_PATHS);
 const REQUIRED_HOSTED_GROUPS = Object.freeze(['deterministic.core', 'e2e.full']);
 const REQUIRED_DATA_CAPABILITIES = Object.freeze(['qualification_fixture']);
+const VERIFICATION_REGRESSION = /^tests\/verification\/[A-Za-z0-9][A-Za-z0-9._-]*\.test\.mjs$/;
 
 function freeze(value) {
   if (value && typeof value === 'object' && !Object.isFrozen(value)) {
@@ -38,7 +40,9 @@ function exactChangedPaths(value) {
     if (path.startsWith('/') || path.includes('\\') || path.split('/').some((part) => part === '' || part === '.' || part === '..')) {
       throw new TypeError(`qualification repair scope contains an unsafe path: ${path}`);
     }
-    if (!ALLOWED_PATHS.has(path)) throw new TypeError(`qualification repair scope is not eligible: ${path}`);
+    if (!ALLOWED_PATHS.has(path) && !VERIFICATION_REGRESSION.test(path)) {
+      throw new TypeError(`qualification repair scope is not eligible: ${path}`);
+    }
   }
   return paths;
 }
