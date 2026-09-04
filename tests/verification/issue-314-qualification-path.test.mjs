@@ -144,6 +144,7 @@ test('D/E: generic qualification repair admits regression companions and all tru
 
   const accepted = validateQualificationRepairTransition({
     changedPaths: [
+      '.github/workflows/protected-qualification-repair.yml',
       'src/browser/animation-runtime-service.mjs',
       'tests/verification/issue-314-animation-trust-callers.test.mjs',
       'web/fullworld-app.mjs',
@@ -156,6 +157,7 @@ test('D/E: generic qualification repair admits regression companions and all tru
   });
 
   assert.equal(accepted.eligible, true);
+  assert(accepted.changedPaths.includes('.github/workflows/protected-qualification-repair.yml'));
   assert(accepted.changedPaths.includes('tests/verification/issue-314-animation-trust-callers.test.mjs'));
   assert(accepted.changedPaths.includes('web/fullworld-app.mjs'));
   assert(accepted.changedPaths.includes('web/fullworld-search.mjs'));

@@ -1,6 +1,7 @@
 import { profileRank } from './verification-plan-schema.mjs';
 
 export const QUALIFICATION_REPAIR_PATHS = Object.freeze([
+  '.github/workflows/protected-qualification-repair.yml',
   'src/browser/animation-runtime-service.mjs',
   'src/browser/fullworld-trust.mjs',
   'src/browser/semantic-search.mjs',
