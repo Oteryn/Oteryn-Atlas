@@ -91,9 +91,15 @@ test('desktop Atlas-owned chrome and user journey retain reviewed visual contrac
       { selector: '#mobile-inspector-panel', label: 'desktop inspector' },
     ],
   });
-  await expect(page.locator('.topbar')).toHaveScreenshot('desktop-topbar.png', {
-    animations: 'disabled', caret: 'hide', scale: 'css',
-  });
+  if (isQualificationFixtureExecution()) {
+    const comparison = await compareReviewedSnapshotOutsideLocators(page, testInfo, '.topbar', 'desktop-topbar.png', ['.coordinate-strip']);
+    expect(comparison.changedOutside, 'qualification desktop topbar chrome drifted outside fixture-owned coordinates').toBe(0);
+    expect(comparison.changedInside, 'qualification desktop coordinates unexpectedly matched the production golden').toBeGreaterThan(0);
+  } else {
+    await expect(page.locator('.topbar')).toHaveScreenshot('desktop-topbar.png', {
+      animations: 'disabled', caret: 'hide', scale: 'css',
+    });
+  }
   await expect(page.locator('#view-mode-control')).toHaveScreenshot('desktop-view-mode.png', {
     animations: 'disabled', caret: 'hide', scale: 'css',
   });

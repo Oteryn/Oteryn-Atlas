@@ -89,10 +89,7 @@ export async function compareReviewedSnapshotOutsideLocators(page, testInfo, con
     if (!box) throw new TypeError(`reviewed snapshot dynamic locator is not visible: ${selector}`);
     rectangles.push({ x: box.x - containerBox.x, y: box.y - containerBox.y, width: box.width, height: box.height });
   }
-  const extensionOffset = snapshotName.lastIndexOf('.');
-  if (extensionOffset <= 0) throw new TypeError(`reviewed snapshot name is invalid: ${snapshotName}`);
-  const reviewedName = `${snapshotName.slice(0, extensionOffset)}-${testInfo.project.name}-${process.platform}${snapshotName.slice(extensionOffset)}`;
-  const expected = await readFile(testInfo.snapshotPath(reviewedName));
+  const expected = await readFile(testInfo.snapshotPath(snapshotName));
   const actual = await container.screenshot({ animations: 'disabled', caret: 'hide', scale: 'css' });
   return comparePngOutsideRects(page, expected, actual, rectangles);
 }
