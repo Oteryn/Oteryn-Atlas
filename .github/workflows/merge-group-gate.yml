@@ -302,8 +302,110 @@ jobs:
           [[ "$selected_legacy_run" =~ ^[1-9][0-9]*$ ]]
           printf 'use_legacy_proof=true\nproducer_run_id=%s\n' "$selected_legacy_run" >> "$GITHUB_OUTPUT"
 
+      - name: Validate exact protected qualification repair bootstrap evidence
+        id: qualification-repair
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ATLAS_CODE_REVISION: ${{ github.event.merge_group.head_sha }}
+          ATLAS_PROTECTED_BASE_SHA: ${{ github.event.merge_group.base_sha }}
+          ATLAS_MERGE_GROUP_HEAD_REF: ${{ github.event.merge_group.head_ref || '' }}
+        run: |
+          set -euo pipefail
+          printf 'use_repair_proof=false\n' >> "$GITHUB_OUTPUT"
+          if [[ ! "$ATLAS_MERGE_GROUP_HEAD_REF" =~ ^refs/heads/gh-readonly-queue/main/pr-([1-9][0-9]*)- ]]; then
+            exit 0
+          fi
+          ATLAS_PR_NUMBER="${BASH_REMATCH[1]}"
+          export ATLAS_PR_NUMBER
+          work="$RUNNER_TEMP/atlas-merge-group-qualification-repair"
+          rm -rf "$work" && mkdir -p "$work"
+          gh api "repos/$GITHUB_REPOSITORY/pulls/$ATLAS_PR_NUMBER" > "$work/live-pr.json"
+          candidate_head_sha="$(jq -er '.head.sha' "$work/live-pr.json")"
+          candidate_base_sha="$(jq -er '.base.sha' "$work/live-pr.json")"
+          test "$candidate_base_sha" = "$ATLAS_PROTECTED_BASE_SHA"
+          current_main_sha="$(gh api "repos/$GITHUB_REPOSITORY/branches/main" --jq '.commit.sha')"
+          test "$current_main_sha" = "$ATLAS_PROTECTED_BASE_SHA"
+          gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/pulls/$ATLAS_PR_NUMBER/files?per_page=100" > "$work/file-pages.json"
+          jq '[.[][] | {path: .filename, previousPath: (.previous_filename // null)}]' "$work/file-pages.json" > "$work/changes.json"
+          jq -r '.[] | [.path, .previousPath] | .[] | select(. != null)' "$work/changes.json" | sort -u > "$work/changed-files.txt"
+          gh api "repos/$GITHUB_REPOSITORY/git/commits/$ATLAS_CODE_REVISION" > "$work/synthetic-commit.json"
+          gh api "repos/$GITHUB_REPOSITORY/git/commits/$candidate_head_sha" > "$work/candidate-commit.json"
+          synthetic_tree_sha="$(jq -er '.tree.sha' "$work/synthetic-commit.json")"
+          candidate_tree_sha="$(jq -er '.tree.sha' "$work/candidate-commit.json")"
+          test "$synthetic_tree_sha" = "$candidate_tree_sha"
+          jq -e --arg base "$ATLAS_PROTECTED_BASE_SHA" '.parents | any(.sha == $base)' "$work/synthetic-commit.json" >/dev/null
+
+          # This narrowly bootstraps the control-plane fix itself, and retires as
+          # soon as protected main no longer has the one-region/one-search fixture.
+          if CHANGES="$work/changed-files.txt" node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import { QUALIFICATION_CREATURES, QUALIFICATION_FIXTURE_ID, QUALIFICATION_SEMANTIC_RECORD } from './trusted-base/tools/verification/qualification-fixture-definition.mjs';
+          import { validateQualificationRepairControlPlaneBootstrap } from './tools/verification/qualification-repair-policy.mjs';
+          const regions = new Set(QUALIFICATION_CREATURES.map(({ position }) => `${Math.floor(position.x / 32)}:${Math.floor(position.y / 32)}:${position.floor}`));
+          validateQualificationRepairControlPlaneBootstrap({
+            changedPaths: fs.readFileSync(process.env.CHANGES, 'utf8').trim().split(/\r?\n/).filter(Boolean),
+            protectedFixtureShape: { fixtureId: QUALIFICATION_FIXTURE_ID, creatureCount: QUALIFICATION_CREATURES.length, creatureRegionCount: regions.size, semanticRecordCount: QUALIFICATION_SEMANTIC_RECORD ? 1 : 0 },
+          });
+          NODE
+          then
+            printf 'use_repair_proof=true\nproof_mode=self-retiring-control-plane-bootstrap\n' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          gh api "repos/$GITHUB_REPOSITORY/commits/$candidate_head_sha/status" > "$work/statuses.json"
+          jq -e '[.statuses[] | select(.context == "atlas-protected-product-qualification" and .state == "success")] | length == 1' "$work/statuses.json" >/dev/null
+          jq '[.statuses[] | select(.context == "atlas-protected-product-qualification" and .state == "success")][0]' "$work/statuses.json" > "$work/status.json"
+          target_url="$(jq -er '.target_url' "$work/status.json")"
+          [[ "$target_url" =~ ^https://github.com/$GITHUB_REPOSITORY/actions/runs/([1-9][0-9]*)$ ]]
+          producer_run_id="${BASH_REMATCH[1]}"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$producer_run_id" > "$work/run.json"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$producer_run_id/jobs?per_page=100" > "$work/jobs.json"
+          MERGE_BASE_SHA="$(git merge-base "$candidate_head_sha" "$ATLAS_PROTECTED_BASE_SHA")" node --input-type=module - "$work" <<'NODE'
+          import fs from 'node:fs';
+          import { buildVerificationPlan } from './trusted-base/tools/verification/build-verification-plan.mjs';
+          import { validateProtectedProductQualificationGate } from './trusted-base/tools/verification/protected-hosted-gate.mjs';
+          import { validateQualificationRepairTransition } from './trusted-base/tools/verification/qualification-repair-policy.mjs';
+          const work = process.argv[2];
+          const read = (name) => JSON.parse(fs.readFileSync(`${work}/${name}`, 'utf8'));
+          const livePr = read('live-pr.json');
+          const changes = read('changes.json');
+          const changedPaths = [...new Set(changes.flatMap(({ path, previousPath }) => [path, previousPath].filter(Boolean)))].sort();
+          const trustedImpact = JSON.parse(fs.readFileSync('./trusted-base/tools/verification/impact-manifest.json'));
+          const candidateImpact = JSON.parse(fs.readFileSync('./tools/verification/impact-manifest.json'));
+          const trustedCatalog = JSON.parse(fs.readFileSync('./trusted-base/tools/verification/verification-catalog.json'));
+          const candidateCatalog = JSON.parse(fs.readFileSync('./tools/verification/verification-catalog.json'));
+          const common = {
+            repository: process.env.GITHUB_REPOSITORY,
+            headSha: livePr.head.sha,
+            integrationBaseSha: process.env.ATLAS_PROTECTED_BASE_SHA,
+            mergeBaseSha: process.env.MERGE_BASE_SHA,
+            changedFiles: changes,
+            requiredGroupFloor: ['deterministic.core', 'e2e.full'],
+          };
+          const protectedPlan = buildVerificationPlan({ ...common, trustedImpactManifest: trustedImpact, candidateImpactManifest: trustedImpact, trustedVerificationCatalog: trustedCatalog, candidateVerificationCatalog: trustedCatalog });
+          const candidatePlan = buildVerificationPlan({ ...common, trustedImpactManifest: trustedImpact, candidateImpactManifest: candidateImpact, trustedVerificationCatalog: trustedCatalog, candidateVerificationCatalog: candidateCatalog });
+          validateQualificationRepairTransition({ changedPaths, protectedPlan, candidatePlan });
+          validateProtectedProductQualificationGate({
+            livePr,
+            status: read('status.json'),
+            producerRun: read('run.json'),
+            producerJobs: read('jobs.json'),
+            expectedRepository: process.env.GITHUB_REPOSITORY,
+            expectedPrNumber: Number(process.env.ATLAS_PR_NUMBER),
+            expectedCandidateHeadSha: livePr.head.sha,
+            expectedProtectedBaseSha: process.env.ATLAS_PROTECTED_BASE_SHA,
+          });
+          const syntheticCommit = read('synthetic-commit.json');
+          const candidateCommit = read('candidate-commit.json');
+          const syntheticTreeSha = syntheticCommit.tree?.sha;
+          const candidateTreeSha = candidateCommit.tree?.sha;
+          if (syntheticTreeSha !== candidateTreeSha) throw new TypeError('merge-group synthetic tree is not exact candidate tree');
+          NODE
+          printf 'use_repair_proof=true\nproof_mode=protected-full-e2e-census\nproducer_run_id=%s\n' "$producer_run_id" >> "$GITHUB_OUTPUT"
+
       - name: Prove complete protected-base browser qualification for synthetic candidate
-        if: ${{ steps.legacy-bootstrap.outputs.use_legacy_proof != 'true' }}
+        if: ${{ steps.legacy-bootstrap.outputs.use_legacy_proof != 'true' && steps.qualification-repair.outputs.use_repair_proof != 'true' }}
         shell: bash
         env:
           ATLAS_CODE_REVISION: ${{ github.event.merge_group.head_sha }}

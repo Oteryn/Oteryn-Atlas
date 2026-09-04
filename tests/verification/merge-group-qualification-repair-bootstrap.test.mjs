@@ -27,6 +27,10 @@ test('merge queue consumes exact protected qualification repair evidence before 
   assert.match(repair, /candidateTreeSha|candidate_tree_sha/);
   assert.match(repair, /syntheticTreeSha|synthetic_tree_sha/);
   assert.match(repair, /use_repair_proof=true/);
+  assert.match(repair, /refs\/heads\/gh-readonly-queue\/main\/pr-\(\[1-9\]\[0-9\]\*\\d*\)|gh-readonly-queue\/main\/pr-/);
+  assert.match(repair, /current_main_sha/);
+  assert.match(repair, /producerJobs/);
+  assert.match(repair, /producerRun:\s*read\('run\.json'\)/);
   assert.doesNotMatch(repair, /fix\/issue-|ATLAS_REPAIR_PR_NUMBER|pull_request\.number\s*==/);
 
   assert.match(full, /steps\.qualification-repair\.outputs\.use_repair_proof != 'true'/);
@@ -35,4 +39,21 @@ test('merge queue consumes exact protected qualification repair evidence before 
       < WORKFLOW.indexOf('Prove complete protected-base browser qualification for synthetic candidate'),
     'repair evidence must be checked before stale-base full qualification',
   );
+});
+
+test('protected repair producer executes the entire protected e2e.full stable-ID census', () => {
+  const repairWorkflow = fs.readFileSync(path.join(ROOT, '.github/workflows/protected-qualification-repair.yml'), 'utf8');
+  assert.match(repairWorkflow, /catalog\.groups\?\.\['e2e\.full'\]/);
+  assert.match(repairWorkflow, /candidateCensus\.stableIds/);
+  assert.match(repairWorkflow, /protectedCensus\.stableIds/);
+  assert.doesNotMatch(repairWorkflow, /selected\.length\s*!==\s*1/);
+  assert.match(repairWorkflow, /--workers=1 --retries=0/);
+});
+
+test('self-retiring bootstrap remains a closed control-plane-only path', () => {
+  const repair = stepBody('Validate exact protected qualification repair bootstrap evidence');
+  assert.match(repair, /validateQualificationRepairControlPlaneBootstrap/);
+  assert.match(repair, /creatureRegionCount/);
+  assert.match(repair, /semanticRecordCount/);
+  assert.match(repair, /self-retiring-control-plane-bootstrap/);
 });

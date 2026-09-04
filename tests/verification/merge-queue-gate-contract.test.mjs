@@ -127,7 +127,7 @@ test('one-shot PR 303 merge-group bootstrap consumes exact protected heavy proof
   assert.match(gate, /branches\/main/);
   assert.match(gate, /use_legacy_proof=true/);
   assert.match(gate, /producer_run_id=/);
-  assert.match(gate, /Prove complete protected-base browser qualification for synthetic candidate[\s\S]*if:\s*\$\{\{\s*steps\.legacy-bootstrap\.outputs\.use_legacy_proof != 'true'\s*\}\}/);
+  assert.match(gate, /Prove complete protected-base browser qualification for synthetic candidate[\s\S]*if:\s*\$\{\{\s*steps\.legacy-bootstrap\.outputs\.use_legacy_proof != 'true' && steps\.qualification-repair\.outputs\.use_repair_proof != 'true'\s*\}\}/);
   assert.doesNotMatch(gate, /atlas-local-e2e/);
 });
 

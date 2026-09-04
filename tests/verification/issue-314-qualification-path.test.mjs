@@ -88,7 +88,7 @@ test('C: verification profile remains independent from product data capability',
   assert.equal(planFor('web/fullworld-creatures.mjs').profile, 'broad');
 });
 
-test('D/E: qualification repair admission is branch-agnostic, exact-scope and monotonic without recursively executing e2e.full', async () => {
+test('D/E: qualification repair admission is branch-agnostic, exact-scope and executes protected e2e.full', async () => {
   const policyUrl = pathToFileURL(path.join(ROOT, 'tools/verification/qualification-repair-policy.mjs')).href;
   const { QUALIFICATION_REPAIR_BROWSER_PROOF, validateQualificationRepairTransition } = await import(policyUrl);
   const protectedPlan = {
@@ -109,9 +109,7 @@ test('D/E: qualification repair admission is branch-agnostic, exact-scope and mo
   assert.deepEqual(accepted.requiredGroupIds, ['deterministic.core']);
   assert.deepEqual(accepted.browserProof, QUALIFICATION_REPAIR_BROWSER_PROOF);
   assert.deepEqual(accepted.browserProof, {
-    project: 'desktop-chromium',
-    spec: 'e2e/tests/creatures-desktop.spec.mjs',
-    title: 'desktop shipped creature controls persist independently and expose bounded diagnostics',
+    groupId: 'e2e.full',
     dataCapability: 'qualification_fixture',
     workers: 1,
     retries: 0,
@@ -162,7 +160,7 @@ test('D/E: generic qualification repair admits regression companions and all tru
   assert(accepted.changedPaths.includes('web/fullworld-farm-explorer.mjs'));
 });
 
-test('D/E: protected qualification repair resolves one exact protected browser oracle instead of the complete matrix', () => {
+test('D/E: protected qualification repair resolves the exact complete protected browser census', () => {
   const workflowPath = path.join(ROOT, '.github/workflows/protected-qualification-repair.yml');
   assert.equal(fs.existsSync(workflowPath), true, 'generic protected qualification repair workflow must exist');
   const workflow = fs.readFileSync(workflowPath, 'utf8');
@@ -172,9 +170,10 @@ test('D/E: protected qualification repair resolves one exact protected browser o
   assert.match(workflow, /pull_request_target:/);
   assert.match(job, /validateQualificationRepairTransition/);
   assert.match(job, /requiredGroupFloor:\s*\['deterministic\.core', 'e2e\.full'\]/);
-  assert.match(job, /QUALIFICATION_REPAIR_BROWSER_PROOF/);
-  assert.match(job, /selected\.length !== 1/);
-  assert.doesNotMatch(job, /catalog\.groups\?\.\['e2e\.full'\]\?\.specs/);
+  assert.match(job, /catalog\.groups\?\.\['e2e\.full'\]\?\.specs/);
+  assert.match(job, /candidateCensus\.stableIds/);
+  assert.match(job, /protectedCensus\.stableIds/);
+  assert.doesNotMatch(job, /selected\.length !== 1/);
   assert.match(job, /runs-on:\s*ubuntu-24\.04/);
   assert.match(job, /--network none/);
   assert.match(job, /--read-only/);
