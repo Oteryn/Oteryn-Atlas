@@ -197,6 +197,7 @@ function populateFloors() {
     select.append(option);
   }
 }
+
 function clampView(next) {
   const entry = floorEntry(runtimeWorld, next.floor);
   const bounds = entry.bounds;
