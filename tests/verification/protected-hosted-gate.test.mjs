@@ -88,6 +88,7 @@ function evidence(currentPlan, lifecycle) {
   });
   return [environment, hosted];
 }
+
 function fixture(overrides = {}) {
   const currentPlan = overrides.plan ?? plan();
   const currentExecution = overrides.execution ?? execution();
@@ -176,6 +177,7 @@ function fixture(overrides = {}) {
     ...overrides,
   };
 }
+
 test('accepts exact live PR, successful producer, state bytes and mixed fan-in identities', () => {
   const result = validateProtectedHostedGate(fixture());
   assert.equal(result.status, 'success');
@@ -246,31 +248,29 @@ test('rejects candidate-controlled producer events and candidate controller auth
   assert.throws(() => validateProtectedHostedGate(fixture({ plan: candidateAuthorityPlan })), /controller|authority|base/i);
 });
 
-
 function productQualificationFixture(overrides = {}) {
   const protectedBaseSha = sha('a');
   const candidateHeadSha = sha('c');
   const prNumber = 268;
   const runId = 9876;
-  const headRef = 'fix/issue-179-qualification-functional-fixture';
   const livePr = {
     number: prNumber,
     state: 'open',
     merged: false,
     base: { ref: 'main', sha: protectedBaseSha, repo: { full_name: REPOSITORY } },
-    head: { ref: headRef, sha: candidateHeadSha, repo: { full_name: REPOSITORY } },
+    head: { ref: 'arbitrary-repair-branch', sha: candidateHeadSha, repo: { full_name: REPOSITORY } },
   };
   const status = {
     state: 'success',
     context: 'atlas-protected-product-qualification',
-    description: 'Protected GitHub-hosted complete qualification functional safety net',
+    description: 'Protected GitHub-hosted qualification repair safety net',
     target_url: `https://github.com/${REPOSITORY}/actions/runs/${runId}`,
     creator: { login: 'github-actions[bot]' },
   };
   const producerRun = {
     id: runId,
     run_attempt: 1,
-    path: '.github/workflows/protected-execution-promotion-qualification.yml',
+    path: '.github/workflows/protected-qualification-repair.yml',
     event: 'pull_request_target',
     status: 'completed',
     conclusion: 'success',
@@ -285,7 +285,7 @@ function productQualificationFixture(overrides = {}) {
   };
   const producerJobs = {
     jobs: [{
-      name: 'Publish functional qualification fixture compatibility evidence',
+      name: 'Protected qualification repair',
       status: 'completed',
       conclusion: 'success',
     }],
@@ -300,15 +300,19 @@ function productQualificationFixture(overrides = {}) {
   };
 }
 
-test('accepts only exact protected full qualification browser promotion evidence', () => {
-  const result = validateProtectedProductQualificationGate(productQualificationFixture());
+test('accepts exact generic protected qualification repair evidence without branch identity', () => {
+  const valid = productQualificationFixture();
+  const result = validateProtectedProductQualificationGate(valid);
   assert.equal(result.status, 'success');
-  assert.equal(result.mode, 'protected-product-qualification');
-  assert.equal(result.qualificationId, 'qualification-functional-fixture-v1');
+  assert.equal(result.mode, 'protected-qualification-repair');
   assert.equal(result.producerRunAttempt, 1);
+
+  const differentBranch = structuredClone(valid.livePr);
+  differentBranch.head.ref = 'another-ordinary-branch';
+  assert.equal(validateProtectedProductQualificationGate(productQualificationFixture({ livePr: differentBranch })).status, 'success');
 });
 
-test('rejects manual, stale, retried, wrong-event and no-browser promotion evidence', () => {
+test('rejects manual stale retried wrong-workflow and failed generic repair evidence', () => {
   const valid = productQualificationFixture();
   assert.throws(() => validateProtectedProductQualificationGate(productQualificationFixture({
     status: { ...valid.status, creator: { login: 'blakinio' } },
@@ -323,12 +327,9 @@ test('rejects manual, stale, retried, wrong-event and no-browser promotion evide
     producerRun: { ...valid.producerRun, head_sha: sha('b') },
   })), /base|stale/i);
   assert.throws(() => validateProtectedProductQualificationGate(productQualificationFixture({
+    producerRun: { ...valid.producerRun, path: '.github/workflows/protected-execution-promotion-qualification.yml' },
+  })), /producer/i);
+  assert.throws(() => validateProtectedProductQualificationGate(productQualificationFixture({
     producerJobs: { jobs: [{ ...valid.producerJobs.jobs[0], conclusion: 'failure' }] },
   })), /proof job|successful/i);
-  assert.throws(() => validateProtectedProductQualificationGate(productQualificationFixture({
-    livePr: {
-      ...valid.livePr,
-      head: { ...valid.livePr.head, ref: 'fix/issue-179-bounded-real-row-framing' },
-    },
-  })), /complete hosted browser/i);
 });

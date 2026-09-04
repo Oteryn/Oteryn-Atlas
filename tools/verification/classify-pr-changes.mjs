@@ -13,5 +13,9 @@ function isSafeDocsMarkdown(path) {
   return segments.length >= 2;
 }
 
-const docsOnly = paths.length > 0 && paths.every(isSafeDocsMarkdown);
+function isInstructionOnly(path) {
+  return path === 'AGENTS.md' || isSafeDocsMarkdown(path);
+}
+
+const docsOnly = paths.length > 0 && paths.every(isInstructionOnly);
 process.stdout.write(`docs_only=${docsOnly}\nrequires_e2e=${!docsOnly}\n`);
