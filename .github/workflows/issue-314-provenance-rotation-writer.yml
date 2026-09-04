@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   rotate:
-    if: github.event.before == 'ce56f022054b740b938048f0d909db97bafe0969' && github.ref == 'refs/heads/fix/issue-314-clean-qualification-path-20260903'
+    if: github.event.before == '8bb7221dab3f3b8b30c058b5392acc702e28c1db' && github.ref == 'refs/heads/fix/issue-314-clean-qualification-path-20260903'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -21,18 +21,18 @@ jobs:
           fetch-depth: 2
           persist-credentials: true
 
-      - name: Rotate exact CI provenance pins
+      - name: Rotate exact CI provenance data
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD^)" = "ce56f022054b740b938048f0d909db97bafe0969"
+          test "$(git rev-parse HEAD^)" = "8bb7221dab3f3b8b30c058b5392acc702e28c1db"
           python - <<'PY'
           import hashlib
           from pathlib import Path
 
           old_ci = '27d0a6bc250a5378064f714b57569a092a2c1579'
           new_ci = '6d1ca9d28fc1f73d284fa140d2917694b4c0a3fe'
-          old_map = 'f5e2c3c04a749ded7a94f721e6fa299b3ce2bf2d'
+          expected_map = '763c797cf23f18a157b2c8ca51f0b7b279ae5ac5'
 
           map_path = Path('docs/migration/legacy-atlas-extraction-provenance.json')
           map_text = map_path.read_text(encoding='utf-8')
@@ -46,39 +46,27 @@ jobs:
 
           map_bytes = map_text.encode('utf-8')
           new_map = hashlib.sha1(f'blob {len(map_bytes)}\0'.encode('ascii') + map_bytes).hexdigest()
-
-          audit_path = Path('.github/workflows/merge-authority-audit.yml')
-          audit = audit_path.read_text(encoding='utf-8')
-          if audit.count(f'EXPECTED_PR_CI_BLOB: "{old_ci}"') != 1:
-              raise SystemExit('protected audit does not contain the exact old CI pin once')
-          if audit.count(f'EXPECTED_PROVENANCE_MAP_BLOB: "{old_map}"') != 1:
-              raise SystemExit('protected audit does not contain the exact old provenance-map pin once')
-          audit = audit.replace(f'EXPECTED_PR_CI_BLOB: "{old_ci}"', f'EXPECTED_PR_CI_BLOB: "{new_ci}"')
-          audit = audit.replace(f'EXPECTED_PROVENANCE_MAP_BLOB: "{old_map}"', f'EXPECTED_PROVENANCE_MAP_BLOB: "{new_map}"')
-          audit_path.write_text(audit, encoding='utf-8')
-
+          if new_map != expected_map:
+              raise SystemExit(f'rotated provenance map blob drift: {new_map} != {expected_map}')
           print(f'rotated_provenance_rows={count}')
           print(f'new_provenance_map_blob={new_map}')
           PY
 
-          node --test tests/verification/merge-queue-gate-contract.test.mjs
           python tools/governance/verify_extraction_provenance.py
           git diff --check
           changed="$(git status --short)"
           printf '%s\n' "$changed"
-          test "$(printf '%s\n' "$changed" | grep -c '^ M ')" = 2
-          printf '%s\n' "$changed" | grep -F ' M .github/workflows/merge-authority-audit.yml'
+          test "$(printf '%s\n' "$changed" | grep -c '^ M ')" = 1
           printf '%s\n' "$changed" | grep -F ' M docs/migration/legacy-atlas-extraction-provenance.json'
 
-      - name: Commit exact provenance rotation to the existing PR branch
+      - name: Commit exact provenance data rotation to the existing PR branch
         shell: bash
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add .github/workflows/merge-authority-audit.yml docs/migration/legacy-atlas-extraction-provenance.json
-          test "$(git diff --cached --name-only | wc -l | tr -d ' ')" = 2
-          git diff --cached --name-only | grep -Fx '.github/workflows/merge-authority-audit.yml'
+          git add docs/migration/legacy-atlas-extraction-provenance.json
+          test "$(git diff --cached --name-only | wc -l | tr -d ' ')" = 1
           git diff --cached --name-only | grep -Fx 'docs/migration/legacy-atlas-extraction-provenance.json'
-          git commit -m "fix(governance): rotate Atlas CI provenance pins"
+          git commit -m "fix(governance): rotate Atlas CI provenance data"
           git push origin HEAD:fix/issue-314-clean-qualification-path-20260903
