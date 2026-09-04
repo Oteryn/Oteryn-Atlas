@@ -25,7 +25,7 @@ jobs:
       contents: read
       pull-requests: read
     env:
-      EXPECTED_PR_CI_BLOB: "ae3b2753931fc3b484fa7cf1228ea7177fa8d747"
+      EXPECTED_PR_CI_BLOB: "24b3a09e79b75bdcaeeefbbef03d386aa5d0ac59"
       EXPECTED_MERGE_GROUP_GATE_BLOB: "2f4ef822b34b1699af70e8142365ee5fc1afdc84"
       EXPECTED_PROVENANCE_VERIFIER_BLOB: "8abcf380d6746b9aa095ec5a792638f2ce1b6314"
       EXPECTED_PROVENANCE_TEST_BLOB: "0e2dda25befd0b66ab870ffe05416986c27ceb61"
