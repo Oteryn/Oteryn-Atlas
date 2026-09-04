@@ -1,4 +1,4 @@
-const PROFILE_RANK = Object.freeze({ none: 0, targeted: 1, focused: 2, broad: 3, full: 4 });
+import { profileRank } from './verification-plan-schema.mjs';
 
 export const QUALIFICATION_REPAIR_PATHS = Object.freeze([
   'src/browser/animation-runtime-service.mjs',
@@ -45,7 +45,7 @@ function exactChangedPaths(value) {
 
 function validatePlan(plan, label) {
   if (!plan || typeof plan !== 'object' || Array.isArray(plan)) throw new TypeError(`${label} plan is invalid`);
-  if (!Object.hasOwn(PROFILE_RANK, plan.profile)) throw new TypeError(`${label} verification profile is invalid`);
+  profileRank(plan.profile);
   const requiredGroupIds = exactStringArray(plan.requiredGroupIds, `${label} required groups`);
   const requiredDataCapabilities = exactStringArray(plan.requiredDataCapabilities, `${label} data capabilities`);
   if (!plan.retryPolicy || plan.retryPolicy.retries !== 0) throw new TypeError(`${label} retry policy must remain zero`);
@@ -63,7 +63,7 @@ export function validateQualificationRepairTransition({ changedPaths, protectedP
   const protectedState = validatePlan(protectedPlan, 'protected');
   const candidateState = validatePlan(candidatePlan, 'candidate');
 
-  if (PROFILE_RANK[candidateState.profile] < PROFILE_RANK[protectedState.profile]) {
+  if (profileRank(candidateState.profile) < profileRank(protectedState.profile)) {
     throw new TypeError('qualification repair candidate narrows protected verification profile');
   }
   requireSuperset(candidateState.requiredGroupIds, protectedState.requiredGroupIds, 'required groups');
