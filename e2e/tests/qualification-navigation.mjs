@@ -80,12 +80,22 @@ function serializeEntry(url, isRelative) {
   return isRelative ? `${url.pathname}${url.search}${url.hash}` : url.href;
 }
 
+function encodeLiteralQueryCommas(entry) {
+  const hashIndex = entry.indexOf('#');
+  const beforeHash = hashIndex === -1 ? entry : entry.slice(0, hashIndex);
+  const hash = hashIndex === -1 ? '' : entry.slice(hashIndex);
+  const queryIndex = beforeHash.indexOf('?');
+  if (queryIndex === -1) return entry;
+  return `${beforeHash.slice(0, queryIndex + 1)}${beforeHash.slice(queryIndex + 1).replaceAll(',', '%2C')}${hash}`;
+}
+
 function isCanonicalSerializedHistoricalDefault(entry, url) {
   const canonical = new URL(url.href);
   for (const [field, value] of Object.entries(SHARED_HISTORICAL_DEFAULT)) {
     canonical.searchParams.set(field, value);
   }
-  return entry === serializeEntry(canonical, entry.startsWith(CANONICAL_FULLWORLD_PATH));
+  const serialized = serializeEntry(canonical, entry.startsWith(CANONICAL_FULLWORLD_PATH));
+  return entry === serialized || encodeLiteralQueryCommas(entry) === serialized;
 }
 
 function isSharedHistoricalDefault(entry) {
