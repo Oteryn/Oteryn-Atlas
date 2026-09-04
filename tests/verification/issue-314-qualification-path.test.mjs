@@ -121,6 +121,32 @@ test('D/E: qualification repair admission is branch-agnostic, exact-scope and mo
   }), /scope|eligible|repair/i);
 });
 
+test('D/E: generic qualification repair admits regression companions and the shared FullWorld app caller', async () => {
+  const policyUrl = pathToFileURL(path.join(ROOT, 'tools/verification/qualification-repair-policy.mjs')).href;
+  const { validateQualificationRepairTransition } = await import(policyUrl);
+  const plan = {
+    profile: 'full',
+    requiredGroupIds: ['deterministic.core', 'e2e.full'],
+    requiredDataCapabilities: ['qualification_fixture'],
+    retryPolicy: { retries: 0 },
+  };
+
+  const accepted = validateQualificationRepairTransition({
+    changedPaths: [
+      'src/browser/animation-runtime-service.mjs',
+      'tests/verification/issue-314-animation-trust-callers.test.mjs',
+      'web/fullworld-app.mjs',
+      'web/fullworld-creatures.mjs',
+    ],
+    protectedPlan: plan,
+    candidatePlan: plan,
+  });
+
+  assert.equal(accepted.eligible, true);
+  assert(accepted.changedPaths.includes('tests/verification/issue-314-animation-trust-callers.test.mjs'));
+  assert(accepted.changedPaths.includes('web/fullworld-app.mjs'));
+});
+
 test('D/E: protected qualification repair is an active generic hosted proof rather than a branch registry', () => {
   const workflowPath = path.join(ROOT, '.github/workflows/protected-qualification-repair.yml');
   assert.equal(fs.existsSync(workflowPath), true, 'generic protected qualification repair workflow must exist');
