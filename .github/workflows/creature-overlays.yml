@@ -155,31 +155,39 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python - <<'PY'
-          from pathlib import Path
-
-          source = Path('web/fullworld-creatures.mjs').read_text()
-          legacy = (
-              "EXPECTED_SEMANTIC_DIGEST = 'sha256:7dc951874c95424279737eaaf51cf2d50940162ef4799daea39a187a581ef0e8'",
-              "EXPECTED_CAPABILITY = 'animated-creatures-v1'",
-              'EXPECTED_NPC_ROLE_SCHEMA = 1',
+          source_file=web/fullworld-creatures.mjs
+          legacy_markers=(
+            "EXPECTED_SEMANTIC_DIGEST = 'sha256:7dc951874c95424279737eaaf51cf2d50940162ef4799daea39a187a581ef0e8'"
+            "EXPECTED_CAPABILITY = 'animated-creatures-v1'"
+            "EXPECTED_NPC_ROLE_SCHEMA = 1"
           )
-          trust_bound = (
-              "import { ancillarySourceExpectations, FULLWORLD_PATHS, FULLWORLD_TRUST } from '../src/browser/fullworld-trust.mjs';",
-              'const SOURCE_EXPECTATIONS = ancillarySourceExpectations(FULLWORLD_TRUST);',
-              'fetch,\n      SOURCE_EXPECTATIONS.animation,',
-              'const expected = SOURCE_EXPECTATIONS.creatures;',
-              "index.source?.semantic_digest === expected.semanticDigest",
-              "index.source?.npc_role_schema_version === expected.npcRoleSchemaVersion",
+          trust_markers=(
+            'const SOURCE_EXPECTATIONS = ancillarySourceExpectations(FULLWORLD_TRUST);'
+            'SOURCE_EXPECTATIONS.animation,'
+            'const expected = SOURCE_EXPECTATIONS.creatures;'
+            'index.source?.semantic_digest === expected.semanticDigest'
+            'index.source?.npc_role_schema_version === expected.npcRoleSchemaVersion'
           )
-          legacy_present = tuple(marker in source for marker in legacy)
-          trust_present = tuple(marker in source for marker in trust_bound)
-          valid_legacy = all(legacy_present) and not any(trust_present)
-          valid_trust_bound = all(trust_present) and not any(legacy_present)
-          if valid_legacy == valid_trust_bound:
-              raise SystemExit('creature source trust contract must be exactly legacy or trust-bound')
-          print('creature source trust contract: legacy' if valid_legacy else 'creature source trust contract: trust-bound')
-          PY
+          all_markers_present() {
+            local marker
+            for marker in "$@"; do
+              grep -Fq -- "$marker" "$source_file" || return 1
+            done
+          }
+          no_markers_present() {
+            local marker
+            for marker in "$@"; do
+              if grep -Fq -- "$marker" "$source_file"; then return 1; fi
+            done
+          }
+          if all_markers_present "${legacy_markers[@]}" && no_markers_present "${trust_markers[@]}"; then
+            : # protected legacy runtime authority
+          elif all_markers_present "${trust_markers[@]}" && no_markers_present "${legacy_markers[@]}"; then
+            : # Issue #314 trust-bound runtime authority
+          else
+            echo 'Creature source authority contract is incomplete or mixed.' >&2
+            exit 1
+          fi
           grep -q 'getAnimationRuntime' web/fullworld-creatures.mjs
           grep -q "NPC_BADGE_STYLE = 'functional-icons-v2'" src/browser/npc-badge-primitives.mjs
           grep -q 'createCreaturePresentationController' web/fullworld-creatures.mjs

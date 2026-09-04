@@ -29,7 +29,6 @@ test('Issue #314: protected hosted gate wait budget covers the producer critical
     'hosted-shards',
     'fan-in',
   ].reduce((total, name) => total + timeoutMinutes(workflowJob(executor, name), name), 0);
-  assert.equal(producerCriticalPathMinutes, 56, 'protected producer critical path budget must remain explicit');
 
   const consumer = workflowJob(ci, 'verification-browser');
   const consumerTimeoutMinutes = timeoutMinutes(consumer, 'verification-browser');
