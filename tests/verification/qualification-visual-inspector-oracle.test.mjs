@@ -11,7 +11,7 @@ const desktopTopbarCall = "compareReviewedSnapshotOutsideLocators(page, testInfo
 const desktopCall = "compareReviewedSnapshotOutsideLocators(page, testInfo, '#mobile-inspector-panel', 'desktop-inspector.png', ['#inspector-content'])";
 const mobileCall = "compareReviewedSnapshotOutsideLocators(page, testInfo, '#mobile-inspector-panel', 'mobile-inspector-panel.png', ['#inspector-content'])";
 
-test('qualification visual acceptance compares positive stable chrome independently from fixture-owned facts', async () => {
+test('qualification visual acceptance compares explicit required chrome independently from fixture-owned facts', async () => {
   const helper = await read('e2e/support/visual-oracle.mjs');
   const desktop = await read('e2e/tests/visual-desktop.spec.mjs');
   const mobile = await read('e2e/tests/visual-mobile.spec.mjs');
@@ -19,8 +19,13 @@ test('qualification visual acceptance compares positive stable chrome independen
   assert.match(helper, /export async function compareReviewedSnapshotOutsideLocators/);
   assert.match(helper, /readFile\(testInfo\.snapshotPath\(snapshotName\)\)/, 'Playwright snapshotPath must own project/platform suffixing exactly once');
   assert.doesNotMatch(helper, /testInfo\.project\.name|process\.platform/, 'reviewed snapshot helper must not duplicate Playwright project/platform suffixes');
-  assert.match(helper, /container\.locator\(':scope > \*'\)/, 'qualification chrome must be an explicit positive set of stable direct children');
-  assert.match(helper, /node\.matches\(selector\)\s*\|\|\s*node\.querySelector\(selector\)/, 'a direct child containing fixture-owned content must be excluded from the stable chrome set');
+  assert.match(helper, /REVIEWED_STABLE_SELECTORS/, 'reviewed goldens must own an explicit required stable selector contract');
+  assert.match(helper, /'desktop-topbar\.png':\s*Object\.freeze\(\['\.brand', '#search-form', '\.zoom-controls'\]\)/);
+  assert.match(helper, /'desktop-inspector\.png':\s*Object\.freeze\(\['\.inspector-heading', '\.creature-inspector-tabs'\]\)/);
+  assert.match(helper, /'mobile-inspector-panel\.png':\s*Object\.freeze\(\['\.inspector-heading', '\.creature-inspector-tabs'\]\)/);
+  assert.match(helper, /locator\.count\(\) !== 1/, 'every reviewed stable selector must resolve exactly once');
+  assert.match(helper, /stable chrome locator is not visible/, 'hidden reviewed chrome must fail closed');
+  assert.doesNotMatch(helper, /if \(!box\) continue;/, 'missing stable chrome must never be silently omitted');
   assert.match(helper, /stableRectangles/, 'stable chrome rectangles must be modeled separately from fixture-owned rectangles');
   assert.match(helper, /dynamicRectangles/, 'fixture-owned rectangles must retain a separate comparison channel');
   assert.doesNotMatch(helper, /atlas-reviewed-snapshot-normalize-scrollbars|scrollbar-width:\s*none\s*!important|::-webkit-scrollbar/, 'qualification chrome must not mutate rendering to chase a production snapshot');

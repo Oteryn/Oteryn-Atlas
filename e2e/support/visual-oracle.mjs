@@ -78,32 +78,35 @@ export async function comparePngOutsideRects(page, before, after, rectangles) {
   }, { before64: before.toString('base64'), after64: after.toString('base64'), rectangles });
 }
 
+const REVIEWED_STABLE_SELECTORS = Object.freeze({
+  'desktop-topbar.png': Object.freeze(['.brand', '#search-form', '.zoom-controls']),
+  'desktop-inspector.png': Object.freeze(['.inspector-heading', '.creature-inspector-tabs']),
+  'mobile-inspector-panel.png': Object.freeze(['.inspector-heading', '.creature-inspector-tabs']),
+});
+
+async function requiredRectangles(container, containerBox, selectors, kind) {
+  const rectangles = [];
+  for (const selector of selectors) {
+    const locator = container.locator(selector);
+    if (await locator.count() !== 1) throw new TypeError(`reviewed snapshot ${kind} locator must resolve exactly once: ${selector}`);
+    const box = await locator.boundingBox();
+    if (!box) throw new TypeError(`reviewed snapshot ${kind} locator is not visible: ${selector}`);
+    rectangles.push({ x: box.x - containerBox.x, y: box.y - containerBox.y, width: box.width, height: box.height });
+  }
+  return rectangles;
+}
+
 export async function compareReviewedSnapshotOutsideLocators(page, testInfo, containerSelector, snapshotName, dynamicSelectors) {
   if (!Array.isArray(dynamicSelectors) || dynamicSelectors.length === 0) throw new TypeError('reviewed snapshot dynamic selectors are required');
+  const stableSelectors = REVIEWED_STABLE_SELECTORS[snapshotName];
+  if (!Array.isArray(stableSelectors) || stableSelectors.length === 0) throw new TypeError(`reviewed snapshot stable selector contract is missing: ${snapshotName}`);
   const container = page.locator(containerSelector);
+  if (await container.count() !== 1) throw new TypeError(`reviewed snapshot container must resolve exactly once: ${containerSelector}`);
   const containerBox = await container.boundingBox();
   if (!containerBox) throw new TypeError(`reviewed snapshot container is not visible: ${containerSelector}`);
 
-  const dynamicRectangles = [];
-  for (const selector of dynamicSelectors) {
-    const locator = container.locator(selector);
-    if (await locator.count() !== 1) throw new TypeError(`reviewed snapshot dynamic locator must resolve exactly once: ${selector}`);
-    const box = await locator.boundingBox();
-    if (!box) throw new TypeError(`reviewed snapshot dynamic locator is not visible: ${selector}`);
-    dynamicRectangles.push({ x: box.x - containerBox.x, y: box.y - containerBox.y, width: box.width, height: box.height });
-  }
-
-  const stableRectangles = [];
-  const stableChildren = container.locator(':scope > *');
-  for (let index = 0; index < await stableChildren.count(); index += 1) {
-    const child = stableChildren.nth(index);
-    const isDynamic = await child.evaluate((node, selectors) => selectors.some((selector) => node.matches(selector) || node.querySelector(selector)), dynamicSelectors);
-    if (isDynamic) continue;
-    const box = await child.boundingBox();
-    if (!box) continue;
-    stableRectangles.push({ x: box.x - containerBox.x, y: box.y - containerBox.y, width: box.width, height: box.height });
-  }
-  if (stableRectangles.length === 0) throw new TypeError(`reviewed snapshot has no visible stable chrome children: ${containerSelector}`);
+  const dynamicRectangles = await requiredRectangles(container, containerBox, dynamicSelectors, 'dynamic');
+  const stableRectangles = await requiredRectangles(container, containerBox, stableSelectors, 'stable chrome');
 
   const expected = await readFile(testInfo.snapshotPath(snapshotName));
   const actual = await container.screenshot({ animations: 'disabled', caret: 'hide', scale: 'css' });
