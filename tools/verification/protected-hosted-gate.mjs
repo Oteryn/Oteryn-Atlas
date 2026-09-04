@@ -247,6 +247,7 @@ export function validateProtectedProductQualificationGate(input) {
   const protectedBaseSha = exactSha(input.expectedProtectedBaseSha, 'protected qualification repair gate protected base');
 
   validateLivePr(input.livePr, { repository, prNumber, candidateHeadSha, protectedBaseSha });
+  const candidateHeadRef = nonEmptyString(input.livePr?.head?.ref, 'protected qualification repair candidate head ref');
 
   const status = input.status;
   if (!isPlainObject(status)
@@ -263,15 +264,17 @@ export function validateProtectedProductQualificationGate(input) {
     || run.conclusion !== 'success'
     || run.path !== QUALIFICATION_REPAIR_WORKFLOW_PATH
     || run.event !== 'pull_request_target'
-    || run.repository?.full_name !== repository
-    || run.head_branch !== 'main') {
+    || run.repository?.full_name !== repository) {
     throw new TypeError('protected qualification repair producer run is not authoritative');
   }
   const runId = exactPositiveInteger(Number(run.id), 'protected qualification repair producer run ID');
   const runAttempt = exactPositiveInteger(Number(run.run_attempt), 'protected qualification repair producer run attempt');
   if (runAttempt !== 1) throw new TypeError('protected qualification repair producer run must be attempt 1');
-  if (exactSha(run.head_sha, 'protected qualification repair producer base') !== protectedBaseSha) {
-    throw new TypeError('protected qualification repair producer base is stale');
+  const producerHeadSha = exactSha(run.head_sha, 'protected qualification repair producer head');
+  const candidateRunIdentity = run.head_branch === candidateHeadRef && producerHeadSha === candidateHeadSha;
+  const protectedBaseRunIdentity = run.head_branch === 'main' && producerHeadSha === protectedBaseSha;
+  if (!candidateRunIdentity && !protectedBaseRunIdentity) {
+    throw new TypeError('protected qualification repair producer head is stale');
   }
   const expectedTarget = `https://github.com/${repository}/actions/runs/${runId}`;
   if (status.target_url !== expectedTarget) throw new TypeError('protected qualification repair status target run mismatch');
