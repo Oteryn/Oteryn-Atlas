@@ -2,8 +2,6 @@ name: Protected Verification Controller
 # Host recovery remains outside the protected controller; specialist transition admission must recover before any candidate checkout.
 
 on:
-  pull_request_target:
-    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
     inputs:
       pr_number:

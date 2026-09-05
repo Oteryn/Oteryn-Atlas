@@ -169,7 +169,8 @@ test('D/E: protected qualification repair resolves one exact protected browser o
   const job = workflow.split('  qualification-repair:')[1] ?? '';
   const gateSource = fs.readFileSync(path.join(ROOT, 'tools/verification/protected-hosted-gate.mjs'), 'utf8');
 
-  assert.match(workflow, /pull_request_target:/);
+  assert.match(workflow, /workflow_dispatch:/);
+  assert.doesNotMatch(workflow, /pull_request_target:/);
   assert.match(job, /validateQualificationRepairTransition/);
   assert.match(job, /requiredGroupFloor:\s*\['deterministic\.core', 'e2e\.full'\]/);
   assert.match(job, /QUALIFICATION_REPAIR_BROWSER_PROOF/);

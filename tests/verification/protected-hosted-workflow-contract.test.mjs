@@ -11,7 +11,8 @@ function occurrences(text, pattern) {
 }
 
 test('protected controller obtains candidate census only inside a no-network no-secret read-only sandbox', () => {
-  assert.match(controller, /pull_request_target:/);
+  assert.match(controller, /workflow_dispatch:/);
+  assert.doesNotMatch(controller, /^  (?:pull_request_target|pull_request|workflow_run):/m);
   assert.match(controller, /refs\/pull\/\$ATLAS_PR_NUMBER\/head/);
   assert.match(controller, /rev-parse FETCH_HEAD/);
   assert.match(controller, /git archive "\$ATLAS_CANDIDATE_HEAD_SHA" \| tar -x -C "\$candidate_dir"/);
@@ -33,8 +34,9 @@ test('protected controller obtains candidate census only inside a no-network no-
 
 test('hosted executor consumes a published protected plan under read-only GitHub permissions', () => {
   assert.match(executor, /name:\s*Protected Hosted Verification Executor/);
-  assert.match(executor, /workflow_run:/);
-  assert.match(executor, /Protected Verification Controller/);
+  assert.match(executor, /workflow_dispatch:/);
+  assert.doesNotMatch(executor, /^  (?:pull_request_target|pull_request|workflow_run):/m);
+  assert.match(executor, /protected-verification-controller\.yml/);
   assert.match(executor, /runs-on:\s*ubuntu-24\.04/);
   assert.match(executor, /contents:\s*read/);
   assert.match(executor, /actions:\s*read/);
@@ -52,9 +54,10 @@ test('hosted executor consumes a published protected plan under read-only GitHub
   assert.doesNotMatch(executor, /pull_request_target:|atlas-local-e2e|192\.168\.|molehill|synology|secrets:/i);
 });
 
-test('hosted executor is activated only by the protected controller workflow_run', () => {
-  assert.match(executor, /workflow_run:/);
-  assert.match(executor, /Protected Verification Controller/);
+test('legacy hosted executor has no automatic triggers and retains protected manual diagnostics', () => {
+  assert.match(executor, /workflow_dispatch:/);
+  assert.doesNotMatch(executor, /^  (?:pull_request_target|pull_request|workflow_run):/m);
+  assert.match(executor, /protected-verification-controller\.yml/);
   assert.match(executor, /github\.event\.workflow_run\.conclusion == 'success'/);
   assert.match(executor, /github\.event\.workflow_run\.event == 'pull_request_target'/);
   assert.match(executor, /github\.event\.workflow_run\.event == 'workflow_dispatch'/);

@@ -8,9 +8,9 @@ test('PR consumes generic evidence using exact protected-base code', () => {
   assert.match(source, /node admission-authority\/tools\/verification\/consume-protected-admission.mjs/);
   assert.match(source, /ref: \$\{\{ github.event.pull_request.base.sha \}\}/);
 });
-test('MQ uses same evidence contract and retains ordinary full proof on absence', () => {
+test('MQ uses same evidence contract and executes shared protected plan on absence', () => {
   const source = read('.github/workflows/merge-group-gate.yml');
   assert.match(source, /node trusted-base\/tools\/verification\/consume-protected-admission.mjs/);
   assert.match(source, /steps.generic-admission.outputs.admission_accepted != 'true'/);
-  assert.match(source, /Prove complete protected-base browser qualification for synthetic candidate/);
+  assert.match(source, /node trusted-base\/tools\/verification\/run-protected-merge-group.mjs/);
 });

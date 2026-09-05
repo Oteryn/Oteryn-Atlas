@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 const sha = c => c.repeat(40);
+const executionPlan = { semanticDigest: `sha256:${'f'.repeat(64)}`, requiredGroups: ['deterministic.core'], scenarioIds: ['geometry'], dataCapabilities: ['qualification_fixture'], profile: 'full', proofPurpose: 'candidate', evidenceKind: 'protected-candidate-v1', propertyObligations: [{stableId:'geometry',profile:'functional',properties:['geometry-preserved']}], hostedPartitions: [{ dataCapability: 'qualification_fixture', scenarioIds: ['geometry'] }], specialist: [], review: [] };
 async function api() {
   const exports = await import('../../tools/verification/consume-protected-admission.mjs').catch(() => ({}));
   assert.equal(typeof exports.consumeProtectedAdmission, 'function', 'consumer must exist');
@@ -11,7 +12,7 @@ function fixture() {
   const pr = { number: 123, state: 'open', merged: false, changed_files: 1, head: { sha: head, repo: { full_name: repository } }, base: { sha: base, ref: 'trunk', repo: { full_name: repository } } };
   const calls = [];
   const state = { repository, base, head, tree, pr, runs: [], files: [{ filename: 'tools/verification/x.mjs', status: 'modified' }], associations: [pr], reads: 0 };
-  const options = { repository, codeRevision: head, protectedBaseSha: base, prNumber: 123, now: '2026-09-05T12:10:00Z', authority: {}, scopeAdmission() { return { eligible: true }; }, async request(path) {
+  const options = { repository, codeRevision: head, protectedBaseSha: base, prNumber: 123, now: '2026-09-05T12:10:00Z', authority: { executionPlan: structuredClone(executionPlan) }, scopeAdmission() { return { eligible: true }; }, async request(path) {
     calls.push(path);
     const route = path.split('?')[0];
     if (route === `/repos/${repository}`) return { full_name: repository, default_branch: 'trunk' };
@@ -63,8 +64,9 @@ function successfulFixture() {
   const run = { id: 55, run_attempt: 1, path: workflow, event: 'pull_request_target', head_sha: state.base, status: 'completed', conclusion: 'success', repository: { id: 7, full_name: state.repository }, created_at: '2026-09-05T12:00:00Z', updated_at: '2026-09-05T12:06:00Z', pull_requests: [{ number: 123, head: { sha: state.head, repo: { id: 7 } }, base: { sha: state.base, repo: { id: 7 } } }] };
   const job = { id: 66, run_id: 55, run_attempt: 1, head_sha: state.base, name: 'Protected admission proof', status: 'completed', conclusion: 'success', started_at: '2026-09-05T12:01:00Z', completed_at: '2026-09-05T12:06:00Z' };
   state.runs = [run];
-  options.authority = { requiredGroups: ['deterministic.core'], requiredScenarioIds: ['geometry'], oracleDigest: digest('d'), maxAgeMs: 3600000 };
-  f.evidence = { schemaVersion: 1, kind: 'protected-admission', candidate: { repository: state.repository, prNumber: 123, headSha: state.head, baseSha: state.base, treeSha: state.tree, changedFiles: [{ path: state.files[0].filename, status: 'modified' }] }, producer: { workflowPath: workflow, event: 'pull_request_target', runId: 55, jobId: 66, runAttempt: 1, sourceSha: state.base }, createdAt: '2026-09-05T12:05:00Z', proof: { deterministic: { groups: ['deterministic.core'], result: 'PASS' }, browser: { scenarioResults: [{ id: 'geometry', result: 'PASS' }], workers: 1, retries: 0, dataCapability: 'qualification_fixture', oracleDigest: digest('d'), productDigest: digest('e') } } };
+  options.authority = { executionPlan: structuredClone(executionPlan), requiredGroups: ['deterministic.core'], requiredScenarioIds: ['geometry'], oracleDigest: digest('d'), maxAgeMs: 3600000 };
+  f.evidence = { schemaVersion: 1, kind: 'protected-admission', candidate: { repository: state.repository, prNumber: 123, headSha: state.head, baseSha: state.base, treeSha: state.tree, changedFiles: [{ path: state.files[0].filename, status: 'modified' }] }, producer: { workflowPath: workflow, event: 'pull_request_target', runId: 55, jobId: 66, runAttempt: 1, sourceSha: state.base }, createdAt: '2026-09-05T12:05:00Z', proof: { plan: structuredClone(executionPlan), deterministic: { groups: ['deterministic.core'], result: 'PASS' }, browser: { scenarioResults: [{ id: 'geometry', result: 'PASS' }], workers: 1, retries: 0, dataCapability: 'qualification_fixture', oracleDigest: digest('d'), productDigest: digest('e') } } };
+  const b=f.evidence.proof.browser; b.partitions=[{...b}];
   const original = options.request;
   options.request = async route => {
     if (route.split('?')[0].endsWith('/actions/runs/55')) return structuredClone(run);
@@ -152,4 +154,32 @@ test('unsafe scope errors remain fatal rather than falling back', async () => {
   const { consumeProtectedAdmission } = await api(); const { options } = fixture();
   options.scopeAdmission = () => { throw new TypeError('unsafe changed-file identity'); };
   await assert.rejects(consumeProtectedAdmission(options), /unsafe/);
+});
+
+test('consumer derives semantic requirements independently instead of accepting artifact plan', async () => {
+  const { consumeProtectedAdmission } = await api(); const { options } = successfulFixture();
+  options.executionPlan = candidate => { assert.equal(candidate.headSha, options.codeRevision); return { ...executionPlan, scenarioIds: ['geometry', 'interaction'], propertyObligations: [...executionPlan.propertyObligations,{stableId:'interaction',profile:'functional',properties:['interaction-preserved']}] }; };
+  await assert.rejects(consumeProtectedAdmission(options), /semantic plan/i);
+});
+for (const mode of ['PR', 'MQ']) test(`${mode} consumes browserless ordinary evidence with exact protected plan`, async () => {
+  const { consumeProtectedAdmission } = await api(); const { options, evidence } = successfulFixture();
+  const plan = { ...executionPlan, scenarioIds: [], requiredGroups: [] , dataCapabilities: [], profile: 'none', propertyObligations: [], hostedPartitions: [] };
+  evidence.proof.browser.partitions=[];
+  options.executionPlan = () => structuredClone(plan); evidence.proof.plan = structuredClone(plan);
+  evidence.proof.deterministic.groups = [];
+  Object.assign(evidence.proof.browser, { scenarioResults: [], dataCapability: null, productDigest: null });
+  if (mode === 'MQ') { delete options.prNumber; options.codeRevision = sha('d'); }
+  assert.equal((await consumeProtectedAdmission(options)).accepted, true);
+});
+test('consumer accepts protected dispatch for exact candidate with empty associations',async()=>{
+ const {consumeProtectedAdmission}=await api();const {options,state,evidence}=successfulFixture();const run=state.runs[0];run.event=evidence.producer.event='workflow_dispatch';run.pull_requests=[];run.display_title=`protected-admission:${state.repository}:123:${state.head}:${state.base}`;
+ assert.equal((await consumeProtectedAdmission(options)).accepted,true);
+});
+test('newer exact dispatch pending prevents reuse of older pull-request evidence',async()=>{
+ const {consumeProtectedAdmission}=await api();const {options,state}=successfulFixture();state.runs.push({...state.runs[0],id:99,event:'workflow_dispatch',pull_requests:[],status:'in_progress',conclusion:null,display_title:`protected-admission:${state.repository}:123:${state.head}:${state.base}`});
+ assert.deepEqual(await consumeProtectedAdmission(options),{accepted:false,eligible:true,reason:'missing-independent-evidence'});
+});
+test('dispatch for another PR cannot shadow exact candidate producer',async()=>{
+ const {consumeProtectedAdmission}=await api();const {options,state}=successfulFixture();state.runs.push({...state.runs[0],id:99,event:'workflow_dispatch',pull_requests:[],status:'in_progress',conclusion:null,display_title:`protected-admission:${state.repository}:124:${state.head}:${state.base}`});
+ assert.equal((await consumeProtectedAdmission(options)).accepted,true);
 });

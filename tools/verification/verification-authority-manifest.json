@@ -3,6 +3,90 @@
   "authorityId": "atlas-protected-verification-authority-v1",
   "components": [
     {
+      "id": "admission-consume-protected-admission",
+      "path": "tools/verification/consume-protected-admission.mjs"
+    },
+    {
+      "id": "admission-merge-authority-audit",
+      "path": ".github/workflows/merge-authority-audit.yml"
+    },
+    {
+      "id": "admission-merge-group-gate",
+      "path": ".github/workflows/merge-group-gate.yml"
+    },
+    {
+      "id": "admission-protected-admission",
+      "path": ".github/workflows/protected-admission.yml"
+    },
+    {
+      "id": "admission-protected-admission-evidence",
+      "path": "tools/verification/protected-admission-evidence.mjs"
+    },
+    {
+      "id": "admission-protected-admission-policy",
+      "path": "tools/verification/protected-admission-policy.mjs"
+    },
+    {
+      "id": "admission-protected-bounded-oracle",
+      "path": "tools/verification/protected-bounded-oracle.mjs"
+    },
+    {
+      "id": "admission-protected-candidate-snapshot",
+      "path": "tools/verification/protected-candidate-snapshot.mjs"
+    },
+    {
+      "id": "admission-protected-main-depth",
+      "path": ".github/workflows/protected-main-depth.yml"
+    },
+    {
+      "id": "admission-protected-qualification-oracle",
+      "path": "tools/verification/protected-qualification-oracle.mjs"
+    },
+    {
+      "id": "admission-protected-routing",
+      "path": "tools/verification/protected-routing.json"
+    },
+    {
+      "id": "admission-protected-scenario-inventory",
+      "path": "tools/verification/protected-scenario-inventory.json"
+    },
+    {
+      "id": "admission-protected-scenario-properties",
+      "path": "tools/verification/protected-scenario-properties.json"
+    },
+    {
+      "id": "admission-protected-semantic-routing",
+      "path": "tools/verification/protected-semantic-routing.mjs"
+    },
+    {
+      "id": "admission-protected-workflow-configuration",
+      "path": "tools/verification/protected-workflow-configuration.json"
+    },
+    {
+      "id": "admission-protected-workflow-contract",
+      "path": "tools/verification/protected-workflow-contract.mjs"
+    },
+    {
+      "id": "admission-qualification-scenario-bindings",
+      "path": "tools/verification/qualification-scenario-bindings.mjs"
+    },
+    {
+      "id": "admission-run-protected-admission",
+      "path": "tools/verification/run-protected-admission.mjs"
+    },
+    {
+      "id": "admission-run-protected-authority-audit",
+      "path": "tools/verification/run-protected-authority-audit.mjs"
+    },
+    {
+      "id": "admission-run-protected-main-depth",
+      "path": "tools/verification/run-protected-main-depth.mjs"
+    },
+    {
+      "id": "admission-run-protected-merge-group",
+      "path": "tools/verification/run-protected-merge-group.mjs"
+    },
+    {
       "id": "anti-loop-common",
       "path": "tools/verification/anti-loop-common.mjs"
     },

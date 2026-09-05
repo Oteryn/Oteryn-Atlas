@@ -36,21 +36,17 @@ test('atlas-gate consumes exact hosted lifecycle evidence without executing repo
   assert.match(browserJob, /actions: read/);
   assert.match(browserJob, /pull-requests: read/);
   assert.match(browserJob, /ATLAS_CODE_REVISION: \$\{\{ github\.event\.pull_request\.head\.sha \}\}/);
-  assert.match(browserJob, /expected_name="protected-hosted-fan-in-\$ATLAS_PROTECTED_BASE_SHA-\$ATLAS_CODE_REVISION"/);
-  assert.match(browserJob, /pulls\/\$ATLAS_PR_NUMBER/);
-  assert.match(browserJob, /\.github\/workflows\/protected-hosted-executor\.yml/);
-  assert.match(browserJob, /protected-hosted-fan-in\.json/);
-  assert.match(browserJob, /protected-verification-state\.json/);
-  assert.match(browserJob, /validateProtectedHostedGate/);
-  assert.match(browserJob, /ATLAS_LEGACY_CUTOVER_BASE_SHA: e31015d0880e9f81a4b96f990658490af45e8fa6/);
-  assert.match(browserJob, /ATLAS_PROTECTED_BASE_SHA.*ATLAS_LEGACY_CUTOVER_BASE_SHA/);
-  assert.match(browserJob, /ATLAS_LEGACY_CUTOVER_HEAD_REF: feat\/issue-179-legacy-transition-qualifier/);
-  assert.match(browserJob, /validateLegacyTransitionBootstrapGate/);
-  assert.match(browserJob, /legacy-molehill-transition-qualification\.yml/);
-  assert.doesNotMatch(browserJob, /atlas-local-e2e/);
-  assert.match(browserJob, /atlas-protected-product-qualification/);
-  assert.match(browserJob, /validateProtectedProductQualificationGate/);
-  assert.match(browserJob, /protected-execution-promotion-qualification\.yml|protected-product-qualification/);
+  assert.match(browserJob, /ATLAS_PROTECTED_BASE_SHA: \$\{\{ github\.event\.pull_request\.base\.sha \}\}/);
+  assert.match(browserJob, /ATLAS_PR_NUMBER: \$\{\{ github\.event\.pull_request\.number \}\}/);
+  assert.match(browserJob, /ref: \$\{\{ github\.event\.pull_request\.base\.sha \}\}/);
+  assert.match(browserJob, /persist-credentials: false/);
+  assert.match(browserJob, /path: admission-authority/);
+  assert.match(browserJob, /node admission-authority\/tools\/verification\/consume-protected-admission\.mjs/);
+  assert.match(browserJob, /jq -e '\.accepted == true'[\s\S]*then exit 0; fi/);
+  assert.match(browserJob, /jq -e '\.eligible == true'/);
+  assert.match(browserJob, /evidence is unavailable[\s\S]*exit 1/);
+  assert.doesNotMatch(browserJob, /validateLegacyTransition|ATLAS_LEGACY_CUTOVER|atlas-local-e2e|validateProtectedProductQualificationGate/);
+  assert.doesNotMatch(browserJob, /continue-on-error: true|(?:checks|statuses|contents|actions): write/);
   assert.doesNotMatch(browserJob, /docker compose|compose\.selfhosted\.yml/);
   assert.match(gate, /- verification-node/);
   assert.match(gate, /- verification-browser/);
@@ -95,7 +91,8 @@ test('required PR and Merge Queue workflows bind to exact candidates', () => {
   assert.match(mergeGroup, /BASE_REF: \$\{\{ github\.event\.merge_group\.base_ref \|\| '' \}\}/);
   assert.match(mergeGroup, /HEAD_SHA: \$\{\{ github\.event\.merge_group\.head_sha \|\| '' \}\}/);
   assert.match(mergeGroup, /ref: \$\{\{ github\.event\.merge_group\.head_sha \}\}/);
-  assert.match(mergeGroup, /python tools\/governance\/verify_extraction_provenance\.py/);
+  assert.match(mergeGroup, /run-protected-merge-group\.mjs/);
+  assert.doesNotMatch(mergeGroup, /run:.*python.*verify_extraction_provenance/);
   assert.doesNotMatch(mergeGroup, /provenance-gate/);
 });
 
@@ -212,7 +209,7 @@ test('docs-only PR classification skips heavy browser proof only when proven saf
   assert.match(classifierJob, /docs_only:.*steps\.classify\.outputs\.docs_only/);
   assert.match(classifierJob, /requires_e2e:.*steps\.classify\.outputs\.requires_e2e/);
 
-  assert.match(browserJob, /needs:\s*\n\s*- verification-node\s*\n\s*- change-classification/);
+  assert.match(browserJob, /needs:\s*\[verification-node, change-classification\]/);
   assert.match(browserJob, /needs\.change-classification\.outputs\.requires_e2e == 'true'/);
 
   assert.match(gate, /- change-classification/);

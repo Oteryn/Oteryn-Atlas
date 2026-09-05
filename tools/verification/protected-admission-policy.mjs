@@ -2,6 +2,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
+import { validateProtectedRouting } from './protected-semantic-routing.mjs';
+import { validateProtectedWorkflowTransition } from './protected-workflow-contract.mjs';
 
 const PRODUCT_PATHS = new Set([
   'src/browser/animation-runtime-service.mjs', 'src/browser/fullworld-trust.mjs',
@@ -55,6 +57,71 @@ export function validateProtectedAdmissionRepin({ protectedIdentities, candidate
   const sorted = (v) => Array.isArray(v) ? v.map(sorted) : v && typeof v === 'object' ? Object.fromEntries(Object.keys(v).sort().map((key) => [key, sorted(v[key])])) : v;
   if (JSON.stringify(sorted(expected)) !== JSON.stringify(sorted(candidateIdentities))) fail('identity repin changes protected identity beyond rebuilt fixture digest');
   return freeze({ productDigest });
+}
+
+const ROUTING_PATH = 'tools/verification/protected-routing.json';
+const WORKFLOW_CONFIGURATION = 'tools/verification/protected-workflow-configuration.json';
+const MECHANICAL_PATHS = new Set(['tools/governance/verify_extraction_provenance.py', 'docs/migration/legacy-atlas-extraction-provenance.json']);
+export function validateProtectedExecutionScope({changedFiles,protectedPaths=[]}={}) {
+  if(!Array.isArray(changedFiles)||!changedFiles.length) fail('scope is empty');
+  const known=new Set(protectedPaths), seen=new Set();let forceFull=false;
+  for(const item of changedFiles) {
+    const p=item?.path;
+    if(typeof p!=='string'||p.split('/').some(s=>!s||s==='.'||s==='..')||p.includes('\\')||/[\x00-\x1f]/.test(p)||seen.has(p)) fail('unsafe or duplicate execution path');
+    if(!['added','modified','removed','renamed'].includes(item.status)) fail('unknown execution status');
+    seen.add(p);
+    if(item.previousPath) {
+      // Classify both ends independently; renames cannot hide an authority removal.
+      validateProtectedExecutionScope({changedFiles:[{path:item.previousPath,status:'removed'}],protectedPaths});
+    }
+    const workflow=p.startsWith('.github/workflows/');
+    const configuration=[ROUTING_PATH,WORKFLOW_CONFIGURATION].includes(p);
+    const binding=known.has(p)&&(/^e2e\/tests\/[A-Za-z0-9._-]+\.mjs$/.test(p)||p==='e2e/support/creature-presentation-fixtures.mjs');
+    const productTest=['tests/verification/qualification-world.test.mjs','tests/verification/protected-hosted-product-identities.test.mjs'].includes(p);
+    if(PRODUCT_PATHS.has(p)||configuration||binding||productTest||MECHANICAL_PATHS.has(p)||workflow) {
+      if(!['added','modified'].includes(item.status)||item.previousPath||workflow&&!known.has(p)) ineligible('unsupported authority transition');
+      forceFull=true;continue;
+    }
+    if(p.startsWith('tests/')&&known.has(p))ineligible(`immutable deterministic oracle: ${p}`);
+    if(p.startsWith('tools/governance/')&&item.status==='removed'&&!['tools/governance/verify_extraction_provenance.py','tools/governance/test_verify_extraction_provenance.py'].includes(p))continue;
+    if(p.startsWith('tools/verification/')||p.startsWith('tools/governance/')||p.startsWith('e2e/')||p.startsWith('.github/')||['Dockerfile','.dockerignore','package.json','package-lock.json'].includes(p)) ineligible(`immutable execution authority: ${p}`);
+  }
+  return freeze({schemaVersion:1,eligible:true,forceFull,changedPaths:[...seen].sort()});
+}
+
+export function validateProtectedExecutionCandidate({protectedRoot,candidateRoot,currentCandidate:c}={}) {
+  if(!c||!sha.test(c.headSha??'')||!sha.test(c.baseSha??'')||!sha.test(c.treeSha??'')) fail('candidate identity is malformed');
+  if(git(protectedRoot,['rev-parse','HEAD']).trim()!==c.baseSha) fail('protected base drift');
+  if(git(candidateRoot,['rev-parse','HEAD']).trim()!==c.headSha||git(candidateRoot,['rev-parse','HEAD^{tree}']).trim()!==c.treeSha) fail('candidate head or tree drift');
+  if(git(candidateRoot,['merge-base','HEAD',c.baseSha]).trim()!==c.baseSha) fail('candidate must incorporate exact protected base');
+  if(git(candidateRoot,['status','--porcelain','--untracked-files=no']).trim()) fail('candidate execution bytes drift');
+  const protectedPaths=git(protectedRoot,['ls-tree','-r','--name-only','HEAD']).trim().split('\n');
+  const result=validateProtectedExecutionScope({changedFiles:c.changedFiles,protectedPaths});
+  const records=git(candidateRoot,['diff','--no-ext-diff','--no-renames','--name-status','-z',c.baseSha,c.headSha,'--']).split('\0');records.pop();
+  const derived=[];
+  while(records.length){const status=records.shift(),p=records.shift();if(!p||!['A','M','D'].includes(status))fail('unsupported exact diff');derived.push({path:p,status:{A:'added',M:'modified',D:'removed'}[status]});}
+  const expanded=c.changedFiles.flatMap(f=>f.status==='renamed'?[{path:f.previousPath,status:'removed'},{path:f.path,status:'added'}]:[{path:f.path,status:f.status}]);
+  const canonical=files=>JSON.stringify(files.sort((a,b)=>a.path.localeCompare(b.path)));
+  if(canonical(derived)!==canonical(expanded)) fail('complete changed-file drift');
+  for(const f of derived)if(f.status!=='removed'){
+    const stat=fs.lstatSync(path.join(candidateRoot,f.path));
+    if(!stat.isFile()||stat.isSymbolicLink()||!git(candidateRoot,['ls-tree',c.headSha,'--',f.path]).startsWith('100644 blob '))fail('candidate path is not regular');
+  }
+  const read=(root,p)=>fs.readFileSync(path.join(root,p),'utf8');
+  validateProtectedRouting(JSON.parse(read(candidateRoot,ROUTING_PATH)),JSON.parse(read(protectedRoot,'tools/verification/full-safety-net-stable-ids.json')));
+  const workflowSources=root=>Object.fromEntries(git(root,['ls-tree','-r','--name-only','HEAD','--','.github/workflows']).trim().split('\n').filter(Boolean).map(p=>[p,read(root,p)]));
+  validateProtectedWorkflowTransition({protectedSources:workflowSources(protectedRoot),candidateSources:workflowSources(candidateRoot),configuration:JSON.parse(read(candidateRoot,WORKFLOW_CONFIGURATION))});
+  // Provenance updates are mechanically derived from rendered workflow bytes.
+  const blob=(root,p)=>git(root,['hash-object','--',p]).trim();
+  const mq='.github/workflows/merge-group-gate.yml',ci='.github/workflows/ci.yml';
+  const verifier='tools/governance/verify_extraction_provenance.py';
+  const expectedVerifier=read(protectedRoot,verifier).replace(`MERGE_GROUP_GATE_BLOB = "${blob(protectedRoot,mq)}"`,`MERGE_GROUP_GATE_BLOB = "${blob(candidateRoot,mq)}"`);
+  if(read(candidateRoot,verifier)!==expectedVerifier)fail('provenance verifier is not exact mechanical pin rotation');
+  const provenance='docs/migration/legacy-atlas-extraction-provenance.json';
+  const expectedMap=JSON.parse(read(protectedRoot,provenance));
+  for(const row of expectedMap.rows)for(const target of row.target_paths??[])if(target.path===ci){if(target.blob!==blob(protectedRoot,ci))fail('protected provenance target pin drift');target.blob=blob(candidateRoot,ci);}
+  if(JSON.stringify(JSON.parse(read(candidateRoot,provenance)))!==JSON.stringify(expectedMap))fail('provenance map is not exact mechanical pin rotation');
+  return freeze({...result,candidate:structuredClone(c)});
 }
 
 function git(root, args) {

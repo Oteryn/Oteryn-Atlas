@@ -90,16 +90,23 @@ export async function consumeProtectedAdmission(options) {
   const candidate = await readCandidate(options, number, queueTree ? undefined : codeRevision);
   if (queueTree && queueTree !== candidate.treeSha) fail('merge-group tree differs from exact candidate tree');
   if (typeof options.scopeAdmission !== 'function') fail('protected scope predicate missing');
+  let admission;
   try {
-    if (options.scopeAdmission(candidate)?.eligible !== true) fail('protected scope predicate did not admit candidate');
+    admission = options.scopeAdmission(candidate);
+    if (admission?.eligible !== true) fail('protected scope predicate did not admit candidate');
   } catch (error) {
     if (error?.code === 'ADMISSION_SCOPE_INELIGIBLE') return { accepted: false, eligible: false, reason: 'scope-ineligible' };
     throw error;
   }
-  const runs = await pages(request, `${prefix}/actions/workflows/protected-admission.yml/runs?event=pull_request_target`, 'workflow_runs');
-  const matchesCandidateRun = run => run?.path === workflow && run.event === 'pull_request_target'
-    && run.repository?.full_name === repository && Array.isArray(run.pull_requests)
-    && run.pull_requests.some(pr => pr.number === number && pr.head?.sha === candidate.headSha && pr.base?.sha === protectedBaseSha);
+  const executionPlan = typeof options.executionPlan === 'function'
+    ? options.executionPlan(candidate, admission) : options.authority.executionPlan;
+  if (!executionPlan) fail('protected semantic execution plan missing');
+  const runs = await pages(request, `${prefix}/actions/workflows/protected-admission.yml/runs`, 'workflow_runs');
+  const matchesCandidateRun = run => run?.path === workflow && run.repository?.full_name === repository
+    && ((run.event === 'pull_request_target' && Array.isArray(run.pull_requests)
+      && run.pull_requests.some(pr => pr.number === number && pr.head?.sha === candidate.headSha && pr.base?.sha === protectedBaseSha))
+    || (run.event === 'workflow_dispatch' && run.head_sha === protectedBaseSha
+      && run.display_title === `protected-admission:${repository}:${number}:${candidate.headSha}:${protectedBaseSha}`));
   const relevant = runs.filter(matchesCandidateRun);
   relevant.sort((a, b) => Number(b.id) - Number(a.id));
   // The latest exact-candidate run is the authority. Never hide its failure or
@@ -124,12 +131,14 @@ export async function consumeProtectedAdmission(options) {
   same(finalRun, run, 'final producer reread');
   const finalJobs = await pages(request, `${prefix}/actions/runs/${locator.id}/attempts/1/jobs`, 'jobs');
   same(finalJobs, jobs, 'final producer jobs reread');
-  const finalRuns = await pages(request, `${prefix}/actions/workflows/protected-admission.yml/runs?event=pull_request_target`, 'workflow_runs');
+  const finalRuns = await pages(request, `${prefix}/actions/workflows/protected-admission.yml/runs`, 'workflow_runs');
   const latest = finalRuns.filter(matchesCandidateRun).sort((a, b) => Number(b.id) - Number(a.id))[0];
   if (latest?.id !== locator.id || latest.run_attempt !== 1 || latest.status !== 'completed' || latest.conclusion !== 'success') fail('latest producer changed during consumption');
   const result = validateProtectedAdmissionEvidence({ evidence,
-    authority: { ...options.authority, protectedBaseSha, expectedRunId: locator.id, expectedJobId: proofJobs[0].id,
-      workflowPath: workflow, event: 'pull_request_target', jobName: 'Protected admission proof', evidenceKind: 'protected-admission' },
+    authority: { ...options.authority, executionPlan,
+      requiredGroups: executionPlan.requiredGroups.filter(group => group.startsWith('deterministic.')),
+      requiredScenarioIds: executionPlan.scenarioIds, protectedBaseSha, expectedRunId: locator.id, expectedJobId: proofJobs[0].id,
+      workflowPath: workflow, event: finalRun.event, jobName: 'Protected admission proof', evidenceKind: 'protected-admission' },
     currentCandidate: current, producerRun: finalRun, producerJobs: { jobs: finalJobs }, now: options.now ?? new Date().toISOString() });
   return { accepted: true, eligible: true, evidence: result };
 }
@@ -157,7 +166,11 @@ async function main() {
   const catalog = JSON.parse(readFileSync(path.join(root, 'tools/verification/verification-catalog.json'), 'utf8'));
   const census = validateStableIdCensus(JSON.parse(readFileSync(path.join(root, 'tools/verification/full-safety-net-stable-ids.json'), 'utf8')));
   const { protectedOracleDigest } = await import('./run-protected-admission.mjs');
-  const { validateProtectedAdmissionScope } = await import('./protected-admission-policy.mjs');
+  const { validateProtectedExecutionScope } = await import('./protected-admission-policy.mjs');
+  const { evaluateProtectedRouting } = await import('./protected-semantic-routing.mjs');
+  const manifest = JSON.parse(readFileSync(path.join(root, 'tools/verification/impact-manifest.json'), 'utf8'));
+  const inventory = JSON.parse(readFileSync(path.join(root, 'tools/verification/protected-scenario-inventory.json'), 'utf8'));
+  const routing = JSON.parse(readFileSync(path.join(root, 'tools/verification/protected-routing.json'), 'utf8'));
   const gitArgs = ['--no-replace-objects', '-C', root, '-c', 'core.hooksPath=/dev/null'];
   if (execFileSync('git', [...gitArgs, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim() !== process.env.ATLAS_PROTECTED_BASE_SHA) fail('protected checkout base drift');
   const protectedPaths = execFileSync('git', [...gitArgs, 'ls-tree', '-r', '--name-only', 'HEAD'], { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 }).trim().split('\n');
@@ -165,10 +178,14 @@ async function main() {
   const result = await consumeProtectedAdmission({ repository, codeRevision: process.env.ATLAS_CODE_REVISION,
     protectedBaseSha: process.env.ATLAS_PROTECTED_BASE_SHA,
     ...(process.env.ATLAS_PR_NUMBER ? { prNumber: Number(process.env.ATLAS_PR_NUMBER) } : {}),
-    scopeAdmission: candidate => validateProtectedAdmissionScope({ changedFiles: candidate.changedFiles, protectedPaths }),
+    scopeAdmission: candidate => validateProtectedExecutionScope({ changedFiles: candidate.changedFiles, protectedPaths }),
+    executionPlan: (candidate, admission) => {
+      const plan = evaluateProtectedRouting({ candidate, manifest, catalog, census, inventory, routing, forceFull: admission.forceFull === true });
+      return { semanticDigest: plan.semanticDigest, requiredGroups: plan.requiredGroups, scenarioIds: plan.scenarioIds,
+        dataCapabilities: plan.capabilities, profile: plan.profile, proofPurpose: plan.proofPurpose, evidenceKind: plan.evidenceKind, propertyObligations: plan.propertyObligations, hostedPartitions: plan.hostedPartitions, specialist: plan.specialist, review: plan.review };
+    },
     request: githubRequest, downloadEvidence: id => downloadEvidence(repository, id),
-    authority: { requiredGroups: ['deterministic.core'], requiredScenarioIds: protectedAdmissionScenarioIds(catalog, census.stableTestIds),
-      oracleDigest: protectedOracleDigest(root), maxAgeMs: 24 * 60 * 60 * 1000 } });
+    authority: { oracleDigest: protectedOracleDigest(root), maxAgeMs: 24 * 60 * 60 * 1000 } });
   if (options['--output']) writeFileSync(options['--output'], `${JSON.stringify(result)}\n`);
   if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `admission_accepted=${result.accepted}\nadmission_eligible=${result.eligible}\n`);
   console.log(JSON.stringify(result));
