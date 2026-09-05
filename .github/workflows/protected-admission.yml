@@ -1,0 +1,61 @@
+name: Protected admission
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: atlas-protected-admission-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  protected-admission:
+    name: Protected admission proof
+    if: >-
+      github.event.pull_request.base.ref == github.event.repository.default_branch &&
+      github.event.pull_request.base.repo.full_name == github.repository &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      pull-requests: read
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      ATLAS_PR_NUMBER: ${{ github.event.pull_request.number }}
+      ATLAS_CODE_REVISION: ${{ github.event.pull_request.head.sha }}
+      ATLAS_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+    steps:
+      - name: Check out exact protected authority
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+          path: trusted-base
+      - name: Check out exact candidate as inert input
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+          path: candidate
+      - name: Independently qualify exact admitted candidate
+        id: proof
+        shell: bash
+        run: |
+          set -euo pipefail
+          node trusted-base/tools/verification/run-protected-admission.mjs \
+            "$PWD/trusted-base" "$PWD/candidate" "$RUNNER_TEMP/protected-admission"
+      - name: Publish independently qualified evidence
+        if: steps.proof.outputs.admission_eligible == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: protected-admission-evidence-${{ github.run_id }}-1
+          path: ${{ runner.temp }}/protected-admission/protected-admission-evidence.json
+          if-no-files-found: error
+          retention-days: 7

@@ -424,6 +424,14 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: Check out protected generic admission authority
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+          path: admission-authority
+
       - name: Require exact protected hosted fan-in and lifecycle state bytes
         id: validate
         shell: bash
@@ -549,6 +557,17 @@ jobs:
           selected_run_id=''
           selected_run_json=''
           for attempt in {1..169}; do
+            if test -f admission-authority/tools/verification/consume-protected-admission.mjs; then
+              node admission-authority/tools/verification/consume-protected-admission.mjs \
+                --output "$work/protected-hosted-gate-validation.json"
+              if jq -e '.accepted == true' "$work/protected-hosted-gate-validation.json" >/dev/null; then
+                exit 0
+              fi
+              if jq -e '.eligible == true' "$work/protected-hosted-gate-validation.json" >/dev/null; then
+                if (( attempt < 169 )); then sleep 20; fi
+                continue
+              fi
+            fi
             if accept_generic_repair; then
               exit 0
             fi

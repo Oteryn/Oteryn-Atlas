@@ -85,7 +85,9 @@ test('required PR and Merge Queue workflows bind to exact candidates', () => {
   const generalExactHeadCount = (ci.match(/ref: \${{ github\.event\.pull_request\.head\.sha \|\| github\.sha }}/g) ?? []).length;
   const prOnlyExactHeadCount = (ci.match(/ref: \${{ github\.event\.pull_request\.head\.sha }}/g) ?? []).length;
   const exactHeadCount = generalExactHeadCount + prOnlyExactHeadCount;
-  assert.equal(exactHeadCount, checkoutCount);
+  const protectedBaseCount = (ci.match(/ref: \${{ github\.event\.pull_request\.base\.sha }}/g) ?? []).length;
+  assert.equal(protectedBaseCount, 1, 'only the independent gate authority uses protected base');
+  assert.equal(exactHeadCount + protectedBaseCount, checkoutCount);
 
   assert.equal(fs.existsSync(provenanceWorkflow), false, 'separate provenance workflow must be retired');
   assert.match(mergeGroup, /merge_group:\s*\n\s+types: \[checks_requested\]/);

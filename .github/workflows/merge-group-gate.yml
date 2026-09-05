@@ -204,6 +204,22 @@ jobs:
           persist-credentials: false
           path: trusted-base
 
+      - name: Consume complete protected exact-candidate admission evidence
+        id: generic-admission
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ATLAS_CODE_REVISION: ${{ github.event.merge_group.head_sha }}
+          ATLAS_PROTECTED_BASE_SHA: ${{ github.event.merge_group.base_sha }}
+        run: |
+          set -euo pipefail
+          if test -f trusted-base/tools/verification/consume-protected-admission.mjs; then
+            node trusted-base/tools/verification/consume-protected-admission.mjs \
+              --output "$RUNNER_TEMP/atlas-merge-group-admission.json"
+          else
+            printf 'admission_accepted=false\n' >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Validate one-shot PR 303 merge-group bootstrap proof
         id: legacy-bootstrap
         shell: bash
@@ -303,7 +319,7 @@ jobs:
           printf 'use_legacy_proof=true\nproducer_run_id=%s\n' "$selected_legacy_run" >> "$GITHUB_OUTPUT"
 
       - name: Prove complete protected-base browser qualification for synthetic candidate
-        if: ${{ steps.legacy-bootstrap.outputs.use_legacy_proof != 'true' }}
+        if: ${{ steps.legacy-bootstrap.outputs.use_legacy_proof != 'true' && steps.generic-admission.outputs.admission_accepted != 'true' }}
         shell: bash
         env:
           ATLAS_CODE_REVISION: ${{ github.event.merge_group.head_sha }}
