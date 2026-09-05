@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
-import crypto from 'node:crypto';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
-import vm from 'node:vm';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const WORKFLOW = fs.readFileSync(path.join(ROOT, '.github/workflows/merge-group-gate.yml'), 'utf8');
@@ -17,61 +17,61 @@ function stepBody(name) {
   return WORKFLOW.slice(start, next === -1 ? WORKFLOW.length : next);
 }
 
-test('one-shot bootstrap does not import future policy exports from protected main', () => {
-  const bootstrap = stepBody('Validate exact protected qualification repair bootstrap evidence');
-  const oneShot = bootstrap.slice(0, bootstrap.indexOf('gh api "repos/$GITHUB_REPOSITORY/commits/$candidate_head_sha/status"'));
-  assert.doesNotMatch(oneShot, /validateQualificationRepairControlPlaneBootstrap/);
-  assert.match(oneShot, /exactControlPlanePaths/);
-  for (const blob of [
-    '2f4ef822b34b1699af70e8142365ee5fc1afdc84',
-    '8abcf380d6746b9aa095ec5a792638f2ce1b6314',
-    '3f9565eaf26577cf36b30475fea61f9fcce66535',
-    '4c49d2ed861d4928bf869aeb35f43215c31a42d4',
-  ]) assert.match(oneShot, new RegExp(blob));
-  assert.match(oneShot, /protected bootstrap authority advanced/);
-});
-
-test('one-shot bootstrap is bound to pre-328 protected authority bytes and retires after any byte advance', () => {
-  const bootstrap = stepBody('Validate exact protected qualification repair bootstrap evidence');
-  const oneShot = bootstrap.slice(0, bootstrap.indexOf('gh api "repos/$GITHUB_REPOSITORY/commits/$candidate_head_sha/status"'));
-  const expected = new Map([
-    ['.github/workflows/merge-group-gate.yml', '2f4ef822b34b1699af70e8142365ee5fc1afdc84'],
-    ['tools/governance/verify_extraction_provenance.py', '8abcf380d6746b9aa095ec5a792638f2ce1b6314'],
-    ['.github/workflows/merge-authority-audit.yml', '3f9565eaf26577cf36b30475fea61f9fcce66535'],
-    ['tools/verification/qualification-repair-policy.mjs', '4c49d2ed861d4928bf869aeb35f43215c31a42d4'],
-  ]);
-  for (const [relative, sha] of expected) {
-    const literal = `'${relative}': '${sha}'`;
-    assert.ok(oneShot.includes(literal), `${relative} pre-328 authority pin must be exact`);
-  }
-  const start = oneShot.indexOf('const read = ');
-  const end = oneShot.indexOf('const exactOne = ', start);
-  assert.ok(start >= 0 && end > start, 'protected authority validation must be executable');
-  const authorityCheck = oneShot.slice(start, end);
-  // Exercise the actual workflow hash/loop with controlled file I/O. The
-  // expected Git blob was independently computed for "protected authority\n".
-  const fixtureText = 'protected authority\n';
-  const fixtureBlob = '77e48505023c9e47f0b2b9142b5b355d7875cda0';
-  const verify = (changedPath = null) => {
-    const reads = [];
-    vm.runInNewContext(authorityCheck, {
-      crypto, Buffer,
-      protectedAuthorityBlobs: Object.fromEntries([...expected.keys()].map((relative) => [relative, fixtureBlob])),
-      fs: { readFileSync(file, encoding) {
-        assert.equal(encoding, 'utf8');
-        assert.ok([...expected.keys()].some((relative) => file === `trusted-base/${relative}`));
-        reads.push(file);
-        return file === `trusted-base/${changedPath}` ? `${fixtureText}!` : fixtureText;
-      } },
-    }, { timeout: 1000 });
-    assert.deepEqual(reads, [...expected.keys()].map((relative) => `trusted-base/${relative}`));
+for (const exactTree of [true, false]) test(`missing repair evidence retains ordinary qualification for ${exactTree ? 'single-candidate' : 'combined'} tree`, (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-repair-evidence-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const bin = path.join(root, 'bin');
+  fs.mkdirSync(bin);
+  const base = 'a'.repeat(40), head = 'b'.repeat(40), tree = 'c'.repeat(40);
+  const responses = {
+    'repos/Oteryn/Oteryn-Atlas/pulls/42': { head: { sha: head }, base: { sha: base } },
+    [`repos/Oteryn/Oteryn-Atlas/git/commits/${head}`]: { tree: { sha: tree } },
+    [`repos/Oteryn/Oteryn-Atlas/git/commits/${'d'.repeat(40)}`]: { tree: { sha: exactTree ? tree : 'e'.repeat(40) }, parents: [{ sha: base }] },
+    [`repos/Oteryn/Oteryn-Atlas/commits/${head}/status`]: { statuses: [] },
+    'repos/Oteryn/Oteryn-Atlas/pulls/42/files?per_page=100': [[{ filename: 'tools/verification/qualification-repair-policy.mjs' }]],
   };
-  assert.doesNotThrow(() => verify());
-  for (const relative of expected.keys()) {
-    assert.throws(() => verify(relative), (error) =>
-      error.name === 'TypeError' && error.message === `protected bootstrap authority advanced: ${relative}`);
-  }
-  assert.match(oneShot, /throw new TypeError\(`protected bootstrap authority advanced: \$\{relative\}`\)/);
+  const command = (name, source) => {
+    fs.writeFileSync(path.join(bin, name), `#!${process.execPath}\n${source}`, { mode: 0o755 });
+  };
+  command('gh', `
+    const args = process.argv.slice(2);
+    const endpoint = args.find((arg) => arg.startsWith('repos/'));
+    if (endpoint === 'repos/Oteryn/Oteryn-Atlas/branches/main') console.log('${base}');
+    else {
+      const responses = ${JSON.stringify(responses)};
+      if (!(endpoint in responses)) throw new Error('unexpected API call: ' + endpoint);
+      console.log(JSON.stringify(responses[endpoint]));
+    }
+  `);
+  command('jq', `
+    const fs = require('node:fs');
+    const args = process.argv.slice(2);
+    const input = JSON.parse(fs.readFileSync(args.at(-1), 'utf8'));
+    const expression = args.at(-2);
+    if (expression === '.head.sha') console.log(input.head.sha);
+    else if (expression === '.base.sha') console.log(input.base.sha);
+    else if (expression === '.tree.sha') console.log(input.tree.sha);
+    else if (expression === '.parents | any(.sha == $base)') { if (!input.parents.some((p) => p.sha === args[args.indexOf('--arg') + 2])) process.exit(1); }
+    else if (expression === '[.[][] | {path: .filename, previousPath: (.previous_filename // null)}]') console.log(JSON.stringify(input.flat().map((p) => ({path:p.filename,previousPath:p.previous_filename??null}))));
+    else if (expression === '.[] | [.path, .previousPath] | .[] | select(. != null)') console.log(input.flatMap((p) => [p.path,p.previousPath]).filter(Boolean).join('\\n'));
+    else if (expression === '[.statuses[] | select(.context == "atlas-protected-product-qualification")] | length') console.log(input.statuses.filter((s) => s.context === 'atlas-protected-product-qualification').length);
+    else throw new Error('unexpected jq expression: ' + expression);
+  `);
+  // Even if candidate code reports success, only protected evidence may grant
+  // use_repair_proof. The ordinary missing-status path must not execute it.
+  command('node', "require('node:fs').appendFileSync(process.env.NODE_CALLS, 'called\\n'); process.stdin.resume();");
+  const step = stepBody('Validate exact protected qualification repair bootstrap evidence');
+  const body = step.slice(step.indexOf('        run: |\n') + '        run: |\n'.length).split('\n').map((line) => line.replace(/^          /, '')).join('\n');
+  const output = path.join(root, 'output');
+  const calls = path.join(root, 'node-calls');
+  const result = spawnSync('bash', ['-c', body], { cwd: root, encoding: 'utf8', timeout: 10000,
+    env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, NODE_CALLS: calls,
+      RUNNER_TEMP: root, GITHUB_OUTPUT: output, GITHUB_REPOSITORY: 'Oteryn/Oteryn-Atlas',
+      ATLAS_MERGE_GROUP_HEAD_REF: `refs/heads/gh-readonly-queue/main/pr-42-${base}`,
+      ATLAS_PROTECTED_BASE_SHA: base, ATLAS_CODE_REVISION: 'd'.repeat(40) } });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(fs.readFileSync(output, 'utf8'), 'use_repair_proof=false\n');
+  assert.equal(fs.existsSync(calls), false, 'missing evidence must not invoke candidate code');
 });
 
 test('merge queue consumes exact protected qualification repair evidence before stale-base full fixture proof', () => {
@@ -107,16 +107,6 @@ test('protected repair producer executes the entire protected e2e.full stable-ID
   assert.doesNotMatch(repairWorkflow, /candidateCensus|candidate-list-artifacts/);
   assert.doesNotMatch(repairWorkflow, /selected\.length\s*!==\s*1/);
   assert.match(repairWorkflow, /--workers=1 --retries=0/);
-});
-
-test('self-retiring bootstrap remains a closed control-plane-only path', () => {
-  const repair = stepBody('Validate exact protected qualification repair bootstrap evidence');
-  assert.match(repair, /exactControlPlanePaths/);
-  assert.doesNotMatch(repair, /from '\.\/tools\/verification\/qualification-repair-policy\.mjs'/);
-  assert.match(repair, /candidate provenance verifier is not an exact gate-pin rotation/);
-  assert.match(repair, /regions\.size !== 1/);
-  assert.match(repair, /QUALIFICATION_SEMANTIC_RECORD/);
-  assert.match(repair, /self-retiring-control-plane-bootstrap/);
 });
 
 test('candidate policy bytes cannot self-authorize bootstrap', () => {

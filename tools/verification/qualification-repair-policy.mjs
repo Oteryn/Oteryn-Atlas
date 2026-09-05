@@ -3,6 +3,30 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { canonicalJson, profileRank } from './verification-plan-schema.mjs';
+import { stableTestId } from './stable-id.mjs';
+
+export function validateQualificationRepairCensus({ summary, protectedTestList, candidateHeadSha }) {
+  const reject = () => { throw new TypeError('qualification repair census must prove exact-head protected 68/68 without skips or retries'); };
+  if (!/^[0-9a-f]{40}$/.test(candidateHeadSha ?? '') || typeof protectedTestList !== 'string') reject();
+  const expected = new Set();
+  for (const line of protectedTestList.split(/\r?\n/).filter((value) => value.trim())) {
+    const match = line.match(/^\s*\[([^\]]+)\]\s+›\s+([^:]+):\d+:\d+\s+›\s+(.+)$/);
+    if (!match) reject();
+    const id = stableTestId(match[1], `e2e/tests/${match[2]}`, match[3]);
+    if (expected.has(id)) reject();
+    expected.add(id);
+  }
+  if (expected.size !== 68 || summary?.status !== 'passed'
+    || summary.metadata?.expectedRevision !== candidateHeadSha || summary.metadata?.workers !== 1
+    || !Array.isArray(summary.scenarios) || summary.scenarios.length !== 68) reject();
+  for (const scenario of summary.scenarios) {
+    if (scenario?.status !== 'passed' || scenario.retry !== 0 || !expected.has(scenario.stableTestId)) reject();
+    if (stableTestId(scenario.project, scenario.specPath, scenario.scenario) !== scenario.stableTestId) reject();
+    expected.delete(scenario.stableTestId);
+  }
+  if (expected.size !== 0) reject();
+  return Object.freeze({ passed: 68, skipped: 0, retried: 0 });
+}
 
 export const QUALIFICATION_REPAIR_PATHS = Object.freeze([
   'src/browser/animation-runtime-service.mjs',
@@ -172,55 +196,6 @@ export function validateQualificationRepairProductRepin({ protectedIdentities, c
 }
 
 
-const CONTROL_PLANE_BOOTSTRAP_PATHS = new Set([
-  '.github/workflows/merge-group-gate.yml',
-  '.github/workflows/merge-authority-audit.yml',
-  '.github/workflows/protected-qualification-repair.yml',
-  'tools/governance/verify_extraction_provenance.py',
-  'tools/verification/qualification-repair-policy.mjs',
-]);
-
-export function validateQualificationRepairControlPlaneBootstrap({ changedPaths, protectedFixtureShape } = {}) {
-  const paths = exactStringArray(changedPaths, 'qualification repair bootstrap changed paths');
-  if (!paths.includes('tools/verification/qualification-repair-policy.mjs')
-    || paths.some((path) => !CONTROL_PLANE_BOOTSTRAP_PATHS.has(path) && !VERIFICATION_REGRESSION.test(path))) {
-    throw new TypeError('qualification repair bootstrap scope is not the closed control-plane repair set');
-  }
-  const shape = protectedFixtureShape;
-  if (!shape || shape.fixtureId !== 'atlas-qualification-world-v2'
-    || shape.creatureCount !== 12 || shape.creatureRegionCount !== 1 || shape.semanticRecordCount !== 1) {
-    throw new TypeError('qualification repair bootstrap protected base no longer has the narrow pre-fix fixture');
-  }
-  return freeze({ schemaVersion: 1, eligible: true, mode: 'self-retiring-narrow-fixture-control-plane-bootstrap', changedPaths: paths });
-}
-
-
-const GIT_BLOB = /^[0-9a-f]{40}$/;
-function replaceExactlyOnce(source, pattern, replacement, label) {
-  const matches = source.match(new RegExp(pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) ?? [];
-  if (matches.length !== 1) throw new TypeError(`${label} must occur exactly once`);
-  return source.replace(pattern, replacement);
-}
-
-export function validateQualificationRepairBootstrapPinRotations({ protectedVerifierText, candidateVerifierText, protectedAuditText, candidateAuditText, candidateGateText, candidateGateBlob, candidateVerifierBlob } = {}) {
-  for (const [label, value] of Object.entries({ candidateGateBlob, candidateVerifierBlob })) {
-    if (!GIT_BLOB.test(value ?? '')) throw new TypeError(`${label} must be a lowercase 40-character git blob`);
-  }
-  const gitBlob = (text) => crypto.createHash('sha1').update(Buffer.concat([Buffer.from(`blob ${Buffer.byteLength(text)}\0`), Buffer.from(text)])).digest('hex');
-  if (gitBlob(candidateGateText) !== candidateGateBlob || gitBlob(candidateVerifierText) !== candidateVerifierBlob) throw new TypeError('candidate pin blob does not match supplied bytes');
-  const verifierMatch = protectedVerifierText.match(/MERGE_GROUP_GATE_BLOB = "([0-9a-f]{40})"/g) ?? [];
-  if (verifierMatch.length !== 1) throw new TypeError('protected verifier gate pin must occur exactly once');
-  const expectedVerifier = replaceExactlyOnce(protectedVerifierText, verifierMatch[0], `MERGE_GROUP_GATE_BLOB = "${candidateGateBlob}"`, 'protected verifier gate pin');
-  if (candidateVerifierText !== expectedVerifier) throw new TypeError('candidate provenance verifier changes more than the exact gate pin');
-  const gateMatches = protectedAuditText.match(/EXPECTED_MERGE_GROUP_GATE_BLOB: "([0-9a-f]{40})"/g) ?? [];
-  const verifierMatches = protectedAuditText.match(/EXPECTED_PROVENANCE_VERIFIER_BLOB: "([0-9a-f]{40})"/g) ?? [];
-  if (gateMatches.length !== 1 || verifierMatches.length !== 1) throw new TypeError('protected audit pins must each occur exactly once');
-  const expectedAudit = replaceExactlyOnce(replaceExactlyOnce(protectedAuditText, gateMatches[0], `EXPECTED_MERGE_GROUP_GATE_BLOB: "${candidateGateBlob}"`, 'audit gate pin'), verifierMatches[0], `EXPECTED_PROVENANCE_VERIFIER_BLOB: "${candidateVerifierBlob}"`, 'audit verifier pin');
-  if (candidateAuditText !== expectedAudit) throw new TypeError('candidate merge authority audit changes more than exact pin rotations');
-  return freeze({ schemaVersion: 1, eligible: true, candidateGateBlob, candidateVerifierBlob });
-}
-
-
 const QUALIFICATION_ORACLE_FILES = Object.freeze([
   'tests/runtime.mjs', 'tests/audit-desktop.spec.mjs', 'tests/state-desktop.spec.mjs',
   'tests/race-desktop.spec.mjs', 'tests/desktop.spec.mjs', 'tests/mobile.spec.mjs',
@@ -278,7 +253,10 @@ function uniqueRecord(records, predicate, label) {
   if (selected.length !== 1) throw new TypeError(`qualification oracle requires exactly one ${label}, observed ${selected.length}`);
   return selected[0];
 }
-function escaped(value) { return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+function escaped(value) {
+  return value.replace(/[.*+?^${}()|[\]\\/\n\r\u2028\u2029]/g, (character) =>
+    ({ '\n': '\\n', '\r': '\\r', '\u2028': '\\u2028', '\u2029': '\\u2029' })[character] ?? `\\${character}`);
+}
 function urlPosition(record) { const p = validPosition(record); return `x=${p.x}&y=${p.y}&floor=${p.floor}`; }
 
 export function resolveQualificationFixtureOracle(productRoot) {
@@ -297,14 +275,22 @@ export function resolveQualificationFixtureOracle(productRoot) {
   const byRecordId = new Map(published.map((record) => [record.record_id, record]));
   if (byRecordId.size !== published.length) throw new TypeError('qualification oracle creature publication contains duplicate records');
   const creatures = searchCreatures.map((record) => {
+    if (!['npc', 'monster'].includes(record?.kind)
+      || !new RegExp(`^${record.kind}:[0-9a-f]{32}$`).test(record.record_id ?? '')
+      || !new RegExp(`^${record.kind}-entity:[0-9a-f]{32}$`).test(record.entity_id ?? '')
+      || typeof record.label !== 'string' || record.label.length === 0) {
+      throw new TypeError('qualification oracle creature identity or label is invalid');
+    }
     const authoritative = byRecordId.get(record.record_id);
     if (!authoritative || authoritative.kind !== record.kind || authoritative.name !== record.label
+      || authoritative.entity_id !== record.entity_id
       || canonicalJson(authoritative.position) !== canonicalJson(record.position)) {
       throw new TypeError('qualification oracle search and creature publication disagree');
     }
     return { ...record, ...authoritative, label: record.label };
   });
   const navigation = uniqueRecord(semantic, (r) => r.capabilities?.includes('navigation'), 'navigable semantic record');
+  if (typeof navigation.label !== 'string' || navigation.label.length === 0) throw new TypeError('qualification oracle navigation label is invalid');
   const roleNpc = uniqueRecord(creatures, (r) => r.kind === 'npc' && r.roles?.includes('shop') && r.roles?.includes('quest') && r.roles.length === 2, 'shop/quest NPC');
   const animationManifest = readJson(productRoot, 'animation/manifest.json');
   if (typeof animationManifest?.programs?.path !== 'string' || !/^[A-Za-z0-9._/-]+$/.test(animationManifest.programs.path)
@@ -371,31 +357,6 @@ export function resolveQualificationFixtureOracle(productRoot) {
 
 export function materializeQualificationFixtureOracleOverlay({ e2eRoot, productRoot } = {}) {
   const oracle = resolveQualificationFixtureOracle(productRoot);
-  const searchRuntimePath = path.join(path.dirname(e2eRoot), 'web/fullworld-search.mjs');
-  const searchRuntime = fs.readFileSync(searchRuntimePath, 'utf8');
-  const legacySearchCall = '{ limit: MAX_RESULTS, currentFloor: currentFloor() }';
-  const qualifiedSearchCall = '{ limit: MAX_RESULTS, currentFloor: currentFloor(), sourceExpectations: SOURCE_EXPECTATIONS.semanticSearch }';
-  const legacySearchCount = searchRuntime.split(legacySearchCall).length - 1;
-  const qualifiedSearchCount = searchRuntime.split(qualifiedSearchCall).length - 1;
-  if (!((legacySearchCount > 0 && qualifiedSearchCount === 0) || (legacySearchCount === 0 && qualifiedSearchCount > 0))) {
-    throw new TypeError('candidate qualification search runtime shape is incompatible');
-  }
-  const qualifiedSearchRuntime = searchRuntime.replaceAll(
-    legacySearchCall,
-    qualifiedSearchCall,
-  );
-  fs.writeFileSync(searchRuntimePath, qualifiedSearchRuntime, 'utf8');
-  const semanticRuntimePath = path.join(path.dirname(e2eRoot), 'src/browser/semantic-search.mjs');
-  const semanticRuntime = fs.readFileSync(semanticRuntimePath, 'utf8');
-  const legacySemanticCall = '  validateSemanticSearchIndex(index);';
-  const qualifiedSemanticCall = '  validateSemanticSearchIndex(index, options.sourceExpectations);';
-  const legacySemanticCount = semanticRuntime.split(legacySemanticCall).length - 1;
-  const qualifiedSemanticCount = semanticRuntime.split(qualifiedSemanticCall).length - 1;
-  if (!((legacySemanticCount === 1 && qualifiedSemanticCount === 0) || (legacySemanticCount === 0 && qualifiedSemanticCount === 1))) {
-    throw new TypeError('candidate qualification semantic runtime shape is incompatible');
-  }
-  const qualifiedSemanticRuntime = semanticRuntime.replace(legacySemanticCall, qualifiedSemanticCall);
-  fs.writeFileSync(semanticRuntimePath, qualifiedSemanticRuntime, 'utf8');
   const before = new Map(QUALIFICATION_ORACLE_FILES.map((relative) => [relative, fs.readFileSync(path.join(e2eRoot, relative), 'utf8')]));
   for (const [relative, source] of before) {
     const digest = crypto.createHash('sha256').update(source).digest('hex');
@@ -412,11 +373,11 @@ export function materializeQualificationFixtureOracleOverlay({ e2eRoot, productR
     ["'Thais'", JSON.stringify(oracle.navigation.label)], ['/Thais/i', `/${escaped(oracle.navigation.label)}/i`],
     ["'Sam'", JSON.stringify(oracle.roleNpc.label)], ['/Sam/i', `/${escaped(oracle.roleNpc.label)}/i`],
     ["'Cave Rat'", JSON.stringify(oracle.animatedMonster.label)], ['/^Cave Rat$/', `/^${escaped(oracle.animatedMonster.label)}$/`],
-    ['monster-entity:8b41afe4c98e72744557d7adc250f7e6', oracle.animatedMonster.entity_id],
-    ['Misguided Thief', oracle.overlap.at(-1).label],
-    ['monster:014cc0368c5989dd788e2af63e087e83', oracle.overlap[0].record_id],
-    ['monster:6c316dffde0b35aa6a9165eb46694374', oracle.overlap[1].record_id],
-    ['monster:7a7d419f84cf4eac5cad81f7cb266dae', oracle.overlap[2].record_id],
+    ["'monster-entity:8b41afe4c98e72744557d7adc250f7e6'", JSON.stringify(oracle.animatedMonster.entity_id)],
+    ["'Misguided Thief'", JSON.stringify(oracle.overlap[0].label)],
+    ["'monster:014cc0368c5989dd788e2af63e087e83'", JSON.stringify(oracle.overlap[0].record_id)],
+    ["'monster:6c316dffde0b35aa6a9165eb46694374'", JSON.stringify(oracle.overlap[1].record_id)],
+    ["'monster:7a7d419f84cf4eac5cad81f7cb266dae'", JSON.stringify(oracle.overlap[2].record_id)],
     ['floor: -10, x: 32522, y: 32419', `floor: ${validPosition(oracle.overlap[0]).floor}, x: ${validPosition(oracle.overlap[0]).x}, y: ${validPosition(oracle.overlap[0]).y}`],
     ['32369', String(validPosition(oracle.navigation).x)], ['32241', String(validPosition(oracle.navigation).y)],
   ];
@@ -424,59 +385,17 @@ export function materializeQualificationFixtureOracleOverlay({ e2eRoot, productR
     [[32380, 32250], oracle.distinct[0]], [[32390, 32260], oracle.distinct[1]],
     [[32469, 32341], oracle.distinct[2]], [[32569, 32441], oracle.distinct[3]],
   ]) {
-    substitutions.push([`${oldPoint[0]} ${oldPoint[1]} -7`, `x=${next.x} y=${next.y} floor=${next.floor}`]);
+    substitutions.push([`${oldPoint[0]} ${oldPoint[1]} -7`, `${next.x} ${next.y} ${next.floor}`]);
     substitutions.push([String(oldPoint[0]), String(next.x)], [String(oldPoint[1]), String(next.y)]);
   }
-  substitutions.push(['`${x} ${y} ${floor}`', '`${"x="}${x} ${"y="}${y} ${"floor="}${floor}`']);
+  const replacements = new Map(substitutions);
+  const pattern = new RegExp([...replacements.keys()].map(escaped).join('|'), 'g');
   for (const [relative, source] of before) {
-    let transformed = source;
-    for (const [oldValue, newValue] of substitutions) transformed = transformed.replaceAll(oldValue, newValue);
+    // One pass over protected source keeps inserted publication data inert:
+    // replacement syntax and later substitutions cannot reinterpret it.
+    const transformed = source.replace(pattern, (match) => replacements.get(match));
     fs.writeFileSync(path.join(e2eRoot, relative), transformed, 'utf8');
   }
-  const presentationPath = path.join(e2eRoot, 'tests/creature-presentation-desktop.spec.mjs');
-  fs.writeFileSync(presentationPath, fs.readFileSync(presentationPath, 'utf8').replace(
-    "sceneEntry(LONG_NAME_NPC, { creatures: 'npc', zoom: 2 })",
-    "sceneEntry(LONG_NAME_NPC, { creatures: 'npc', creature: LONG_NAME_NPC.record_id, zoom: 2 })",
-  ).replace(
-    "sceneEntry(edgeScene, { creatures: 'npc', zoom: 2 })",
-    "sceneEntry(edgeScene, { creatures: 'npc', creature: LONG_NAME_NPC.record_id, zoom: 2 })",
-  ).replace(
-    'x: LONG_NAME_NPC.position.x - Math.max(0.5, halfTiles - 0.75)',
-    'x: LONG_NAME_NPC.position.x + Math.max(0.5, halfTiles - 0.75)',
-  ).replace(
-    "  expect(longLabel.suppressed).toBe(false);\n  expect(longLabel.displayText).not.toBe(LONG_NAME_NPC.label);\n  expect(longLabel.displayText).toMatch(/(?:…|\\.\\.\\.)$/);\n  assertCssRect(longLabel.rect, await viewportSize(page), 'long-name edge label');",
-    "  expect(longLabel.suppressed).toBe(true);\n  expect(longLabel.fullText).toBe(LONG_NAME_NPC.label);\n  expect(longLabel.displayText).not.toBe(LONG_NAME_NPC.label);\n  expect(longLabel.displayText).toMatch(/(?:…|\\.\\.\\.)$/);\n  expect(longLabel.rect).toBeNull();",
-  ), 'utf8');
-  const auditPath = path.join(e2eRoot, 'tests/audit-desktop.spec.mjs');
-  fs.writeFileSync(auditPath, fs.readFileSync(auditPath, 'utf8').replace(
-    '  await expect(coordinateResults).toBeHidden();',
-    `  if (new URL(page.url()).searchParams.get('x') !== String(${oracle.distinct[0].x})) {\n    const coordinateTarget = new URL(page.url());\n    coordinateTarget.searchParams.set('x', String(${oracle.distinct[0].x}));\n    coordinateTarget.searchParams.set('y', String(${oracle.distinct[0].y}));\n    coordinateTarget.searchParams.set('floor', String(${oracle.distinct[0].floor}));\n    await gotoAtlas(page, coordinateTarget.href);\n  }\n  await expect.poll(() => new URL(page.url()).searchParams.get('x')).toBe(String(${oracle.distinct[0].x}));\n  await page.locator('#search-input').fill('');\n  await expect(coordinateResults).toBeHidden();`,
-  ), 'utf8');
-  const mobileGeometryPath = path.join(e2eRoot, 'tests/geometry-mobile.spec.mjs');
-  fs.writeFileSync(mobileGeometryPath, fs.readFileSync(mobileGeometryPath, 'utf8').replace(
-    "  aligned = await resizeAndAlign(page, 390, 844);\n  compareCreatureAnchors(aligned.base, aligned.creature).assertWithin(TOLERANCE_PX);\n  aligned = await resizeAndAlign(page, 844, 390);\n  compareCreatureAnchors(aligned.base, aligned.creature).assertWithin(TOLERANCE_PX);\n  aligned = await resizeAndAlign(page, 390, 844);",
-    "  aligned = await resizeAndAlign(page, 844, 390);\n  compareCreatureAnchors(aligned.base, aligned.creature).assertWithin(TOLERANCE_PX);\n  aligned = await resizeAndAlign(page, 390, 844);\n  compareCreatureAnchors(aligned.base, aligned.creature).assertWithin(TOLERANCE_PX);\n  aligned = await resizeAndAlign(page, 844, 390);",
-  ), 'utf8');
-  const visualPath = path.join(e2eRoot, 'tests/visual-desktop.spec.mjs');
-  let visualSource = fs.readFileSync(visualPath, 'utf8');
-  visualSource = visualSource.replace(
-    "  await expect(page.locator('.topbar')).toHaveScreenshot('desktop-topbar.png', {\n    animations: 'disabled', caret: 'hide', scale: 'css',\n  });",
-    "  await expect(page.locator('.topbar')).toBeVisible();",
-  );
-  visualSource = visualSource.replace(
-    "  await expect(page.locator('#view-mode-control')).toHaveScreenshot('desktop-view-mode.png', {\n    animations: 'disabled', caret: 'hide', scale: 'css',\n  });",
-    "  await expect(page.locator('#view-mode-control')).toBeVisible();",
-  );
-  visualSource = visualSource.replace(/await expect\((page\.locator\([^\n]+\))\)\.toHaveScreenshot\([\s\S]*?\n  \}\);/g, 'await expect($1).toBeVisible();');
-  fs.writeFileSync(visualPath, visualSource, 'utf8');
-  const mobileVisualPath = path.join(e2eRoot, 'tests/visual-mobile.spec.mjs');
-  let mobileVisualSource = fs.readFileSync(mobileVisualPath, 'utf8').replace(
-    "  await expect(page.locator('.topbar')).toHaveScreenshot('mobile-topbar.png', {\n    animations: 'disabled', caret: 'hide', scale: 'css',\n  });",
-    "  await expect(page.locator('.topbar')).toBeVisible();",
-  );
-  mobileVisualSource = mobileVisualSource.replace(/await expect\((page\.locator\([^\n]+\))\)\.toHaveScreenshot\([\s\S]*?\n  \}\);/g, 'await expect($1).toBeVisible();');
-  mobileVisualSource = mobileVisualSource.replace("  await expect(modes).toHaveScreenshot('mobile-view-mode.png', {\n    animations: 'disabled', caret: 'hide', scale: 'css',\n  });", "  await expect(modes).toBeVisible();\n  await page.locator('#mobile-controls-panel').scrollIntoViewIfNeeded();");
-  fs.writeFileSync(mobileVisualPath, mobileVisualSource, 'utf8');
   const literal = (value) => JSON.stringify(value);
   const recordSource = (record) => `record(${literal({ label: record.label, kind: record.kind, record_id: record.record_id, position: validPosition(record), roles: record.roles ?? [] })})`;
   const npcs = oracle.creatures.filter((record) => record.kind === 'npc');

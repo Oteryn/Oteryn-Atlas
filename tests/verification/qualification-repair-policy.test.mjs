@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -11,14 +12,11 @@ import {
   independentlyVerifyQualificationProduct,
   materializeQualificationFixtureOracleOverlay,
   resolveQualificationFixtureOracle,
-  validateQualificationRepairBootstrapPinRotations,
-  validateQualificationRepairControlPlaneBootstrap,
   validateQualificationRepairProductRepin,
   validateQualificationRepairTransition,
 } from '../../tools/verification/qualification-repair-policy.mjs';
 const digest = (c) => `sha256:${c.repeat(64)}`;
 const plan = { profile: 'full', requiredGroupIds: ['deterministic.core', 'e2e.full'], requiredDataCapabilities: ['qualification_fixture'], retryPolicy: { retries: 0 } };
-const gitBlob = (text) => crypto.createHash('sha1').update(Buffer.concat([Buffer.from(`blob ${Buffer.byteLength(text)}\0`), Buffer.from(text)])).digest('hex');
 function writeOracleProduct(root) {
   fs.mkdirSync(path.join(root, 'web/semantic-search'), { recursive: true });
   fs.mkdirSync(path.join(root, 'data/creatures'), { recursive: true });
@@ -86,6 +84,20 @@ test('oracle rejects the historical narrow fixture without genuine animated NPC 
   assert.throws(() => resolveQualificationFixtureOracle(root), /pixel-backed animated NPC/);
 });
 
+test('oracle rejects disagreement between search and published entity identity', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-oracle-identity-'));
+  try {
+    writeOracleProduct(root);
+    const file = path.join(root, 'data/creatures/chunks/f-7/fixture.json');
+    const publication = JSON.parse(fs.readFileSync(file, 'utf8'));
+    publication.records[0].entity_id = `npc-entity:${'9'.repeat(32)}`;
+    fs.writeFileSync(file, JSON.stringify(publication));
+    assert.throws(() => resolveQualificationFixtureOracle(root), /publication disagree/);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test('identity repin preserves the complete protected mirror', () => {
   const protectedIdentities = { qualification_fixture: { id: 'atlas-qualification-world-v2', digest: digest('1') }, bounded_real_world: { id: 'real', digest: digest('2') } };
   const candidateIdentities = structuredClone(protectedIdentities); candidateIdentities.qualification_fixture.digest = digest('3');
@@ -93,24 +105,6 @@ test('identity repin preserves the complete protected mirror', () => {
   const candidateMirrorText = protectedMirrorText.replace(digest('1'), digest('3'));
   assert.equal(validateQualificationRepairProductRepin({ protectedIdentities, candidateIdentities, rebuiltProductDigest: digest('3'), protectedMirrorText, candidateMirrorText }).productDigest, digest('3'));
   assert.throws(() => validateQualificationRepairProductRepin({ protectedIdentities, candidateIdentities, rebuiltProductDigest: digest('3'), protectedMirrorText, candidateMirrorText: `// ${digest('3')}` }), /mirror/);
-});
-
-test('control-plane bootstrap activates only for narrow protected shape and retires', () => {
-  const changedPaths = ['.github/workflows/merge-authority-audit.yml', '.github/workflows/merge-group-gate.yml', '.github/workflows/protected-qualification-repair.yml', 'tools/governance/verify_extraction_provenance.py', 'tools/verification/qualification-repair-policy.mjs', 'tests/verification/qualification-repair-policy.test.mjs'];
-  const narrow = { fixtureId: 'atlas-qualification-world-v2', creatureCount: 12, creatureRegionCount: 1, semanticRecordCount: 1 };
-  assert.equal(validateQualificationRepairControlPlaneBootstrap({ changedPaths, protectedFixtureShape: narrow }).eligible, true);
-  assert.throws(() => validateQualificationRepairControlPlaneBootstrap({ changedPaths, protectedFixtureShape: { ...narrow, creatureRegionCount: 2 } }), /no longer/);
-});
-
-test('bootstrap pins permit only exact mechanical rotations', () => {
-  const oldGate = '1'.repeat(40), gateText = 'gate\n', gateBlob = gitBlob(gateText);
-  const protectedVerifierText = `MERGE_GROUP_GATE_BLOB = "${oldGate}"\n`; const candidateVerifierText = `MERGE_GROUP_GATE_BLOB = "${gateBlob}"\n`; const verifierBlob = gitBlob(candidateVerifierText);
-  const protectedAuditText = `EXPECTED_MERGE_GROUP_GATE_BLOB: "${oldGate}"\nEXPECTED_PROVENANCE_VERIFIER_BLOB: "${'2'.repeat(40)}"\n`;
-  const candidateAuditText = `EXPECTED_MERGE_GROUP_GATE_BLOB: "${gateBlob}"\nEXPECTED_PROVENANCE_VERIFIER_BLOB: "${verifierBlob}"\n`;
-  const args = { protectedVerifierText, candidateVerifierText, protectedAuditText, candidateAuditText, candidateGateText: gateText, candidateGateBlob: gateBlob, candidateVerifierBlob: verifierBlob };
-  assert.equal(validateQualificationRepairBootstrapPinRotations(args).eligible, true);
-  assert.throws(() => validateQualificationRepairBootstrapPinRotations({ ...args, candidateAuditText: `${candidateAuditText}# x\n` }), /more than/);
-  assert.throws(() => validateQualificationRepairBootstrapPinRotations({ ...args, candidateGateBlob: 'A'.repeat(40) }), /lowercase/);
 });
 
 test('protected qualification overlay adapts every unresolved oracle family from publication structure', async () => {
@@ -165,8 +159,9 @@ test('protected qualification overlay fails closed on unknown protected source d
   assert.throws(() => materializeQualificationFixtureOracleOverlay({ e2eRoot, productRoot }), /source (?:shape|fingerprint) drifted/);
 });
 
-test('candidate runtime repair paths are validated by shape rather than protected byte fingerprints', () => {
+test('candidate runtime repair paths remain byte-identical during qualification overlay', (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-oracle-runtime-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const e2eRoot = path.join(root, 'e2e');
   const productRoot = path.join(root, 'product');
   fs.cpSync(path.resolve('e2e'), e2eRoot, { recursive: true, filter: (source) => !source.includes('node_modules') });
@@ -176,5 +171,75 @@ test('candidate runtime repair paths are validated by shape rather than protecte
   fs.copyFileSync('src/browser/semantic-search.mjs', path.join(root, 'src/browser/semantic-search.mjs'));
   fs.appendFileSync(path.join(root, 'src/browser/semantic-search.mjs'), '\n// admitted runtime repair\n');
   writeOracleProduct(productRoot);
+  const runtimePaths = ['web/fullworld-search.mjs', 'src/browser/semantic-search.mjs'];
+  const before = runtimePaths.map((relative) => fs.readFileSync(path.join(root, relative)));
   assert.equal(materializeQualificationFixtureOracleOverlay({ e2eRoot, productRoot }).dataCapability, 'qualification_fixture');
+  runtimePaths.forEach((relative, index) => {
+    assert.deepEqual(fs.readFileSync(path.join(root, relative)), before[index], `${relative} must be the exact candidate bytes`);
+  });
 });
+
+for (const obligation of ['screenshot baselines', 'visible edge label', 'coordinate navigation', 'coordinate input grammar', 'literal publication labels']) {
+  test(`qualification overlay preserves protected ${obligation} obligations`, (t) => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-oracle-obligations-'));
+    t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+    const e2eRoot = path.join(root, 'e2e');
+    const productRoot = path.join(root, 'product');
+    fs.cpSync(path.resolve('e2e'), e2eRoot, { recursive: true, filter: (source) => !source.includes('node_modules') });
+    fs.cpSync(path.resolve('web'), path.join(root, 'web'), { recursive: true });
+    fs.mkdirSync(path.join(root, 'src/browser'), { recursive: true });
+    fs.copyFileSync('src/browser/semantic-search.mjs', path.join(root, 'src/browser/semantic-search.mjs'));
+    writeOracleProduct(productRoot);
+    const specialLabel = "Quoted 'label' / path $& $' $`\nnext line";
+    if (obligation === 'literal publication labels') {
+      const semanticPath = path.join(productRoot, 'web/semantic-search/index.json');
+      const semantic = JSON.parse(fs.readFileSync(semanticPath));
+      semantic.records[0].label = specialLabel;
+      fs.writeFileSync(semanticPath, JSON.stringify(semantic));
+      for (const relative of ['data/creatures/search.json', 'data/creatures/chunks/f-7/fixture.json']) {
+        const file = path.join(productRoot, relative);
+        const data = JSON.parse(fs.readFileSync(file));
+        for (const record of data.records.filter((record) => record.kind === 'monster' && !record.outfit_presentation)) {
+          if (relative.includes('search')) record.label = specialLabel;
+          else record.name = specialLabel;
+        }
+        fs.writeFileSync(file, JSON.stringify(data));
+      }
+    }
+    const read = (relative) => fs.readFileSync(path.join(e2eRoot, 'tests', relative), 'utf8');
+    const originalAudit = read('audit-desktop.spec.mjs');
+    const originalVisuals = ['visual-desktop.spec.mjs', 'visual-mobile.spec.mjs'].map(read);
+    materializeQualificationFixtureOracleOverlay({ e2eRoot, productRoot });
+    if (obligation === 'screenshot baselines') {
+      ['visual-desktop.spec.mjs', 'visual-mobile.spec.mjs'].forEach((relative, index) => {
+        const baselines = (source) => [...source.matchAll(/\.toHaveScreenshot\('([^']+)'/g)].map((match) => match[1]);
+        const expected = baselines(originalVisuals[index]);
+        assert.ok(expected.length > 0);
+        assert.deepEqual(baselines(read(relative)), expected, `${relative} must retain every protected visual comparison`);
+      });
+    } else if (obligation === 'visible edge label') {
+      const source = read('creature-presentation-desktop.spec.mjs');
+      assert.ok(source.includes('expect(longLabel.suppressed).toBe(false);'));
+      assert.ok(source.includes("assertCssRect(longLabel.rect, await viewportSize(page), 'long-name edge label');"));
+      assert.ok(!source.includes('expect(longLabel.rect).toBeNull();'));
+    } else if (obligation === 'literal publication labels') {
+      const source = read('creature-interaction-desktop.spec.mjs');
+      assert.ok(source.includes(`label: ${JSON.stringify(specialLabel)},`), 'publication label must be one serialized JavaScript string');
+      assert.ok(source.includes(`.toContainText(${JSON.stringify(specialLabel)})`));
+      for (const relative of ['desktop.spec.mjs', 'mobile.spec.mjs', 'creature-interaction-desktop.spec.mjs']) {
+        const result = spawnSync(process.execPath, ['--check', path.join(e2eRoot, 'tests', relative)], { encoding: 'utf8' });
+        assert.equal(result.status, 0, result.stderr);
+      }
+    } else if (obligation === 'coordinate input grammar') {
+      for (const relative of ['audit-desktop.spec.mjs', 'state-desktop.spec.mjs']) {
+        assert.match(read(relative), /\.fill\('\d+ \d+ -?\d+'\)/, `${relative} must still exercise unkeyed coordinate input`);
+      }
+      assert.ok(read('race-desktop.spec.mjs').includes('.fill(`${x} ${y} ${floor}`)'));
+    } else {
+      const source = read('audit-desktop.spec.mjs');
+      const count = (text, literal) => text.split(literal).length - 1;
+      assert.equal(count(source, 'await gotoAtlas('), count(originalAudit, 'await gotoAtlas('), 'the oracle must not repair a failed user navigation');
+      assert.equal(count(source, ".fill('')"), count(originalAudit, ".fill('')"), 'the oracle must not hide search results by clearing the input');
+    }
+  });
+}

@@ -158,33 +158,51 @@ jobs:
           rm -rf "$source_root" "$trust_dir"
           mkdir -p "$source_root" "$trust_dir"
           chmod 0777 "$source_root" "$trust_dir"
+          build="$RUNNER_TEMP/atlas-qualification-repair-product-build.mjs"
+          cat > "$build" <<'NODE'
+          import { buildQualificationWorld } from '/candidate/tools/verification/qualification-world.mjs';
+          await buildQualificationWorld('/out/product');
+          NODE
+          timeout --signal=KILL 180s docker run --rm \
+            --network none --read-only --cap-drop ALL --security-opt no-new-privileges \
+            --pids-limit 192 --memory 1024m --cpus 2 --user 1000:1000 \
+            --tmpfs /tmp:rw,nosuid,nodev,size=128m \
+            --mount "type=bind,src=$execution_context,dst=/candidate,readonly" \
+            --mount "type=bind,src=$build,dst=/build.mjs,readonly" \
+            --mount "type=bind,src=$source_root,dst=/out" \
+            "$ATLAS_CANDIDATE_IMAGE" node /build.mjs
+
+          # The candidate container has terminated. Only protected code runs
+          # here, with rebuilt bytes read-only and a separate trust output.
+          test -d "$source_root/product"
+          test ! -L "$source_root/product"
+          test -f "$source_root/product/fixture-manifest.json"
+          test ! -L "$source_root/product/fixture-manifest.json"
           proof="$RUNNER_TEMP/atlas-qualification-repair-product-proof.mjs"
           cat > "$proof" <<'NODE'
           import fs from 'node:fs';
           import { resolveFullWorldTrust } from '/trusted/src/browser/fullworld-trust.mjs';
           import { independentlyVerifyQualificationProduct } from '/trusted/tools/verification/qualification-repair-policy.mjs';
-          import { buildQualificationWorld, qualificationTrustDescriptor } from '/candidate/tools/verification/qualification-world.mjs';
-          await buildQualificationWorld('/out/product');
-          const manifest = JSON.parse(fs.readFileSync('/out/product/fixture-manifest.json', 'utf8'));
-          const independent = independentlyVerifyQualificationProduct('/out/product', manifest);
+          import { qualificationTrustDescriptor } from '/trusted/tools/verification/qualification-world.mjs';
+          const manifest = JSON.parse(fs.readFileSync('/product/fixture-manifest.json', 'utf8'));
+          const independent = independentlyVerifyQualificationProduct('/product', manifest);
           const descriptor = qualificationTrustDescriptor(manifest);
           const trust = resolveFullWorldTrust({ __OTERYN_ATLAS_QUALIFICATION_TRUST__: descriptor });
           if (descriptor.dataCapability !== 'qualification_fixture' || trust.qualificationFixtureId !== descriptor.fixtureId || trust.qualificationProductDigest !== independent.productDigest) {
             throw new TypeError('protected trust rejected independently verified qualification repair fixture');
           }
-          fs.writeFileSync('/out/qualification_fixture.json', `${JSON.stringify(descriptor)}\n`, 'utf8');
+          fs.writeFileSync('/trust/qualification_fixture.json', `${JSON.stringify(descriptor)}\n`, { encoding: 'utf8', flag: 'wx' });
           NODE
           timeout --signal=KILL 180s docker run --rm \
             --network none --read-only --cap-drop ALL --security-opt no-new-privileges \
             --pids-limit 192 --memory 1024m --cpus 2 --user 1000:1000 \
             --tmpfs /tmp:rw,nosuid,nodev,size=128m \
             --mount "type=bind,src=$PWD/trusted-base,dst=/trusted,readonly" \
-            --mount "type=bind,src=$execution_context,dst=/candidate,readonly" \
             --mount "type=bind,src=$proof,dst=/proof.mjs,readonly" \
-            --mount "type=bind,src=$source_root,dst=/out" \
+            --mount "type=bind,src=$source_root/product,dst=/product,readonly" \
+            --mount "type=bind,src=$trust_dir,dst=/trust" \
             "$ATLAS_CANDIDATE_IMAGE" node /proof.mjs
-          test -s "$source_root/qualification_fixture.json"
-          mv "$source_root/qualification_fixture.json" "$trust_path"
+          test -s "$trust_path"
           REBUILT_DIGEST="$(jq -er '.productDigest' "$trust_path")" node --input-type=module <<'NODE'
           import fs from 'node:fs';
           import { validateQualificationRepairProductRepin } from './trusted-base/tools/verification/qualification-repair-policy.mjs';
@@ -359,6 +377,16 @@ jobs:
             -f trusted-base/e2e/compose.github-hosted.yml \
             run --rm e2e \
             bash -lc 'exec ./node_modules/.bin/playwright test --config=playwright.config.mjs --test-list=/run/atlas-protected-test-list.txt --workers=1 --retries=0'
+          SUMMARY_PATH="$artifacts/summary.json" TEST_LIST="$qualification_list" node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import { validateQualificationRepairCensus } from './trusted-base/tools/verification/qualification-repair-policy.mjs';
+          const result = validateQualificationRepairCensus({
+            summary: JSON.parse(fs.readFileSync(process.env.SUMMARY_PATH, 'utf8')),
+            protectedTestList: fs.readFileSync(process.env.TEST_LIST, 'utf8'),
+            candidateHeadSha: process.env.ATLAS_CODE_REVISION,
+          });
+          console.log(JSON.stringify(result));
+          NODE
 
       - name: Fence exact head and publish generic protected qualification evidence
         shell: bash
