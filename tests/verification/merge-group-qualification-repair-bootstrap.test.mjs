@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import vm from 'node:vm';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const WORKFLOW = fs.readFileSync(path.join(ROOT, '.github/workflows/merge-group-gate.yml'), 'utf8');
@@ -39,11 +41,36 @@ test('one-shot bootstrap is bound to pre-328 protected authority bytes and retir
     ['tools/verification/qualification-repair-policy.mjs', '4c49d2ed861d4928bf869aeb35f43215c31a42d4'],
   ]);
   for (const [relative, sha] of expected) {
-    const literal = `[${JSON.stringify(relative).replaceAll('"', "'")}, ${JSON.stringify(sha).replaceAll('"', "'")}]`;
+    const literal = `'${relative}': '${sha}'`;
     assert.ok(oneShot.includes(literal), `${relative} pre-328 authority pin must be exact`);
   }
-  assert.match(oneShot, /for \(const \[relative, expectedBlob\] of expectedProtectedAuthority\)/);
-  assert.match(oneShot, /gitBlobFile\(path\.join\('trusted-base', relative\)\) !== expectedBlob/);
+  const start = oneShot.indexOf('const read = ');
+  const end = oneShot.indexOf('const exactOne = ', start);
+  assert.ok(start >= 0 && end > start, 'protected authority validation must be executable');
+  const authorityCheck = oneShot.slice(start, end);
+  // Exercise the actual workflow hash/loop with controlled file I/O. The
+  // expected Git blob was independently computed for "protected authority\n".
+  const fixtureText = 'protected authority\n';
+  const fixtureBlob = '77e48505023c9e47f0b2b9142b5b355d7875cda0';
+  const verify = (changedPath = null) => {
+    const reads = [];
+    vm.runInNewContext(authorityCheck, {
+      crypto, Buffer,
+      protectedAuthorityBlobs: Object.fromEntries([...expected.keys()].map((relative) => [relative, fixtureBlob])),
+      fs: { readFileSync(file, encoding) {
+        assert.equal(encoding, 'utf8');
+        assert.ok([...expected.keys()].some((relative) => file === `trusted-base/${relative}`));
+        reads.push(file);
+        return file === `trusted-base/${changedPath}` ? `${fixtureText}!` : fixtureText;
+      } },
+    }, { timeout: 1000 });
+    assert.deepEqual(reads, [...expected.keys()].map((relative) => `trusted-base/${relative}`));
+  };
+  assert.doesNotThrow(() => verify());
+  for (const relative of expected.keys()) {
+    assert.throws(() => verify(relative), (error) =>
+      error.name === 'TypeError' && error.message === `protected bootstrap authority advanced: ${relative}`);
+  }
   assert.match(oneShot, /throw new TypeError\(`protected bootstrap authority advanced: \$\{relative\}`\)/);
 });
 
