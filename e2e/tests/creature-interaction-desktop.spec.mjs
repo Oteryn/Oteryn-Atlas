@@ -1,3 +1,4 @@
+const __atlasQualification = process.env.ATLAS_E2E_DATA_CAPABILITY === 'qualification_fixture';
 import { expect, test } from '@playwright/test';
 import {
   DESKTOP_ENTRY,
@@ -31,13 +32,13 @@ function targetEntry(record, zoom = 2) {
 
 const OVERLAP_MONSTER_FIXTURE = Object.freeze({
   kind: 'monster',
-  label: 'Misguided Thief',
-  record_id: 'monster:014cc0368c5989dd788e2af63e087e83',
-  position: Object.freeze({ floor: -10, x: 32522, y: 32419 }),
+  label: (__atlasQualification ? "Fixture Raider One" : 'Misguided Thief'),
+  record_id: (__atlasQualification ? "monster:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" : 'monster:014cc0368c5989dd788e2af63e087e83'),
+  position: Object.freeze((__atlasQualification ? {"floor":-7,"x":32283,"y":32158} : { floor: -10, x: 32522, y: 32419 })),
   record_ids: Object.freeze([
-    'monster:014cc0368c5989dd788e2af63e087e83',
-    'monster:6c316dffde0b35aa6a9165eb46694374',
-    'monster:7a7d419f84cf4eac5cad81f7cb266dae',
+    (__atlasQualification ? "monster:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" : 'monster:014cc0368c5989dd788e2af63e087e83'),
+    (__atlasQualification ? "monster:cccccccccccccccccccccccccccccccc" : 'monster:6c316dffde0b35aa6a9165eb46694374'),
+    (__atlasQualification ? "monster:dddddddddddddddddddddddddddddddd" : 'monster:7a7d419f84cf4eac5cad81f7cb266dae'),
   ]),
 });
 
@@ -139,7 +140,7 @@ test('desktop monster activation opens Monster spawn card and survives canonical
   await expect.poll(() => page.evaluate(() => globalThis.__OTERYN_ATLAS_CREATURES__?.cardState)).toBe('chooser');
   const choices = page.locator('#creature-card-choices button');
   expect(await choices.count()).toBeGreaterThanOrEqual(3);
-  await expect(choices.first()).toContainText('Misguided Thief');
+  await expect(choices.first()).toContainText((__atlasQualification ? "Fixture Raider One" : 'Misguided Thief'));
   await choices.first().click();
   expect(OVERLAP_MONSTER_FIXTURE.record_ids).toContain((await creatureState(page)).cardRecordId);
   await expect(page.locator('#creature-card-kind')).toHaveText('Monster spawn');

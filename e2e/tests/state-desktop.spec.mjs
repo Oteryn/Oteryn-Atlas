@@ -1,3 +1,4 @@
+const __atlasQualification = process.env.ATLAS_E2E_DATA_CAPABILITY === 'qualification_fixture';
 import { expect, test } from '@playwright/test';
 import {
   DESKTOP_ENTRY,
@@ -44,31 +45,31 @@ test('desktop coordinate replace-state, reload and browser history remain cohere
   await waitForAtlas(page);
   const historyLength = await page.evaluate(() => history.length);
 
-  await page.locator('#search-input').fill('32380 32250 -7');
+  await page.locator('#search-input').fill((__atlasQualification ? "32240 32112 -7" : '32380 32250 -7'));
   await page.locator('#search-form button[type="submit"]').click();
-  await expect.poll(() => new URL(page.url()).searchParams.get('x')).toBe('32380');
+  await expect.poll(() => new URL(page.url()).searchParams.get('x')).toBe((__atlasQualification ? "32240" : '32380'));
   expect(await page.evaluate(() => history.length)).toBe(historyLength);
 
   await page.reload({ waitUntil: 'domcontentloaded' });
   await waitForAtlas(page);
-  expect(new URL(page.url()).searchParams.get('x')).toBe('32380');
+  expect(new URL(page.url()).searchParams.get('x')).toBe((__atlasQualification ? "32240" : '32380'));
 
   const second = new URL(page.url());
-  second.searchParams.set('x', '32390');
-  second.searchParams.set('y', '32260');
+  second.searchParams.set('x', (__atlasQualification ? "32272" : '32390'));
+  second.searchParams.set('y', (__atlasQualification ? "32112" : '32260'));
   await gotoAtlas(page, second.href);
   await waitForAtlas(page);
-  expect(new URL(page.url()).searchParams.get('x')).toBe('32390');
+  expect(new URL(page.url()).searchParams.get('x')).toBe((__atlasQualification ? "32272" : '32390'));
 
   await page.goBack({ waitUntil: 'domcontentloaded' });
   await waitForAtlas(page);
-  expect(new URL(page.url()).searchParams.get('x')).toBe('32380');
+  expect(new URL(page.url()).searchParams.get('x')).toBe((__atlasQualification ? "32240" : '32380'));
 
   await page.goForward({ waitUntil: 'domcontentloaded' });
   await waitForAtlas(page);
   const forward = new URL(page.url());
-  expect(forward.searchParams.get('x')).toBe('32390');
-  expect(forward.searchParams.get('y')).toBe('32260');
+  expect(forward.searchParams.get('x')).toBe((__atlasQualification ? "32272" : '32390'));
+  expect(forward.searchParams.get('y')).toBe((__atlasQualification ? "32112" : '32260'));
   expect(forward.searchParams.get('floor')).toBe('-7');
   assertNoRuntimeFailures(runtime);
 });

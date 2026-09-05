@@ -1,3 +1,4 @@
+const __atlasQualification = process.env.ATLAS_E2E_DATA_CAPABILITY === 'qualification_fixture';
 import { expect, test } from '@playwright/test';
 
 import { analyzeGeometryEventLog, compareCreatureAnchors } from '../support/geometry-oracle.mjs';
@@ -10,7 +11,7 @@ import {
 } from '../support/diagnostics.mjs';
 import { assertNoRuntimeFailures, captureRuntimeFailures, gotoAtlas } from './runtime.mjs';
 
-const ENTRY = '/web/fullworld.html?x=32361&y=32198&floor=-7&zoom=2&mode=map&animation=off&creatures=npc&npcRole=shop';
+const ENTRY = (__atlasQualification ? "/web/fullworld.html?x=32280&y=32155&floor=-7&zoom=2&mode=map&animation=off&creatures=npc&npcRole=shop" : '/web/fullworld.html?x=32361&y=32198&floor=-7&zoom=2&mode=map&animation=off&creatures=npc&npcRole=shop');
 const TOLERANCE_PX = 0.25;
 
 async function resizeAndAlign(page, width, height) {
