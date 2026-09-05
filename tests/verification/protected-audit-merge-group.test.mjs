@@ -26,3 +26,9 @@ test('MQ audit validates exact synthetic candidate before Python and rereads com
 for(const fault of ['event','repository','baseRef','head','action','validation','fileDrift','treeDrift'])test(`MQ audit rejects ${fault} without publication`,()=>{
  const {calls,error}=execute(fault);assert.ok(error);assert.ok(!calls.includes('publish'));if(!fault.endsWith('Drift'))assert.ok(!calls.includes('python'));
 });
+
+test('mandatory audit never treats rejected identities as skipped or supersedes an in-flight required run',()=>{
+ const workflow=fs.readFileSync(new URL('../../.github/workflows/merge-authority-audit.yml',import.meta.url),'utf8');
+ assert.doesNotMatch(workflow,/^    if:/m);
+ assert.match(workflow,/cancel-in-progress: false/);
+});

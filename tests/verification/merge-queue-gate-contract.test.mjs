@@ -48,10 +48,10 @@ test('protected-base audit validates inert candidate against immutable authority
   const policy = readText(new URL('../../tools/verification/protected-admission-policy.mjs', import.meta.url));
   assert.match(audit, /pull_request_target:/);
   assert.match(audit, /merge_group:\n\s+types: \[checks_requested\]/);
-  assert.match(audit, /github\.event\.merge_group\.head_sha == github\.sha/);
+  assert.match(runner, /env\.GITHUB_SHA!==env\.ATLAS_CODE_REVISION/);
   assert.match(runner, /gitChangedFiles\(candidateRoot,options\.baseSha,options\.headSha\)/);
   assert.match(runner, /prNumber:queue\?null:Number/);
-  assert.match(audit, /github\.event\.pull_request\.base\.ref == github\.event\.repository\.default_branch/);
+  assert.match(runner, /env\.ATLAS_BASE_REF!==env\.ATLAS_DEFAULT_BRANCH/);
   assert.match(audit, /permissions: \{\}/);
   assert.match(audit, /contents: read/);
   assert.match(audit, /pull-requests: read/);
