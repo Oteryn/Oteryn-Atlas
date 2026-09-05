@@ -21,19 +21,14 @@ function timeoutMinutes(job, name) {
 
 test('Issue #314: protected hosted gate wait budget covers the producer critical path', () => {
   const ci = fs.readFileSync(path.join(ROOT, '.github/workflows/ci.yml'), 'utf8');
-  const executor = fs.readFileSync(path.join(ROOT, '.github/workflows/protected-hosted-executor.yml'), 'utf8');
+  const executor = fs.readFileSync(path.join(ROOT, '.github/workflows/protected-admission.yml'), 'utf8');
 
-  const producerCriticalPathMinutes = [
-    'preflight',
-    'environment-qualification',
-    'hosted-shards',
-    'fan-in',
-  ].reduce((total, name) => total + timeoutMinutes(workflowJob(executor, name), name), 0);
+  const producerCriticalPathMinutes = ['resolve-candidate', 'protected-admission'].reduce((sum, name) => sum + timeoutMinutes(workflowJob(executor, name), name), 0);
 
   const consumer = workflowJob(ci, 'verification-browser');
   const consumerTimeoutMinutes = timeoutMinutes(consumer, 'verification-browser');
   const attemptsMatch = consumer.match(/for attempt in \{1\.\.(\d+)\}; do/);
-  const sleepMatch = consumer.match(/\(\( attempt < \d+ \)\) && sleep (\d+)/);
+  const sleepMatch = consumer.match(/if \(\( attempt < \d+ \)\); then sleep (\d+); fi/);
   assert(attemptsMatch, 'verification-browser must declare a bounded polling attempt count');
   assert(sleepMatch, 'verification-browser must declare a bounded polling interval');
 
@@ -52,21 +47,12 @@ test('Issue #314: protected hosted gate wait budget covers the producer critical
   );
 });
 
-test('Issue #314: every hosted polling iteration checks exact generic qualification before standard fan-in', () => {
+test('Issue #314: each bounded polling iteration invokes the exact protected consumer and fails closed', () => {
   const ci = fs.readFileSync(path.join(ROOT, '.github/workflows/ci.yml'), 'utf8');
   const consumer = workflowJob(ci, 'verification-browser');
-  const attemptsMatch = consumer.match(/for attempt in \{1\.\.(\d+)\}; do/);
-  assert(attemptsMatch, 'verification-browser must declare a bounded polling loop');
-
-  const loopStart = consumer.indexOf(attemptsMatch[0]);
-  const helperStart = consumer.indexOf('accept_generic_repair() {');
-  const statusQuery = consumer.indexOf('commits/$ATLAS_CODE_REVISION/statuses?per_page=100', helperStart);
-  const loopCall = consumer.indexOf('if accept_generic_repair; then', loopStart);
-  const artifactQuery = consumer.indexOf('actions/artifacts?name=$expected_name&per_page=100', loopStart);
-
-  assert(helperStart >= 0 && helperStart < loopStart, 'generic repair validator must be defined before polling');
-  assert(statusQuery > helperStart && statusQuery < loopStart, 'generic repair helper must refresh exact-head commit status');
-  assert(loopCall > loopStart, 'generic repair helper must run inside every polling iteration');
-  assert(artifactQuery > loopCall, 'generic repair evidence must be checked before standard hosted fan-in each iteration');
-  assert.match(consumer.slice(loopCall, artifactQuery), /if accept_generic_repair; then\s+exit 0\s+fi/);
+  assert.match(consumer, /for attempt in \{1\.\.\d+\}; do[\s\S]*node admission-authority\/tools\/verification\/consume-protected-admission\.mjs/);
+  assert.match(consumer, /if jq -e '\.accepted == true'[\s\S]*then exit 0; fi/);
+  assert.match(consumer, /jq -e '\.eligible == true'/);
+  assert.match(consumer, /evidence is unavailable[\s\S]*exit 1/);
+  assert.doesNotMatch(consumer, /accept_generic_repair|validateLegacyTransition|commits\/.*statuses/);
 });

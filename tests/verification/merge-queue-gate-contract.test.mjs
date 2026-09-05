@@ -15,10 +15,8 @@ function gitBlobSha(text) {
 const mergeAuthorityAuditUrl = new URL('../../.github/workflows/merge-authority-audit.yml', import.meta.url);
 const mergeGroupGateUrl = new URL('../../.github/workflows/merge-group-gate.yml', import.meta.url);
 const prCiUrl = new URL('../../.github/workflows/ci.yml', import.meta.url);
-const provenanceMapUrl = new URL('../../docs/migration/legacy-atlas-extraction-provenance.json', import.meta.url);
 const provenanceWorkflow = new URL('../../.github/workflows/extraction-provenance.yml', import.meta.url);
 const provenanceVerifierUrl = new URL('../../tools/governance/verify_extraction_provenance.py', import.meta.url);
-const provenanceTestUrl = new URL('../../tools/governance/test_verify_extraction_provenance.py', import.meta.url);
 
 test('Merge Queue authority is exact-blob pinned and emits only atlas-gate', () => {
   assert.equal(fs.existsSync(provenanceWorkflow), false, 'separate provenance gate must remain retired');
@@ -37,53 +35,37 @@ test('Merge Queue authority is exact-blob pinned and emits only atlas-gate', () 
   assert.match(workflow, /BASE_SHA: \$\{\{ github\.event\.merge_group\.base_sha \|\| '' \}\}/);
   assert.match(workflow, /HEAD_SHA: \$\{\{ github\.event\.merge_group\.head_sha \|\| '' \}\}/);
   assert.match(workflow, /HEAD_SHA.*GITHUB_SHA_VALUE/);
-  assert.match(workflow, /refs\/heads\/main/);
+  assert.match(workflow, /refs\/heads\/\*/);
   assert.match(workflow, /verify_extraction_provenance\.py/);
-  assert.match(workflow, /test_verify_extraction_provenance\.py/);
+  const executor = readText(new URL('../../tools/verification/run-protected-merge-group.mjs', import.meta.url));
+  assert.match(executor, /validateProtectedExecutionCandidate[\s\S]*python3/);
   assert.doesNotMatch(workflow, /provenance-gate/);
 });
 
-test('protected-base audit owns Atlas merge-authority pins outside candidate checkout', () => {
-  assert.equal(fs.existsSync(mergeAuthorityAuditUrl), true, 'protected-base merge-authority audit must exist');
-
+test('protected-base audit validates inert candidate against immutable authority and exact workflow renderer', () => {
   const audit = readText(mergeAuthorityAuditUrl);
-  const expectedPins = [
-    ['EXPECTED_PR_CI_BLOB', gitBlobSha(readText(prCiUrl))],
-    ['EXPECTED_MERGE_GROUP_GATE_BLOB', gitBlobSha(readText(mergeGroupGateUrl))],
-    ['EXPECTED_PROVENANCE_VERIFIER_BLOB', gitBlobSha(readText(provenanceVerifierUrl))],
-    ['EXPECTED_PROVENANCE_TEST_BLOB', gitBlobSha(readText(provenanceTestUrl))],
-    ['EXPECTED_PROVENANCE_MAP_BLOB', gitBlobSha(readText(provenanceMapUrl))],
-  ];
-
-  assert.match(audit, /pull_request_target:\s*\n\s*branches:\s*\n\s*- main/);
-  assert.match(audit, /permissions:\s*\{\}/);
-  assert.match(audit, /contents:\s*read/);
-  assert.match(audit, /pull-requests:\s*read/);
-  assert.doesNotMatch(audit, /^\s*uses:\s*actions\/checkout@/m);
-  for (const [name, blob] of expectedPins) {
-    assert.match(audit, new RegExp(`${name}:\\s*["']${blob}["']`));
-  }
-  assert.match(audit, /candidate modifies the protected-base audit itself/);
-  assert.match(audit, /read_candidate_text/);
-  assert.match(audit, /actual_blob != expected_blob/);
-  assert.match(audit, /expected_atlas_gate_paths/);
-  assert.match(audit, /\.github\/workflows\/ci\.yml/);
-  assert.match(audit, /\.github\/workflows\/merge-group-gate\.yml/);
-  assert.match(audit, /tools\/governance\/test_verify_extraction_provenance\.py/);
-  assert.match(audit, /provenance_gate_paths/);
-  assert.match(audit, /governance_prefix\s*=\s*['"]tools\/governance\//);
-  assert.match(audit, /path\.startsWith\(governance_prefix\)|path\.startswith\(governance_prefix\)/);
-  assert.match(audit, /unpinned_governance/);
-  assert.match(audit, /unpinned Python import authority/);
-  assert.match(audit, /\/git\/commits\/\{expected_head\}/);
-  assert.match(audit, /candidate_tree_sha/);
-  assert.match(audit, /\/git\/trees\/\{candidate_tree_sha\}\?recursive=1/);
-  assert.match(audit, /candidate tree enumeration is truncated/);
-  assert.match(audit, /entry\.get\('type'\) != 'blob'/);
-  assert.match(audit, /entry\.get\('mode'\) != '100644'/);
-  assert.match(audit, /regular non-symlink blob/);
-  assert.match(audit, /pinned control-plane tree entry drift/);
-  assert.doesNotMatch(audit, /^\s*(?:contents|pull-requests|actions|checks|statuses|id-token):\s*write\s*$/m);
+  const runner = readText(new URL('../../tools/verification/run-protected-authority-audit.mjs', import.meta.url));
+  const policy = readText(new URL('../../tools/verification/protected-admission-policy.mjs', import.meta.url));
+  assert.match(audit, /pull_request_target:/);
+  assert.match(audit, /merge_group:\n\s+types: \[checks_requested\]/);
+  assert.match(runner, /env\.GITHUB_SHA!==env\.ATLAS_CODE_REVISION/);
+  assert.match(runner, /gitChangedFiles\(candidateRoot,options\.baseSha,options\.headSha\)/);
+  assert.match(runner, /prNumber:queue\?null:Number/);
+  assert.match(runner, /env\.ATLAS_BASE_REF!==env\.ATLAS_DEFAULT_BRANCH/);
+  assert.match(audit, /permissions: \{\}/);
+  assert.match(audit, /contents: read/);
+  assert.match(audit, /pull-requests: read/);
+  assert.match(audit, /ref: \$\{\{ github\.event\.pull_request\.base\.sha \|\| github\.event\.merge_group\.base_sha \}\}[\s\S]*path: trusted-base/);
+  assert.match(audit, /ref: \$\{\{ github\.event\.pull_request\.head\.sha \|\| github\.event\.merge_group\.head_sha \}\}[\s\S]*path: candidate/);
+  assert.equal((audit.match(/persist-credentials: false/g) ?? []).length, 2);
+  assert.match(audit, /node trusted-base\/tools\/verification\/run-protected-authority-audit\.mjs "\$PWD\/trusted-base" "\$PWD\/candidate"/);
+  assert.doesNotMatch(audit, /node candidate\/|python candidate\/|(?:contents|pull-requests|actions|checks|statuses|id-token):\s*write/);
+  assert.match(runner, /validateProtectedExecutionCandidate\(\{protectedRoot,candidateRoot,currentCandidate:candidate\}\)/);
+  assert.match(runner, /assertSameCandidate\(candidate,await snapshot\(\)\)/);
+  assert.match(policy, /validateProtectedWorkflowTransition\(\{protectedSources:workflowSources\(protectedRoot\),candidateSources:workflowSources\(candidateRoot\)/);
+  assert.match(policy, /immutable execution authority/);
+  assert.match(policy, /stat\.isSymbolicLink\(\)/);
+  assert.match(policy, /100644 blob/);
 });
 
 test('candidate executable checks cannot mutate the atlas-gate runner state', () => {
@@ -110,25 +92,17 @@ test('candidate executable checks cannot mutate the atlas-gate runner state', ()
   assert.doesNotMatch(gate, /tests\/verification\/\*\.test\.mjs/);
 });
 
-test('one-shot PR 303 merge-group bootstrap consumes exact protected heavy proof and cannot widen to other queues', () => {
+test('Merge Queue uses the same exact evidence consumer as PR with no historical bootstrap exception', () => {
   const workflow = readText(mergeGroupGateUrl);
+  const prCi = readText(prCiUrl);
   const gate = workflow.slice(workflow.indexOf('  atlas-gate:'));
-
   assert.match(workflow, /permissions:\s*\n\s*contents:\s*read\s*\n\s*actions:\s*read\s*\n\s*pull-requests:\s*read/);
-  assert.match(gate, /name:\s*Validate one-shot PR 303 merge-group bootstrap proof/);
-  assert.match(gate, /ATLAS_LEGACY_CUTOVER_BASE_SHA:\s*e31015d0880e9f81a4b96f990658490af45e8fa6/);
-  assert.match(gate, /ATLAS_LEGACY_CUTOVER_PR_NUMBER:\s*['"]303['"]/);
-  assert.match(gate, /ATLAS_LEGACY_CUTOVER_HEAD_REF:\s*feat\/issue-179-legacy-transition-qualifier/);
-  assert.match(gate, /refs\/heads\/gh-readonly-queue\/main\/pr-\$ATLAS_LEGACY_CUTOVER_PR_NUMBER-\$ATLAS_LEGACY_CUTOVER_BASE_SHA/);
-  assert.match(gate, /validateLegacyTransitionMergeGroupBootstrapGate/);
-  assert.match(gate, /legacy-molehill-transition-qualification\.yml/);
-  assert.match(gate, /git\/commits\/\$ATLAS_CODE_REVISION/);
-  assert.match(gate, /git\/commits\/\$candidate_head_sha/);
-  assert.match(gate, /branches\/main/);
-  assert.match(gate, /use_legacy_proof=true/);
-  assert.match(gate, /producer_run_id=/);
-  assert.match(gate, /Prove complete protected-base browser qualification for synthetic candidate[\s\S]*if:\s*\$\{\{\s*steps\.legacy-bootstrap\.outputs\.use_legacy_proof != 'true'\s*\}\}/);
-  assert.doesNotMatch(gate, /atlas-local-e2e/);
+  assert.match(gate, /node trusted-base\/tools\/verification\/consume-protected-admission\.mjs/);
+  assert.match(prCi, /node admission-authority\/tools\/verification\/consume-protected-admission\.mjs/);
+  assert.match(gate, /ATLAS_CODE_REVISION: \$\{\{ github\.event\.merge_group\.head_sha \}\}/);
+  assert.match(gate, /ATLAS_PROTECTED_BASE_SHA: \$\{\{ github\.event\.merge_group\.base_sha \}\}/);
+  assert.match(gate, /if: steps\.generic-admission\.outputs\.admission_accepted != 'true'/);
+  assert.doesNotMatch(gate, /ATLAS_LEGACY_CUTOVER|legacy-bootstrap|validateLegacyTransition|use_legacy_proof|atlas-local-e2e|pr-303|one-shot PR/);
 });
 
 test('atlas-gate fully browser-qualifies the exact synthetic candidate with protected-base harness', () => {
@@ -142,19 +116,21 @@ test('atlas-gate fully browser-qualifies the exact synthetic candidate with prot
   assert.match(workflow, /name: Check out exact protected merge-group base/);
   assert.match(workflow, /ref: \$\{\{ github\.event\.merge_group\.base_sha \}\}/);
   assert.match(workflow, /path:\s*trusted-base/);
-  assert.match(workflow, /buildQualificationWorld/);
-  assert.match(workflow, /qualificationTrustDescriptor/);
-  assert.match(workflow, /trusted-base\/tools\/verification\/verification-catalog\.json/);
-  assert.match(workflow, /e2e\.full/);
-  assert.match(workflow, /trusted-base\/e2e\/compose\.protected-hosted-executor\.yml/);
-  assert.match(workflow, /trusted-base\/e2e\/compose\.github-hosted\.yml/);
-  assert.match(workflow, /ATLAS_EXECUTION_CONTEXT/);
-  assert.match(workflow, /ATLAS_PROTECTED_TEST_LIST/);
-  assert.match(workflow, /ATLAS_CODE_REVISION/);
-  assert.match(workflow, /ATLAS_E2E_WORKERS:\s*['"]1['"]/);
-  assert.match(workflow, /ATLAS_E2E_SHARD:\s*['"]1\/1['"]/);
-  assert.match(workflow, /--retries=0/);
-  assert.match(workflow, /compose run --no-deps --rm e2e/);
+  const executor = readText(new URL('../../tools/verification/run-protected-merge-group.mjs', import.meta.url));
+  const producer = readText(new URL('../../tools/verification/run-protected-admission.mjs', import.meta.url));
+  assert.match(workflow, /node trusted-base\/tools\/verification\/run-protected-merge-group\.mjs/);
+  assert.match(executor, /GITHUB_EVENT_NAME!=='merge_group'/);
+  assert.match(executor, /readCandidateSnapshot/);
+  assert.match(executor, /validateProtectedExecutionCandidate/);
+  assert.match(executor, /executeProtectedCandidateProof\(\{protectedRoot,candidateRoot,outputRoot,candidate,admission\}\)/);
+  assert.match(executor, /assertSameCandidate\(candidate,await readCandidateSnapshot/);
+  assert.match(producer, /evaluateProtectedRouting/);
+  assert.match(producer, /runtime browser list differs from protected stable census/);
+  assert.match(producer, /validateBrowserSummary/);
+  assert.match(producer, /--workers=1 --retries=0/);
+  assert.match(producer, /protected execution lower bounds invalid/);
+  assert.match(producer, /hostedPartitions/);
+  assert.match(producer, /'qualification_fixture','bounded_real_world'/);
   assert.match(workflow, /runs-on:\s*ubuntu-24\.04/);
   assert.doesNotMatch(workflow, /runs-on:\s*\[[^\]]*(?:oteryn-atlas-pc|synology)[^\]]*\]/i);
   assert.doesNotMatch(workflow, /dataCapability:\s*real_fullworld|ATLAS_DATA_CAPABILITY:\s*real_fullworld/i);

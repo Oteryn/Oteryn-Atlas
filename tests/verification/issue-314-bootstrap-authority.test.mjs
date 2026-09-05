@@ -56,7 +56,8 @@ test('Issue #314 bootstrap: generic repair authority is protected and branch agn
   assert.equal(paths.has('tools/verification/qualification-repair-policy.mjs'), true);
 
   const workflow = fs.readFileSync(path.join(ROOT, '.github/workflows/protected-qualification-repair.yml'), 'utf8');
-  assert.match(workflow, /pull_request_target:/);
+  assert.match(workflow, /workflow_dispatch:/);
+  assert.doesNotMatch(workflow, /pull_request_target:/);
   assert.match(workflow, /runs-on:\s*ubuntu-24\.04/);
   assert.match(workflow, /--network none/);
   assert.match(workflow, /--read-only/);

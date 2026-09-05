@@ -15,11 +15,14 @@ test('main advances actively dispatch bounded compatibility evaluation for every
   const dispatcherPath = new URL('../../.github/workflows/protected-base-advance-dispatcher.yml', import.meta.url);
   assert.equal(fs.existsSync(dispatcherPath), true);
   const dispatcher = fs.readFileSync(dispatcherPath, 'utf8').replace(/\r\n/g, '\n');
-  assert.match(dispatcher, /push:[\s\S]*branches:\s*\[main\]/);
+  assert.match(dispatcher, /push:/);
   assert.match(dispatcher, /actions:\s*write/);
   assert.match(dispatcher, /pull-requests:\s*read/);
-  assert.match(dispatcher, /state=open[^\n]*base=main/);
-  assert.match(dispatcher, /protected-verification-controller\.yml/);
+  assert.match(dispatcher, /pr\.base\?\.ref === process\.env\.ATLAS_DEFAULT_BRANCH/);
+  assert.match(dispatcher, /protected-admission\.yml/);
+  assert.match(dispatcher, /github\.ref == format/);
+  assert.match(dispatcher, /github\.event\.repository\.default_branch/);
+  assert.match(dispatcher, /head_sha=\$head_sha/);
   assert.match(dispatcher, /pr_number/);
   assert.match(controller, /workflow_dispatch:[\s\S]*pr_number:/);
   assert.match(controller, /Resolve exact PR lifecycle identity/);
@@ -57,13 +60,13 @@ test('executor makes lifecycle decisions before expensive work and persists a st
   assert.match(executor, /reuseEvidenceIds/);
 });
 
-test('executed and reused evidence use schema v2 and converge through one exact fan-in validator', () => {
+test('legacy hosted evidence retains its validator while PR consumes the protected semantic contract', () => {
   assert.match(executor, /evidenceSemanticDigest/);
   assert.match(executor, /evidenceSemanticDigests/);
   assert.match(executor, /buildProtectedWorkflowSuccessState/);
   assert.match(executor, /disposition.*EXECUTED|EXECUTED.*disposition/);
   assert.match(executor, /materializeProtectedWorkflowReuse/);
-  assert.match(ci, /validateProtectedHostedGate/);
+  assert.match(ci, /node admission-authority\/tools\/verification\/consume-protected-admission\.mjs/);
   assert.match(gate, /evidenceSemanticDigest/);
   assert.match(gate, /validateEvidenceManifest/);
 });

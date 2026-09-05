@@ -399,234 +399,39 @@ jobs:
       github.event_name == 'pull_request' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       needs.change-classification.outputs.requires_e2e == 'true'
-    needs:
-      - verification-node
-      - change-classification
+    needs: [verification-node, change-classification]
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 105
     permissions:
       contents: read
       actions: read
       pull-requests: read
-      statuses: read
     env:
       GH_TOKEN: ${{ github.token }}
       ATLAS_CODE_REVISION: ${{ github.event.pull_request.head.sha }}
       ATLAS_PROTECTED_BASE_SHA: ${{ github.event.pull_request.base.sha }}
       ATLAS_PR_NUMBER: ${{ github.event.pull_request.number }}
-      ATLAS_LEGACY_CUTOVER_BASE_SHA: e31015d0880e9f81a4b96f990658490af45e8fa6
-      ATLAS_LEGACY_CUTOVER_HEAD_REF: feat/issue-179-legacy-transition-qualifier
     steps:
-      - name: Check out exact Atlas candidate gate authority
+      - name: Check out protected generic admission authority
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event.pull_request.base.sha }}
           fetch-depth: 0
           persist-credentials: false
-
-      - name: Require exact protected hosted fan-in and lifecycle state bytes
-        id: validate
+          path: admission-authority
+      - name: Consume exact protected semantic evidence
         shell: bash
         run: |
           set -euo pipefail
-          test "$GITHUB_REPOSITORY" = Oteryn/Oteryn-Atlas
-          test "$(git rev-parse HEAD)" = "$ATLAS_CODE_REVISION"
-          if [[ "$ATLAS_PROTECTED_BASE_SHA" == "$ATLAS_LEGACY_CUTOVER_BASE_SHA" ]]; then
-            work=artifacts/protected-hosted-fan-in
-            mkdir -p "$work"
-            live_pr="$work/live-pr.json"
-            changed_files="$work/legacy-cutover-changed-files.txt"
-            gh api "repos/$GITHUB_REPOSITORY/pulls/$ATLAS_PR_NUMBER" > "$live_pr"
-            test "$(jq -r '.head.ref' "$live_pr")" = "$ATLAS_LEGACY_CUTOVER_HEAD_REF"
-            gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$ATLAS_PR_NUMBER/files?per_page=100" \
-              --jq '.[].filename' | sort > "$changed_files"
-            runs="$work/legacy-transition-runs.json"
-            gh api "repos/$GITHUB_REPOSITORY/actions/workflows/legacy-molehill-transition-qualification.yml/runs?event=pull_request&branch=$ATLAS_LEGACY_CUTOVER_HEAD_REF&per_page=100" > "$runs"
-            mapfile -t legacy_run_ids < <(node --input-type=module - "$runs" <<'NODE'
-          import fs from 'node:fs';
-          const runs = JSON.parse(fs.readFileSync(process.argv[2], 'utf8')).workflow_runs ?? [];
-          const ids = runs
-            .filter((run) => run.status === 'completed'
-              && run.path === '.github/workflows/legacy-molehill-transition-qualification.yml'
-              && run.event === 'pull_request'
-              && run.head_branch === process.env.ATLAS_LEGACY_CUTOVER_HEAD_REF
-              && run.head_sha === process.env.ATLAS_CODE_REVISION
-              && run.repository?.full_name === process.env.GITHUB_REPOSITORY
-              && Number(run.run_attempt) === 1)
-            .map((run) => Number(run.id))
-            .filter((id) => Number.isSafeInteger(id) && id > 0)
-            .sort((left, right) => right - left);
-          for (const id of ids) process.stdout.write(`${id}\n`);
-          NODE
-            )
-            selected_legacy_run=''
-            for legacy_run_id in "${legacy_run_ids[@]}"; do
-              run_json="$work/legacy-transition-run-$legacy_run_id.json"
-              jobs_json="$work/legacy-transition-jobs-$legacy_run_id.json"
-              gh api "repos/$GITHUB_REPOSITORY/actions/runs/$legacy_run_id" > "$run_json"
-              gh api "repos/$GITHUB_REPOSITORY/actions/runs/$legacy_run_id/jobs?per_page=100" > "$jobs_json"
-              if node --input-type=module - "$run_json" "$jobs_json" "$live_pr" "$changed_files" "$work/protected-hosted-gate-validation.json" <<'NODE'
-          import fs from 'node:fs';
-          import { validateLegacyTransitionBootstrapGate } from './tools/verification/protected-hosted-gate.mjs';
-          const [runPath, jobsPath, livePrPath, changedFilesPath, outputPath] = process.argv.slice(2);
-          const read = (path) => JSON.parse(fs.readFileSync(path, 'utf8'));
-          const changedFiles = fs.readFileSync(changedFilesPath, 'utf8').split(/\r?\n/).filter(Boolean);
-          const result = validateLegacyTransitionBootstrapGate({
-            producerRun: read(runPath),
-            producerJobs: read(jobsPath),
-            livePr: read(livePrPath),
-            changedFiles,
-            expectedRepository: process.env.GITHUB_REPOSITORY,
-            expectedPrNumber: Number(process.env.ATLAS_PR_NUMBER),
-            expectedCandidateHeadSha: process.env.ATLAS_CODE_REVISION,
-            expectedProtectedBaseSha: process.env.ATLAS_PROTECTED_BASE_SHA,
-          });
-          fs.writeFileSync(outputPath, `${JSON.stringify(result, null, 2)}\n`);
-          NODE
-              then
-                selected_legacy_run="$legacy_run_id"
-                break
-              fi
-            done
-            [[ "$selected_legacy_run" =~ ^[1-9][0-9]*$ ]]
-            printf 'producer_run_id=%s\nartifact_name=%s\n' \
-              "$selected_legacy_run" 'legacy-transition-heavy-proof' >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          expected_name="protected-hosted-fan-in-$ATLAS_PROTECTED_BASE_SHA-$ATLAS_CODE_REVISION"
-          work=artifacts/protected-hosted-fan-in
-          mkdir -p "$work"
-          live_pr="$work/live-pr.json"
-          gh api "repos/$GITHUB_REPOSITORY/pulls/$ATLAS_PR_NUMBER" > "$live_pr"
-
-          accept_generic_repair() {
-            promotion_status="$work/protected-product-qualification-status.json"
-            gh api "repos/$GITHUB_REPOSITORY/commits/$ATLAS_CODE_REVISION/statuses?per_page=100" \
-              --jq '[.[] | select(.context == "atlas-protected-product-qualification" and .state == "success")][0] // empty' > "$promotion_status" || return 1
-            [[ -s "$promotion_status" ]] || return 1
-            promotion_run_id="$(node --input-type=module - "$promotion_status" "$GITHUB_REPOSITORY" <<'NODE'
-          import fs from 'node:fs';
-          const [statusPath, repository] = process.argv.slice(2);
-          const status = JSON.parse(fs.readFileSync(statusPath, 'utf8'));
-          const escaped = repository.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-          const match = String(status.target_url ?? '').match(new RegExp(`^https://github\\.com/${escaped}/actions/runs/([1-9][0-9]*)$`));
-          if (match) process.stdout.write(match[1]);
-          NODE
-            )"
-            [[ "$promotion_run_id" =~ ^[1-9][0-9]*$ ]] || return 1
-            promotion_run="$work/protected-product-qualification-run.json"
-            promotion_jobs="$work/protected-product-qualification-jobs.json"
-            gh api "repos/$GITHUB_REPOSITORY/actions/runs/$promotion_run_id" > "$promotion_run" || return 1
-            gh api "repos/$GITHUB_REPOSITORY/actions/runs/$promotion_run_id/jobs?per_page=100" > "$promotion_jobs" || return 1
-            if node --input-type=module - \
-              "$promotion_status" "$promotion_run" "$promotion_jobs" "$live_pr" \
-              "$work/protected-hosted-gate-validation.json" <<'NODE'
-          import fs from 'node:fs';
-          import { validateProtectedProductQualificationGate } from './tools/verification/protected-hosted-gate.mjs';
-          const [statusPath, runPath, jobsPath, livePrPath, outputPath] = process.argv.slice(2);
-          const read = (path) => JSON.parse(fs.readFileSync(path, 'utf8'));
-          const result = validateProtectedProductQualificationGate({
-            status: read(statusPath),
-            producerRun: read(runPath),
-            producerJobs: read(jobsPath),
-            livePr: read(livePrPath),
-            expectedRepository: process.env.GITHUB_REPOSITORY,
-            expectedPrNumber: Number(process.env.ATLAS_PR_NUMBER),
-            expectedCandidateHeadSha: process.env.ATLAS_CODE_REVISION,
-            expectedProtectedBaseSha: process.env.ATLAS_PROTECTED_BASE_SHA,
-          });
-          fs.writeFileSync(outputPath, `${JSON.stringify(result, null, 2)}\n`);
-          NODE
-            then
-              printf 'producer_run_id=%s\nartifact_name=%s\n' \
-                "$promotion_run_id" 'protected-product-qualification' >> "$GITHUB_OUTPUT"
-              return 0
-            fi
-            return 1
-          }
-
-          selected_artifact_id=''
-          selected_run_id=''
-          selected_run_json=''
-          for attempt in {1..169}; do
-            if accept_generic_repair; then
-              exit 0
-            fi
-            payload="$RUNNER_TEMP/protected-hosted-artifacts.json"
-            gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?name=$expected_name&per_page=100" > "$payload"
-            mapfile -t candidates < <(node --input-type=module - "$payload" "$expected_name" <<'NODE'
-          import fs from 'node:fs';
-          const [payloadPath, expectedName] = process.argv.slice(2);
-          const artifacts = (JSON.parse(fs.readFileSync(payloadPath, 'utf8')).artifacts ?? [])
-            .filter((artifact) => artifact.expired === false
-              && artifact.name === expectedName
-              && Number.isSafeInteger(artifact.id)
-              && Number.isSafeInteger(artifact.workflow_run?.id))
-            .sort((left, right) => Date.parse(right.created_at) - Date.parse(left.created_at));
-          for (const artifact of artifacts) process.stdout.write(`${artifact.id}\t${artifact.workflow_run.id}\n`);
-          NODE
-            )
-            for candidate in "${candidates[@]}"; do
-              IFS=$'\t' read -r artifact_id producer_run_id <<< "$candidate"
-              run_json="$RUNNER_TEMP/protected-hosted-run-$producer_run_id.json"
-              gh api "repos/$GITHUB_REPOSITORY/actions/runs/$producer_run_id" > "$run_json"
-              if node --input-type=module - "$run_json" <<'NODE'
-          import fs from 'node:fs';
-          const run = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
-          if (run.status !== 'completed' || run.conclusion !== 'success'
-            || run.path !== '.github/workflows/protected-hosted-executor.yml'
-            || run.event !== 'workflow_run'
-            || run.repository?.full_name !== process.env.GITHUB_REPOSITORY) process.exit(1);
-          NODE
-              then
-                selected_artifact_id="$artifact_id"
-                selected_run_id="$producer_run_id"
-                selected_run_json="$run_json"
-                break 2
-              fi
-            done
-            (( attempt < 169 )) && sleep 20
+          for attempt in {1..201}; do
+            node admission-authority/tools/verification/consume-protected-admission.mjs \
+              --output "$RUNNER_TEMP/protected-semantic-evidence.json"
+            if jq -e '.accepted == true' "$RUNNER_TEMP/protected-semantic-evidence.json" >/dev/null; then exit 0; fi
+            jq -e '.eligible == true' "$RUNNER_TEMP/protected-semantic-evidence.json" >/dev/null
+            if (( attempt < 201 )); then sleep 30; fi
           done
-          [[ "$selected_artifact_id" =~ ^[0-9]+$ && "$selected_run_id" =~ ^[0-9]+$ ]]
-          cp "$selected_run_json" "$work/producer-run.json"
-          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$selected_artifact_id/zip" > "$work/artifact.zip"
-          unzip -q "$work/artifact.zip" -d "$work/unpacked"
-          mapfile -t fan_in_files < <(find "$work/unpacked" -type f -name protected-hosted-fan-in.json -print)
-          mapfile -t state_files < <(find "$work/unpacked" -type f -name protected-verification-state.json -print)
-          test "${#fan_in_files[@]}" -eq 1
-          test "${#state_files[@]}" -eq 1
-
-          node --input-type=module - \
-            "${fan_in_files[0]}" "${state_files[0]}" "$live_pr" "$work/producer-run.json" \
-            "$expected_name" "$work/protected-hosted-gate-validation.json" <<'NODE'
-          import fs from 'node:fs';
-          import { validateProtectedHostedGate } from './tools/verification/protected-hosted-gate.mjs';
-          const [payloadPath, statePath, livePrPath, runPath, artifactName, outputPath] = process.argv.slice(2);
-          const read = (path) => JSON.parse(fs.readFileSync(path, 'utf8'));
-          const result = validateProtectedHostedGate({
-            payload: read(payloadPath),
-            state: read(statePath),
-            livePr: read(livePrPath),
-            producerRun: read(runPath),
-            expectedRepository: process.env.GITHUB_REPOSITORY,
-            expectedPrNumber: Number(process.env.ATLAS_PR_NUMBER),
-            expectedCandidateHeadSha: process.env.ATLAS_CODE_REVISION,
-            expectedProtectedBaseSha: process.env.ATLAS_PROTECTED_BASE_SHA,
-            expectedArtifactName: artifactName,
-            now: new Date().toISOString(),
-          });
-          fs.writeFileSync(outputPath, `${JSON.stringify(result, null, 2)}\n`);
-          NODE
-          printf 'producer_run_id=%s\nartifact_id=%s\nartifact_name=%s\n' \
-            "$selected_run_id" "$selected_artifact_id" "$expected_name" >> "$GITHUB_OUTPUT"
-
-      - name: Publish independently validated current-head hosted gate evidence
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: protected-hosted-gate-${{ github.run_id }}-${{ github.run_attempt }}
-          path: artifacts/protected-hosted-fan-in/protected-hosted-gate-validation.json
-          if-no-files-found: error
-          retention-days: 14
+          echo 'Exact current protected semantic evidence is unavailable.' >&2
+          exit 1
 
   atlas-gate:
     name: atlas-gate

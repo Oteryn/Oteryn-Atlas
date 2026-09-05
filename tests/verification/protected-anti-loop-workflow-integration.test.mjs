@@ -123,14 +123,12 @@ test('Playwright summaries bind semantic, instance, authority and environment id
   assert.doesNotMatch(executor, /ATLAS_VERIFICATION_PLAN_SHA256|\.planDigest/);
 });
 
-test('atlas-gate independently validates exact hosted fan-in and lifecycle state instead of the legacy local status', () => {
-  assert.match(ci, /name:\s*Protected Hosted Playwright evidence/);
-  assert.match(ci, /protected-hosted-fan-in/);
-  assert.match(ci, /protected-verification-state/);
-  assert.match(ci, /validateProtectedHostedGate/);
-  assert.match(ci, /expectedCandidateHeadSha: process\.env\.ATLAS_CODE_REVISION/);
-  assert.match(ci, /expectedProtectedBaseSha: process\.env\.ATLAS_PROTECTED_BASE_SHA/);
-  assert.match(ci, /ATLAS_LEGACY_CUTOVER_BASE_SHA: e31015d0880e9f81a4b96f990658490af45e8fa6/);
-  assert.match(ci, /ATLAS_LEGACY_CUTOVER_HEAD_REF: feat\/issue-179-legacy-transition-qualifier/);
-  assert.match(ci, /validateLegacyTransitionBootstrapGate/);
+test('atlas-gate independently consumes exact semantic evidence without legacy local status or historical fallback', () => {
+  const consumer = read('tools/verification/consume-protected-admission.mjs');
+  assert.match(ci, /node admission-authority\/tools\/verification\/consume-protected-admission\.mjs/);
+  assert.match(consumer, /validateProtectedAdmissionEvidence/);
+  assert.match(consumer, /latest producer changed during consumption/);
+  assert.match(consumer, /final producer reread/);
+  assert.match(consumer, /final producer jobs reread/);
+  assert.doesNotMatch(ci, /ATLAS_LEGACY_CUTOVER|validateLegacyTransitionBootstrapGate|atlas-local-e2e/);
 });

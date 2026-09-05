@@ -1,0 +1,109 @@
+name: Protected admission
+run-name: ${{ format('protected-admission:{0}:{1}:{2}:{3}', github.repository, inputs.pr_number || github.event.pull_request.number, inputs.head_sha || github.event.pull_request.head.sha, github.workflow_sha) }}
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Open PR routing key, independently resolved against current protected default branch
+        required: true
+        type: number
+      head_sha:
+        description: Untrusted head locator, verified against the live PR before execution
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: atlas-protected-admission-${{ inputs.pr_number || github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  resolve-candidate:
+    name: Resolve current protected candidate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      pr_number: ${{ steps.resolve.outputs.pr_number }}
+      head_sha: ${{ steps.resolve.outputs.head_sha }}
+      base_sha: ${{ steps.resolve.outputs.base_sha }}
+    steps:
+      - name: Resolve live identity without candidate execution
+        id: resolve
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_PR_NUMBER: ${{ inputs.pr_number || github.event.pull_request.number }}
+          INPUT_HEAD_SHA: ${{ inputs.head_sha }}
+          WORKFLOW_SOURCE_SHA: ${{ github.workflow_sha }}
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import {execFileSync} from 'node:child_process';
+          const env=process.env,repository=env.GITHUB_REPOSITORY,number=Number(env.INPUT_PR_NUMBER);
+          if(!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository)||!Number.isSafeInteger(number)||number<1)throw new Error('invalid routing identity');
+          if(!['pull_request_target','workflow_dispatch'].includes(env.GITHUB_EVENT_NAME))throw new Error('invalid producer event');
+          const api=p=>JSON.parse(execFileSync('gh',['api',`repos/${repository}${p}`],{encoding:'utf8'}));
+          const repo=api(''),pr=api(`/pulls/${number}`),base=api(`/git/ref/heads/${encodeURIComponent(repo.default_branch)}`);
+          if(repo.full_name!==repository||typeof repo.default_branch!=='string'||pr.number!==number||pr.state!=='open'||pr.merged||pr.head?.repo?.full_name!==repository||pr.base?.repo?.full_name!==repository||pr.base?.ref!==repo.default_branch||pr.base?.sha!==base.object?.sha)throw new Error('live PR association or protected base drift');
+          if(!/^[a-f0-9]{40}$/.test(pr.head.sha)||!/^[a-f0-9]{40}$/.test(pr.base.sha)||env.WORKFLOW_SOURCE_SHA!==pr.base.sha)throw new Error('workflow source is not exact current protected authority');
+          if(env.GITHUB_EVENT_NAME==='workflow_dispatch'&&(env.GITHUB_REF!==`refs/heads/${repo.default_branch}`||env.INPUT_HEAD_SHA!==pr.head.sha))throw new Error('dispatch must use protected default branch');
+          if(env.GITHUB_EVENT_NAME==='pull_request_target'){
+            const event=JSON.parse(fs.readFileSync(env.GITHUB_EVENT_PATH,'utf8')).pull_request;
+            if(event?.number!==number||event.head?.sha!==pr.head.sha||event.base?.sha!==pr.base.sha)throw new Error('stale PR event');
+          }
+          fs.appendFileSync(env.GITHUB_OUTPUT,`pr_number=${number}\nhead_sha=${pr.head.sha}\nbase_sha=${pr.base.sha}\n`);
+          NODE
+
+  protected-admission:
+    name: Protected admission proof
+    needs: resolve-candidate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      pull-requests: read
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      ATLAS_PR_NUMBER: ${{ needs.resolve-candidate.outputs.pr_number }}
+      ATLAS_CODE_REVISION: ${{ needs.resolve-candidate.outputs.head_sha }}
+      ATLAS_BASE_SHA: ${{ needs.resolve-candidate.outputs.base_sha }}
+    steps:
+      - name: Check out exact protected authority
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.resolve-candidate.outputs.base_sha }}
+          persist-credentials: false
+          fetch-depth: 0
+          path: trusted-base
+      - name: Check out exact candidate as inert input
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.resolve-candidate.outputs.head_sha }}
+          persist-credentials: false
+          fetch-depth: 0
+          path: candidate
+      - name: Independently qualify exact admitted candidate
+        id: proof
+        shell: bash
+        run: |
+          set -euo pipefail
+          node trusted-base/tools/verification/run-protected-admission.mjs \
+            "$PWD/trusted-base" "$PWD/candidate" "$RUNNER_TEMP/protected-admission"
+      - name: Publish independently qualified evidence
+        if: steps.proof.outputs.admission_eligible == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: protected-admission-evidence-${{ github.run_id }}-1
+          path: ${{ runner.temp }}/protected-admission/protected-admission-evidence.json
+          if-no-files-found: error
+          retention-days: 7
