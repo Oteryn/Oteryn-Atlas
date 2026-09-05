@@ -272,7 +272,7 @@ export async function runProtectedAdmission({ protectedRoot, candidateRoot, outp
   const producerEvent=validateProducerEvent(env.GITHUB_EVENT_NAME);
   if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository) || !Number.isSafeInteger(prNumber) || prNumber < 1 || env.GITHUB_RUN_ATTEMPT !== '1') throw new TypeError('invalid producer identity');
   const api = async endpoint => {
-    const response = await fetch(`${env.GITHUB_API_URL || 'https://api.github.com'}/repos/${repository}/${endpoint}`, { headers: { Authorization: `Bearer ${env.GH_TOKEN}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' } });
+    const response = await fetch(`${env.GITHUB_API_URL || 'https://api.github.com'}/repos/${repository}${endpoint ? `/${endpoint}` : ''}`, { headers: { Authorization: `Bearer ${env.GH_TOKEN}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' } });
     if (!response.ok) throw new Error(`GitHub read failed ${response.status}: ${endpoint}`);
     return response.json();
   };
