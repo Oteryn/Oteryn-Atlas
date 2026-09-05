@@ -139,21 +139,44 @@ jobs:
           if not isinstance(changed_files, int) or changed_files < 0 or changed_files > 3000:
               raise SystemExit('invalid or over-cap changed-files count')
 
-          changed = []
+          changed = set()
+          destinations = set()
           page = 1
           while True:
               batch = api(f'/pulls/{number}/files?per_page=100&page={page}')
+              if not isinstance(batch, list) or len(batch) > 100:
+                  raise SystemExit('invalid changed-files page')
               for item in batch:
+                  if not isinstance(item, dict):
+                      raise SystemExit('invalid changed-file record')
                   filename = item.get('filename', '')
-                  if isinstance(filename, str) and filename:
-                      changed.append(filename)
+                  status = item.get('status')
+                  if not isinstance(filename, str) or not filename or status not in (
+                      'added', 'removed', 'modified', 'renamed', 'copied', 'changed', 'unchanged',
+                  ):
+                      raise SystemExit('invalid changed-file filename or status')
+                  if filename in destinations:
+                      raise SystemExit('duplicate changed-files enumeration')
+                  destinations.add(filename)
+                  if len(destinations) > changed_files:
+                      raise SystemExit('changed-files enumeration exceeds declared count')
+                  changed.add(filename)
+                  if status == 'removed':
+                      if filename in tree_entries:
+                          raise SystemExit(f'removed path still present in candidate tree: {filename}')
+                  elif filename not in tree_entries:
+                      raise SystemExit(f'changed path missing from candidate tree: {filename}')
                   previous = item.get('previous_filename')
-                  if isinstance(previous, str) and previous:
-                      changed.append(previous)
+                  if status in ('renamed', 'copied'):
+                      if not isinstance(previous, str) or not previous or previous == filename:
+                          raise SystemExit('invalid changed-file rename/copy source')
+                      changed.add(previous)
+                  elif previous is not None:
+                      raise SystemExit('invalid changed-file previous filename for status')
               if len(batch) < 100:
                   break
               page += 1
-          if len({path for path in changed if path}) < changed_files:
+          if len(destinations) != changed_files:
               raise SystemExit('changed-files enumeration is incomplete')
 
           protected_audit = '.github/workflows/merge-authority-audit.yml'
@@ -180,7 +203,7 @@ jobs:
 
           unpinned_governance = sorted({
               path for path in changed
-              if path.startswith(governance_prefix) and path not in pins
+              if path.startswith(governance_prefix) and path not in pins and path in tree_entries
           })
           if unpinned_governance:
               raise SystemExit(
