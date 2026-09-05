@@ -117,7 +117,7 @@ export async function runProtectedAdmission({ protectedRoot, candidateRoot, outp
   const verifier = path.join(outputRoot, 'verify.mjs');
   fs.writeFileSync(verifier, `import fs from 'node:fs';
 import { resolveQualificationScenarioBindings } from '/candidate/tools/verification/qualification-scenario-bindings.mjs';
-import { verifyQualificationWorld, qualificationTrustDescriptor } from '/candidate/tools/verification/qualification-world.mjs';
+import { verifyQualificationWorld, qualificationTrustDescriptor } from '/candidate/tools/verification/protected-qualification-oracle.mjs';
 function inertTree(root){for(const name of fs.readdirSync(root)){const entry=root+'/'+name,stat=fs.lstatSync(entry);if(stat.isSymbolicLink()||(!stat.isFile()&&!stat.isDirectory()))throw new Error('publication contains nonregular input');if(stat.isDirectory())inertTree(entry);}}
 inertTree('/product');
 const manifest=await verifyQualificationWorld('/product');
