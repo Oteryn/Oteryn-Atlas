@@ -3,8 +3,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { execFileSync } from 'node:child_process';
-import crypto from 'node:crypto';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const WORKFLOW = fs.readFileSync(path.join(ROOT, '.github/workflows/merge-group-gate.yml'), 'utf8');
@@ -32,6 +30,8 @@ test('one-shot bootstrap does not import future policy exports from protected ma
 });
 
 test('one-shot bootstrap is bound to pre-328 protected authority bytes and retires after any byte advance', () => {
+  const bootstrap = stepBody('Validate exact protected qualification repair bootstrap evidence');
+  const oneShot = bootstrap.slice(0, bootstrap.indexOf('gh api "repos/$GITHUB_REPOSITORY/commits/$candidate_head_sha/status"'));
   const expected = new Map([
     ['.github/workflows/merge-group-gate.yml', '2f4ef822b34b1699af70e8142365ee5fc1afdc84'],
     ['tools/governance/verify_extraction_provenance.py', '8abcf380d6746b9aa095ec5a792638f2ce1b6314'],
@@ -39,11 +39,12 @@ test('one-shot bootstrap is bound to pre-328 protected authority bytes and retir
     ['tools/verification/qualification-repair-policy.mjs', '4c49d2ed861d4928bf869aeb35f43215c31a42d4'],
   ]);
   for (const [relative, sha] of expected) {
-    const bytes = execFileSync('git', ['show', `cc10f2af8889e9d70810c57404d8c85548ac570f:${relative}`], { cwd: ROOT });
-    const blob = (value) => crypto.createHash('sha1').update(Buffer.concat([Buffer.from(`blob ${value.length}\0`), value])).digest('hex');
-    assert.equal(blob(bytes), sha, `${relative} pre-328 authority`);
-    assert.notEqual(blob(Buffer.concat([bytes, Buffer.from('\n')])), sha, `${relative} must retire after a byte advance`);
+    const literal = `[${JSON.stringify(relative).replaceAll('"', "'")}, ${JSON.stringify(sha).replaceAll('"', "'")}]`;
+    assert.ok(oneShot.includes(literal), `${relative} pre-328 authority pin must be exact`);
   }
+  assert.match(oneShot, /for \(const \[relative, expectedBlob\] of expectedProtectedAuthority\)/);
+  assert.match(oneShot, /gitBlobFile\(path\.join\('trusted-base', relative\)\) !== expectedBlob/);
+  assert.match(oneShot, /throw new TypeError\(`protected bootstrap authority advanced: \$\{relative\}`\)/);
 });
 
 test('merge queue consumes exact protected qualification repair evidence before stale-base full fixture proof', () => {
