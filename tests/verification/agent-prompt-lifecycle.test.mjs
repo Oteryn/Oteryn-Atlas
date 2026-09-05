@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -46,6 +47,24 @@ test('Atlas Documentation/Agent IA has one mutable lifecycle authority', () => {
     '`docs/agents/tasks/active` is a convenience cache',
   ]) {
     assert.match(policy, new RegExp(phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), `missing authority rule: ${phrase}`);
+  }
+});
+
+test('optional task caches tolerate missing directories but reject non-directory paths', (t) => {
+  const temporaryRoot = mkdtempSync(resolve(tmpdir(), 'atlas-task-cache-'));
+  t.after(() => rmSync(temporaryRoot, { recursive: true, force: true }));
+
+  for (const name of ['active', 'archive']) {
+    const directory = resolve(temporaryRoot, name);
+    assert.deepEqual(readOptionalCache(directory), []);
+    mkdirSync(directory);
+    assert.deepEqual(readOptionalCache(directory), []);
+    writeFileSync(resolve(directory, 'packet.md'), 'task contract');
+    assert.deepEqual(readOptionalCache(directory), ['packet.md']);
+    rmSync(directory, { recursive: true });
+    assert.deepEqual(readOptionalCache(directory), []);
+    writeFileSync(directory, 'not a directory');
+    assert.throws(() => readOptionalCache(directory), { code: 'ENOTDIR' });
   }
 });
 
