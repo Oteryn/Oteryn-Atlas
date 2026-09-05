@@ -122,9 +122,12 @@ test('full pages preserve removal classification across pagination', () => {
 test('pinned verifier removal remains rejected', () => reject([
   { filename: 'tools/governance/verify_extraction_provenance.py', status: 'removed' },
 ], /pinned control-plane path missing/));
-for (const override of [{ sha: 'e'.repeat(40) }, { mode: '120000' }, { type: 'tree' }]) {
-  test(`unpinned removal does not excuse pinned tree drift: ${JSON.stringify(override)}`, () => reject([removed], /pinned control-plane/,
-    { treeOverrides: { 'tools/governance/verify_extraction_provenance.py': { type: 'blob', mode: '100644', ...override } } }));
+for (const [override, error] of [[{ sha: 'e'.repeat(40) }, /pinned control-plane tree entry drift/],
+  [{ mode: '120000' }, /regular non-symlink blob/], [{ type: 'tree' }, /regular non-symlink blob/]]) {
+  test(`unpinned removal does not excuse pinned tree drift: ${JSON.stringify(override)}`, () => reject([removed], error,
+    { treeOverrides: { 'tools/governance/verify_extraction_provenance.py': {
+      path: 'tools/governance/verify_extraction_provenance.py', type: 'blob', mode: '100644', ...override,
+    } } }));
 }
 test('audit self-rotation still requires explicit owner authorization and independent review', () => reject([
   { filename: '.github/workflows/merge-authority-audit.yml', status: 'modified' },
