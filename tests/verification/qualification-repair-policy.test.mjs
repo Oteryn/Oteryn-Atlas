@@ -10,6 +10,7 @@ import {
   classifyQualificationRepairStatuses,
   independentlyVerifyQualificationProduct,
   materializeQualificationFixtureOracleOverlay,
+  resolveQualificationFixtureOracle,
   validateQualificationRepairBootstrapPinRotations,
   validateQualificationRepairControlPlaneBootstrap,
   validateQualificationRepairProductRepin,
@@ -23,6 +24,7 @@ function writeOracleProduct(root) {
   fs.mkdirSync(path.join(root, 'data/creatures'), { recursive: true });
   fs.mkdirSync(path.join(root, 'data/creatures/chunks/f-7'), { recursive: true });
   fs.mkdirSync(path.join(root, 'runtime-index/floors'), { recursive: true });
+  fs.mkdirSync(path.join(root, 'animation'), { recursive: true });
   const at = (x, y) => ({ x, y, floor: -7 });
   const semantic = [
     { label: 'Fixture Harbor', capabilities: ['navigation'], position: at(32280, 32155) },
@@ -30,9 +32,9 @@ function writeOracleProduct(root) {
   ];
   const creatures = [
     { kind: 'npc', label: 'Fixture Guide', record_id: `npc:${'1'.repeat(32)}`, entity_id: `npc-entity:${'1'.repeat(32)}`, roles: ['shop', 'quest'], position: at(32280, 32155) },
-    { kind: 'npc', label: 'Fixture Wayfarer', record_id: `npc:${'2'.repeat(32)}`, entity_id: `npc-entity:${'2'.repeat(32)}`, roles: ['shop', 'quest', 'travel', 'trainer'], outfit_presentation: {}, position: at(32282, 32155) },
+    { kind: 'npc', label: 'Fixture Wayfarer', record_id: `npc:${'2'.repeat(32)}`, entity_id: `npc-entity:${'2'.repeat(32)}`, roles: ['shop', 'quest', 'travel', 'trainer'], outfit_presentation: { outfit_presentation_id: 'outfit-presentation:npc' }, position: at(32282, 32155) },
     { kind: 'npc', label: 'Fixture Cartographer With A Deliberately Long Name', record_id: `npc:${'3'.repeat(32)}`, entity_id: `npc-entity:${'3'.repeat(32)}`, roles: [], position: at(32284, 32155) },
-    { kind: 'monster', label: 'Fixture Sentinel', record_id: `monster:${'a'.repeat(32)}`, entity_id: `monster-entity:${'a'.repeat(32)}`, outfit_presentation: {}, position: at(32280, 32158) },
+    { kind: 'monster', label: 'Fixture Sentinel', record_id: `monster:${'a'.repeat(32)}`, entity_id: `monster-entity:${'a'.repeat(32)}`, outfit_presentation: { outfit_presentation_id: 'outfit-presentation:monster' }, position: at(32280, 32158) },
     ...['b', 'c', 'd'].map((value) => ({ kind: 'monster', label: `Raider ${value}`, record_id: `monster:${value.repeat(32)}`, entity_id: `monster-entity:${value.repeat(32)}`, position: at(32283, 32158) })),
   ];
   fs.writeFileSync(path.join(root, 'web/semantic-search/index.json'), JSON.stringify({ records: semantic }));
@@ -41,6 +43,11 @@ function writeOracleProduct(root) {
   fs.writeFileSync(path.join(root, 'data/creatures/index.json'), JSON.stringify({ chunks: [{ path: 'chunks/f-7/fixture.json' }] }));
   fs.writeFileSync(path.join(root, 'data/creatures/chunks/f-7/fixture.json'), JSON.stringify({ records: published }));
   fs.writeFileSync(path.join(root, 'runtime-index/floors/f-7.json'), JSON.stringify({ bounds: { x_min: 32224, x_max_exclusive: 32512, y_min: 32096, y_max_exclusive: 32384 } }));
+  const phase = (value) => `sha256:${value.repeat(64)}`;
+  const program = (id, a, b) => ({ outfit_presentation_id: id, animation_program_id: `animation-program:${id}`, phase_count: 2, phase_content_ids: [a, b], width: 1, height: 1, displacement: { x: 0, y: 0 }, selection_policy: 'test', animation: { presentation_durations_ms: [100, 100], loop_type: 'infinite', synchronized: false, default_start_phase: 0, loop_count: 0 } });
+  const programs = { profile: 'oteryn-atlas-animation-runtime-v1', creature_programs: [program('outfit-presentation:npc', phase('1'), phase('2')), program('outfit-presentation:monster', phase('3'), phase('4'))], blob_index: Object.fromEntries(['1', '2', '3', '4'].map((value) => [phase(value), { width: 1, height: 1, bytes: 4, bucket: 'test', offset: 0 }])), object_programs: [], sprite_index: {} };
+  fs.writeFileSync(path.join(root, 'animation/manifest.json'), JSON.stringify({ programs: { path: 'programs.json' } }));
+  fs.writeFileSync(path.join(root, 'animation/programs.json'), JSON.stringify(programs));
 }
 
 test('candidate E2E is never admitted and product paths remain closed', () => {
@@ -73,13 +80,10 @@ test('independent product proof hashes the exact canonical qualification-world b
   assert.equal(independentlyVerifyQualificationProduct(root, manifest).productDigest, manifest.productDigest);
 });
 
-test('oracle resolves presentation sentinels and four anchors from the real narrow fixture', async () => {
+test('oracle rejects the historical narrow fixture without genuine animated NPC and monster programs', async () => {
   const root = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-oracle-real-')), 'product');
   await buildQualificationWorld(root);
-  const oracle = (await import('../../tools/verification/qualification-repair-policy.mjs')).resolveQualificationFixtureOracle(root);
-  assert.equal(typeof oracle.animatedNpc.presentation_resolution_state, 'string');
-  assert.ok(oracle.animatedMonster.outfit_presentation);
-  assert.equal(new Set(oracle.distinct.map(({ x, y, floor }) => `${x}:${y}:${floor}`)).size, 4);
+  assert.throws(() => resolveQualificationFixtureOracle(root), /pixel-backed animated NPC/);
 });
 
 test('identity repin preserves the complete protected mirror', () => {
@@ -129,6 +133,23 @@ test('protected qualification overlay adapts every unresolved oracle family from
   ]) assert.ok(result.touched.includes(expected), expected);
   assert.doesNotMatch(fs.readFileSync(path.join(e2eRoot, 'tests/desktop.spec.mjs'), 'utf8'), /Thais/);
   assert.doesNotMatch(fs.readFileSync(path.join(e2eRoot, 'tests/farm-explorer-desktop.spec.mjs'), 'utf8'), /Cave Rat/);
+  const visual = fs.readFileSync(path.join(e2eRoot, 'tests/visual-desktop.spec.mjs'), 'utf8');
+  assert.match(visual, /CREATURE_ONLY_PLAYBACK_ENTRY[\s\S]*creatures=monster/);
+  assert.match(visual, /NPC_ONLY_PLAYBACK_ENTRY[\s\S]*creatures=npc/);
+  for (const oracleSource of ['animationRectangles', 'comparePngOutsideRects', 'changedOutside', 'world animation overlay blanked during playback']) assert.match(visual, new RegExp(oracleSource));
+  assert.doesNotMatch(visual, /assertCreatureFamilyPlaybackChangesPixels\(page, CREATURE_ONLY_PLAYBACK_ENTRY, 'monster'\);\n  return;/);
+});
+
+test('oracle rejects missing, fallback, single-phase, and visually static animation programs', () => {
+  const mutate = (change, pattern) => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-oracle-animation-'));
+    writeOracleProduct(root);
+    change(root);
+    assert.throws(() => resolveQualificationFixtureOracle(root), pattern);
+  };
+  mutate((root) => fs.rmSync(path.join(root, 'animation/programs.json')), /ENOENT/);
+  mutate((root) => { const file = path.join(root, 'data/creatures/chunks/f-7/fixture.json'); const value = JSON.parse(fs.readFileSync(file)); value.records.find((r) => r.kind === 'npc' && r.outfit_presentation).presentation_resolution_state = 'FALLBACK_MARKER'; fs.writeFileSync(file, JSON.stringify(value)); }, /pixel-backed animated NPC/);
+  for (const mode of ['single', 'same']) mutate((root) => { const file = path.join(root, 'animation/programs.json'); const value = JSON.parse(fs.readFileSync(file)); const entry = value.creature_programs[0]; if (mode === 'single') { entry.phase_count = 1; entry.phase_content_ids = entry.phase_content_ids.slice(0, 1); entry.animation.presentation_durations_ms = [100]; } else entry.phase_content_ids[1] = entry.phase_content_ids[0]; fs.writeFileSync(file, JSON.stringify(value)); }, /pixel-backed animated NPC/);
 });
 
 test('protected qualification overlay fails closed on unknown protected source drift', async () => {

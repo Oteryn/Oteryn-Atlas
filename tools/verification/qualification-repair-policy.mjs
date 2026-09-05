@@ -306,9 +306,50 @@ export function resolveQualificationFixtureOracle(productRoot) {
   });
   const navigation = uniqueRecord(semantic, (r) => r.capabilities?.includes('navigation'), 'navigable semantic record');
   const roleNpc = uniqueRecord(creatures, (r) => r.kind === 'npc' && r.roles?.includes('shop') && r.roles?.includes('quest') && r.roles.length === 2, 'shop/quest NPC');
-  const animatedNpc = uniqueRecord(creatures, (r) => r.kind === 'npc' && typeof r.presentation_resolution_state === 'string' && r.roles?.length >= 4, 'presented multi-role NPC');
+  const animationManifest = readJson(productRoot, 'animation/manifest.json');
+  if (typeof animationManifest?.programs?.path !== 'string' || !/^[A-Za-z0-9._/-]+$/.test(animationManifest.programs.path)
+    || animationManifest.programs.path.startsWith('/') || animationManifest.programs.path.split('/').includes('..')) {
+    throw new TypeError('qualification oracle animation programs path is invalid');
+  }
+  const animationProduct = readJson(productRoot, `animation/${animationManifest.programs.path}`);
+  if (animationProduct?.profile !== 'oteryn-atlas-animation-runtime-v1' || !Array.isArray(animationProduct.creature_programs)
+    || !animationProduct.blob_index || typeof animationProduct.blob_index !== 'object') {
+    throw new TypeError('qualification oracle animation publication is invalid');
+  }
+  const dynamicPrograms = new Map();
+  for (const program of animationProduct.creature_programs) {
+    const ids = program?.phase_content_ids;
+    const valid = typeof program?.outfit_presentation_id === 'string'
+      && Number.isSafeInteger(program.phase_count) && program.phase_count >= 2
+      && Array.isArray(ids) && ids.length === program.phase_count && new Set(ids).size >= 2
+      && Number.isSafeInteger(program.width) && program.width > 0
+      && Number.isSafeInteger(program.height) && program.height > 0
+      && ids.every((id) => {
+        const blobEntry = animationProduct.blob_index[id];
+        return /^sha256:[0-9a-f]{64}$/.test(id) && blobEntry
+          && blobEntry.width === program.width && blobEntry.height === program.height
+          && blobEntry.bytes === program.width * program.height * 4
+          && typeof blobEntry.bucket === 'string' && Number.isSafeInteger(blobEntry.offset) && blobEntry.offset >= 0;
+      })
+      && program.animation && Array.isArray(program.animation.presentation_durations_ms)
+      && program.animation.presentation_durations_ms.length === program.phase_count
+      && program.animation.presentation_durations_ms.every((duration) => Number.isSafeInteger(duration) && duration > 0)
+      && ['infinite', 'pingpong', 'counted'].includes(program.animation.loop_type)
+      && typeof program.animation.synchronized === 'boolean'
+      && Number.isSafeInteger(program.animation.default_start_phase)
+      && program.animation.default_start_phase >= 0 && program.animation.default_start_phase < program.phase_count
+      && Number.isSafeInteger(program.animation.loop_count) && program.animation.loop_count >= 0;
+    if (!valid || dynamicPrograms.has(program?.outfit_presentation_id)) continue;
+    dynamicPrograms.set(program.outfit_presentation_id, program);
+  }
+  const isDynamicPresentation = (record) => record.outfit_presentation
+    && typeof record.outfit_presentation.outfit_presentation_id === 'string'
+    && record.presentation_resolution_state === 'RESOLVED'
+    && record.presentation_resolution_state !== 'FALLBACK_MARKER'
+    && dynamicPrograms.has(record.outfit_presentation.outfit_presentation_id);
+  const animatedNpc = uniqueRecord(creatures, (r) => r.kind === 'npc' && isDynamicPresentation(r), 'pixel-backed animated NPC');
   const longNpc = uniqueRecord(creatures, (r) => r.kind === 'npc' && r.label.length >= 32, 'long-name NPC');
-  const animatedMonster = uniqueRecord(creatures, (r) => r.kind === 'monster' && r.outfit_presentation, 'animated monster');
+  const animatedMonster = uniqueRecord(creatures, (r) => r.kind === 'monster' && isDynamicPresentation(r), 'pixel-backed animated monster');
   const monsters = creatures.filter((r) => r.kind === 'monster');
   const overlap = monsters.filter((r) => monsters.filter((other) => JSON.stringify(validPosition(other)) === JSON.stringify(validPosition(r))).length >= 3);
   const floor = readJson(productRoot, `runtime-index/floors/f${validPosition(navigation).floor}.json`);
@@ -365,8 +406,8 @@ export function materializeQualificationFixtureOracleOverlay({ e2eRoot, productR
     ['x=32361&y=32198&floor=-7', urlPosition(oracle.roleNpc)],
     ['x=32364&y=32240.2&floor=-7', urlPosition(oracle.roleNpc)],
     ['x=33018&y=32009&floor=-7', urlPosition(oracle.overlap[0])],
-    ['x=32831&y=32596&floor=-12', urlPosition(oracle.animatedNpc)],
-    ['x=32209&y=31924&floor=-12', urlPosition(oracle.animatedMonster)],
+    ['x=32831&y=32596&floor=-12', urlPosition(oracle.animatedMonster)],
+    ['x=32209&y=31924&floor=-12', urlPosition(oracle.animatedNpc)],
     ['x=32724&y=31155&floor=-15', urlPosition(oracle.animatedMonster)],
     ["'Thais'", JSON.stringify(oracle.navigation.label)], ['/Thais/i', `/${escaped(oracle.navigation.label)}/i`],
     ["'Sam'", JSON.stringify(oracle.roleNpc.label)], ['/Sam/i', `/${escaped(oracle.roleNpc.label)}/i`],
@@ -421,10 +462,6 @@ export function materializeQualificationFixtureOracleOverlay({ e2eRoot, productR
   visualSource = visualSource.replace(
     "  await expect(page.locator('.topbar')).toHaveScreenshot('desktop-topbar.png', {\n    animations: 'disabled', caret: 'hide', scale: 'css',\n  });",
     "  await expect(page.locator('.topbar')).toBeVisible();",
-  );
-  visualSource = visualSource.replace(
-    "test('playback changes only verified animated presentation regions and restores static pixels', async ({ page }, testInfo) => {",
-    "test('playback changes only verified animated presentation regions and restores static pixels', async ({ page }, testInfo) => {\n  await assertCreatureFamilyPlaybackChangesPixels(page, CREATURE_ONLY_PLAYBACK_ENTRY, 'monster');\n  return;",
   );
   visualSource = visualSource.replace(
     "  await expect(page.locator('#view-mode-control')).toHaveScreenshot('desktop-view-mode.png', {\n    animations: 'disabled', caret: 'hide', scale: 'css',\n  });",

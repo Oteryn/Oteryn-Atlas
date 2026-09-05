@@ -3,6 +3,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { execFileSync } from 'node:child_process';
+import crypto from 'node:crypto';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const WORKFLOW = fs.readFileSync(path.join(ROOT, '.github/workflows/merge-group-gate.yml'), 'utf8');
@@ -20,6 +22,28 @@ test('one-shot bootstrap does not import future policy exports from protected ma
   const oneShot = bootstrap.slice(0, bootstrap.indexOf('gh api "repos/$GITHUB_REPOSITORY/commits/$candidate_head_sha/status"'));
   assert.doesNotMatch(oneShot, /validateQualificationRepairControlPlaneBootstrap/);
   assert.match(oneShot, /exactControlPlanePaths/);
+  for (const blob of [
+    '2f4ef822b34b1699af70e8142365ee5fc1afdc84',
+    '8abcf380d6746b9aa095ec5a792638f2ce1b6314',
+    '3f9565eaf26577cf36b30475fea61f9fcce66535',
+    '4c49d2ed861d4928bf869aeb35f43215c31a42d4',
+  ]) assert.match(oneShot, new RegExp(blob));
+  assert.match(oneShot, /protected bootstrap authority advanced/);
+});
+
+test('one-shot bootstrap is bound to pre-328 protected authority bytes and retires after any byte advance', () => {
+  const expected = new Map([
+    ['.github/workflows/merge-group-gate.yml', '2f4ef822b34b1699af70e8142365ee5fc1afdc84'],
+    ['tools/governance/verify_extraction_provenance.py', '8abcf380d6746b9aa095ec5a792638f2ce1b6314'],
+    ['.github/workflows/merge-authority-audit.yml', '3f9565eaf26577cf36b30475fea61f9fcce66535'],
+    ['tools/verification/qualification-repair-policy.mjs', '4c49d2ed861d4928bf869aeb35f43215c31a42d4'],
+  ]);
+  for (const [relative, sha] of expected) {
+    const bytes = execFileSync('git', ['show', `cc10f2af8889e9d70810c57404d8c85548ac570f:${relative}`], { cwd: ROOT });
+    const blob = (value) => crypto.createHash('sha1').update(Buffer.concat([Buffer.from(`blob ${value.length}\0`), value])).digest('hex');
+    assert.equal(blob(bytes), sha, `${relative} pre-328 authority`);
+    assert.notEqual(blob(Buffer.concat([bytes, Buffer.from('\n')])), sha, `${relative} must retire after a byte advance`);
+  }
 });
 
 test('merge queue consumes exact protected qualification repair evidence before stale-base full fixture proof', () => {

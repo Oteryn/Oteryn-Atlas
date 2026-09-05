@@ -343,6 +343,12 @@ jobs:
           import fs from 'node:fs';
           import { QUALIFICATION_CREATURES, QUALIFICATION_FIXTURE_ID, QUALIFICATION_SEMANTIC_RECORD } from './trusted-base/tools/verification/qualification-fixture-definition.mjs';
           const changedPaths = fs.readFileSync(process.env.CHANGES, 'utf8').trim().split(/\r?\n/).filter(Boolean);
+          const protectedAuthorityBlobs = {
+            '.github/workflows/merge-group-gate.yml': '2f4ef822b34b1699af70e8142365ee5fc1afdc84',
+            'tools/governance/verify_extraction_provenance.py': '8abcf380d6746b9aa095ec5a792638f2ce1b6314',
+            '.github/workflows/merge-authority-audit.yml': '3f9565eaf26577cf36b30475fea61f9fcce66535',
+            'tools/verification/qualification-repair-policy.mjs': '4c49d2ed861d4928bf869aeb35f43215c31a42d4',
+          };
           const exactControlPlanePaths = [
             '.github/workflows/merge-authority-audit.yml',
             '.github/workflows/merge-group-gate.yml',
@@ -364,6 +370,9 @@ jobs:
           }
           const read = (root, relative) => fs.readFileSync(`${root}/${relative}`, 'utf8');
           const blob = (text) => crypto.createHash('sha1').update(Buffer.concat([Buffer.from(`blob ${Buffer.byteLength(text)}\0`), Buffer.from(text)])).digest('hex');
+          for (const [relative, expected] of Object.entries(protectedAuthorityBlobs)) {
+            if (blob(read('trusted-base', relative)) !== expected) throw new TypeError(`protected bootstrap authority advanced: ${relative}`);
+          }
           const exactOne = (text, expression, label) => { const matches = text.match(expression) ?? []; if (matches.length !== 1) throw new TypeError(`${label} must occur exactly once`); return matches[0]; };
           const gateText = read('.', '.github/workflows/merge-group-gate.yml');
           const verifierProtected = read('trusted-base', 'tools/governance/verify_extraction_provenance.py');
