@@ -26,6 +26,7 @@ export function validateProtectedAdmissionScope({ changedFiles, protectedPaths =
   if (!Array.isArray(changedFiles) || !changedFiles.length) fail('scope is empty');
   const basePaths = new Set(protectedPaths);
   const paths = new Set();
+  let hasRepairChange = false;
   for (const item of changedFiles) {
     const p = item?.path;
     if (typeof p !== 'string' || !/^[A-Za-z0-9._/-]+$/.test(p) || p.split('/').some((part) => !part || part === '.' || part === '..')) fail('path is unsafe');
@@ -39,7 +40,9 @@ export function validateProtectedAdmissionScope({ changedFiles, protectedPaths =
     }
     if (!['added', 'modified'].includes(item.status) || item.previousPath) ineligible('status is not an admitted non-renaming transition');
     paths.add(p);
+    if (PRODUCT_PATHS.has(p) || binding) hasRepairChange = true;
   }
+  if (!hasRepairChange) ineligible('scope contains only regressions; use ordinary qualification');
   return freeze({ schemaVersion: 1, eligible: true, changedPaths: [...paths].sort(), requiredGroups: ['deterministic.core', 'e2e.full'], dataCapability: 'qualification_fixture', workers: 1, retries: 0 });
 }
 

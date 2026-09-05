@@ -29,6 +29,9 @@ test('well-formed unsupported transitions remain eligible for ordinary qualifica
 });
 test('duplicate paths are rejected', () => assert.throws(() => policy.validateProtectedAdmissionScope({ ...valid(), changedFiles: [valid().changedFiles[0], valid().changedFiles[0]] }), /duplicate/));
 test('ordinary docs change is not admitted into repair evidence', () => assert.throws(() => policy.validateProtectedAdmissionScope({ ...valid(), changedFiles: [change('README.md')] }), /scope/));
+test('pure new verification regressions retain ordinary deterministic-only routing', () => {
+  assert.throws(() => policy.validateProtectedAdmissionScope({ changedFiles: [{ path: 'tests/verification/new-contract.test.mjs', status: 'added' }], protectedPaths: [] }), error => error.code === 'ADMISSION_SCOPE_INELIGIBLE');
+});
 test('existing protected deterministic oracles cannot be removed by candidate tests', () => {
   const p = 'tests/verification/protected-admission-evidence.test.mjs';
   assert.throws(() => policy.validateProtectedAdmissionScope({ changedFiles: [change(p)], protectedPaths: [p] }), /scope/);
