@@ -257,4 +257,3 @@ test('G: genuine runtime-impacting browser changes retain full plan floor while 
   assert.equal(QUALIFICATION_REPAIR_BROWSER_PROOF.workers, 1);
   assert.equal(QUALIFICATION_REPAIR_BROWSER_PROOF.retries, 0);
 });
-

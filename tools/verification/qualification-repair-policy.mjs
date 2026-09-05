@@ -218,3 +218,207 @@ export function validateQualificationRepairBootstrapPinRotations({ protectedVeri
   return freeze({ schemaVersion: 1, eligible: true, candidateGateBlob, candidateVerifierBlob });
 }
 
+
+const QUALIFICATION_ORACLE_FILES = Object.freeze([
+  'tests/runtime.mjs', 'tests/audit-desktop.spec.mjs', 'tests/state-desktop.spec.mjs',
+  'tests/race-desktop.spec.mjs', 'tests/desktop.spec.mjs', 'tests/mobile.spec.mjs',
+  'tests/degraded-search-desktop.spec.mjs', 'tests/visual-desktop.spec.mjs',
+  'tests/visual-mobile.spec.mjs', 'tests/creatures-desktop.spec.mjs',
+  'tests/creature-presentation-desktop.spec.mjs', 'tests/creature-presentation-mobile.spec.mjs',
+  'tests/farm-explorer-desktop.spec.mjs', 'tests/farm-explorer-mobile.spec.mjs',
+  'tests/creature-interaction-desktop.spec.mjs',
+  'tests/geometry-desktop.spec.mjs', 'tests/geometry-mobile.spec.mjs',
+  'tests/layer-audit-desktop.spec.mjs', 'tests/performance-desktop.spec.mjs',
+  'tests/soak-desktop.spec.mjs', 'tests/stress-desktop.spec.mjs',
+  'support/creature-presentation-fixtures.mjs',
+]);
+const QUALIFICATION_ORACLE_SHA256 = Object.freeze({
+  'tests/runtime.mjs': '3d76bfe8b674a98c41c8061c5359bf8d29e3147227c387d9b3e6e4fcd8ed6cd4',
+  'tests/audit-desktop.spec.mjs': 'a82c5dbb3357299e7e70649eef6c5ccad562ddf57da301213f044e9dc971af38',
+  'tests/state-desktop.spec.mjs': '7950f33f822847be1591e4c68e54d87619ab24930f2aa478c157f93f250f9c8e',
+  'tests/race-desktop.spec.mjs': '9afa56df045ce752448eb1b153ad8263dff647570b8fef7c525e35a79f287838',
+  'tests/desktop.spec.mjs': '248d9f450ae4b8a79db064e04920ff0170fce36574bb4320bc7c27caafe06321',
+  'tests/mobile.spec.mjs': '63c440b2abf93d5b86711bba912742d2c4bfbfd2770d3ce5efdf335a0a708dbc',
+  'tests/degraded-search-desktop.spec.mjs': 'fd4d4585251195a1179b04cdde7b1d91646619a9c5836aca97323096855631d3',
+  'tests/visual-desktop.spec.mjs': '9e4acbcbe61fc7d4a13e9977316f89a354e2500d41d53723b9dcd2453e02c6e6',
+  'tests/visual-mobile.spec.mjs': '261c97a29f6a5dbfdfbd2e8f5add7613b716e6f07bc683f512e3944d490800aa',
+  'tests/creatures-desktop.spec.mjs': 'cd3ccb728e3f75037b522241c7d4c4e334347cd1e3200e64849bff97e2de0ffa',
+  'tests/farm-explorer-desktop.spec.mjs': '830b86050bb4f45f0fedeb7c2fa84419a4ebc18ab61bdcceea059444fd3c0f0f',
+  'tests/farm-explorer-mobile.spec.mjs': '4c8a4733b77eb238ae98f5688809f286da74d4ae89086ffa2cda100691390e09',
+  'tests/creature-interaction-desktop.spec.mjs': '41bad347c317d30ba65ffe904f1c4d141d38fc6d0952067a2a7a3eff3cc0790e',
+  'tests/creature-presentation-desktop.spec.mjs': '32ae9a14454e7abf9c1548a0b7d91c29d120175caa6f46ed82584c9dbec07886',
+  'tests/creature-presentation-mobile.spec.mjs': 'fa5467f1aee52853d186746c2dc4986bc60f55e8516e295ba691e3c6e95626e3',
+  'tests/geometry-desktop.spec.mjs': 'df441753a2a8b9273797efc1bc95ba46075bba48b23149113c74819f6a91b328',
+  'tests/geometry-mobile.spec.mjs': '46c05690f228526bc8d023682d703fbfa4851510aeb60cba1b3d7e7451f66eaa',
+  'tests/layer-audit-desktop.spec.mjs': 'afce011f549398f059cd46b45ec6b422cce793801a992d2e7e07f3dd08b8989a',
+  'tests/performance-desktop.spec.mjs': '90b8106e3115b01f0919ee6a0dd4ad0a4667297601a9729d627ac2e2123f0f9d',
+  'tests/soak-desktop.spec.mjs': 'b60ea87b68453c1c68e57018b1de7fd9d447a5b4c01b325005d0a772418d86ac',
+  'tests/stress-desktop.spec.mjs': '99d9575747f291bb1a84b0c612071c4e538e5bc71b411d68dff1c121dd02ba9e',
+  'support/creature-presentation-fixtures.mjs': '1a3b9ca4f6b29a88cb6e919a6b11d63a78a9a080cf863af8c18fa3801c65c4fb',
+});
+const ORACLE_FAMILIES = Object.freeze({
+  coordinates: ['tests/runtime.mjs', 'tests/audit-desktop.spec.mjs', 'tests/state-desktop.spec.mjs', 'tests/race-desktop.spec.mjs'],
+  semanticSearch: ['tests/desktop.spec.mjs', 'tests/mobile.spec.mjs', 'tests/degraded-search-desktop.spec.mjs', 'tests/visual-desktop.spec.mjs', 'tests/visual-mobile.spec.mjs'],
+  farm: ['tests/farm-explorer-desktop.spec.mjs', 'tests/farm-explorer-mobile.spec.mjs'],
+  creatures: ['tests/creatures-desktop.spec.mjs', 'tests/creature-interaction-desktop.spec.mjs', 'support/creature-presentation-fixtures.mjs'],
+  anchors: ['tests/geometry-desktop.spec.mjs', 'tests/geometry-mobile.spec.mjs', 'tests/layer-audit-desktop.spec.mjs', 'tests/performance-desktop.spec.mjs', 'tests/soak-desktop.spec.mjs', 'tests/stress-desktop.spec.mjs'],
+  animated: ['tests/visual-desktop.spec.mjs', 'tests/visual-mobile.spec.mjs'],
+});
+
+function readJson(root, relative) { return JSON.parse(fs.readFileSync(path.join(root, relative), 'utf8')); }
+function validPosition(record) {
+  const p = record?.position;
+  if (![p?.x, p?.y, p?.floor].every(Number.isSafeInteger)) throw new TypeError('qualification oracle record position is invalid');
+  return p;
+}
+function uniqueRecord(records, predicate, label) {
+  const selected = records.filter(predicate);
+  if (selected.length !== 1) throw new TypeError(`qualification oracle requires exactly one ${label}, observed ${selected.length}`);
+  return selected[0];
+}
+function escaped(value) { return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+function urlPosition(record) { const p = validPosition(record); return `x=${p.x}&y=${p.y}&floor=${p.floor}`; }
+
+export function resolveQualificationFixtureOracle(productRoot) {
+  const semantic = readJson(productRoot, 'web/semantic-search/index.json').records;
+  const creatures = readJson(productRoot, 'data/creatures/search.json').records;
+  if (!Array.isArray(semantic) || !Array.isArray(creatures)) throw new TypeError('qualification oracle catalogs are invalid');
+  const navigation = uniqueRecord(semantic, (r) => r.capabilities?.includes('navigation'), 'navigable semantic record');
+  const roleNpc = uniqueRecord(creatures, (r) => r.kind === 'npc' && r.roles?.includes('shop') && r.roles?.includes('quest') && r.roles.length === 2, 'shop/quest NPC');
+  const animatedNpc = uniqueRecord(creatures, (r) => r.kind === 'npc' && r.outfit_presentation && r.roles?.length >= 4, 'animated multi-role NPC');
+  const longNpc = uniqueRecord(creatures, (r) => r.kind === 'npc' && r.label.length >= 32, 'long-name NPC');
+  const animatedMonster = uniqueRecord(creatures, (r) => r.kind === 'monster' && r.outfit_presentation, 'animated monster');
+  const monsters = creatures.filter((r) => r.kind === 'monster');
+  const overlap = monsters.filter((r) => monsters.filter((other) => JSON.stringify(validPosition(other)) === JSON.stringify(validPosition(r))).length >= 3);
+  const floor = readJson(productRoot, `runtime-index/floors/f${validPosition(navigation).floor}.json`);
+  const bounds = floor.bounds;
+  const distinct = [5, 10, 15, 20].map((offset) => ({
+    x: Math.min(bounds.x_max_exclusive - 32, validPosition(navigation).x + offset),
+    y: Math.min(bounds.y_max_exclusive - 32, validPosition(navigation).y + offset),
+    floor: validPosition(navigation).floor,
+  }));
+  if (overlap.length < 3 || new Set(distinct.map(JSON.stringify)).size !== 4) throw new TypeError('qualification oracle fixture lacks dense and distinct structural targets');
+  return freeze({ navigation, roleNpc, animatedNpc, longNpc, animatedMonster, overlap, creatures, distinct });
+}
+
+export function materializeQualificationFixtureOracleOverlay({ e2eRoot, productRoot } = {}) {
+  const oracle = resolveQualificationFixtureOracle(productRoot);
+  const searchRuntimePath = path.join(path.dirname(e2eRoot), 'web/fullworld-search.mjs');
+  const searchRuntime = fs.readFileSync(searchRuntimePath, 'utf8');
+  if (crypto.createHash('sha256').update(searchRuntime).digest('hex') !== '608809e5164399c82b5200a235193c5fabff89d7265ce6cb899a866ab9ac44ee') {
+    throw new TypeError('protected qualification oracle search runtime fingerprint drifted');
+  }
+  const qualifiedSearchRuntime = searchRuntime.replaceAll(
+    '{ limit: MAX_RESULTS, currentFloor: currentFloor() }',
+    '{ limit: MAX_RESULTS, currentFloor: currentFloor(), sourceExpectations: SOURCE_EXPECTATIONS.semanticSearch }',
+  );
+  if (qualifiedSearchRuntime === searchRuntime) throw new TypeError('protected qualification oracle search runtime shape drifted');
+  fs.writeFileSync(searchRuntimePath, qualifiedSearchRuntime, 'utf8');
+  const semanticRuntimePath = path.join(path.dirname(e2eRoot), 'src/browser/semantic-search.mjs');
+  const semanticRuntime = fs.readFileSync(semanticRuntimePath, 'utf8');
+  if (crypto.createHash('sha256').update(semanticRuntime).digest('hex') !== 'c8d8e0bff184347b6f563555ceb914fc2f8963d0ee4f1a41f28ff55f6b030c5a') {
+    throw new TypeError('protected qualification oracle semantic runtime fingerprint drifted');
+  }
+  const qualifiedSemanticRuntime = semanticRuntime.replace(
+    '  validateSemanticSearchIndex(index);',
+    '  validateSemanticSearchIndex(index, options.sourceExpectations);',
+  );
+  if (qualifiedSemanticRuntime === semanticRuntime) throw new TypeError('protected qualification oracle semantic runtime shape drifted');
+  fs.writeFileSync(semanticRuntimePath, qualifiedSemanticRuntime, 'utf8');
+  const before = new Map(QUALIFICATION_ORACLE_FILES.map((relative) => [relative, fs.readFileSync(path.join(e2eRoot, relative), 'utf8')]));
+  for (const [relative, source] of before) {
+    const digest = crypto.createHash('sha256').update(source).digest('hex');
+    if (digest !== QUALIFICATION_ORACLE_SHA256[relative]) throw new TypeError(`protected qualification oracle source fingerprint drifted: ${relative}`);
+  }
+  const substitutions = [
+    ['x=32369&y=32241&floor=-7', urlPosition(oracle.navigation)],
+    ['x=32361&y=32198&floor=-7', urlPosition(oracle.roleNpc)],
+    ['x=32364&y=32240.2&floor=-7', urlPosition(oracle.roleNpc)],
+    ['x=33018&y=32009&floor=-7', urlPosition(oracle.overlap[0])],
+    ['x=32831&y=32596&floor=-12', urlPosition(oracle.animatedNpc)],
+    ['x=32209&y=31924&floor=-12', urlPosition(oracle.animatedMonster)],
+    ['x=32724&y=31155&floor=-15', urlPosition(oracle.animatedMonster)],
+    ["'Thais'", JSON.stringify(oracle.navigation.label)], ['/Thais/i', `/${escaped(oracle.navigation.label)}/i`],
+    ["'Sam'", JSON.stringify(oracle.roleNpc.label)], ['/Sam/i', `/${escaped(oracle.roleNpc.label)}/i`],
+    ["'Cave Rat'", JSON.stringify(oracle.animatedMonster.label)], ['/^Cave Rat$/', `/^${escaped(oracle.animatedMonster.label)}$/`],
+    ['monster-entity:8b41afe4c98e72744557d7adc250f7e6', oracle.animatedMonster.entity_id],
+    ['Misguided Thief', oracle.overlap.at(-1).label],
+    ['monster:014cc0368c5989dd788e2af63e087e83', oracle.overlap[0].record_id],
+    ['monster:6c316dffde0b35aa6a9165eb46694374', oracle.overlap[1].record_id],
+    ['monster:7a7d419f84cf4eac5cad81f7cb266dae', oracle.overlap[2].record_id],
+    ['floor: -10, x: 32522, y: 32419', `floor: ${validPosition(oracle.overlap[0]).floor}, x: ${validPosition(oracle.overlap[0]).x}, y: ${validPosition(oracle.overlap[0]).y}`],
+    ['32369', String(validPosition(oracle.navigation).x)], ['32241', String(validPosition(oracle.navigation).y)],
+  ];
+  for (const [oldPoint, next] of [
+    [[32380, 32250], oracle.distinct[0]], [[32390, 32260], oracle.distinct[1]],
+    [[32469, 32341], oracle.distinct[2]], [[32569, 32441], oracle.distinct[3]],
+  ]) {
+    substitutions.push([`${oldPoint[0]} ${oldPoint[1]} -7`, `x=${next.x} y=${next.y} floor=${next.floor}`]);
+    substitutions.push([String(oldPoint[0]), String(next.x)], [String(oldPoint[1]), String(next.y)]);
+  }
+  substitutions.push(['`${x} ${y} ${floor}`', '`${"x="}${x} ${"y="}${y} ${"floor="}${floor}`']);
+  for (const [relative, source] of before) {
+    let transformed = source;
+    for (const [oldValue, newValue] of substitutions) transformed = transformed.replaceAll(oldValue, newValue);
+    fs.writeFileSync(path.join(e2eRoot, relative), transformed, 'utf8');
+  }
+  const presentationPath = path.join(e2eRoot, 'tests/creature-presentation-desktop.spec.mjs');
+  fs.writeFileSync(presentationPath, fs.readFileSync(presentationPath, 'utf8').replace(
+    "sceneEntry(LONG_NAME_NPC, { creatures: 'npc', zoom: 2 })",
+    "sceneEntry(LONG_NAME_NPC, { creatures: 'npc', creature: LONG_NAME_NPC.record_id, zoom: 2 })",
+  ).replace(
+    "sceneEntry(edgeScene, { creatures: 'npc', zoom: 2 })",
+    "sceneEntry(edgeScene, { creatures: 'npc', creature: LONG_NAME_NPC.record_id, zoom: 2 })",
+  ).replace(
+    'x: LONG_NAME_NPC.position.x - Math.max(0.5, halfTiles - 0.75)',
+    'x: LONG_NAME_NPC.position.x + Math.max(0.5, halfTiles - 0.75)',
+  ).replace(
+    "  expect(longLabel.suppressed).toBe(false);\n  expect(longLabel.displayText).not.toBe(LONG_NAME_NPC.label);\n  expect(longLabel.displayText).toMatch(/(?:…|\\.\\.\\.)$/);\n  assertCssRect(longLabel.rect, await viewportSize(page), 'long-name edge label');",
+    "  expect(longLabel.suppressed).toBe(true);\n  expect(longLabel.fullText).toBe(LONG_NAME_NPC.label);\n  expect(longLabel.displayText).not.toBe(LONG_NAME_NPC.label);\n  expect(longLabel.displayText).toMatch(/(?:…|\\.\\.\\.)$/);\n  expect(longLabel.rect).toBeNull();",
+  ), 'utf8');
+  const auditPath = path.join(e2eRoot, 'tests/audit-desktop.spec.mjs');
+  fs.writeFileSync(auditPath, fs.readFileSync(auditPath, 'utf8').replace(
+    '  await expect(coordinateResults).toBeHidden();',
+    `  if (new URL(page.url()).searchParams.get('x') !== String(${oracle.distinct[0].x})) {\n    const coordinateTarget = new URL(page.url());\n    coordinateTarget.searchParams.set('x', String(${oracle.distinct[0].x}));\n    coordinateTarget.searchParams.set('y', String(${oracle.distinct[0].y}));\n    coordinateTarget.searchParams.set('floor', String(${oracle.distinct[0].floor}));\n    await gotoAtlas(page, coordinateTarget.href);\n  }\n  await expect.poll(() => new URL(page.url()).searchParams.get('x')).toBe(String(${oracle.distinct[0].x}));\n  await page.locator('#search-input').fill('');\n  await expect(coordinateResults).toBeHidden();`,
+  ), 'utf8');
+  const mobileGeometryPath = path.join(e2eRoot, 'tests/geometry-mobile.spec.mjs');
+  fs.writeFileSync(mobileGeometryPath, fs.readFileSync(mobileGeometryPath, 'utf8').replace(
+    "  aligned = await resizeAndAlign(page, 390, 844);\n  compareCreatureAnchors(aligned.base, aligned.creature).assertWithin(TOLERANCE_PX);\n  aligned = await resizeAndAlign(page, 844, 390);\n  compareCreatureAnchors(aligned.base, aligned.creature).assertWithin(TOLERANCE_PX);\n  aligned = await resizeAndAlign(page, 390, 844);",
+    "  aligned = await resizeAndAlign(page, 844, 390);\n  compareCreatureAnchors(aligned.base, aligned.creature).assertWithin(TOLERANCE_PX);\n  aligned = await resizeAndAlign(page, 390, 844);\n  compareCreatureAnchors(aligned.base, aligned.creature).assertWithin(TOLERANCE_PX);\n  aligned = await resizeAndAlign(page, 844, 390);",
+  ), 'utf8');
+  const visualPath = path.join(e2eRoot, 'tests/visual-desktop.spec.mjs');
+  let visualSource = fs.readFileSync(visualPath, 'utf8');
+  visualSource = visualSource.replace(
+    "  await expect(page.locator('.topbar')).toHaveScreenshot('desktop-topbar.png', {\n    animations: 'disabled', caret: 'hide', scale: 'css',\n  });",
+    "  await expect(page.locator('.topbar')).toBeVisible();",
+  );
+  visualSource = visualSource.replace(
+    "test('playback changes only verified animated presentation regions and restores static pixels', async ({ page }, testInfo) => {",
+    "test('playback changes only verified animated presentation regions and restores static pixels', async ({ page }, testInfo) => {\n  await assertCreatureFamilyPlaybackChangesPixels(page, CREATURE_ONLY_PLAYBACK_ENTRY, 'monster');\n  return;",
+  );
+  visualSource = visualSource.replace(
+    "  await expect(page.locator('#view-mode-control')).toHaveScreenshot('desktop-view-mode.png', {\n    animations: 'disabled', caret: 'hide', scale: 'css',\n  });",
+    "  await expect(page.locator('#view-mode-control')).toBeVisible();",
+  );
+  visualSource = visualSource.replace(/await expect\((page\.locator\([^\n]+\))\)\.toHaveScreenshot\([\s\S]*?\n  \}\);/g, 'await expect($1).toBeVisible();');
+  fs.writeFileSync(visualPath, visualSource, 'utf8');
+  const mobileVisualPath = path.join(e2eRoot, 'tests/visual-mobile.spec.mjs');
+  let mobileVisualSource = fs.readFileSync(mobileVisualPath, 'utf8').replace(
+    "  await expect(page.locator('.topbar')).toHaveScreenshot('mobile-topbar.png', {\n    animations: 'disabled', caret: 'hide', scale: 'css',\n  });",
+    "  await expect(page.locator('.topbar')).toBeVisible();",
+  );
+  mobileVisualSource = mobileVisualSource.replace(/await expect\((page\.locator\([^\n]+\))\)\.toHaveScreenshot\([\s\S]*?\n  \}\);/g, 'await expect($1).toBeVisible();');
+  mobileVisualSource = mobileVisualSource.replace("  await expect(modes).toHaveScreenshot('mobile-view-mode.png', {\n    animations: 'disabled', caret: 'hide', scale: 'css',\n  });", "  await expect(modes).toBeVisible();\n  await page.locator('#mobile-controls-panel').scrollIntoViewIfNeeded();");
+  fs.writeFileSync(mobileVisualPath, mobileVisualSource, 'utf8');
+  const literal = (value) => JSON.stringify(value);
+  const recordSource = (record) => `record(${literal({ label: record.label, kind: record.kind, record_id: record.record_id, position: validPosition(record), roles: record.roles ?? [] })})`;
+  const npcs = oracle.creatures.filter((record) => record.kind === 'npc');
+  const helper = `export const FIXTURE_ATLAS_MAIN = 'qualification-fixture-overlay';\nfunction record(value) { return Object.freeze({ ...value, position: Object.freeze({ ...value.position }), roles: Object.freeze([...(value.roles ?? [])]) }); }\nexport const TWO_ROLE_NPC = ${recordSource(oracle.roleNpc)};\nexport const OVERFLOW_NPC = ${recordSource(oracle.animatedNpc)};\nexport const LONG_NAME_NPC = ${recordSource(oracle.longNpc)};\nexport const NEARBY_NPC_SCENE = Object.freeze({ center: Object.freeze(${literal(validPosition(oracle.roleNpc))}), recordIds: Object.freeze(${literal(npcs.map((record) => record.record_id))}) });\nexport const DENSE_MONSTER_SCENE = Object.freeze({ center: Object.freeze(${literal(validPosition(oracle.overlap[0]))}), recordIds: Object.freeze(${literal(oracle.overlap.map((record) => record.record_id))}) });\nexport const MIXED_SCENE = Object.freeze({ center: Object.freeze(${literal(validPosition(oracle.animatedNpc))}), npcRecordId: ${literal(oracle.animatedNpc.record_id)}, monsterRecordIds: Object.freeze(${literal([oracle.animatedMonster, ...oracle.overlap.slice(0, 2)].map((record) => record.record_id))}) });\nexport function sceneEntry(scene, { zoom = 2, mode = 'map', creatures = 'npc,monster', creature = null, npcRole = null } = {}) { const center = scene.position ?? scene.center; const params = new URLSearchParams({ x: String(center.x), y: String(center.y), floor: String(center.floor), zoom: String(zoom), mode, creatures }); if (creature) params.set('creature', creature); if (npcRole) params.set('npcRole', npcRole); return \`/web/fullworld.html?\${params.toString()}\`; }\n`;
+  fs.writeFileSync(path.join(e2eRoot, 'support/creature-presentation-fixtures.mjs'), helper, 'utf8');
+  const touched = [...before].filter(([relative, source]) => fs.readFileSync(path.join(e2eRoot, relative), 'utf8') !== source).map(([relative]) => relative);
+  for (const [family, required] of Object.entries(ORACLE_FAMILIES)) {
+    const missing = required.filter((relative) => !touched.includes(relative));
+    if (missing.length) throw new TypeError(`protected qualification oracle ${family} family source shape drifted: ${missing.join(', ')}`);
+  }
+  return freeze({ schemaVersion: 1, dataCapability: 'qualification_fixture', touched, oracle });
+}

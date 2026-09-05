@@ -493,6 +493,11 @@ jobs:
           rm -f "$execution_context/.dockerignore" "$execution_context/e2e/Dockerfile.dockerignore"
           mkdir -p "$execution_context/tools/verification"
           cp trusted-base/tools/verification/stable-id.mjs "$execution_context/tools/verification/stable-id.mjs"
+          E2E_ROOT="$execution_context/e2e" PRODUCT_ROOT="$source_root" node --input-type=module <<'NODE'
+          import { materializeQualificationFixtureOracleOverlay } from './trusted-base/tools/verification/qualification-repair-policy.mjs';
+          const result = materializeQualificationFixtureOracleOverlay({ e2eRoot: process.env.E2E_ROOT, productRoot: process.env.PRODUCT_ROOT });
+          if (result.dataCapability !== 'qualification_fixture' || result.touched.length === 0) throw new TypeError('protected qualification oracle overlay was not materialized');
+          NODE
 
           digest() {
             printf '%s' "$1" | sha256sum | awk '{print "sha256:" $1}'
@@ -521,4 +526,3 @@ jobs:
           compose config -q
           compose up -d --wait atlas-publication atlas-web
           compose run --no-deps --rm e2e
-

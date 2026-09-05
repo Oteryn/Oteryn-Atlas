@@ -47,4 +47,3 @@ test('qualification repair proof validates the actual runtime-trust contract', (
   assert.match(workflow, /independentlyVerifyQualificationProduct/);
   assert.doesNotMatch(workflow, /verifyQualificationWorld } from '\/candidate/);
 });
-

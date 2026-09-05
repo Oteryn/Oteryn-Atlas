@@ -8,6 +8,7 @@ import test from 'node:test';
 import {
   classifyQualificationRepairStatuses,
   independentlyVerifyQualificationProduct,
+  materializeQualificationFixtureOracleOverlay,
   validateQualificationRepairBootstrapPinRotations,
   validateQualificationRepairControlPlaneBootstrap,
   validateQualificationRepairProductRepin,
@@ -16,6 +17,26 @@ import {
 const digest = (c) => `sha256:${c.repeat(64)}`;
 const plan = { profile: 'full', requiredGroupIds: ['deterministic.core', 'e2e.full'], requiredDataCapabilities: ['qualification_fixture'], retryPolicy: { retries: 0 } };
 const gitBlob = (text) => crypto.createHash('sha1').update(Buffer.concat([Buffer.from(`blob ${Buffer.byteLength(text)}\0`), Buffer.from(text)])).digest('hex');
+function writeOracleProduct(root) {
+  fs.mkdirSync(path.join(root, 'web/semantic-search'), { recursive: true });
+  fs.mkdirSync(path.join(root, 'data/creatures'), { recursive: true });
+  fs.mkdirSync(path.join(root, 'runtime-index/floors'), { recursive: true });
+  const at = (x, y) => ({ x, y, floor: -7 });
+  const semantic = [
+    { label: 'Fixture Harbor', capabilities: ['navigation'], position: at(32280, 32155) },
+    ...[1, 2, 3, 4].map((value) => ({ label: `Point ${value}`, capabilities: ['overlay-point'], position: at(32280 + value, 32155 + value) })),
+  ];
+  const creatures = [
+    { kind: 'npc', label: 'Fixture Guide', record_id: `npc:${'1'.repeat(32)}`, entity_id: `npc-entity:${'1'.repeat(32)}`, roles: ['shop', 'quest'], position: at(32280, 32155) },
+    { kind: 'npc', label: 'Fixture Wayfarer', record_id: `npc:${'2'.repeat(32)}`, entity_id: `npc-entity:${'2'.repeat(32)}`, roles: ['shop', 'quest', 'travel', 'trainer'], outfit_presentation: {}, position: at(32282, 32155) },
+    { kind: 'npc', label: 'Fixture Cartographer With A Deliberately Long Name', record_id: `npc:${'3'.repeat(32)}`, entity_id: `npc-entity:${'3'.repeat(32)}`, roles: [], position: at(32284, 32155) },
+    { kind: 'monster', label: 'Fixture Sentinel', record_id: `monster:${'a'.repeat(32)}`, entity_id: `monster-entity:${'a'.repeat(32)}`, outfit_presentation: {}, position: at(32280, 32158) },
+    ...['b', 'c', 'd'].map((value) => ({ kind: 'monster', label: `Raider ${value}`, record_id: `monster:${value.repeat(32)}`, entity_id: `monster-entity:${value.repeat(32)}`, position: at(32283, 32158) })),
+  ];
+  fs.writeFileSync(path.join(root, 'web/semantic-search/index.json'), JSON.stringify({ records: semantic }));
+  fs.writeFileSync(path.join(root, 'data/creatures/search.json'), JSON.stringify({ records: creatures }));
+  fs.writeFileSync(path.join(root, 'runtime-index/floors/f-7.json'), JSON.stringify({ bounds: { x_min: 32224, x_max_exclusive: 32512, y_min: 32096, y_max_exclusive: 32384 } }));
+}
 
 test('candidate E2E is never admitted and product paths remain closed', () => {
   assert.throws(() => validateQualificationRepairTransition({ changedPaths: ['e2e/tests/desktop.spec.mjs'], protectedPlan: plan, candidatePlan: plan }), /not eligible/);
@@ -67,3 +88,37 @@ test('bootstrap pins permit only exact mechanical rotations', () => {
   assert.throws(() => validateQualificationRepairBootstrapPinRotations({ ...args, candidateGateBlob: 'A'.repeat(40) }), /lowercase/);
 });
 
+test('protected qualification overlay adapts every unresolved oracle family from publication structure', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-oracle-'));
+  const e2eRoot = path.join(root, 'e2e');
+  const productRoot = path.join(root, 'product');
+  fs.cpSync(path.resolve('e2e'), e2eRoot, { recursive: true, filter: (source) => !source.includes('node_modules') });
+  fs.cpSync(path.resolve('web'), path.join(root, 'web'), { recursive: true });
+  fs.mkdirSync(path.join(root, 'src/browser'), { recursive: true });
+  fs.copyFileSync('src/browser/semantic-search.mjs', path.join(root, 'src/browser/semantic-search.mjs'));
+  writeOracleProduct(productRoot);
+  const result = materializeQualificationFixtureOracleOverlay({ e2eRoot, productRoot });
+  assert.equal(result.dataCapability, 'qualification_fixture');
+  for (const expected of [
+    'tests/runtime.mjs', 'tests/state-desktop.spec.mjs', 'tests/race-desktop.spec.mjs',
+    'tests/desktop.spec.mjs', 'tests/visual-desktop.spec.mjs', 'tests/visual-mobile.spec.mjs',
+    'tests/creatures-desktop.spec.mjs', 'tests/farm-explorer-desktop.spec.mjs',
+    'tests/geometry-desktop.spec.mjs', 'tests/performance-desktop.spec.mjs',
+    'tests/soak-desktop.spec.mjs', 'tests/stress-desktop.spec.mjs',
+  ]) assert.ok(result.touched.includes(expected), expected);
+  assert.doesNotMatch(fs.readFileSync(path.join(e2eRoot, 'tests/desktop.spec.mjs'), 'utf8'), /Thais/);
+  assert.doesNotMatch(fs.readFileSync(path.join(e2eRoot, 'tests/farm-explorer-desktop.spec.mjs'), 'utf8'), /Cave Rat/);
+});
+
+test('protected qualification overlay fails closed on unknown protected source drift', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-oracle-drift-'));
+  const e2eRoot = path.join(root, 'e2e');
+  const productRoot = path.join(root, 'product');
+  fs.cpSync(path.resolve('e2e'), e2eRoot, { recursive: true, filter: (source) => !source.includes('node_modules') });
+  fs.cpSync(path.resolve('web'), path.join(root, 'web'), { recursive: true });
+  fs.mkdirSync(path.join(root, 'src/browser'), { recursive: true });
+  fs.copyFileSync('src/browser/semantic-search.mjs', path.join(root, 'src/browser/semantic-search.mjs'));
+  writeOracleProduct(productRoot);
+  fs.writeFileSync(path.join(e2eRoot, 'tests/stress-desktop.spec.mjs'), 'unknown source\n');
+  assert.throws(() => materializeQualificationFixtureOracleOverlay({ e2eRoot, productRoot }), /source (?:shape|fingerprint) drifted/);
+});

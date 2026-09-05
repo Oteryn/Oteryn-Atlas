@@ -65,4 +65,3 @@ test('candidate policy bytes cannot self-authorize bootstrap', () => {
   assert.doesNotMatch(repair, /import .* from '\.\/tools\/verification\/qualification-repair-policy\.mjs'/);
   assert.match(repair, /trusted-base\/tools\/verification\/qualification-repair-policy\.mjs/);
 });
-
