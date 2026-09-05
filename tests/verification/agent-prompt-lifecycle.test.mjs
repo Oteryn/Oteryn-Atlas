@@ -24,6 +24,15 @@ const FORBIDDEN_CANARY_SECTIONS = [
   'Live deployment authority',
 ];
 
+function readOptionalCache(directory) {
+  try {
+    return readdirSync(directory).filter((name) => name.endsWith('.md'));
+  } catch (error) {
+    if (error.code === 'ENOENT') return [];
+    throw error;
+  }
+}
+
 test('Atlas Documentation/Agent IA has one mutable lifecycle authority', () => {
   assert.equal(existsSync(REGISTRY), false, 'mutable Documentation/Agent IA registry mirror must be removed');
   assert.equal(existsSync(REGISTRY_VALIDATOR), false, 'registry-only validator must be removed');
@@ -41,8 +50,8 @@ test('Atlas Documentation/Agent IA has one mutable lifecycle authority', () => {
 });
 
 test('task cache structure cannot classify the same packet as active and archived', () => {
-  const active = new Set(readdirSync(ACTIVE_TASKS).filter((name) => name.endsWith('.md')));
-  const archived = new Set(readdirSync(ARCHIVED_TASKS).filter((name) => name.endsWith('.md')));
+  const active = new Set(readOptionalCache(ACTIVE_TASKS));
+  const archived = new Set(readOptionalCache(ARCHIVED_TASKS));
   const overlap = [...active].filter((name) => archived.has(name)).sort();
   assert.deepEqual(overlap, [], 'task packet cannot exist in both lifecycle cache directories');
 });
