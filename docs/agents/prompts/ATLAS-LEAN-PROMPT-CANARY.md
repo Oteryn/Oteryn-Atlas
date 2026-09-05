@@ -1,6 +1,7 @@
 # ATLAS-LEAN-PROMPT-CANARY
 
-Lifecycle: Oteryn/Oteryn-Atlas#322  
+Lifecycle: Oteryn/Oteryn-Atlas#322
+
 Parent: Oteryn/Oteryn#140
 
 ## Outcome
