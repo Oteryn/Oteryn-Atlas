@@ -15,6 +15,13 @@ function stepBody(name) {
   return WORKFLOW.slice(start, next === -1 ? WORKFLOW.length : next);
 }
 
+test('one-shot bootstrap does not import future policy exports from protected main', () => {
+  const bootstrap = stepBody('Validate exact protected qualification repair bootstrap evidence');
+  const oneShot = bootstrap.slice(0, bootstrap.indexOf('gh api "repos/$GITHUB_REPOSITORY/commits/$candidate_head_sha/status"'));
+  assert.doesNotMatch(oneShot, /validateQualificationRepairControlPlaneBootstrap/);
+  assert.match(oneShot, /exactControlPlanePaths/);
+});
+
 test('merge queue consumes exact protected qualification repair evidence before stale-base full fixture proof', () => {
   const repair = stepBody('Validate exact protected qualification repair bootstrap evidence');
   const full = stepBody('Prove complete protected-base browser qualification for synthetic candidate');
@@ -52,11 +59,11 @@ test('protected repair producer executes the entire protected e2e.full stable-ID
 
 test('self-retiring bootstrap remains a closed control-plane-only path', () => {
   const repair = stepBody('Validate exact protected qualification repair bootstrap evidence');
-  assert.match(repair, /from '\.\/trusted-base\/tools\/verification\/qualification-repair-policy\.mjs'/);
+  assert.match(repair, /exactControlPlanePaths/);
   assert.doesNotMatch(repair, /from '\.\/tools\/verification\/qualification-repair-policy\.mjs'/);
   assert.match(repair, /candidate provenance verifier is not an exact gate-pin rotation/);
-  assert.match(repair, /creatureRegionCount/);
-  assert.match(repair, /semanticRecordCount/);
+  assert.match(repair, /regions\.size !== 1/);
+  assert.match(repair, /QUALIFICATION_SEMANTIC_RECORD/);
   assert.match(repair, /self-retiring-control-plane-bootstrap/);
 });
 

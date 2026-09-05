@@ -342,10 +342,26 @@ jobs:
           import crypto from 'node:crypto';
           import fs from 'node:fs';
           import { QUALIFICATION_CREATURES, QUALIFICATION_FIXTURE_ID, QUALIFICATION_SEMANTIC_RECORD } from './trusted-base/tools/verification/qualification-fixture-definition.mjs';
-          import { validateQualificationRepairControlPlaneBootstrap } from './trusted-base/tools/verification/qualification-repair-policy.mjs';
           const changedPaths = fs.readFileSync(process.env.CHANGES, 'utf8').trim().split(/\r?\n/).filter(Boolean);
+          const exactControlPlanePaths = [
+            '.github/workflows/merge-authority-audit.yml',
+            '.github/workflows/merge-group-gate.yml',
+            '.github/workflows/protected-qualification-repair.yml',
+            'tests/verification/issue-314-qualification-path.test.mjs',
+            'tests/verification/issue-314-qualification-repair-trust.test.mjs',
+            'tests/verification/merge-group-qualification-repair-bootstrap.test.mjs',
+            'tests/verification/merge-queue-gate-contract.test.mjs',
+            'tests/verification/qualification-fixture-oracle-overlay.test.mjs',
+            'tests/verification/qualification-repair-policy.test.mjs',
+            'tools/governance/verify_extraction_provenance.py',
+            'tools/verification/qualification-repair-policy.mjs',
+          ].sort();
+          if (JSON.stringify(changedPaths) !== JSON.stringify(exactControlPlanePaths)) throw new TypeError('bootstrap is not the exact protected control-plane transition');
           const regions = new Set(QUALIFICATION_CREATURES.map(({ position }) => `${Math.floor(position.x / 32)}:${Math.floor(position.y / 32)}:${position.floor}`));
-          validateQualificationRepairControlPlaneBootstrap({ changedPaths, protectedFixtureShape: { fixtureId: QUALIFICATION_FIXTURE_ID, creatureCount: QUALIFICATION_CREATURES.length, creatureRegionCount: regions.size, semanticRecordCount: QUALIFICATION_SEMANTIC_RECORD ? 1 : 0 } });
+          if (QUALIFICATION_FIXTURE_ID !== 'atlas-qualification-world-v2' || QUALIFICATION_CREATURES.length !== 12
+            || regions.size !== 1 || (QUALIFICATION_SEMANTIC_RECORD ? 1 : 0) !== 1) {
+            throw new TypeError('protected base no longer has the exact pre-fix qualification fixture');
+          }
           const read = (root, relative) => fs.readFileSync(`${root}/${relative}`, 'utf8');
           const blob = (text) => crypto.createHash('sha1').update(Buffer.concat([Buffer.from(`blob ${Buffer.byteLength(text)}\0`), Buffer.from(text)])).digest('hex');
           const exactOne = (text, expression, label) => { const matches = text.match(expression) ?? []; if (matches.length !== 1) throw new TypeError(`${label} must occur exactly once`); return matches[0]; };

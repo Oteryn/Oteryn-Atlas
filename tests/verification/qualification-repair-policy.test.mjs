@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { buildQualificationWorld } from '../../tools/verification/qualification-world.mjs';
 
 import {
   classifyQualificationRepairStatuses,
@@ -20,6 +21,7 @@ const gitBlob = (text) => crypto.createHash('sha1').update(Buffer.concat([Buffer
 function writeOracleProduct(root) {
   fs.mkdirSync(path.join(root, 'web/semantic-search'), { recursive: true });
   fs.mkdirSync(path.join(root, 'data/creatures'), { recursive: true });
+  fs.mkdirSync(path.join(root, 'data/creatures/chunks/f-7'), { recursive: true });
   fs.mkdirSync(path.join(root, 'runtime-index/floors'), { recursive: true });
   const at = (x, y) => ({ x, y, floor: -7 });
   const semantic = [
@@ -35,6 +37,9 @@ function writeOracleProduct(root) {
   ];
   fs.writeFileSync(path.join(root, 'web/semantic-search/index.json'), JSON.stringify({ records: semantic }));
   fs.writeFileSync(path.join(root, 'data/creatures/search.json'), JSON.stringify({ records: creatures }));
+  const published = creatures.map(({ label, ...record }) => ({ ...record, name: label, presentation_resolution_state: record.outfit_presentation ? 'RESOLVED' : 'FALLBACK_MARKER' }));
+  fs.writeFileSync(path.join(root, 'data/creatures/index.json'), JSON.stringify({ chunks: [{ path: 'chunks/f-7/fixture.json' }] }));
+  fs.writeFileSync(path.join(root, 'data/creatures/chunks/f-7/fixture.json'), JSON.stringify({ records: published }));
   fs.writeFileSync(path.join(root, 'runtime-index/floors/f-7.json'), JSON.stringify({ bounds: { x_min: 32224, x_max_exclusive: 32512, y_min: 32096, y_max_exclusive: 32384 } }));
 }
 
@@ -55,10 +60,26 @@ test('independent product proof rejects tampered bytes and lying manifest', () =
   fs.writeFileSync(path.join(root, 'data'), 'truth');
   const entry = { path: 'data', bytes: 5, digest: digest('0') };
   entry.digest = `sha256:${crypto.createHash('sha256').update('truth').digest('hex')}`;
-  const productDigest = `sha256:${crypto.createHash('sha256').update('[{\"bytes\":5,\"digest\":'+JSON.stringify(entry.digest)+',\"path\":\"data\"}]').digest('hex')}`;
+  const productDigest = `sha256:${crypto.createHash('sha256').update('[{\"bytes\":5,\"digest\":'+JSON.stringify(entry.digest)+',\"path\":\"data\"}]\n').digest('hex')}`;
   assert.equal(independentlyVerifyQualificationProduct(root, { files: [entry], productDigest }).productDigest, productDigest);
   fs.writeFileSync(path.join(root, 'data'), 'lie');
   assert.throws(() => independentlyVerifyQualificationProduct(root, { files: [entry], productDigest }), /independently/);
+});
+
+test('independent product proof hashes the exact canonical qualification-world bytes', async () => {
+  const root = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-repair-canonical-')), 'product');
+  await buildQualificationWorld(root);
+  const manifest = JSON.parse(fs.readFileSync(path.join(root, 'fixture-manifest.json'), 'utf8'));
+  assert.equal(independentlyVerifyQualificationProduct(root, manifest).productDigest, manifest.productDigest);
+});
+
+test('oracle resolves presentation sentinels and four anchors from the real narrow fixture', async () => {
+  const root = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-oracle-real-')), 'product');
+  await buildQualificationWorld(root);
+  const oracle = (await import('../../tools/verification/qualification-repair-policy.mjs')).resolveQualificationFixtureOracle(root);
+  assert.equal(typeof oracle.animatedNpc.presentation_resolution_state, 'string');
+  assert.ok(oracle.animatedMonster.outfit_presentation);
+  assert.equal(new Set(oracle.distinct.map(({ x, y, floor }) => `${x}:${y}:${floor}`)).size, 4);
 });
 
 test('identity repin preserves the complete protected mirror', () => {
@@ -121,4 +142,18 @@ test('protected qualification overlay fails closed on unknown protected source d
   writeOracleProduct(productRoot);
   fs.writeFileSync(path.join(e2eRoot, 'tests/stress-desktop.spec.mjs'), 'unknown source\n');
   assert.throws(() => materializeQualificationFixtureOracleOverlay({ e2eRoot, productRoot }), /source (?:shape|fingerprint) drifted/);
+});
+
+test('candidate runtime repair paths are validated by shape rather than protected byte fingerprints', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-oracle-runtime-'));
+  const e2eRoot = path.join(root, 'e2e');
+  const productRoot = path.join(root, 'product');
+  fs.cpSync(path.resolve('e2e'), e2eRoot, { recursive: true, filter: (source) => !source.includes('node_modules') });
+  fs.cpSync(path.resolve('web'), path.join(root, 'web'), { recursive: true });
+  fs.appendFileSync(path.join(root, 'web/fullworld-search.mjs'), '\n// admitted runtime repair\n');
+  fs.mkdirSync(path.join(root, 'src/browser'), { recursive: true });
+  fs.copyFileSync('src/browser/semantic-search.mjs', path.join(root, 'src/browser/semantic-search.mjs'));
+  fs.appendFileSync(path.join(root, 'src/browser/semantic-search.mjs'), '\n// admitted runtime repair\n');
+  writeOracleProduct(productRoot);
+  assert.equal(materializeQualificationFixtureOracleOverlay({ e2eRoot, productRoot }).dataCapability, 'qualification_fixture');
 });

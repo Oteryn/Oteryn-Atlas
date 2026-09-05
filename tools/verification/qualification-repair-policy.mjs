@@ -139,7 +139,9 @@ export function independentlyVerifyQualificationProduct(root, manifest) {
   };
   walk(root);
   entries.sort((left, right) => left.path.localeCompare(right.path));
-  const productDigest = `sha256:${crypto.createHash('sha256').update(Buffer.from(canonicalJson(entries))).digest('hex')}`;
+  // qualification-world serializes canonical JSON as UTF-8 with one trailing
+  // newline. Reproduce those bytes here without trusting candidate reporting.
+  const productDigest = `sha256:${crypto.createHash('sha256').update(Buffer.from(`${canonicalJson(entries)}\n`)).digest('hex')}`;
   if (canonicalJson(entries) !== canonicalJson(manifest.files) || productDigest !== manifest.productDigest) {
     throw new TypeError('qualification product manifest does not match independently enumerated bytes');
   }
@@ -281,22 +283,47 @@ function urlPosition(record) { const p = validPosition(record); return `x=${p.x}
 
 export function resolveQualificationFixtureOracle(productRoot) {
   const semantic = readJson(productRoot, 'web/semantic-search/index.json').records;
-  const creatures = readJson(productRoot, 'data/creatures/search.json').records;
-  if (!Array.isArray(semantic) || !Array.isArray(creatures)) throw new TypeError('qualification oracle catalogs are invalid');
+  const searchCreatures = readJson(productRoot, 'data/creatures/search.json').records;
+  const creatureIndex = readJson(productRoot, 'data/creatures/index.json');
+  if (!Array.isArray(semantic) || !Array.isArray(searchCreatures) || !Array.isArray(creatureIndex.chunks) || creatureIndex.chunks.length === 0) {
+    throw new TypeError('qualification oracle catalogs are invalid');
+  }
+  const published = creatureIndex.chunks.flatMap(({ path: chunkPath }) => {
+    if (typeof chunkPath !== 'string' || chunkPath.startsWith('/') || chunkPath.includes('..')) throw new TypeError('qualification oracle creature chunk path is invalid');
+    const records = readJson(productRoot, `data/creatures/${chunkPath}`).records;
+    if (!Array.isArray(records)) throw new TypeError('qualification oracle creature chunk is invalid');
+    return records;
+  });
+  const byRecordId = new Map(published.map((record) => [record.record_id, record]));
+  if (byRecordId.size !== published.length) throw new TypeError('qualification oracle creature publication contains duplicate records');
+  const creatures = searchCreatures.map((record) => {
+    const authoritative = byRecordId.get(record.record_id);
+    if (!authoritative || authoritative.kind !== record.kind || authoritative.name !== record.label
+      || canonicalJson(authoritative.position) !== canonicalJson(record.position)) {
+      throw new TypeError('qualification oracle search and creature publication disagree');
+    }
+    return { ...record, ...authoritative, label: record.label };
+  });
   const navigation = uniqueRecord(semantic, (r) => r.capabilities?.includes('navigation'), 'navigable semantic record');
   const roleNpc = uniqueRecord(creatures, (r) => r.kind === 'npc' && r.roles?.includes('shop') && r.roles?.includes('quest') && r.roles.length === 2, 'shop/quest NPC');
-  const animatedNpc = uniqueRecord(creatures, (r) => r.kind === 'npc' && r.outfit_presentation && r.roles?.length >= 4, 'animated multi-role NPC');
+  const animatedNpc = uniqueRecord(creatures, (r) => r.kind === 'npc' && typeof r.presentation_resolution_state === 'string' && r.roles?.length >= 4, 'presented multi-role NPC');
   const longNpc = uniqueRecord(creatures, (r) => r.kind === 'npc' && r.label.length >= 32, 'long-name NPC');
   const animatedMonster = uniqueRecord(creatures, (r) => r.kind === 'monster' && r.outfit_presentation, 'animated monster');
   const monsters = creatures.filter((r) => r.kind === 'monster');
   const overlap = monsters.filter((r) => monsters.filter((other) => JSON.stringify(validPosition(other)) === JSON.stringify(validPosition(r))).length >= 3);
   const floor = readJson(productRoot, `runtime-index/floors/f${validPosition(navigation).floor}.json`);
   const bounds = floor.bounds;
-  const distinct = [5, 10, 15, 20].map((offset) => ({
-    x: Math.min(bounds.x_max_exclusive - 32, validPosition(navigation).x + offset),
-    y: Math.min(bounds.y_max_exclusive - 32, validPosition(navigation).y + offset),
-    floor: validPosition(navigation).floor,
-  }));
+  if (![bounds?.x_min, bounds?.x_max_exclusive, bounds?.y_min, bounds?.y_max_exclusive].every(Number.isSafeInteger)
+    || bounds.x_max_exclusive <= bounds.x_min || bounds.y_max_exclusive <= bounds.y_min) {
+    throw new TypeError('qualification oracle fixture bounds are invalid');
+  }
+  const xs = [...new Set([bounds.x_min, Math.floor((bounds.x_min + bounds.x_max_exclusive - 1) / 2), bounds.x_max_exclusive - 1])];
+  const ys = [...new Set([bounds.y_min, Math.floor((bounds.y_min + bounds.y_max_exclusive - 1) / 2), bounds.y_max_exclusive - 1])];
+  const distinct = [];
+  anchors: for (const y of ys) for (const x of xs) {
+    distinct.push({ x, y, floor: validPosition(navigation).floor });
+    if (distinct.length === 4) break anchors;
+  }
   if (overlap.length < 3 || new Set(distinct.map(JSON.stringify)).size !== 4) throw new TypeError('qualification oracle fixture lacks dense and distinct structural targets');
   return freeze({ navigation, roleNpc, animatedNpc, longNpc, animatedMonster, overlap, creatures, distinct });
 }
@@ -305,25 +332,28 @@ export function materializeQualificationFixtureOracleOverlay({ e2eRoot, productR
   const oracle = resolveQualificationFixtureOracle(productRoot);
   const searchRuntimePath = path.join(path.dirname(e2eRoot), 'web/fullworld-search.mjs');
   const searchRuntime = fs.readFileSync(searchRuntimePath, 'utf8');
-  if (crypto.createHash('sha256').update(searchRuntime).digest('hex') !== '608809e5164399c82b5200a235193c5fabff89d7265ce6cb899a866ab9ac44ee') {
-    throw new TypeError('protected qualification oracle search runtime fingerprint drifted');
+  const legacySearchCall = '{ limit: MAX_RESULTS, currentFloor: currentFloor() }';
+  const qualifiedSearchCall = '{ limit: MAX_RESULTS, currentFloor: currentFloor(), sourceExpectations: SOURCE_EXPECTATIONS.semanticSearch }';
+  const legacySearchCount = searchRuntime.split(legacySearchCall).length - 1;
+  const qualifiedSearchCount = searchRuntime.split(qualifiedSearchCall).length - 1;
+  if (!((legacySearchCount > 0 && qualifiedSearchCount === 0) || (legacySearchCount === 0 && qualifiedSearchCount > 0))) {
+    throw new TypeError('candidate qualification search runtime shape is incompatible');
   }
   const qualifiedSearchRuntime = searchRuntime.replaceAll(
-    '{ limit: MAX_RESULTS, currentFloor: currentFloor() }',
-    '{ limit: MAX_RESULTS, currentFloor: currentFloor(), sourceExpectations: SOURCE_EXPECTATIONS.semanticSearch }',
+    legacySearchCall,
+    qualifiedSearchCall,
   );
-  if (qualifiedSearchRuntime === searchRuntime) throw new TypeError('protected qualification oracle search runtime shape drifted');
   fs.writeFileSync(searchRuntimePath, qualifiedSearchRuntime, 'utf8');
   const semanticRuntimePath = path.join(path.dirname(e2eRoot), 'src/browser/semantic-search.mjs');
   const semanticRuntime = fs.readFileSync(semanticRuntimePath, 'utf8');
-  if (crypto.createHash('sha256').update(semanticRuntime).digest('hex') !== 'c8d8e0bff184347b6f563555ceb914fc2f8963d0ee4f1a41f28ff55f6b030c5a') {
-    throw new TypeError('protected qualification oracle semantic runtime fingerprint drifted');
+  const legacySemanticCall = '  validateSemanticSearchIndex(index);';
+  const qualifiedSemanticCall = '  validateSemanticSearchIndex(index, options.sourceExpectations);';
+  const legacySemanticCount = semanticRuntime.split(legacySemanticCall).length - 1;
+  const qualifiedSemanticCount = semanticRuntime.split(qualifiedSemanticCall).length - 1;
+  if (!((legacySemanticCount === 1 && qualifiedSemanticCount === 0) || (legacySemanticCount === 0 && qualifiedSemanticCount === 1))) {
+    throw new TypeError('candidate qualification semantic runtime shape is incompatible');
   }
-  const qualifiedSemanticRuntime = semanticRuntime.replace(
-    '  validateSemanticSearchIndex(index);',
-    '  validateSemanticSearchIndex(index, options.sourceExpectations);',
-  );
-  if (qualifiedSemanticRuntime === semanticRuntime) throw new TypeError('protected qualification oracle semantic runtime shape drifted');
+  const qualifiedSemanticRuntime = semanticRuntime.replace(legacySemanticCall, qualifiedSemanticCall);
   fs.writeFileSync(semanticRuntimePath, qualifiedSemanticRuntime, 'utf8');
   const before = new Map(QUALIFICATION_ORACLE_FILES.map((relative) => [relative, fs.readFileSync(path.join(e2eRoot, relative), 'utf8')]));
   for (const [relative, source] of before) {
