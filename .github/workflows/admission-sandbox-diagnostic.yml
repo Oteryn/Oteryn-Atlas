@@ -49,7 +49,7 @@ jobs:
           NODE
           docker run --rm --network none --read-only --cap-drop ALL \
             --security-opt no-new-privileges --pids-limit 256 --memory 1536m --cpus 2 \
-            --user 1000:1000 --tmpfs /tmp:rw,nosuid,nodev,size=256m \
+            --env TMPDIR=/out --user 1000:1000 --tmpfs /tmp:rw,nosuid,nodev,size=256m \
             --mount "type=bind,src=$PWD/protected-source,dst=/candidate,readonly" \
             --mount "type=bind,src=$PWD/protected-source/tests,dst=/candidate/tests,readonly" \
             --mount "type=bind,src=$RUNNER_TEMP/admission-diagnostic/out,dst=/out" \
