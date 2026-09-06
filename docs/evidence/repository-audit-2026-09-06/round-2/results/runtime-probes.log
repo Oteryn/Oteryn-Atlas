@@ -1,0 +1,27 @@
+SATISFIED path-ordinary: {"input":"chunks/floor.json","target":"https://audit.invalid/semantic/chunks/floor.json"}
+SATISFIED path-parent: {"input":"../outside.json","error":"unsafe path"}
+VIOLATION path-encoded-parent: {"input":"%2e%2e/outside.json","target":"https://audit.invalid/outside.json"}
+VIOLATION path-encoded-double: {"input":"chunks/%2e%2e/%2e%2e/outside.json","target":"https://audit.invalid/outside.json"}
+SATISFIED path-scheme: {"input":"https:other.invalid/file","target":"https://audit.invalid/semantic/other.invalid/file"}
+VIOLATION path-control-prefix: {"input":"\t/outside.json","target":"https://audit.invalid/outside.json"}
+VIOLATION cache-quota-load: {"error":"QuotaExceededError: Synthetic quota exhaustion","stats":{"cacheBytes":0,"cachedGroups":0,"cacheHits":0,"cacheMisses":1,"persistentHits":0,"networkBytes":176,"rangeRequests":1},"networkDigest":"sha256:e181cb2b1b5b130854b1289b94b9c5dc74b640ce0f183742f84bc960a6cf9c28","expectedDigest":"sha256:e181cb2b1b5b130854b1289b94b9c5dc74b640ce0f183742f84bc960a6cf9c28"}
+VIOLATION cache-unavailable-load: {"calls":0,"error":"SecurityError: Synthetic denied storage"}
+VIOLATION cache-parallel-same-group: {"calls":2,"actualResidentPayloadBytes":176,"stats":{"cacheBytes":352,"cachedGroups":1,"cacheHits":0,"cacheMisses":2,"persistentHits":0,"networkBytes":352,"rangeRequests":2}}
+VIOLATION cache-floor-clear-inflight: {"stats":{"cacheBytes":176,"cachedGroups":1,"cacheHits":0,"cacheMisses":1,"persistentHits":0,"networkBytes":176,"rangeRequests":1},"note":"API-level test; integration may suppress stale scene commits independently"}
+SATISFIED cache-content-corruption: {"error":"semantic authenticated range identity mismatch"}
+SATISFIED range-header-corruption: {"error":"semantic range Content-Range mismatch"}
+VIOLATION near-boundary-url-roundtrip: {"view":{"animation":"off","debugFlags":[],"floor":-7,"layers":[],"mode":"auto","overview":false,"searchQuery":"","selected":null,"x":10,"y":5,"zoom":2},"error":"x is outside exported floor bounds"}
+SATISFIED ordinary-url-roundtrip: {"v":{"animation":"off","debugFlags":[],"floor":-7,"layers":[],"mode":"auto","overview":false,"searchQuery":"","selected":null,"x":5.1234,"y":4.4321,"zoom":2},"v2":{"animation":"off","debugFlags":[],"floor":-7,"layers":[],"mode":"auto","overview":false,"searchQuery":"","selected":null,"x":5.1234,"y":4.4321,"zoom":2}}
+VIOLATION proof-near-boundary-url-roundtrip: {"view":{"x":32441,"y":32230,"floor":-7,"zoom":2},"error":"x outside proof bounds"}
+VIOLATION proof-fractional-tile: {"value":{"x":32360.5,"y":32230.5,"floor":-7,"legacy":{"x":32360.5,"y":32230.5,"z":7},"tileRecordId":"tile:audit","presentations":[]}}
+VIOLATION bounded-manifest-stream: {"pulls":8,"cancelled":false,"consumedBytes":1048576,"declaredLimit":262144,"error":"manifest bytes exceed proof limit"}
+SATISFIED geometry-valid: {"maxDriftPx":"0","accepted":true,"log":{"checked":1,"mismatches":[],"tolerancePx":0.25}}
+SATISFIED geometry-drift: {"maxDriftPx":"20","accepted":false,"error":"creature overlay drift 20.0000px exceeds 0.25px","log":{"checked":1,"mismatches":[{"creatureGeneration":2,"baseGeneration":1,"error":"creature overlay drift 20.0000px exceeds 0.25px","maxDriftPx":20,"sample":{"id":"npc:audit","kind":"npc","dx":20,"dy":0,"driftPx":20,"expected":{"x":400,"y":300},"actual":{"x":420,"y":300}}}],"tolerancePx":0.25}}
+VIOLATION geometry-nan: {"maxDriftPx":"NaN","accepted":true,"log":{"checked":1,"mismatches":[],"tolerancePx":0.25}}
+VIOLATION geometry-missing: {"maxDriftPx":"NaN","accepted":true,"log":{"checked":1,"mismatches":[],"tolerancePx":0.25}}
+SATISFIED geometry-infinity: {"maxDriftPx":"Infinity","accepted":false,"error":"creature overlay drift Infinitypx exceeds 0.25px","log":{"checked":1,"mismatches":[{"creatureGeneration":2,"baseGeneration":1,"error":"creature overlay drift Infinitypx exceeds 0.25px","maxDriftPx":null,"sample":{"id":"npc:audit","kind":"npc","dx":null,"dy":0,"driftPx":null,"expected":{"x":400,"y":300},"actual":{"x":null,"y":300}}}],"tolerancePx":0.25}}
+VIOLATION geometry-nan-hides-real-drift: {"maxDriftPx":"NaN","perAnchor":["NaN","100"],"accepted":true}
+VIOLATION runtime-world-duplicate-floors: {"accepted":true,"uniqueFloors":1,"note":"trust pin intentionally matches test input; this probes schema, not ability to forge production trust"}
+SATISFIED fullworld-root-mismatch: {"error":"publication trusted root mismatch"}
+SATISFIED portable-sha-vectors: {"vectorCount":16,"failures":[]}
+VIOLATION canonical-prototype-key: {"inputKeys":["a","__proto__"],"output":"{\"a\":1}\n","note":"fullworld canonical-byte equality can reject this; legacy loader canonicalizes without exact-byte comparison"}

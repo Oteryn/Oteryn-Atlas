@@ -1,0 +1,20 @@
+{
+  "scope": "All deleted/modified files were created by audit in temporary sandbox directories. No user repository or host touched.",
+  "results": [
+    {
+      "id": "output-equals-input-fabric",
+      "expected": "reject overlapping output before deleting inputs",
+      "satisfied": false,
+      "sentinelSurvives": false,
+      "remainingSourceShards": 0,
+      "initialSourceShards": 1197,
+      "error": "FileNotFoundError: [Errno 2] No such file or directory: '/tmp/atlas-audit-safety-d37a4fa7/fabric/shard-0000/tiles.jsonl'"
+    },
+    {
+      "id": "published-file-hardlink-alias",
+      "type": "observation, not intrinsically a defect under enforced immutability",
+      "sameInode": true,
+      "sourceChangedWithOutput": true
+    }
+  ]
+}

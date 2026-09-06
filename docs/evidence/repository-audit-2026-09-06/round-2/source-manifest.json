@@ -1,0 +1,106 @@
+{
+  "src/browser/verified-content-cache.mjs": {
+    "blob_sha": "1fd47ad092d9379cb03483403a33c75cb5bcbbd6",
+    "bytes": 2191,
+    "lines": 53,
+    "commit": "51623c7dab2346cee39cd51e3caa845bf4b65426",
+    "source": "GitHub.fetch_file /response/turn71",
+    "inspection": "full"
+  },
+  "src/browser/semantic.mjs": {
+    "blob_sha": "61df75f257812eea13ddaddb7b771ac3c722ad97",
+    "bytes": 10556,
+    "lines": 190,
+    "commit": "51623c7dab2346cee39cd51e3caa845bf4b65426",
+    "source": "GitHub.fetch_file /response/turn72",
+    "inspection": "full"
+  },
+  "src/browser/loader.mjs": {
+    "blob_sha": "2f56433f797b4178e28d7bf1cbf86487ac2832e8",
+    "bytes": 6554,
+    "lines": 153,
+    "commit": "51623c7dab2346cee39cd51e3caa845bf4b65426",
+    "source": "GitHub.fetch_file previous /response/turn43 verified same commit",
+    "inspection": "full"
+  },
+  "src/browser/fullworld.mjs": {
+    "blob_sha": "86f908811d01d60587b0a644e8f76f803da5ab0f",
+    "bytes": 37333,
+    "lines": 656,
+    "commit": "51623c7dab2346cee39cd51e3caa845bf4b65426",
+    "source": "GitHub.fetch_file /response/turn66,/response/turn67,/response/turn70",
+    "inspection": "full"
+  },
+  "e2e/support/geometry-oracle.mjs": {
+    "blob_sha": "5d09792cc8e74a7b744f53347fddc7ab76626a8f",
+    "bytes": 4249,
+    "lines": 77,
+    "commit": "51623c7dab2346cee39cd51e3caa845bf4b65426",
+    "source": "GitHub.fetch_file /response/turn74",
+    "inspection": "full"
+  },
+  "src/browser/framebuffer-probe.mjs": {
+    "blob_sha": "6aac25939b090b068978a420a3b30f0816187c9a",
+    "bytes": 3964,
+    "lines": 86,
+    "commit": "51623c7dab2346cee39cd51e3caa845bf4b65426",
+    "source": "GitHub.fetch_file /response/turn82",
+    "inspection": "full"
+  },
+  "src/browser/fullworld-webgl.mjs": {
+    "blob_sha": "1881a3928c29921cbfa8d971b495da33f1a1d13a",
+    "bytes": 13368,
+    "lines": 78,
+    "commit": "51623c7dab2346cee39cd51e3caa845bf4b65426",
+    "source": "GitHub.fetch_file /response/turn76",
+    "inspection": "full"
+  },
+  "src/browser/frame-scheduler.mjs": {
+    "blob_sha": "b9a017d6f38f43b088d6fe3b16d028ded857319b",
+    "bytes": 1211,
+    "lines": 41,
+    "commit": "51623c7dab2346cee39cd51e3caa845bf4b65426",
+    "source": "GitHub.fetch_file /response/turn88",
+    "inspection": "full"
+  },
+  "src/browser/fullworld-performance.mjs": {
+    "blob_sha": "c6e52d0a255396a640f4ea7caf23cf944d8f6b32",
+    "bytes": 3417,
+    "lines": 80,
+    "commit": "51623c7dab2346cee39cd51e3caa845bf4b65426",
+    "source": "GitHub.fetch_file /response/turn86",
+    "inspection": "full"
+  },
+  "tests/fullworld-runtime/performance.test.mjs": {
+    "blob_sha": "5fd4f4a09f89fb35e0d30b9bd3390f38b162d11e",
+    "bytes": 3921,
+    "lines": 76,
+    "commit": "51623c7dab2346cee39cd51e3caa845bf4b65426",
+    "source": "GitHub.fetch_file /response/turn89",
+    "inspection": "full"
+  },
+  "tools/fullworld-publication/publication.py": {
+    "blob_sha": "83be9adecd23167988b1f9c3f4302adc70cadb91",
+    "bytes": 12952,
+    "lines": 169,
+    "commit": "51623c7dab2346cee39cd51e3caa845bf4b65426",
+    "source": "GitHub.fetch_file /response/turn93,94",
+    "inspection": "full"
+  },
+  "src/browser/fullworld-pixels.mjs": {
+    "blob_sha": "1ae57543eeb9aa46b47465d315d56496c526bf6d",
+    "bytes": 7357,
+    "lines": 126,
+    "commit": "51623c7dab2346cee39cd51e3caa845bf4b65426",
+    "source": "GitHub.fetch_file /response/turn90",
+    "inspection": "full"
+  },
+  "tools/build-creature-index.py": {
+    "blob_sha": "325c63b22b5b75797af7ecb47f1aaae5f577657f",
+    "bytes": 9164,
+    "lines": 194,
+    "commit": "51623c7dab2346cee39cd51e3caa845bf4b65426",
+    "source": "Retained from prior audit; same commit, blob reverified in v2",
+    "inspection": "full"
+  }
+}

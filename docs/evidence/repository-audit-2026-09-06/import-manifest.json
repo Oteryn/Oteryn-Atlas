@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "kind": "historical-audit-artifact-import",
+  "auditDate": "2026-09-06",
+  "repository": "Oteryn/Oteryn-Atlas",
+  "auditedCommit": "51623c7dab2346cee39cd51e3caa845bf4b65426",
+  "auditedTree": "8d5b8f1ea3bf636698b8cf7cc81fe434f19f58df",
+  "lifecycleIssue": 315,
+  "destination": "docs/evidence/repository-audit-2026-09-06/",
+  "originalTextFiles": 77,
+  "originalTextBytes": 392104,
+  "fileMode": "100644",
+  "preservation": "Every included archive entry is byte-identical; no rewriting of report claims, source snapshots, probe output or timestamps.",
+  "productQualification": "NOT_PERFORMED_BY_IMPORT",
+  "originalExperimentsRerunDuringImport": false,
+  "checksumFile": "SHA256SUMS",
+  "checksumExcludes": [
+    "SHA256SUMS"
+  ],
+  "archives": [
+    {
+      "round": "round-1",
+      "fileName": "Oteryn-Atlas_Audyt_2026-09-06_pakiet.zip",
+      "sha256": "cea1f29667b64edd3e63bf2a196003edf5c93a446976316062fe3d0723a8a838",
+      "archiveFileEntries": 13,
+      "includedTextFiles": 11,
+      "includedTextBytes": 104796,
+      "gitTreeSha": "4bc713648976cee75ff34a45d628440bd6a5f2e4",
+      "excludedEntries": 2,
+      "exclusionGroups": {
+        "Original archive checksum manifest has excluded entries; replaced by repository import checksum manifest": 1,
+        "Rendered duplicate; Markdown retained": 1
+      }
+    },
+    {
+      "round": "round-2",
+      "fileName": "Oteryn-Atlas_Audyt_Poglebiony_v2_2026-09-06_pakiet.zip",
+      "sha256": "e7ae442335affc9c84ab1e5551f4b539d48a021a0549d39d776d8186e7c16bef",
+      "archiveFileEntries": 4913,
+      "includedTextFiles": 66,
+      "includedTextBytes": 287308,
+      "gitTreeSha": "36ab14450f92a23a8c04291152f86917821748a3",
+      "excludedEntries": 4847,
+      "exclusionGroups": {
+        "Audit packaging helper, not required by replay": 2,
+        "Binary output excluded from text-only maintenance import": 2,
+        "Generated expanded browser experiment; generator retained": 1,
+        "Non-qualification environment diagnostic; failure summary retained": 2,
+        "Original archive checksum manifest has excluded entries; replaced by repository import checksum manifest": 1,
+        "Regenerable synthetic working products; generators and summary outcomes retained": 4838,
+        "Rendered duplicate; Markdown retained": 1
+      }
+    }
+  ]
+}

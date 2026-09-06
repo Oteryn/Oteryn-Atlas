@@ -1,0 +1,34 @@
+docs_add                   actual=ALLOW expectation=MATCH 
+root_modify                actual=ALLOW expectation=MATCH 
+governance_add             actual=ALLOW expectation=MATCH 
+docs_delete                actual=ALLOW expectation=MATCH 
+product_test_delete        actual=ALLOW expectation=MISMATCH 
+runtime                    actual=DENY  expectation=MATCH atlas maintenance gate: maintenance path is frozen: web/app.mjs
+mixed                      actual=DENY  expectation=MATCH atlas maintenance gate: maintenance path is frozen: web/app.mjs
+root_delete                actual=DENY  expectation=MATCH atlas maintenance gate: maintenance path is frozen: AGENTS.md
+readme                     actual=DENY  expectation=MATCH atlas maintenance gate: maintenance path is frozen: README.md
+test_add                   actual=DENY  expectation=MATCH atlas maintenance gate: maintenance path is frozen: tests/verification/new.test.mjs
+test_modify                actual=DENY  expectation=MATCH atlas maintenance gate: maintenance path is frozen: tests/verification/bounded-real-world.test.mjs
+gate_edit                  actual=DENY  expectation=MATCH atlas maintenance gate: maintenance authority is immutable: tools/maintenance/verify-maintenance-diff.mjs
+workflow_restore           actual=DENY  expectation=MATCH atlas maintenance gate: workflow transition is not the complete suspension cutover: active workflow inventory is not the required three-file set
+symlink                    actual=DENY  expectation=MATCH atlas maintenance gate: candidate path is not a regular 100644 file: docs/agents/unsafe.md
+executable                 actual=DENY  expectation=MATCH atlas maintenance gate: candidate path is not a regular 100644 file: docs/agents/unsafe.md
+binary                     actual=DENY  expectation=MATCH atlas maintenance gate: candidate path is not text content: docs/agents/unsafe.md
+invalid_utf8               actual=DENY  expectation=MATCH atlas maintenance gate: candidate path is not UTF-8 text content: docs/agents/unsafe.md
+oversized                  actual=DENY  expectation=MATCH atlas maintenance gate: candidate text exceeds size limit: docs/agents/unsafe.md
+rename_escape              actual=DENY  expectation=MATCH atlas maintenance gate: rename or copy is forbidden: web/app.mjs -> docs/agents/runtime.md
+space_path                 actual=DENY  expectation=MATCH atlas maintenance gate: unsafe path: docs/agents/unsafe name.md
+empty                      actual=DENY  expectation=MATCH atlas maintenance gate: maintenance diff is empty
+dirty_candidate            actual=DENY  expectation=MATCH atlas maintenance gate: candidate worktree is dirty
+dirty_base                 actual=DENY  expectation=MATCH atlas maintenance gate: protected worktree is dirty
+wrong_repo                 actual=DENY  expectation=MATCH atlas maintenance gate: repository identity mismatch
+wrong_event                actual=DENY  expectation=MATCH atlas maintenance gate: unsupported maintenance event
+wrong_head                 actual=DENY  expectation=MATCH atlas maintenance gate: candidate head identity mismatch
+merge_group_valid          actual=ALLOW expectation=MATCH 
+merge_group_wrong_sha      actual=DENY  expectation=MATCH atlas maintenance gate: merge-group head identity mismatch
+cutover_text               actual=ALLOW expectation=MATCH 
+cutover_symlink            actual=ALLOW expectation=MISMATCH 
+cutover_binary             actual=ALLOW expectation=MISMATCH 
+cutover_executable         actual=ALLOW expectation=MISMATCH 
+partial_cutover            actual=DENY  expectation=MATCH atlas maintenance gate: minimal Merge Queue gate does not equal protected template
+SUMMARY 33 29 ['product_test_delete', 'cutover_symlink', 'cutover_binary', 'cutover_executable']

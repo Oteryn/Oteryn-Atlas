@@ -1,0 +1,92 @@
+{
+  "source_repository": "Oteryn/Oteryn-Atlas",
+  "source_commit": "51623c7dab2346cee39cd51e3caa845bf4b65426",
+  "source_path": "tools/build-creature-index.py",
+  "verified_git_blob": "325c63b22b5b75797af7ecb47f1aaae5f577657f",
+  "python_version": "3.13.5",
+  "scope": "Invented small inputs only. Not full publication, upstream Game validation, or browser acceptance.",
+  "probes": [
+    {
+      "probe": "valid_static",
+      "expected_accept": true,
+      "actual_accept": true,
+      "matches_contract_expectation": true,
+      "error": null
+    },
+    {
+      "probe": "valid_animated",
+      "expected_accept": true,
+      "actual_accept": true,
+      "matches_contract_expectation": true,
+      "error": null
+    },
+    {
+      "probe": "wrong_contract",
+      "expected_accept": false,
+      "actual_accept": false,
+      "matches_contract_expectation": true,
+      "error": "unsupported Game export contract"
+    },
+    {
+      "probe": "wrong_capability",
+      "expected_accept": false,
+      "actual_accept": false,
+      "matches_contract_expectation": true,
+      "error": "unsupported creature capability"
+    },
+    {
+      "probe": "wrong_coordinate_profile",
+      "expected_accept": false,
+      "actual_accept": false,
+      "matches_contract_expectation": true,
+      "error": "unsupported coordinate profile"
+    },
+    {
+      "probe": "monster_npc_roles",
+      "expected_accept": false,
+      "actual_accept": false,
+      "matches_contract_expectation": true,
+      "error": "monster records must not expose NPC role metadata"
+    },
+    {
+      "probe": "boolean_coordinate",
+      "expected_accept": false,
+      "actual_accept": true,
+      "matches_contract_expectation": false,
+      "error": null
+    },
+    {
+      "probe": "nonhex_digest",
+      "expected_accept": false,
+      "actual_accept": true,
+      "matches_contract_expectation": false,
+      "error": null
+    },
+    {
+      "probe": "malformed_record_id",
+      "expected_accept": false,
+      "actual_accept": true,
+      "matches_contract_expectation": false,
+      "error": null
+    },
+    {
+      "probe": "duplicate_roles",
+      "expected_accept": false,
+      "actual_accept": false,
+      "matches_contract_expectation": true,
+      "error": "NPC roles must be unique and use canonical order"
+    },
+    {
+      "probe": "same_input_two_clean_builds",
+      "expected_equal": true,
+      "actual_equal": true,
+      "matches_contract_expectation": true,
+      "output_file_count": 3,
+      "hashes": {
+        "chunks/f-7/1_2.json": "70eb317a6b345ff8328f23b11d6f1a6b7aaf59b67d046e1fca0ba3696ba53101",
+        "index.json": "5a6e9042b6438a7120c98d89ed91866fa4332ac6de115e3b20094ae45914ec30",
+        "search.json": "eab8356e1dd61d4bb64df80d1337b96cede559a93c4b39b06f62475003253897"
+      }
+    }
+  ]
+}

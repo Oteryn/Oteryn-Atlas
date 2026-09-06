@@ -1,0 +1,71 @@
+{
+  "kind": "audit_observations_transcribed_from_connector_and_local_execution_not_raw_api_dump",
+  "audit_date": "2026-09-06",
+  "repository": "Oteryn/Oteryn-Atlas",
+  "start_main_sha": "51623c7dab2346cee39cd51e3caa845bf4b65426",
+  "end_main_sha": "51623c7dab2346cee39cd51e3caa845bf4b65426",
+  "tree_sha": "8d5b8f1ea3bf636698b8cf7cc81fe434f19f58df",
+  "repository_mutations": false,
+  "full_checkout_available": false,
+  "full_atlas_test_suite_executed": false,
+  "browser_visual_acceptance_performed": false,
+  "ruleset_ids": [
+    22103758,
+    22352928
+  ],
+  "required_status_context": "Merge authority audit / protected-base validate",
+  "required_status_integration_id": 15368,
+  "merge_queue_enabled": true,
+  "active_workflow_paths": [
+    ".github/workflows/merge-authority-audit.yml",
+    ".github/workflows/merge-group-gate.yml",
+    ".github/workflows/terminal-branch-lifecycle.yml"
+  ],
+  "suspended_workflow_inventory_count": 25,
+  "verified_mq_evidence": {
+    "run_id": 34040534843,
+    "job_id": 101506348064,
+    "event": "merge_group",
+    "head_sha": "51623c7dab2346cee39cd51e3caa845bf4b65426",
+    "conclusion": "success"
+  },
+  "historical_synology_evidence": {
+    "run_id": 34033820190,
+    "job_id": 101488141779,
+    "head_sha": "d0e2f143ae678c97c0657cdd8e446725ab0a11f3",
+    "conclusion": "success",
+    "is_current_snapshot_acceptance": false
+  },
+  "merged_prompt_cleanup": {
+    "pr": 326,
+    "merge_commit_sha": "9755e31513c7949035b4d446ab9132880dac80e1",
+    "merged_at": "2026-09-06T14:35:52Z"
+  },
+  "exact_source_copies": [
+    {
+      "repository_path": "tools/maintenance/verify-maintenance-diff.mjs",
+      "artifact_path": "sources/verify-maintenance-diff.mjs",
+      "git_blob_sha": "714fb73fe08b7c741d606c6e5a8ecdf33a3adf10"
+    },
+    {
+      "repository_path": "tools/build-creature-index.py",
+      "artifact_path": "sources/build-creature-index.py",
+      "git_blob_sha": "325c63b22b5b75797af7ecb47f1aaae5f577657f"
+    }
+  ],
+  "results": [
+    {
+      "path": "results/maintenance-probes.json",
+      "probes": 33,
+      "matches": 29,
+      "mismatches": 4
+    },
+    {
+      "path": "results/creature-builder-probes.json",
+      "probes": 11,
+      "matches": 8,
+      "mismatches": 3
+    }
+  ],
+  "important_limit": "Probe mismatches are not independent vulnerability counts. Three cutover mismatches share one cause; three builder mismatches are one contract-consistency finding."
+}

@@ -1,0 +1,411 @@
+{
+  "runtime": "v22.16.0",
+  "commit": "51623c7dab2346cee39cd51e3caa845bf4b65426",
+  "total": 27,
+  "satisfied": 11,
+  "violations": 16,
+  "probeErrors": 0,
+  "results": [
+    {
+      "id": "path-ordinary",
+      "expected": "same publication prefix",
+      "satisfied": true,
+      "details": {
+        "input": "chunks/floor.json",
+        "target": "https://audit.invalid/semantic/chunks/floor.json"
+      }
+    },
+    {
+      "id": "path-parent",
+      "expected": "reject or retain publication prefix",
+      "satisfied": true,
+      "details": {
+        "input": "../outside.json",
+        "error": "unsafe path"
+      }
+    },
+    {
+      "id": "path-encoded-parent",
+      "expected": "reject or retain publication prefix",
+      "satisfied": false,
+      "details": {
+        "input": "%2e%2e/outside.json",
+        "target": "https://audit.invalid/outside.json"
+      }
+    },
+    {
+      "id": "path-encoded-double",
+      "expected": "reject or retain publication prefix",
+      "satisfied": false,
+      "details": {
+        "input": "chunks/%2e%2e/%2e%2e/outside.json",
+        "target": "https://audit.invalid/outside.json"
+      }
+    },
+    {
+      "id": "path-scheme",
+      "expected": "reject or retain publication prefix",
+      "satisfied": true,
+      "details": {
+        "input": "https:other.invalid/file",
+        "target": "https://audit.invalid/semantic/other.invalid/file"
+      }
+    },
+    {
+      "id": "path-control-prefix",
+      "expected": "reject or retain publication prefix",
+      "satisfied": false,
+      "details": {
+        "input": "\t/outside.json",
+        "target": "https://audit.invalid/outside.json"
+      }
+    },
+    {
+      "id": "cache-quota-load",
+      "expected": "valid authenticated response still usable when optional disk cache quota is exhausted",
+      "satisfied": false,
+      "details": {
+        "error": "QuotaExceededError: Synthetic quota exhaustion",
+        "stats": {
+          "cacheBytes": 0,
+          "cachedGroups": 0,
+          "cacheHits": 0,
+          "cacheMisses": 1,
+          "persistentHits": 0,
+          "networkBytes": 176,
+          "rangeRequests": 1
+        },
+        "networkDigest": "sha256:e181cb2b1b5b130854b1289b94b9c5dc74b640ce0f183742f84bc960a6cf9c28",
+        "expectedDigest": "sha256:e181cb2b1b5b130854b1289b94b9c5dc74b640ce0f183742f84bc960a6cf9c28"
+      }
+    },
+    {
+      "id": "cache-unavailable-load",
+      "expected": "optional cache unavailable does not prevent network load",
+      "satisfied": false,
+      "details": {
+        "calls": 0,
+        "error": "SecurityError: Synthetic denied storage"
+      }
+    },
+    {
+      "id": "cache-parallel-same-group",
+      "expected": "resident byte count equals unique resident content after concurrent same-key loads",
+      "satisfied": false,
+      "details": {
+        "calls": 2,
+        "actualResidentPayloadBytes": 176,
+        "stats": {
+          "cacheBytes": 352,
+          "cachedGroups": 1,
+          "cacheHits": 0,
+          "cacheMisses": 2,
+          "persistentHits": 0,
+          "networkBytes": 352,
+          "rangeRequests": 2
+        }
+      }
+    },
+    {
+      "id": "cache-floor-clear-inflight",
+      "expected": "cleared range store is not repopulated by an earlier in-flight request",
+      "satisfied": false,
+      "details": {
+        "stats": {
+          "cacheBytes": 176,
+          "cachedGroups": 1,
+          "cacheHits": 0,
+          "cacheMisses": 1,
+          "persistentHits": 0,
+          "networkBytes": 176,
+          "rangeRequests": 1
+        },
+        "note": "API-level test; integration may suppress stale scene commits independently"
+      }
+    },
+    {
+      "id": "cache-content-corruption",
+      "expected": "tampered range bytes rejected",
+      "satisfied": true,
+      "details": {
+        "error": "semantic authenticated range identity mismatch"
+      }
+    },
+    {
+      "id": "range-header-corruption",
+      "expected": "incorrect Content-Range rejected",
+      "satisfied": true,
+      "details": {
+        "error": "semantic range Content-Range mismatch"
+      }
+    },
+    {
+      "id": "near-boundary-url-roundtrip",
+      "expected": "accepted normalized view serializes and remains within exported bounds",
+      "satisfied": false,
+      "details": {
+        "view": {
+          "animation": "off",
+          "debugFlags": [],
+          "floor": -7,
+          "layers": [],
+          "mode": "auto",
+          "overview": false,
+          "searchQuery": "",
+          "selected": null,
+          "x": 10,
+          "y": 5,
+          "zoom": 2
+        },
+        "error": "x is outside exported floor bounds"
+      }
+    },
+    {
+      "id": "ordinary-url-roundtrip",
+      "expected": "ordinary view survives roundtrip",
+      "satisfied": true,
+      "details": {
+        "v": {
+          "animation": "off",
+          "debugFlags": [],
+          "floor": -7,
+          "layers": [],
+          "mode": "auto",
+          "overview": false,
+          "searchQuery": "",
+          "selected": null,
+          "x": 5.1234,
+          "y": 4.4321,
+          "zoom": 2
+        },
+        "v2": {
+          "animation": "off",
+          "debugFlags": [],
+          "floor": -7,
+          "layers": [],
+          "mode": "auto",
+          "overview": false,
+          "searchQuery": "",
+          "selected": null,
+          "x": 5.1234,
+          "y": 4.4321,
+          "zoom": 2
+        }
+      }
+    },
+    {
+      "id": "proof-near-boundary-url-roundtrip",
+      "expected": "proof view normalizes within bounds",
+      "satisfied": false,
+      "details": {
+        "view": {
+          "x": 32441,
+          "y": 32230,
+          "floor": -7,
+          "zoom": 2
+        },
+        "error": "x outside proof bounds"
+      }
+    },
+    {
+      "id": "proof-fractional-tile",
+      "expected": "tile data coordinates are integral, unlike camera coordinates",
+      "satisfied": false,
+      "details": {
+        "value": {
+          "x": 32360.5,
+          "y": 32230.5,
+          "floor": -7,
+          "legacy": {
+            "x": 32360.5,
+            "y": 32230.5,
+            "z": 7
+          },
+          "tileRecordId": "tile:audit",
+          "presentations": []
+        }
+      }
+    },
+    {
+      "id": "bounded-manifest-stream",
+      "expected": "response reader stops before buffering all bytes of an oversized stream",
+      "satisfied": false,
+      "details": {
+        "pulls": 8,
+        "cancelled": false,
+        "consumedBytes": 1048576,
+        "declaredLimit": 262144,
+        "error": "manifest bytes exceed proof limit"
+      }
+    },
+    {
+      "id": "geometry-valid",
+      "expected": "accept valid geometry",
+      "satisfied": true,
+      "details": {
+        "maxDriftPx": "0",
+        "accepted": true,
+        "log": {
+          "checked": 1,
+          "mismatches": [],
+          "tolerancePx": 0.25
+        }
+      }
+    },
+    {
+      "id": "geometry-drift",
+      "expected": "reject invalid geometry",
+      "satisfied": true,
+      "details": {
+        "maxDriftPx": "20",
+        "accepted": false,
+        "error": "creature overlay drift 20.0000px exceeds 0.25px",
+        "log": {
+          "checked": 1,
+          "mismatches": [
+            {
+              "creatureGeneration": 2,
+              "baseGeneration": 1,
+              "error": "creature overlay drift 20.0000px exceeds 0.25px",
+              "maxDriftPx": 20,
+              "sample": {
+                "id": "npc:audit",
+                "kind": "npc",
+                "dx": 20,
+                "dy": 0,
+                "driftPx": 20,
+                "expected": {
+                  "x": 400,
+                  "y": 300
+                },
+                "actual": {
+                  "x": 420,
+                  "y": 300
+                }
+              }
+            }
+          ],
+          "tolerancePx": 0.25
+        }
+      }
+    },
+    {
+      "id": "geometry-nan",
+      "expected": "reject invalid geometry",
+      "satisfied": false,
+      "details": {
+        "maxDriftPx": "NaN",
+        "accepted": true,
+        "log": {
+          "checked": 1,
+          "mismatches": [],
+          "tolerancePx": 0.25
+        }
+      }
+    },
+    {
+      "id": "geometry-missing",
+      "expected": "reject invalid geometry",
+      "satisfied": false,
+      "details": {
+        "maxDriftPx": "NaN",
+        "accepted": true,
+        "log": {
+          "checked": 1,
+          "mismatches": [],
+          "tolerancePx": 0.25
+        }
+      }
+    },
+    {
+      "id": "geometry-infinity",
+      "expected": "reject invalid geometry",
+      "satisfied": true,
+      "details": {
+        "maxDriftPx": "Infinity",
+        "accepted": false,
+        "error": "creature overlay drift Infinitypx exceeds 0.25px",
+        "log": {
+          "checked": 1,
+          "mismatches": [
+            {
+              "creatureGeneration": 2,
+              "baseGeneration": 1,
+              "error": "creature overlay drift Infinitypx exceeds 0.25px",
+              "maxDriftPx": null,
+              "sample": {
+                "id": "npc:audit",
+                "kind": "npc",
+                "dx": null,
+                "dy": 0,
+                "driftPx": null,
+                "expected": {
+                  "x": 400,
+                  "y": 300
+                },
+                "actual": {
+                  "x": null,
+                  "y": 300
+                }
+              }
+            }
+          ],
+          "tolerancePx": 0.25
+        }
+      }
+    },
+    {
+      "id": "geometry-nan-hides-real-drift",
+      "expected": "one invalid measurement cannot hide another anchor with definite large drift",
+      "satisfied": false,
+      "details": {
+        "maxDriftPx": "NaN",
+        "perAnchor": [
+          "NaN",
+          "100"
+        ],
+        "accepted": true
+      }
+    },
+    {
+      "id": "runtime-world-duplicate-floors",
+      "expected": "runtime index validates a unique 16-floor census",
+      "satisfied": false,
+      "details": {
+        "accepted": true,
+        "uniqueFloors": 1,
+        "note": "trust pin intentionally matches test input; this probes schema, not ability to forge production trust"
+      }
+    },
+    {
+      "id": "fullworld-root-mismatch",
+      "expected": "mismatching publication root is rejected",
+      "satisfied": true,
+      "details": {
+        "error": "publication trusted root mismatch"
+      }
+    },
+    {
+      "id": "portable-sha-vectors",
+      "expected": "portable SHA agrees with independent node:crypto including padding boundaries",
+      "satisfied": true,
+      "details": {
+        "vectorCount": 16,
+        "failures": []
+      }
+    },
+    {
+      "id": "canonical-prototype-key",
+      "expected": "canonical representation does not silently drop an own JSON __proto__ key",
+      "satisfied": false,
+      "details": {
+        "inputKeys": [
+          "a",
+          "__proto__"
+        ],
+        "output": "{\"a\":1}\n",
+        "note": "fullworld canonical-byte equality can reject this; legacy loader canonicalizes without exact-byte comparison"
+      }
+    }
+  ]
+}

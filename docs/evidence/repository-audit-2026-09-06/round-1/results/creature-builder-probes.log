@@ -1,0 +1,12 @@
+MATCH valid_static {"probe": "valid_static", "expected_accept": true, "actual_accept": true, "matches_contract_expectation": true, "error": null}
+MATCH valid_animated {"probe": "valid_animated", "expected_accept": true, "actual_accept": true, "matches_contract_expectation": true, "error": null}
+MATCH wrong_contract {"probe": "wrong_contract", "expected_accept": false, "actual_accept": false, "matches_contract_expectation": true, "error": "unsupported Game export contract"}
+MATCH wrong_capability {"probe": "wrong_capability", "expected_accept": false, "actual_accept": false, "matches_contract_expectation": true, "error": "unsupported creature capability"}
+MATCH wrong_coordinate_profile {"probe": "wrong_coordinate_profile", "expected_accept": false, "actual_accept": false, "matches_contract_expectation": true, "error": "unsupported coordinate profile"}
+MATCH monster_npc_roles {"probe": "monster_npc_roles", "expected_accept": false, "actual_accept": false, "matches_contract_expectation": true, "error": "monster records must not expose NPC role metadata"}
+MISMATCH boolean_coordinate {"probe": "boolean_coordinate", "expected_accept": false, "actual_accept": true, "matches_contract_expectation": false, "error": null}
+MISMATCH nonhex_digest {"probe": "nonhex_digest", "expected_accept": false, "actual_accept": true, "matches_contract_expectation": false, "error": null}
+MISMATCH malformed_record_id {"probe": "malformed_record_id", "expected_accept": false, "actual_accept": true, "matches_contract_expectation": false, "error": null}
+MATCH duplicate_roles {"probe": "duplicate_roles", "expected_accept": false, "actual_accept": false, "matches_contract_expectation": true, "error": "NPC roles must be unique and use canonical order"}
+MATCH same_input_two_clean_builds {"probe": "same_input_two_clean_builds", "expected_equal": true, "actual_equal": true, "matches_contract_expectation": true, "output_file_count": 3, "hashes": {"chunks/f-7/1_2.json": "70eb317a6b345ff8328f23b11d6f1a6b7aaf59b67d046e1fca0ba3696ba53101", "index.json": "5a6e9042b6438a7120c98d89ed91866fa4332ac6de115e3b20094ae45914ec30", "search.json": "eab8356e1dd61d4bb64df80d1337b96cede559a93c4b39b06f62475003253897"}}
+TOTAL 11; MATCH 8; MISMATCH 3
