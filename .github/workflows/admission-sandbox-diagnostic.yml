@@ -15,14 +15,14 @@ jobs:
       - name: Check out exact proposed authority
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: 5e097ca84f20c137b8af623df6f3c1c9b727a502
+          ref: 7d260c6a7a2f872435dd070263158261303b8284
           persist-credentials: false
           fetch-depth: 0
           path: proposed-authority
       - name: Check out exact shadow candidate
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: a653743a3a734804ef848b5d7a765b274e9ba253
+          ref: 10d81d8d1e50784bc48eff9b2db10c0bdde816e8
           persist-credentials: false
           fetch-depth: 0
           path: shadow-candidate
@@ -48,6 +48,10 @@ jobs:
            return {repository,prNumber:null,headSha,baseSha,treeSha:git(candidateRoot,'rev-parse','HEAD^{tree}'),changedFiles};
           };
           const candidate=snapshot();
+          const sourceAuthor=api('repos/'+repository+'/pulls/333').user;
+          const reviewPermission=api('repos/'+repository+'/collaborators/'+encodeURIComponent(sourceAuthor.login)+'/permission');
+          if(reviewPermission.user?.id!==sourceAuthor.id||!['admin','maintain'].includes(reviewPermission.role_name))throw Error('review authority API readback unavailable');
+          console.log('LIVE_REVIEW_PERMISSION_READBACK',JSON.stringify({user:sourceAuthor.login,id:sourceAuthor.id,permission:reviewPermission.permission,role:reviewPermission.role_name}));
           const liveReadback=async()=>{
            const main=api('repos/'+repository+'/git/ref/heads/main'),source=api('repos/'+repository+'/pulls/333');
            if(main.object.sha!=='e96da570cc4b5f9a8ee3d3d4889caea33cfb4d1b'||source.head.sha!=='0be8b5e1cdb2011c19247b3262cf15e43544467b'||source.state!=='open')throw Error('LIVE source authority moved; shadow invalidated');
