@@ -57,7 +57,7 @@ export function validateDeterministicCensus(expected, actual) {
   if(!Array.isArray(expected)||!expected.length||JSON.stringify(expected)!==JSON.stringify(actual))throw new TypeError('protected deterministic census drift');
 }
 export function candidateSandboxArgs({ source, output, script, protectedTests }) {
-  return ['run', '--rm', '--network', 'none', '--read-only', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges', '--pids-limit', '256', '--memory', '1536m', '--cpus', '2', '--user', '1000:1000', '--tmpfs', '/tmp:rw,nosuid,nodev,size=256m', '--mount', `type=bind,src=${source},dst=/candidate,readonly`, '--mount', `type=bind,src=${output},dst=/out`, '--mount', `type=bind,src=${script},dst=/run-proof.mjs,readonly`, ...(protectedTests ? ['--mount', `type=bind,src=${protectedTests},dst=/candidate/tests,readonly`] : []), CANDIDATE_IMAGE, 'node', '/run-proof.mjs', ...(protectedTests ? ['protected-tests'] : [])];
+  return ['run', '--rm', '--env', 'TMPDIR=/out', '--network', 'none', '--read-only', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges', '--pids-limit', '256', '--memory', '1536m', '--cpus', '2', '--user', '1000:1000', '--tmpfs', '/tmp:rw,nosuid,nodev,size=256m', '--mount', `type=bind,src=${source},dst=/candidate,readonly`, '--mount', `type=bind,src=${output},dst=/out`, '--mount', `type=bind,src=${script},dst=/run-proof.mjs,readonly`, ...(protectedTests ? ['--mount', `type=bind,src=${protectedTests},dst=/candidate/tests,readonly`] : []), CANDIDATE_IMAGE, 'node', '/run-proof.mjs', ...(protectedTests ? ['protected-tests'] : [])];
 }
 export function resolveProtectedBrowserCensus(listText, catalog) {
   const specs = new Set(catalog.groups?.['e2e.full']?.specs ?? []);
@@ -153,7 +153,7 @@ if(process.argv[2]==='protected-tests') {
  const collect=${collectDeterministicCensus.toString()};
  process.stdout.write(JSON.stringify(await collect(files)));
 } else {
- execFileSync('node',['--test',...files],{stdio:'inherit',cwd:'/candidate',env:{PATH:'/tmp/bin:'+process.env.PATH,PYTHONPYCACHEPREFIX:'/tmp/pycache'}});
+ execFileSync('node',['--test',...files],{stdio:'inherit',cwd:'/candidate',env:{PATH:'/tmp/bin:'+process.env.PATH,PYTHONPYCACHEPREFIX:'/tmp/pycache',TMPDIR:'/out'}});
 }
 `);
   const deterministicOutput=path.join(outputRoot,'deterministic');fs.mkdirSync(deterministicOutput,{mode:0o777});fs.chmodSync(deterministicOutput,0o777);
