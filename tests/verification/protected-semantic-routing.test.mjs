@@ -70,7 +70,7 @@ test('complete protected inventory includes source-contract scenarios outside fu
 });
 test('visual review obligations survive overlapping hosted execution IDs',()=>{
  const result=evaluateProtectedRouting({...input,candidate:{...candidate,changedFiles:[{path:'src/browser/creature-model.mjs',status:'modified'}]}});
- assert.ok(result.review.some(p=>p.dataCapability==='bounded_real_world'&&p.evidenceKind==='restricted-visual-review'));
+ assert.ok(result.review.some(p=>p.dataCapability==='qualification_fixture'&&p.evidenceKind==='restricted-visual-review'));
  assert.ok(result.review[0].scenarioIds.some(id=>result.hostedPartitions.some(p=>p.scenarioIds.includes(id))));
 });
 test('inventory cannot omit the historical floor or catalog browser specs',()=>{

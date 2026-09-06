@@ -90,7 +90,7 @@
       "projects": ["desktop-chromium", "mobile-chromium"],
       "resourceClass": "browser-targeted",
       "evidence": "restricted-visual-review",
-      "capabilities": { "browser": true, "hosted": false, "requiresPublication": true, "dataCapability": "bounded_real_world", "visualReview": true, "specialistReason": "private-visual" },
+      "capabilities": { "browser": true, "hosted": true, "requiresPublication": true, "dataCapability": "qualification_fixture", "visualReview": true, "specialistReason": null },
       "fullSafetyNet": false
     }
   }

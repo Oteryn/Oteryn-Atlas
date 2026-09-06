@@ -2,6 +2,8 @@ name: CI
 
 on:
   pull_request:
+  pull_request_review:
+    types: [submitted, edited, dismissed]
   push:
     branches: [main]
 
@@ -266,7 +268,7 @@ jobs:
 
   change-classification:
     name: Classify PR verification risk
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' || github.event_name == 'pull_request_review'
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -396,7 +398,7 @@ jobs:
   verification-browser:
     name: Protected Hosted Playwright evidence
     if: >-
-      github.event_name == 'pull_request' &&
+      (github.event_name == 'pull_request' || github.event_name == 'pull_request_review') &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       needs.change-classification.outputs.requires_e2e == 'true'
     needs: [verification-node, change-classification]
@@ -466,7 +468,7 @@ jobs:
           for result in "$REPOSITORY_CONTRACT" "$SEMANTIC_PROOF" "$BROWSER_SEMANTIC" "$BROWSER_WEBGL_PROOF" "$PROJECT" "$VERIFICATION_NODE"; do
             test "$result" = success
           done
-          if [[ "$GITHUB_EVENT_NAME" == pull_request ]]; then
+          if [[ "$GITHUB_EVENT_NAME" == pull_request || "$GITHUB_EVENT_NAME" == pull_request_review ]]; then
             test "$CHANGE_CLASSIFICATION" = success
             case "$REQUIRES_E2E:$DOCS_ONLY" in
               false:true) test "$VERIFICATION_BROWSER" = skipped ;;

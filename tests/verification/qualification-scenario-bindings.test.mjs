@@ -15,6 +15,7 @@ function fixture(t) {
   const at = x => ({x,y:20,floor:-7});
   const creature = (kind, id, name, x, roles = [], dynamic = false) => ({kind,record_id:`${kind}:${id.repeat(32)}`,entity_id:`${kind}-entity:${id.repeat(32)}`,name,position:at(x),roles,presentation_resolution_state:dynamic?'RESOLVED':'FALLBACK_MARKER',...(dynamic?{outfit_presentation:{outfit_presentation_id:`outfit:${kind}`}}:{})});
   const creatures = [creature('npc','1','Guide',20,['shop','quest']),creature('npc','2','Walker',21,['travel','shop','quest','blessing','trainer'],true),creature('npc','3','A cartographer with a very long meaningful name',22),creature('monster','a','Sentinel',23,[],true),...['b','c','d'].map(id=>creature('monster',id,`Raider ${id}`,24))];
+  creatures[2].position.y += 4; // Isolated edge-label fixture; assertions remain unchanged.
   put('web/semantic-search/index.json',{records:[{label:'Harbor',position:at(20),capabilities:['navigation']}]});
   put('data/creatures/search.json',{records:creatures.map(({name,...record})=>({...record,label:name}))});
   put('data/creatures/index.json',{chunks:[{path:'chunks/entities.json'}]});
@@ -111,4 +112,14 @@ test('missing protected source and modified production fallback are rejected',t=
   const absent={...sources};delete absent['tests/race-desktop.spec.mjs'];
   assert.throws(()=>module.renderQualificationHarnessBindings({protectedSources:absent,bindings}),/missing protected/);
   assert.throws(()=>module.validateQualificationHarnessBindings({protectedSources:sources,candidateSources:{...candidate,'tests/desktop.spec.mjs':candidate['tests/desktop.spec.mjs'].replace(": 'Thais'",": 'ChangedProduction'")},bindings}),/oracle source/);
+});
+test('qualification inspector references are external while production snapshots remain selected verbatim',t=>{
+ const sources=protectedSources();
+ sources['tests/visual-desktop.spec.mjs']="const VISUAL_ENTRY = '/web/fullworld.html?x=20&y=20&floor=-7&zoom=2&mode=map&animation=off';\nawait expect(panel).toHaveScreenshot('desktop-inspector.png', { animations: 'disabled', caret: 'hide', scale: 'css' });\n";
+ sources['tests/visual-mobile.spec.mjs']="await expect(panel).toHaveScreenshot('mobile-inspector-panel.png', { animations: 'disabled', caret: 'hide', scale: 'css' });\n";
+ const generated=module.renderQualificationHarnessBindings({protectedSources:sources,bindings:resolve(fixture(t))});
+ assert.match(generated['tests/visual-desktop.spec.mjs'],/\["protected-reference","desktop-inspector.png"\]/);
+ assert.match(generated['tests/visual-mobile.spec.mjs'],/\["protected-reference","mobile-inspector-panel.png"\]/);
+ assert.match(generated['tests/visual-desktop.spec.mjs'],/: 'desktop-inspector.png'/);
+ assert.match(generated['tests/visual-desktop.spec.mjs'],/const VISUAL_ENTRY = '\/web\/fullworld.html\?x=20&y=20/);
 });
