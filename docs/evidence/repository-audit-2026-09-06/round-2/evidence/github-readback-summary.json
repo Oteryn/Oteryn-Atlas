@@ -1,0 +1,16 @@
+{
+  "kind": "auditor-transcribed summary of observed GitHub responses",
+  "repository": "Oteryn/Oteryn-Atlas",
+  "mainSha": "51623c7dab2346cee39cd51e3caa845bf4b65426",
+  "treeSha": "8d5b8f1ea3bf636698b8cf7cc81fe434f19f58df",
+  "branchResponse": "GitHub.fetch /response/turn103",
+  "rulesetResponse": "GitHub.fetch /response/turn104",
+  "rulesetId": 22103758,
+  "requiredContext": "Merge authority audit / protected-base validate",
+  "integrationId": 15368,
+  "mergeQueue": true,
+  "requiredApprovals": 0,
+  "codeOwnerReviewRequired": false,
+  "bypassMode": "pull_request",
+  "inspectionDate": "2026-09-06"
+}

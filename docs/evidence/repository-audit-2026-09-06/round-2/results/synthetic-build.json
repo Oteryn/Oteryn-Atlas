@@ -1,0 +1,33 @@
+{
+  "compiler": "original hash-verified publication.py",
+  "results": [
+    {
+      "name": "control-same-width",
+      "inputSpriteIds": [
+        11,
+        12
+      ],
+      "sourceShardCount": 1197,
+      "publicationShardCount": 1197,
+      "publicationFloors": 16,
+      "publicationRoot": "sha256:6a0c278f6a2bafbe4f5815e33f17d04e9d68e55350c54afc268bd7a1187c50d5",
+      "pixelRoot": "sha256:51ef5e80d1cdecea2120ada49bd4e5a0f5f813c8e495d27674a2ccd96795a172",
+      "rawSourceBytes": 786555,
+      "scope": "Original compile_all with synthetic source metadata and self-generated pixels. No real Game/FullWorld validation."
+    },
+    {
+      "name": "cross-language-mixed",
+      "inputSpriteIds": [
+        2,
+        10
+      ],
+      "sourceShardCount": 1197,
+      "publicationShardCount": 1197,
+      "publicationFloors": 16,
+      "publicationRoot": "sha256:8be81abd010dd0ee2ba3d9d26d9f2789df15577363858b81fba3a30411bfe394",
+      "pixelRoot": "sha256:58af1a37233db4a4ab804db9b0139223aea063e3a2275993b128d2de1d065ece",
+      "rawSourceBytes": 785956,
+      "scope": "Original compile_all with synthetic source metadata and self-generated pixels. No real Game/FullWorld validation."
+    }
+  ]
+}

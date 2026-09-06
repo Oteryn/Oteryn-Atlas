@@ -1,0 +1,134 @@
+{
+  "S01": {
+    "path": "src/browser/fullworld.mjs",
+    "url": "https://github.com/Oteryn/Oteryn-Atlas/blob/51623c7dab2346cee39cd51e3caa845bf4b65426/src/browser/fullworld.mjs"
+  },
+  "S02": {
+    "path": "src/browser/fullworld-pixels.mjs",
+    "url": "https://github.com/Oteryn/Oteryn-Atlas/blob/51623c7dab2346cee39cd51e3caa845bf4b65426/src/browser/fullworld-pixels.mjs"
+  },
+  "S03": {
+    "path": "src/browser/loader.mjs",
+    "url": "https://github.com/Oteryn/Oteryn-Atlas/blob/51623c7dab2346cee39cd51e3caa845bf4b65426/src/browser/loader.mjs"
+  },
+  "S04": {
+    "path": "tools/fullworld-publication/publication.py",
+    "url": "https://github.com/Oteryn/Oteryn-Atlas/blob/51623c7dab2346cee39cd51e3caa845bf4b65426/tools/fullworld-publication/publication.py"
+  },
+  "S05": {
+    "path": "src/browser/verified-content-cache.mjs",
+    "url": "https://github.com/Oteryn/Oteryn-Atlas/blob/51623c7dab2346cee39cd51e3caa845bf4b65426/src/browser/verified-content-cache.mjs"
+  },
+  "S06": {
+    "path": "src/browser/semantic.mjs",
+    "url": "https://github.com/Oteryn/Oteryn-Atlas/blob/51623c7dab2346cee39cd51e3caa845bf4b65426/src/browser/semantic.mjs"
+  },
+  "S07": {
+    "path": "e2e/support/geometry-oracle.mjs",
+    "url": "https://github.com/Oteryn/Oteryn-Atlas/blob/51623c7dab2346cee39cd51e3caa845bf4b65426/e2e/support/geometry-oracle.mjs"
+  },
+  "S08": {
+    "path": "src/browser/framebuffer-probe.mjs",
+    "url": "https://github.com/Oteryn/Oteryn-Atlas/blob/51623c7dab2346cee39cd51e3caa845bf4b65426/src/browser/framebuffer-probe.mjs"
+  },
+  "S09": {
+    "path": "src/browser/fullworld-webgl.mjs",
+    "url": "https://github.com/Oteryn/Oteryn-Atlas/blob/51623c7dab2346cee39cd51e3caa845bf4b65426/src/browser/fullworld-webgl.mjs"
+  },
+  "S10": {
+    "path": "src/browser/fullworld-performance.mjs",
+    "url": "https://github.com/Oteryn/Oteryn-Atlas/blob/51623c7dab2346cee39cd51e3caa845bf4b65426/src/browser/fullworld-performance.mjs"
+  },
+  "S11": {
+    "path": "tests/fullworld-runtime/performance.test.mjs",
+    "url": "https://github.com/Oteryn/Oteryn-Atlas/blob/51623c7dab2346cee39cd51e3caa845bf4b65426/tests/fullworld-runtime/performance.test.mjs"
+  },
+  "S12": {
+    "path": "src/browser/frame-scheduler.mjs",
+    "url": "https://github.com/Oteryn/Oteryn-Atlas/blob/51623c7dab2346cee39cd51e3caa845bf4b65426/src/browser/frame-scheduler.mjs"
+  },
+  "S13": {
+    "path": "tools/build-creature-index.py",
+    "url": "https://github.com/Oteryn/Oteryn-Atlas/blob/51623c7dab2346cee39cd51e3caa845bf4b65426/tools/build-creature-index.py"
+  },
+  "C01": {
+    "path": "src/publication/fullworld-v0.md",
+    "url": "https://github.com/Oteryn/Oteryn-Atlas/blob/51623c7dab2346cee39cd51e3caa845bf4b65426/src/publication/fullworld-v0.md"
+  },
+  "C02": {
+    "path": "src/browser/fullworld-trust.mjs",
+    "url": "https://github.com/Oteryn/Oteryn-Atlas/blob/51623c7dab2346cee39cd51e3caa845bf4b65426/src/browser/fullworld-trust.mjs"
+  },
+  "C03": {
+    "path": "web/fullworld-creatures.mjs",
+    "url": "https://github.com/Oteryn/Oteryn-Atlas/blob/51623c7dab2346cee39cd51e3caa845bf4b65426/web/fullworld-creatures.mjs"
+  },
+  "C04": {
+    "path": "tests/fullworld-runtime/runtime.test.mjs",
+    "url": "https://github.com/Oteryn/Oteryn-Atlas/blob/51623c7dab2346cee39cd51e3caa845bf4b65426/tests/fullworld-runtime/runtime.test.mjs"
+  },
+  "C05": {
+    "path": "web/fullworld-app.mjs",
+    "url": "https://github.com/Oteryn/Oteryn-Atlas/blob/51623c7dab2346cee39cd51e3caa845bf4b65426/web/fullworld-app.mjs"
+  },
+  "C06": {
+    "path": "src/browser/creature-render-diagnostics.mjs",
+    "url": "https://github.com/Oteryn/Oteryn-Atlas/blob/51623c7dab2346cee39cd51e3caa845bf4b65426/src/browser/creature-render-diagnostics.mjs"
+  },
+  "C07": {
+    "path": "src/hunt-intelligence/consumer.mjs",
+    "url": "https://github.com/Oteryn/Oteryn-Atlas/blob/51623c7dab2346cee39cd51e3caa845bf4b65426/src/hunt-intelligence/consumer.mjs"
+  },
+  "C08": {
+    "path": "e2e/tests/geometry-desktop.spec.mjs",
+    "url": "https://github.com/Oteryn/Oteryn-Atlas/blob/51623c7dab2346cee39cd51e3caa845bf4b65426/e2e/tests/geometry-desktop.spec.mjs"
+  },
+  "C09": {
+    "path": "e2e/tests/accessibility-desktop.spec.mjs",
+    "url": "https://github.com/Oteryn/Oteryn-Atlas/blob/51623c7dab2346cee39cd51e3caa845bf4b65426/e2e/tests/accessibility-desktop.spec.mjs"
+  },
+  "C10": {
+    "path": "e2e/playwright.config.mjs",
+    "url": "https://github.com/Oteryn/Oteryn-Atlas/blob/51623c7dab2346cee39cd51e3caa845bf4b65426/e2e/playwright.config.mjs"
+  },
+  "C11": {
+    "path": ".github/workflows/terminal-branch-lifecycle.yml",
+    "url": "https://github.com/Oteryn/Oteryn-Atlas/blob/51623c7dab2346cee39cd51e3caa845bf4b65426/.github/workflows/terminal-branch-lifecycle.yml"
+  },
+  "C12": {
+    "path": "docs/agents/BRANCH_LIFECYCLE_POLICY.json",
+    "url": "https://github.com/Oteryn/Oteryn-Atlas/blob/51623c7dab2346cee39cd51e3caa845bf4b65426/docs/agents/BRANCH_LIFECYCLE_POLICY.json"
+  },
+  "C14": {
+    "path": "docs/agents/DOCUMENTATION_AGENT_IA.md",
+    "url": "https://github.com/Oteryn/Oteryn-Atlas/blob/51623c7dab2346cee39cd51e3caa845bf4b65426/docs/agents/DOCUMENTATION_AGENT_IA.md"
+  },
+  "C15": {
+    "path": "tools/governance/test_agent_prompt_lifecycle.mjs",
+    "url": "https://github.com/Oteryn/Oteryn-Atlas/blob/51623c7dab2346cee39cd51e3caa845bf4b65426/tools/governance/test_agent_prompt_lifecycle.mjs"
+  },
+  "C16": {
+    "path": "docs/agents/prompts/ATLAS-LEAN-PROMPT-CANARY.md",
+    "url": "https://github.com/Oteryn/Oteryn-Atlas/blob/51623c7dab2346cee39cd51e3caa845bf4b65426/docs/agents/prompts/ATLAS-LEAN-PROMPT-CANARY.md"
+  },
+  "C17": {
+    "path": "README.md",
+    "url": "https://github.com/Oteryn/Oteryn-Atlas/blob/51623c7dab2346cee39cd51e3caa845bf4b65426/README.md"
+  },
+  "C18": {
+    "path": "docs/agents/prompts/ATLAS-E2E-VERIFICATION-OPTIMIZATION-IMPLEMENTATION.md",
+    "url": "https://github.com/Oteryn/Oteryn-Atlas/blob/51623c7dab2346cee39cd51e3caa845bf4b65426/docs/agents/prompts/ATLAS-E2E-VERIFICATION-OPTIMIZATION-IMPLEMENTATION.md"
+  },
+  "C19": {
+    "path": "e2e/Dockerfile",
+    "url": "https://github.com/Oteryn/Oteryn-Atlas/blob/51623c7dab2346cee39cd51e3caa845bf4b65426/e2e/Dockerfile"
+  },
+  "C20": {
+    "path": "e2e/Dockerfile.web",
+    "url": "https://github.com/Oteryn/Oteryn-Atlas/blob/51623c7dab2346cee39cd51e3caa845bf4b65426/e2e/Dockerfile.web"
+  },
+  "C21": {
+    "path": ".github/dependabot.yml",
+    "url": "https://github.com/Oteryn/Oteryn-Atlas/blob/51623c7dab2346cee39cd51e3caa845bf4b65426/.github/dependabot.yml"
+  }
+}

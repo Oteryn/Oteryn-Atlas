@@ -1,0 +1,56 @@
+{
+  "scope": "CPU function with explicit fake GL readPixels/getError; NO actual WebGL/context-loss experiment succeeded.",
+  "results": [
+    {
+      "id": "clear-success",
+      "readCalls": 9,
+      "simulatedGLError": 0,
+      "result": {
+        "sampleCount": 9,
+        "nonClearSamples": 0,
+        "blank": true,
+        "signature": "8e800e05",
+        "recordIds": [
+          "tile:synthetic-audit"
+        ]
+      },
+      "error": null,
+      "expected": "blank",
+      "satisfied": true
+    },
+    {
+      "id": "colored-success",
+      "readCalls": 9,
+      "simulatedGLError": 0,
+      "result": {
+        "sampleCount": 9,
+        "nonClearSamples": 9,
+        "blank": false,
+        "signature": "b17df43a",
+        "recordIds": [
+          "tile:synthetic-audit"
+        ]
+      },
+      "error": null,
+      "expected": "nonblank",
+      "satisfied": true
+    },
+    {
+      "id": "read-failure-unchanged-buffer",
+      "readCalls": 9,
+      "simulatedGLError": 1282,
+      "result": {
+        "sampleCount": 9,
+        "nonClearSamples": 9,
+        "blank": false,
+        "signature": "3f0ac70a",
+        "recordIds": [
+          "tile:synthetic-audit"
+        ]
+      },
+      "error": null,
+      "expected": "classify failed/unknown read as invalid, not evidence of nonblank frame",
+      "satisfied": false
+    }
+  ]
+}

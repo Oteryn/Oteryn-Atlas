@@ -1,0 +1,32 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Atlas renderer audit — synthetic pixels</title>
+<style>canvas{width:128px;height:128px;border:1px solid}pre{white-space:pre-wrap}</style>
+<h1>Atlas renderer — isolated source-module audit</h1><p>Synthetic RGBA, not an Atlas product or end-to-end qualification.</p>
+<canvas id="a"></canvas><canvas id="b"></canvas><pre id="result">RUNNING</pre>
+<script type="module">
+import {createFullWorldWebGLRenderer} from '../sources/src/browser/fullworld-webgl.mjs';
+import {sampleVisibleFramebufferRecords} from '../sources/src/browser/framebuffer-probe.mjs';
+const results=[];
+const rgba=new Uint8Array(32*32*4);for(let i=0;i<rgba.length;i+=4){rgba[i]=255;rgba[i+3]=255;}
+const blob={contentId:'sha256:'+'a'.repeat(64),offset:0,width:32,height:32};
+const pc={sprites:new Map([[1,blob]])};
+const rc={manifest:{identityAuthority:false,counts:{bytes:rgba.length}},buckets:new Map([['aa',{bytes:rgba.length}]]),blobsByBucket:new Map([['aa',[blob]]])};
+const record={floor:-7,x:1,y:1,tileRecordId:'tile:synthetic',primitive:{spriteSourceId:1,widthUnits:32,heightUnits:32,displacement:{dxUnits:0,dyUnits:0}}};
+const view={floor:-7,x:1,y:1,zoom:1};
+try{
+  for(const [id,capture] of [['a',false],['b',true]]){
+    const canvas=document.querySelector('#'+id);
+    const renderer=createFullWorldWebGLRenderer(canvas,pc,rc,{capture,gpuTiming:true,gpuTextureBudgetBytes:8*1024*1024});
+    renderer.uploadBucket('aa',rgba);renderer.setRecords([record]);
+    const before=renderer.render(view);renderer.gl.finish();
+    const pixel=new Uint8Array(4);renderer.gl.readPixels(80,47,1,1,renderer.gl.RGBA,renderer.gl.UNSIGNED_BYTE,pixel);
+    const ext=renderer.gl.getExtension('WEBGL_lose_context');
+    if(!ext){results.push({id,capture,unsupported:'WEBGL_lose_context'});continue;}
+    let eventObserved=false;canvas.addEventListener('webglcontextlost',()=>{eventObserved=true;},{once:true});
+    ext.loseContext();await new Promise(r=>setTimeout(r,250));
+    let after,error,probe;
+    try{after=renderer.render(view);probe=sampleVisibleFramebufferRecords(renderer.gl,[record],view,canvas,1);}catch(e){error=e.name+': '+e.message;}
+    results.push({id,capture,browser:navigator.userAgent,beforePixel:[...pixel],before:{backend:before.backend,generation:before.generation,drawCalls:before.drawCalls,gpuTimerSupported:before.gpuTimerSupported,framebufferProbe:before.framebufferProbe},contextLost:renderer.gl.isContextLost(),eventObserved,after,error,independentProbe:probe,glError:renderer.gl.getError(),hasDispose:typeof renderer.dispose==='function'});
+  }
+  document.querySelector('#result').textContent=JSON.stringify({status:'COMPLETED',results},null,2);document.body.dataset.status='completed';
+}catch(e){document.querySelector('#result').textContent=JSON.stringify({status:'HARNESS_ERROR',error:e.stack,results},null,2);document.body.dataset.status='error';}
+</script></html>

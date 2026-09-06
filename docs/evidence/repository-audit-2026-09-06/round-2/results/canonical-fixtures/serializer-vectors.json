@@ -1,0 +1,1 @@
+[{"name": "numeric-keys", "python": "{\"spriteIndex\":{\"10\":0,\"2\":0}}\n"}, {"name": "integer", "python": "{\"a\":1}\n"}, {"name": "float-integer", "python": "{\"a\":1.0}\n"}, {"name": "small-float", "python": "{\"a\":1e-07}\n"}, {"name": "negative-zero", "python": "{\"a\":-0.0}\n"}, {"name": "proto-key", "python": "{\"__proto__\":{\"hidden\":2},\"a\":1}\n"}]

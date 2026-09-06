@@ -1,0 +1,45 @@
+{
+  "scope": "Only tests/fullworld-runtime/performance.test.mjs (four original tests), plus three audit contracts. Other repository test coverage is NOT assessed by this mutation score. Mutations remain only in temporary sandbox copies.",
+  "results": [
+    {
+      "id": "disable-get-digest",
+      "source": "src/browser/verified-content-cache.mjs",
+      "removedOrChanged": " || await sha256ContentId(bytes) !== contentId",
+      "replacement": "",
+      "originalFourTestsExit": 1,
+      "additionalThreeTestsExit": 0,
+      "detectedByOriginal": true,
+      "detectedByUnion": true
+    },
+    {
+      "id": "disable-put-digest",
+      "source": "src/browser/verified-content-cache.mjs",
+      "removedOrChanged": "    if (await sha256ContentId(bytes) !== contentId) throw new Error('refusing to cache bytes under a mismatched content identity');",
+      "replacement": "",
+      "originalFourTestsExit": 0,
+      "additionalThreeTestsExit": 1,
+      "detectedByOriginal": false,
+      "detectedByUnion": true
+    },
+    {
+      "id": "remove-entry-byte-cap",
+      "source": "src/browser/verified-content-cache.mjs",
+      "removedOrChanged": " || bytes.byteLength > this.maxEntryBytes",
+      "replacement": "",
+      "originalFourTestsExit": 0,
+      "additionalThreeTestsExit": 1,
+      "detectedByOriginal": false,
+      "detectedByUnion": true
+    },
+    {
+      "id": "disable-scheduler-cancel",
+      "source": "src/browser/frame-scheduler.mjs",
+      "removedOrChanged": "    dirty = false;\n    if (handle != null && typeof cancelFrame === 'function') cancelFrame(handle);\n    handle = null;",
+      "replacement": "    // audit-only deliberate mutant: cancellation omitted",
+      "originalFourTestsExit": 0,
+      "additionalThreeTestsExit": 1,
+      "detectedByOriginal": false,
+      "detectedByUnion": true
+    }
+  ]
+}

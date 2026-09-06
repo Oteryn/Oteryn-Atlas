@@ -1,0 +1,68 @@
+{
+  "commit": "51623c7dab2346cee39cd51e3caa845bf4b65426",
+  "fixtureScope": "synthetic metadata; real producer serialization and real consumer; not a FullWorld compile",
+  "results": [
+    {
+      "id": "single",
+      "expected": "Python metadata accepted by actual JavaScript consumer",
+      "satisfied": true,
+      "error": null,
+      "spriteCount": 1,
+      "root": "sha256:477656225ec6e106f93e8578ad534c05c858c18af88903eb6d10905af4bf1862"
+    },
+    {
+      "id": "same-width",
+      "expected": "Python metadata accepted by actual JavaScript consumer",
+      "satisfied": true,
+      "error": null,
+      "spriteCount": 2,
+      "root": "sha256:057059d025939da8d71b8f0483735f6b9545cf7c1a6260a4efbf4c41de8ffe42"
+    },
+    {
+      "id": "mixed-width",
+      "expected": "Python metadata accepted by actual JavaScript consumer",
+      "satisfied": false,
+      "error": "pixel manifest is not canonical JSON",
+      "spriteCount": null,
+      "root": "sha256:3658caf7aeb9ed1c1a3ca226cedadd5fd9d4c5578b8f845c9355ad5a552a8a2c"
+    }
+  ],
+  "vectors": [
+    {
+      "name": "numeric-keys",
+      "python": "{\"spriteIndex\":{\"10\":0,\"2\":0}}\n",
+      "javascript": "{\"spriteIndex\":{\"2\":0,\"10\":0}}\n",
+      "equal": false
+    },
+    {
+      "name": "integer",
+      "python": "{\"a\":1}\n",
+      "javascript": "{\"a\":1}\n",
+      "equal": true
+    },
+    {
+      "name": "float-integer",
+      "python": "{\"a\":1.0}\n",
+      "javascript": "{\"a\":1}\n",
+      "equal": false
+    },
+    {
+      "name": "small-float",
+      "python": "{\"a\":1e-07}\n",
+      "javascript": "{\"a\":1e-7}\n",
+      "equal": false
+    },
+    {
+      "name": "negative-zero",
+      "python": "{\"a\":-0.0}\n",
+      "javascript": "{\"a\":0}\n",
+      "equal": false
+    },
+    {
+      "name": "proto-key",
+      "python": "{\"__proto__\":{\"hidden\":2},\"a\":1}\n",
+      "javascript": "{\"a\":1}\n",
+      "equal": false
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "status": "HARNESS_ERROR",
+  "error": "Error: WebGL2 unavailable\n    at requireValue (eval at evaluate (:290:30), <anonymous>:95:67)\n    at createFullWorldWebGLRenderer (eval at evaluate (:290:30), <anonymous>:130:167)\n    at eval (eval at evaluate (:290:30), <anonymous>:175:20)\n    at UtilityScript.evaluate (<anonymous>:297:18)\n    at UtilityScript.<anonymous> (<anonymous>:1:44)",
+  "results": [],
+  "pageErrors": [],
+  "execution": "in-memory module integration; network-free; native Chromium 144 SwiftShader"
+}

@@ -1,0 +1,29 @@
+{
+  "scope": "Original compiler outputs -> original JS publication, semantic-world and pixel-catalog loaders. Synthetic metadata/pixels only; not full runtime or real Game source verification.",
+  "results": [
+    {
+      "name": "control-same-width",
+      "accepted": true,
+      "phase": "complete",
+      "error": null,
+      "trust": {
+        "publicationRoot": "sha256:6a0c278f6a2bafbe4f5815e33f17d04e9d68e55350c54afc268bd7a1187c50d5",
+        "semanticRoot": "sha256:fde01d8305f21481ded0812dec5dd8c9a3de1f56a4948a0adf92e208bd084999",
+        "pixelRoot": "sha256:51ef5e80d1cdecea2120ada49bd4e5a0f5f813c8e495d27674a2ccd96795a172",
+        "sourceFingerprint": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+      }
+    },
+    {
+      "name": "cross-language-mixed",
+      "accepted": false,
+      "phase": "pixel-catalog",
+      "error": "pixel manifest is not canonical JSON",
+      "trust": {
+        "publicationRoot": "sha256:8be81abd010dd0ee2ba3d9d26d9f2789df15577363858b81fba3a30411bfe394",
+        "semanticRoot": "sha256:20e977637f85f113baac6701c979fa72fb94d4d5bf194ecab05ccc13b21c4a61",
+        "pixelRoot": "sha256:58af1a37233db4a4ab804db9b0139223aea063e3a2275993b128d2de1d065ece",
+        "sourceFingerprint": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+      }
+    }
+  ]
+}

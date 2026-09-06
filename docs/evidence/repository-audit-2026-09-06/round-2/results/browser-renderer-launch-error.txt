@@ -1,0 +1,3 @@
+Page.goto: net::ERR_BLOCKED_BY_ADMINISTRATOR at http://127.0.0.1:32791/probes/browser-renderer.html
+Call log:
+  - navigating to "http://127.0.0.1:32791/probes/browser-renderer.html", waiting until "domcontentloaded"

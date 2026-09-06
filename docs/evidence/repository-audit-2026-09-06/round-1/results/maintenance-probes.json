@@ -1,0 +1,349 @@
+{
+  "source_repository": "Oteryn/Oteryn-Atlas",
+  "source_commit": "51623c7dab2346cee39cd51e3caa845bf4b65426",
+  "source_path": "tools/maintenance/verify-maintenance-diff.mjs",
+  "verified_git_blob": "714fb73fe08b7c741d606c6e5a8ecdf33a3adf10",
+  "node_version": "v22.16.0",
+  "git_version": "git version 2.47.3",
+  "scope": "33 synthetic Git-fixture probes; not a full Atlas test suite or GitHub workflow execution",
+  "probes": [
+    {
+      "probe": "docs_add",
+      "synthetic_stage": "B",
+      "expected_allow": true,
+      "actual_allow": true,
+      "matches_safety_expectation": true,
+      "exit_code": 0,
+      "stdout": "{\"schemaVersion\":1,\"result\":\"PASS\",\"baseSha\":\"428c518a7144eb6c19fc8b847a709ab13352302c\",\"headSha\":\"9cb457a0bb943db5e386d7dff2d57b4a67350957\",\"mode\":\"maintenance-only\",\"changedPaths\":[\"docs/agents/new.md\"]}",
+      "stderr": ""
+    },
+    {
+      "probe": "root_modify",
+      "synthetic_stage": "B",
+      "expected_allow": true,
+      "actual_allow": true,
+      "matches_safety_expectation": true,
+      "exit_code": 0,
+      "stdout": "{\"schemaVersion\":1,\"result\":\"PASS\",\"baseSha\":\"428c518a7144eb6c19fc8b847a709ab13352302c\",\"headSha\":\"2edee156ae499ca637c604f61982fc7fde6451bd\",\"mode\":\"maintenance-only\",\"changedPaths\":[\"AGENTS.md\"]}",
+      "stderr": ""
+    },
+    {
+      "probe": "governance_add",
+      "synthetic_stage": "B",
+      "expected_allow": true,
+      "actual_allow": true,
+      "matches_safety_expectation": true,
+      "exit_code": 0,
+      "stdout": "{\"schemaVersion\":1,\"result\":\"PASS\",\"baseSha\":\"428c518a7144eb6c19fc8b847a709ab13352302c\",\"headSha\":\"56ca30d4fa5d4431144b9531fe0f6a0c923303a3\",\"mode\":\"maintenance-only\",\"changedPaths\":[\"tools/governance/check.py\"]}",
+      "stderr": ""
+    },
+    {
+      "probe": "docs_delete",
+      "synthetic_stage": "B",
+      "expected_allow": true,
+      "actual_allow": true,
+      "matches_safety_expectation": true,
+      "exit_code": 0,
+      "stdout": "{\"schemaVersion\":1,\"result\":\"PASS\",\"baseSha\":\"428c518a7144eb6c19fc8b847a709ab13352302c\",\"headSha\":\"c02140513b7ef5163bdb93d14844165a76a1b67e\",\"mode\":\"maintenance-only\",\"changedPaths\":[\"docs/evidence/old.md\"]}",
+      "stderr": ""
+    },
+    {
+      "probe": "product_test_delete",
+      "synthetic_stage": "B",
+      "expected_allow": false,
+      "actual_allow": true,
+      "matches_safety_expectation": false,
+      "exit_code": 0,
+      "stdout": "{\"schemaVersion\":1,\"result\":\"PASS\",\"baseSha\":\"428c518a7144eb6c19fc8b847a709ab13352302c\",\"headSha\":\"83e5caeb2193ad403903f29dc53d203b90ecb026\",\"mode\":\"maintenance-only\",\"changedPaths\":[\"tests/verification/bounded-real-world.test.mjs\"]}",
+      "stderr": ""
+    },
+    {
+      "probe": "runtime",
+      "synthetic_stage": "B",
+      "expected_allow": false,
+      "actual_allow": false,
+      "matches_safety_expectation": true,
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "atlas maintenance gate: maintenance path is frozen: web/app.mjs"
+    },
+    {
+      "probe": "mixed",
+      "synthetic_stage": "B",
+      "expected_allow": false,
+      "actual_allow": false,
+      "matches_safety_expectation": true,
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "atlas maintenance gate: maintenance path is frozen: web/app.mjs"
+    },
+    {
+      "probe": "root_delete",
+      "synthetic_stage": "B",
+      "expected_allow": false,
+      "actual_allow": false,
+      "matches_safety_expectation": true,
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "atlas maintenance gate: maintenance path is frozen: AGENTS.md"
+    },
+    {
+      "probe": "readme",
+      "synthetic_stage": "B",
+      "expected_allow": false,
+      "actual_allow": false,
+      "matches_safety_expectation": true,
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "atlas maintenance gate: maintenance path is frozen: README.md"
+    },
+    {
+      "probe": "test_add",
+      "synthetic_stage": "B",
+      "expected_allow": false,
+      "actual_allow": false,
+      "matches_safety_expectation": true,
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "atlas maintenance gate: maintenance path is frozen: tests/verification/new.test.mjs"
+    },
+    {
+      "probe": "test_modify",
+      "synthetic_stage": "B",
+      "expected_allow": false,
+      "actual_allow": false,
+      "matches_safety_expectation": true,
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "atlas maintenance gate: maintenance path is frozen: tests/verification/bounded-real-world.test.mjs"
+    },
+    {
+      "probe": "gate_edit",
+      "synthetic_stage": "B",
+      "expected_allow": false,
+      "actual_allow": false,
+      "matches_safety_expectation": true,
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "atlas maintenance gate: maintenance authority is immutable: tools/maintenance/verify-maintenance-diff.mjs"
+    },
+    {
+      "probe": "workflow_restore",
+      "synthetic_stage": "B",
+      "expected_allow": false,
+      "actual_allow": false,
+      "matches_safety_expectation": true,
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "atlas maintenance gate: workflow transition is not the complete suspension cutover: active workflow inventory is not the required three-file set"
+    },
+    {
+      "probe": "symlink",
+      "synthetic_stage": "B",
+      "expected_allow": false,
+      "actual_allow": false,
+      "matches_safety_expectation": true,
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "atlas maintenance gate: candidate path is not a regular 100644 file: docs/agents/unsafe.md"
+    },
+    {
+      "probe": "executable",
+      "synthetic_stage": "B",
+      "expected_allow": false,
+      "actual_allow": false,
+      "matches_safety_expectation": true,
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "atlas maintenance gate: candidate path is not a regular 100644 file: docs/agents/unsafe.md"
+    },
+    {
+      "probe": "binary",
+      "synthetic_stage": "B",
+      "expected_allow": false,
+      "actual_allow": false,
+      "matches_safety_expectation": true,
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "atlas maintenance gate: candidate path is not text content: docs/agents/unsafe.md"
+    },
+    {
+      "probe": "invalid_utf8",
+      "synthetic_stage": "B",
+      "expected_allow": false,
+      "actual_allow": false,
+      "matches_safety_expectation": true,
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "atlas maintenance gate: candidate path is not UTF-8 text content: docs/agents/unsafe.md"
+    },
+    {
+      "probe": "oversized",
+      "synthetic_stage": "B",
+      "expected_allow": false,
+      "actual_allow": false,
+      "matches_safety_expectation": true,
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "atlas maintenance gate: candidate text exceeds size limit: docs/agents/unsafe.md"
+    },
+    {
+      "probe": "rename_escape",
+      "synthetic_stage": "B",
+      "expected_allow": false,
+      "actual_allow": false,
+      "matches_safety_expectation": true,
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "atlas maintenance gate: rename or copy is forbidden: web/app.mjs -> docs/agents/runtime.md"
+    },
+    {
+      "probe": "space_path",
+      "synthetic_stage": "B",
+      "expected_allow": false,
+      "actual_allow": false,
+      "matches_safety_expectation": true,
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "atlas maintenance gate: unsafe path: docs/agents/unsafe name.md"
+    },
+    {
+      "probe": "empty",
+      "synthetic_stage": "B",
+      "expected_allow": false,
+      "actual_allow": false,
+      "matches_safety_expectation": true,
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "atlas maintenance gate: maintenance diff is empty"
+    },
+    {
+      "probe": "dirty_candidate",
+      "synthetic_stage": "B",
+      "expected_allow": false,
+      "actual_allow": false,
+      "matches_safety_expectation": true,
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "atlas maintenance gate: candidate worktree is dirty"
+    },
+    {
+      "probe": "dirty_base",
+      "synthetic_stage": "B",
+      "expected_allow": false,
+      "actual_allow": false,
+      "matches_safety_expectation": true,
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "atlas maintenance gate: protected worktree is dirty"
+    },
+    {
+      "probe": "wrong_repo",
+      "synthetic_stage": "B",
+      "expected_allow": false,
+      "actual_allow": false,
+      "matches_safety_expectation": true,
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "atlas maintenance gate: repository identity mismatch"
+    },
+    {
+      "probe": "wrong_event",
+      "synthetic_stage": "B",
+      "expected_allow": false,
+      "actual_allow": false,
+      "matches_safety_expectation": true,
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "atlas maintenance gate: unsupported maintenance event"
+    },
+    {
+      "probe": "wrong_head",
+      "synthetic_stage": "B",
+      "expected_allow": false,
+      "actual_allow": false,
+      "matches_safety_expectation": true,
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "atlas maintenance gate: candidate head identity mismatch"
+    },
+    {
+      "probe": "merge_group_valid",
+      "synthetic_stage": "B",
+      "expected_allow": true,
+      "actual_allow": true,
+      "matches_safety_expectation": true,
+      "exit_code": 0,
+      "stdout": "{\"schemaVersion\":1,\"result\":\"PASS\",\"baseSha\":\"834e22432ecc974ae4dc4104095c390ca0b98a03\",\"headSha\":\"1ebc6dc2d517e0461a044d3ea595f551125f01e2\",\"mode\":\"maintenance-only\",\"changedPaths\":[\"docs/agents/new.md\"]}",
+      "stderr": ""
+    },
+    {
+      "probe": "merge_group_wrong_sha",
+      "synthetic_stage": "B",
+      "expected_allow": false,
+      "actual_allow": false,
+      "matches_safety_expectation": true,
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "atlas maintenance gate: merge-group head identity mismatch"
+    },
+    {
+      "probe": "cutover_text",
+      "synthetic_stage": "A",
+      "expected_allow": true,
+      "actual_allow": true,
+      "matches_safety_expectation": true,
+      "exit_code": 0,
+      "stdout": "{\"schemaVersion\":1,\"result\":\"PASS\",\"baseSha\":\"d322e40e11879ff82787644eb449f787c99c7148\",\"headSha\":\"b8f74af40f1b7da19b4994d476ab6588af828dc2\",\"mode\":\"workflow-suspension-cutover\",\"suspendedWorkflows\":[\"ci.yml\"]}",
+      "stderr": ""
+    },
+    {
+      "probe": "cutover_symlink",
+      "synthetic_stage": "A",
+      "expected_allow": false,
+      "actual_allow": true,
+      "matches_safety_expectation": false,
+      "exit_code": 0,
+      "stdout": "{\"schemaVersion\":1,\"result\":\"PASS\",\"baseSha\":\"d322e40e11879ff82787644eb449f787c99c7148\",\"headSha\":\"b222ab62353a641ede2e96eb400172837cd712c7\",\"mode\":\"workflow-suspension-cutover\",\"suspendedWorkflows\":[\"ci.yml\"]}",
+      "stderr": ""
+    },
+    {
+      "probe": "cutover_binary",
+      "synthetic_stage": "A",
+      "expected_allow": false,
+      "actual_allow": true,
+      "matches_safety_expectation": false,
+      "exit_code": 0,
+      "stdout": "{\"schemaVersion\":1,\"result\":\"PASS\",\"baseSha\":\"d322e40e11879ff82787644eb449f787c99c7148\",\"headSha\":\"82e6ce0dec8a4dba7cca17c6aa7b96674aaf474a\",\"mode\":\"workflow-suspension-cutover\",\"suspendedWorkflows\":[\"ci.yml\"]}",
+      "stderr": ""
+    },
+    {
+      "probe": "cutover_executable",
+      "synthetic_stage": "A",
+      "expected_allow": false,
+      "actual_allow": true,
+      "matches_safety_expectation": false,
+      "exit_code": 0,
+      "stdout": "{\"schemaVersion\":1,\"result\":\"PASS\",\"baseSha\":\"d322e40e11879ff82787644eb449f787c99c7148\",\"headSha\":\"a65f4f3bab2caef0dd0e5d0a64d998940491bc08\",\"mode\":\"workflow-suspension-cutover\",\"suspendedWorkflows\":[\"ci.yml\"]}",
+      "stderr": ""
+    },
+    {
+      "probe": "partial_cutover",
+      "synthetic_stage": "A",
+      "expected_allow": false,
+      "actual_allow": false,
+      "matches_safety_expectation": true,
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "atlas maintenance gate: minimal Merge Queue gate does not equal protected template"
+    }
+  ],
+  "total": 33,
+  "matched": 29,
+  "mismatches": [
+    "product_test_delete",
+    "cutover_symlink",
+    "cutover_binary",
+    "cutover_executable"
+  ]
+}
