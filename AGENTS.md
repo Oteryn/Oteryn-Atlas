@@ -60,6 +60,15 @@ Before resuming, refresh GitHub repository/default-branch SHA/governing Issue/PR
 - Record exact base/head revisions and any pinned external evidence used by the task.
 - Treat `UNKNOWN` provenance, rights, coordinates or semantics as a blocker to the affected claim, not permission to guess.
 
+## Active maintenance freeze
+
+- Issue #315 is the lifecycle authority for the temporary Atlas maintenance freeze. The freeze is enforced by the organization-required `.github/workflows/merge-authority-audit.yml`, which evaluates the complete exact candidate diff using code from the protected base and never executes candidate code.
+- Product/runtime, publication inputs, deployment behavior, verification authority and maintenance-gate code are frozen. Mixed maintenance/runtime changes are rejected. Automatic publication and deployment must remain suspended during maintenance mode.
+- Normal maintenance changes are limited to the gate's closed operation/path allowlist: `AGENTS.md`, `docs/agents/**`, `docs/evidence/**`, `docs/maintenance/**`, `tools/governance/**`, and removal of obsolete `tests/verification/*.test.mjs` governance contracts. A matching path is not sufficient when its Git mode, content type, size or operation is disallowed.
+- The one admitted workflow transition is the complete byte-preserving suspension cutover defined by protected `tools/maintenance/verify-maintenance-diff.mjs`. Partial workflow deactivation, candidate-editable policy, status fabrication and direct/admin merge remain forbidden.
+- Until the suspension cutover is merged, old test/verification workflows may still execute but are not authority for widening maintenance scope. After cutover, only the protected maintenance audit, minimal Merge Queue `atlas-gate`, and terminal branch-lifecycle governance workflow remain active.
+- Test restoration is a later #315 phase: restore each group in non-blocking shadow mode, qualify it through real PR/MQ canaries, then make only impact-applicable coverage blocking.
+
 ## Preflight
 
 Before editing, inspect the current default-branch head, this file, the active Issue/PR, overlapping work, and only the architecture/contracts relevant to the paths being changed. Read a nearer `AGENTS.md` if one exists for a touched path.

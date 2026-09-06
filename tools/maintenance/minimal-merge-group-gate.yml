@@ -1,16 +1,18 @@
-name: Merge authority audit
+name: Atlas maintenance Merge Queue gate
+
 on:
-  pull_request_target:
-    types: [opened, reopened, synchronize, edited]
   merge_group:
     types: [checks_requested]
+
 permissions: {}
+
 concurrency:
-  group: atlas-merge-authority-audit-${{ github.event_name }}-${{ github.event.pull_request.number || github.event.merge_group.head_sha }}
-  cancel-in-progress: false
+  group: atlas-maintenance-merge-group-${{ github.event.merge_group.head_sha }}
+  cancel-in-progress: true
+
 jobs:
-  audit:
-    name: Merge authority audit / protected-base validate
+  atlas-gate:
+    name: atlas-gate
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -18,23 +20,23 @@ jobs:
     env:
       ATLAS_EVENT_REPOSITORY: ${{ github.event.repository.full_name }}
       ATLAS_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
-      ATLAS_BASE_REF: ${{ github.event.pull_request.base.ref || github.event.merge_group.base_ref }}
+      ATLAS_BASE_REF: ${{ github.event.merge_group.base_ref }}
       ATLAS_EVENT_ACTION: ${{ github.event.action }}
-      ATLAS_PR_NUMBER: ${{ github.event.pull_request.number }}
-      ATLAS_CODE_REVISION: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
-      ATLAS_PROTECTED_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+      ATLAS_PR_NUMBER: ''
+      ATLAS_CODE_REVISION: ${{ github.event.merge_group.head_sha }}
+      ATLAS_PROTECTED_BASE_SHA: ${{ github.event.merge_group.base_sha }}
     steps:
       - name: Check out exact protected maintenance authority
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+          ref: ${{ github.event.merge_group.base_sha }}
           persist-credentials: false
           fetch-depth: 0
           path: trusted-base
-      - name: Check out inert candidate
+      - name: Check out inert merge-group candidate
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
+          ref: ${{ github.event.merge_group.head_sha }}
           persist-credentials: false
           fetch-depth: 0
           path: candidate
