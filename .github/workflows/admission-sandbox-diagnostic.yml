@@ -1,41 +1,28 @@
-name: Protected consumer replay (non-authoritative)
+name: Protected sandbox diagnosis (non-authoritative)
 on:
   push:
     paths:
       - '.github/workflows/admission-sandbox-diagnostic.yml'
 permissions:
   contents: read
-  actions: read
-  pull-requests: read
 jobs:
-  replay:
+  diagnose:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - name: Check out actual protected source
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: 6f7df79b8dd965dc33a56c34f1f7f4376dce8fbb
+          ref: 563370409880d40b0b7e334b9a5d4fc86b08b459
           persist-credentials: false
           path: protected
-      - name: Check out exact proposed consumer
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          ref: 8df58e829b4dae8a97aea474b2ff61c119981db2
-          persist-credentials: false
-          path: proposed
-      - name: Replay actual current protected evidence and authenticated review
+      - name: Reproduce exact protected CLI regression sandbox
         shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          ATLAS_CODE_REVISION: d44116f34491f50955292d1dce865ede968a627f
-          ATLAS_PROTECTED_BASE_SHA: 6f7df79b8dd965dc33a56c34f1f7f4376dce8fbb
         run: |
           set -euo pipefail
-          echo 'NON_AUTHORITATIVE_CONSUMER_REPLAY: no accepted protected publication, status, or merge.'
-          ATLAS_PR_NUMBER=336 node proposed/tools/verification/consume-protected-admission.mjs --protected-root "$PWD/protected" --output "$RUNNER_TEMP/replay-pr.json"
-          jq -e '.accepted == true' "$RUNNER_TEMP/replay-pr.json"
-          echo 'MQ_MODE_REPLAY uses current candidate commit association; this is not a real merge-group canary.'
-          env -u ATLAS_PR_NUMBER node proposed/tools/verification/consume-protected-admission.mjs --protected-root "$PWD/protected" --output "$RUNNER_TEMP/replay-mq-mode.json"
-          jq -e '.accepted == true' "$RUNNER_TEMP/replay-mq-mode.json"
-          echo 'Complete real API consumer replay passed; proposed code remains untrusted until protected integration.'
+          mkdir -p "$RUNNER_TEMP/diag-out"
+          chmod 777 "$RUNNER_TEMP/diag-out"
+          cat > "$RUNNER_TEMP/diag.mjs" <<'JS'
+          import {spawnSync} from 'node:child_process';
+          const r=spawnSync('node',['--test','/candidate/tests/verification/protected-admission-cli-census.test.mjs'],{stdio:'inherit',cwd:'/candidate',env:process.env});process.exit(r.status??1);
+          JS
+          docker run --rm --env TMPDIR=/out --network none --read-only --cap-drop ALL --security-opt no-new-privileges --pids-limit 256 --memory 1536m --cpus 2 --user 1000:1000 --tmpfs /tmp:rw,nosuid,nodev,size=256m --mount "type=bind,src=$PWD/protected,dst=/candidate,readonly" --mount "type=bind,src=$RUNNER_TEMP/diag-out,dst=/out" --mount "type=bind,src=$RUNNER_TEMP/diag.mjs,dst=/run-proof.mjs,readonly" mcr.microsoft.com/playwright:v1.62.0-noble@sha256:baed2032d533817f3dbe6425de795788430ba345e819a1201337009ba17c9d07 node /run-proof.mjs
