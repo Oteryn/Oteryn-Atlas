@@ -1,3 +1,4 @@
+const __atlasQualification = process.env.ATLAS_E2E_DATA_CAPABILITY === 'qualification_fixture';
 import { writeFile } from 'node:fs/promises';
 
 import { expect, test } from '@playwright/test';
@@ -15,7 +16,7 @@ import {
 import { waitForCreatureAlignedToBase, waitForCreatureCommit, waitForRendererCommit } from '../support/diagnostics.mjs';
 import { assertNoRuntimeFailures, captureRuntimeFailures, gotoAtlas, waitForAtlas } from './runtime.mjs';
 
-const ENTRY = '/web/fullworld.html?x=33018&y=32009&floor=-7&zoom=2&mode=map&animation=off&creatures=npc,monster';
+const ENTRY = (__atlasQualification ? "/web/fullworld.html?x=32283&y=32158&floor=-7&zoom=2&mode=map&animation=off&creatures=npc,monster" : '/web/fullworld.html?x=33018&y=32009&floor=-7&zoom=2&mode=map&animation=off&creatures=npc,monster');
 const SOAK_CYCLES = 4;
 const STRUCTURAL_GROWTH_FIELDS = Object.freeze(['retainedChunks', 'retainedGroups', 'rangeCacheBytes', 'creatureCacheChunks']);
 

@@ -1,9 +1,10 @@
+const __atlasQualification = process.env.ATLAS_E2E_DATA_CAPABILITY === 'qualification_fixture';
 import { expect, test } from '@playwright/test';
 
 import { waitForRendererCommit } from '../support/diagnostics.mjs';
 import { assertNoRuntimeFailures, captureRuntimeFailures, gotoAtlas } from './runtime.mjs';
 
-const ENTRY = '/web/fullworld.html?x=32369&y=32241&floor=-7&zoom=2&mode=map&capture=1&sync-evidence=1&animation=off';
+const ENTRY = (__atlasQualification ? "/web/fullworld.html?x=32280&y=32155&floor=-7&zoom=2&mode=map&capture=1&sync-evidence=1&animation=off" : '/web/fullworld.html?x=32369&y=32241&floor=-7&zoom=2&mode=map&capture=1&sync-evidence=1&animation=off');
 
 async function waitForNonBlankProbe(page, afterGeneration = 0) {
   await page.waitForFunction((after) => {
