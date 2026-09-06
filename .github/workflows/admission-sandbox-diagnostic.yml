@@ -1,4 +1,4 @@
-name: Admission sandbox diagnostic (non-authoritative)
+name: Protected consumer replay (non-authoritative)
 on:
   push:
     paths:
@@ -8,75 +8,34 @@ permissions:
   actions: read
   pull-requests: read
 jobs:
-  shadow:
+  replay:
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    timeout-minutes: 10
     steps:
-      - name: Check out exact proposed authority
+      - name: Check out actual protected source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: 362a5cc309debfb233dbcc6b39ef56c652966111
+          ref: 6f7df79b8dd965dc33a56c34f1f7f4376dce8fbb
           persist-credentials: false
-          fetch-depth: 0
-          path: proposed-authority
-      - name: Check out exact shadow candidate
+          path: protected
+      - name: Check out exact proposed consumer
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: f4fd28e1f68d4ae2fd7dd946b52ab4aba2e3c27f
+          ref: 8df58e829b4dae8a97aea474b2ff61c119981db2
           persist-credentials: false
-          fetch-depth: 0
-          path: shadow-candidate
-      - name: Execute complete proposed recovery without trusted publication
+          path: proposed
+      - name: Replay actual current protected evidence and authenticated review
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          ATLAS_CODE_REVISION: d44116f34491f50955292d1dce865ede968a627f
+          ATLAS_PROTECTED_BASE_SHA: 6f7df79b8dd965dc33a56c34f1f7f4376dce8fbb
         run: |
           set -euo pipefail
-          cat > shadow-entry.mjs <<'NODE'
-          import fs from 'node:fs';
-          import path from 'node:path';
-          import {execFileSync} from 'node:child_process';
-          import {executeProtectedCandidateProof,assertSameCandidate} from './proposed-authority/tools/verification/run-protected-admission.mjs';
-          import {validateProtectedExecutionCandidate} from './proposed-authority/tools/verification/protected-admission-policy.mjs';
-          const protectedRoot=path.resolve('proposed-authority'),candidateRoot=path.resolve('shadow-candidate');
-          const git=(root,...args)=>execFileSync('git',['-C',root,...args],{encoding:'utf8'}).trim();
-          const api=endpoint=>JSON.parse(execFileSync('gh',['api',endpoint],{encoding:'utf8'}));
-          const repository=process.env.GITHUB_REPOSITORY;
-          const snapshot=()=>{
-           const headSha=git(candidateRoot,'rev-parse','HEAD'),baseSha=git(protectedRoot,'rev-parse','HEAD');
-           const changedFiles=git(candidateRoot,'diff','--no-renames','--name-status',baseSha,headSha).split('\n').map(row=>{const [status,p]=row.split('\t');if(!['M','A','D'].includes(status))throw Error('unexpected status');return {path:p,status:{M:'modified',A:'added',D:'removed'}[status]};});
-           return {repository,prNumber:null,headSha,baseSha,treeSha:git(candidateRoot,'rev-parse','HEAD^{tree}'),changedFiles};
-          };
-          const candidate=snapshot();
-          const sourceAuthor=api('repos/'+repository+'/pulls/333').user;
-          const reviewPermission=api('repos/'+repository+'/collaborators/'+encodeURIComponent(sourceAuthor.login)+'/permission');
-          if(reviewPermission.user?.id!==sourceAuthor.id||!['admin','maintain'].includes(reviewPermission.role_name))throw Error('review authority API readback unavailable');
-          console.log('LIVE_REVIEW_PERMISSION_READBACK',JSON.stringify({user:sourceAuthor.login,id:sourceAuthor.id,permission:reviewPermission.permission,role:reviewPermission.role_name}));
-          const liveReadback=async()=>{
-           const main=api('repos/'+repository+'/git/ref/heads/main'),source=api('repos/'+repository+'/pulls/333');
-           if(main.object.sha!=='e96da570cc4b5f9a8ee3d3d4889caea33cfb4d1b'||source.head.sha!=='0be8b5e1cdb2011c19247b3262cf15e43544467b'||source.state!=='open')throw Error('LIVE source authority moved; shadow invalidated');
-           const actual=snapshot();assertSameCandidate(candidate,actual);return actual;
-          };
-          await liveReadback();
-          const jobs=api('repos/'+repository+'/actions/runs/'+process.env.GITHUB_RUN_ID+'/attempts/1/jobs?per_page=100').jobs.filter(job=>job.name==='shadow'&&job.status==='in_progress');
-          if(jobs.length!==1||Number(process.env.GITHUB_RUN_ATTEMPT)!==1)throw Error('exact diagnostic job/attempt missing');
-          const admission=validateProtectedExecutionCandidate({protectedRoot,candidateRoot,currentCandidate:candidate});
-          console.log('UNTRUSTED_PROPOSED_AUTHORITY_SHADOW',JSON.stringify({candidate,admission,jobId:jobs[0].id}));
-          const outputRoot=path.join(process.env.RUNNER_TEMP,'shadow-full-proof');
-          const proof=await executeProtectedCandidateProof({protectedRoot,candidateRoot,outputRoot,candidate,admission,producerJobId:jobs[0].id,producerWorkflowPath:'.github/workflows/admission-sandbox-diagnostic.yml',freshSnapshot:liveReadback});
-          await liveReadback();
-          fs.writeFileSync(path.join(outputRoot,'shadow-proof.json'),JSON.stringify({kind:'NON_AUTHORITATIVE_RECOVERY_SHADOW',candidate,proof},null,2));
-          console.log('SHADOW_COMPLETE_NOT_PUBLISHED_ACCEPTANCE',JSON.stringify(proof));
-          NODE
-          node shadow-entry.mjs
-      - name: Retain complete shadow diagnostics for actual review
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: shadow-browser-diagnostics-${{ github.run_id }}
-          path: |
-            ${{ runner.temp }}/shadow-full-proof/browser-*
-            ${{ runner.temp }}/shadow-full-proof/private-visual-reference/visual-reference/
-            ${{ runner.temp }}/shadow-full-proof/shadow-proof.json
-          if-no-files-found: warn
-          retention-days: 3
+          echo 'NON_AUTHORITATIVE_CONSUMER_REPLAY: no accepted protected publication, status, or merge.'
+          ATLAS_PR_NUMBER=336 node proposed/tools/verification/consume-protected-admission.mjs --protected-root "$PWD/protected" --output "$RUNNER_TEMP/replay-pr.json"
+          jq -e '.accepted == true' "$RUNNER_TEMP/replay-pr.json"
+          echo 'MQ_MODE_REPLAY uses current candidate commit association; this is not a real merge-group canary.'
+          env -u ATLAS_PR_NUMBER node proposed/tools/verification/consume-protected-admission.mjs --protected-root "$PWD/protected" --output "$RUNNER_TEMP/replay-mq-mode.json"
+          jq -e '.accepted == true' "$RUNNER_TEMP/replay-mq-mode.json"
+          echo 'Complete real API consumer replay passed; proposed code remains untrusted until protected integration.'
