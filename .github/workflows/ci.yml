@@ -282,7 +282,7 @@ jobs:
       ATLAS_CODE_REVISION: ${{ github.event.pull_request.head.sha }}
       ATLAS_INTEGRATION_BASE_REF: ${{ github.event.pull_request.base.ref }}
       ATLAS_PR_NUMBER: ${{ github.event.pull_request.number }}
-      ATLAS_CHANGED_FILE_COUNT: ${{ github.event.pull_request.changed_files }}
+      ATLAS_INTEGRATION_BASE_SHA: ${{ github.event.pull_request.base.sha }}
     steps:
       - name: Check out exact Atlas candidate
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -303,11 +303,24 @@ jobs:
           git_changes="$(mktemp)"
           trusted_impact="$(mktemp)"
           trusted_catalog="$(mktemp)"
-          trap 'rm -f "$rows" "$paths" "$changes" "$git_changes" "$trusted_impact" "$trusted_catalog"' EXIT
+          pr_snapshot="$(mktemp)"
+          trap 'rm -f "$rows" "$paths" "$changes" "$git_changes" "$trusted_impact" "$trusted_catalog" "$pr_snapshot"' EXIT
+          read_current_pr() {
+            gh api "repos/$GITHUB_REPOSITORY/pulls/$ATLAS_PR_NUMBER" > "$pr_snapshot" || return
+            node --input-type=module - "$pr_snapshot" <<'NODE'
+          import fs from 'node:fs';
+          const pr=JSON.parse(fs.readFileSync(process.argv[2],'utf8')),env=process.env;
+          if(pr.number!==Number(env.ATLAS_PR_NUMBER)||!Number.isSafeInteger(pr.number)||pr.number<1||pr.state!=='open'||pr.merged===true||pr.head?.repo?.full_name!==env.GITHUB_REPOSITORY||pr.base?.repo?.full_name!==env.GITHUB_REPOSITORY||pr.head?.sha!==env.ATLAS_CODE_REVISION||pr.base?.sha!==env.ATLAS_INTEGRATION_BASE_SHA||pr.base?.ref!==env.ATLAS_INTEGRATION_BASE_REF)throw new Error('Current PR identity differs from classification event.');
+          if(!/^[a-f0-9]{40}$/.test(pr.head.sha)||!/^[a-f0-9]{40}$/.test(pr.base.sha)||!Number.isSafeInteger(pr.changed_files)||pr.changed_files<0)throw new Error('Current PR revision or changed-file count is invalid.');
+          console.log(`${pr.head.sha} ${pr.base.sha} ${pr.changed_files}`);
+          NODE
+          }
+          initial_pr_identity="$(read_current_pr)"
+          read -r current_head expected_base_sha expected_count <<< "$initial_pr_identity"
           gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$ATLAS_PR_NUMBER/files?per_page=100" \
             --jq '.[] | [.filename, (.previous_filename // "")] | @tsv' > "$rows"
           actual_count="$(wc -l < "$rows" | tr -d '[:space:]')"
-          test "$actual_count" = "$ATLAS_CHANGED_FILE_COUNT"
+          test "$actual_count" = "$expected_count"
           while IFS=$'\t' read -r filename previous_filename; do
             test -n "$filename"
             printf '%s\n' "$filename" >> "$paths"
@@ -315,6 +328,7 @@ jobs:
           done < "$rows"
           git fetch --no-tags origin "$ATLAS_INTEGRATION_BASE_REF"
           integration_base_sha="$(git rev-parse "origin/$ATLAS_INTEGRATION_BASE_REF")"
+          test "$integration_base_sha" = "$expected_base_sha"
           merge_base_sha="$(git merge-base "$ATLAS_CODE_REVISION" "$integration_base_sha")"
           test -n "$merge_base_sha"
           git diff --name-status -z --find-renames "$merge_base_sha" "$ATLAS_CODE_REVISION" > "$git_changes"
@@ -374,6 +388,7 @@ jobs:
             --merge-base-sha "$merge_base_sha" \
             --stable-test-ids artifacts/verification/stable-test-ids.json \
             > artifacts/verification/shadow-verification-plan.json
+          test "$(read_current_pr)" = "$initial_pr_identity"
           node --input-type=module - artifacts/verification/shadow-verification-plan.json "$GITHUB_OUTPUT" <<'NODE'
           import crypto from 'node:crypto';
           import fs from 'node:fs';
