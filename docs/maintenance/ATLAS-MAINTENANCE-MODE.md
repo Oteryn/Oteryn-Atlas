@@ -30,4 +30,6 @@ No direct merge, ruleset bypass, fabricated success, candidate code execution or
 
 ## Current state
 
-This document is introduced by Stage A. Maintenance enforcement becomes active only after the Stage A PR is merged through Merge Queue and the exact protected-main workflow is read back. Full test/deployment suspension becomes active only after the separate Stage B cutover is merged and read back.
+Stage A is active on protected `main` at `d0e2f143ae678c97c0657cdd8e446725ab0a11f3`; the organization-required workflow was read back from that exact revision and invokes only the protected maintenance validator.
+
+This Stage B candidate archives 25 old workflows byte-for-byte and leaves three active workflow files: the protected maintenance audit, the minimal Merge Queue `atlas-gate`, and terminal branch-lifecycle governance. Full test/deployment suspension becomes active only after this cutover is merged and the exact protected-main workflow inventory is read back.
