@@ -1,0 +1,17 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import {execFileSync} from 'node:child_process';
+import {readCandidateSnapshot,gitChangedFiles} from './protected-candidate-snapshot.mjs';
+import {validateProtectedExecutionCandidate} from './protected-admission-policy.mjs';
+import {executeProtectedCandidateProof,assertSameCandidate} from './run-protected-admission.mjs';
+const [protectedRoot,candidateRoot,outputRoot]=process.argv.slice(2);
+if(!protectedRoot||!candidateRoot||!outputRoot||process.env.GITHUB_EVENT_NAME!=='merge_group')throw new TypeError('protected merge-group invocation required');
+const options={repository:process.env.GITHUB_REPOSITORY,baseSha:process.env.ATLAS_PROTECTED_BASE_SHA,headSha:process.env.ATLAS_CODE_REVISION,changedFiles:gitChangedFiles(candidateRoot,process.env.ATLAS_PROTECTED_BASE_SHA,process.env.ATLAS_CODE_REVISION)};
+const candidate=await readCandidateSnapshot(options);
+const admission=validateProtectedExecutionCandidate({protectedRoot,candidateRoot,currentCandidate:candidate});
+execFileSync('python3',['-I',path.join(candidateRoot,'tools/governance/verify_extraction_provenance.py')],{stdio:'inherit',timeout:180000});
+const proof=await executeProtectedCandidateProof({protectedRoot,candidateRoot,outputRoot,candidate,admission});
+assertSameCandidate(candidate,await readCandidateSnapshot({...options,changedFiles:gitChangedFiles(candidateRoot,options.baseSha,options.headSha)}));
+validateProtectedExecutionCandidate({protectedRoot,candidateRoot,currentCandidate:candidate});
+fs.writeFileSync(path.join(outputRoot,'merge-group-proof.json'),JSON.stringify({candidate,proof},null,2)+'\n',{flag:'wx'});
+console.log(JSON.stringify({candidate,plan:proof.plan,result:'PASS'}));

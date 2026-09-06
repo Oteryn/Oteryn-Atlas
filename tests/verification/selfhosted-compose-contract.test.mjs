@@ -19,11 +19,9 @@ test('self-hosted Compose sends checkout into images instead of bind mounting ru
 
 test('required PR gate validates hosted lifecycle artifacts while nightly keeps the no-bind self-hosted Compose path', () => {
   assert.match(ci, /Protected Hosted Playwright evidence/);
-  assert.match(ci, /protected-hosted-fan-in/);
-  assert.match(ci, /protected-verification-state/);
-  assert.match(ci, /validateProtectedHostedGate/);
-  assert.match(ci, /ATLAS_LEGACY_CUTOVER_BASE_SHA: e31015d0880e9f81a4b96f990658490af45e8fa6/);
-  assert.match(ci, /validateLegacyTransitionBootstrapGate/);
+  assert.match(ci, /node admission-authority\/tools\/verification\/consume-protected-admission\.mjs/);
+  assert.match(ci, /ref: \$\{\{ github\.event\.pull_request\.base\.sha \}\}/);
+  assert.doesNotMatch(ci, /ATLAS_LEGACY_CUTOVER|validateLegacyTransitionBootstrapGate/);
   assert.doesNotMatch(ci, /atlas-local-e2e/);
   assert.doesNotMatch(ci, /compose\.selfhosted\.yml|docker cp/);
   assert.match(nightly, /compose\.selfhosted\.yml/);

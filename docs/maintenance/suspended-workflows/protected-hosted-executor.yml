@@ -1,9 +1,6 @@
 name: Protected Hosted Verification Executor
 
 on:
-  workflow_run:
-    workflows: ["Protected Verification Controller"]
-    types: [completed]
   workflow_dispatch:
     inputs:
       controller_run_id:

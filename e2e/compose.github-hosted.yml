@@ -18,6 +18,7 @@ services:
       ATLAS_ENVIRONMENT_DIGEST: ${ATLAS_ENVIRONMENT_DIGEST:?ATLAS_ENVIRONMENT_DIGEST is required}
       ATLAS_E2E_SHARD: ${ATLAS_E2E_SHARD:?ATLAS_E2E_SHARD is required}
       GITHUB_RUN_ID: ${GITHUB_RUN_ID:?GITHUB_RUN_ID is required}
+      GITHUB_REPOSITORY: ${GITHUB_REPOSITORY:?GITHUB_REPOSITORY is required}
     volumes:
       - ${ATLAS_QUALIFICATION_PUBLICATION_HOST:?ATLAS_QUALIFICATION_PUBLICATION_HOST must identify a verified qualification publication}:/source:ro
       - atlas-ready-publication:/ready
@@ -50,7 +51,7 @@ services:
         const shardOrdinal = process.env.ATLAS_E2E_SHARD.split('/')[0];
         if (!/^[1-9][0-9]*$/.test(shardOrdinal)) throw new Error('ATLAS_E2E_SHARD ordinal is invalid');
         const identity = {
-          repository: 'Oteryn/Oteryn-Atlas',
+          repository: process.env.GITHUB_REPOSITORY,
           candidateSha: process.env.ATLAS_CODE_REVISION,
           planSemanticDigest: process.env.ATLAS_PLAN_SEMANTIC_DIGEST,
           planInstanceDigest: process.env.ATLAS_PLAN_INSTANCE_DIGEST,
@@ -234,6 +235,7 @@ services:
 
   e2e:
     environment:
+      ATLAS_E2E_DATA_CAPABILITY: ${ATLAS_E2E_DATA_CAPABILITY:-qualification_fixture}
       ATLAS_PUBLICATION_ORIGIN: http://atlas-publication:8081
       ATLAS_QUALIFICATION_TRUST_JSON: ${ATLAS_QUALIFICATION_TRUST_JSON:?ATLAS_QUALIFICATION_TRUST_JSON must identify verified qualification roots}
 

@@ -262,8 +262,8 @@ function selectedGroups(groupIds, catalog) {
 }
 
 export function buildVerificationPlan(input) {
-  if (!input || typeof input !== 'object' || input.repository !== 'Oteryn/Oteryn-Atlas') {
-    throw new TypeError('repository must be Oteryn/Oteryn-Atlas');
+  if (!input || typeof input !== 'object' || typeof input.repository !== 'string' || !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(input.repository)) {
+    throw new TypeError('repository must be an owner/repository identity');
   }
   const trustedVerificationCatalog = validateVerificationCatalog(input.trustedVerificationCatalog ?? input.verificationCatalog);
   const candidateVerificationCatalog = validateVerificationCatalog(input.candidateVerificationCatalog ?? input.verificationCatalog);

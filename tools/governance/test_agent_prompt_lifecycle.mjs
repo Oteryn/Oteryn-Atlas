@@ -50,7 +50,7 @@ test('Atlas Documentation/Agent IA has one mutable lifecycle authority', () => {
   }
 });
 
-test('optional task caches tolerate missing directories but reject non-directory paths', (t) => {
+test('optional task caches tolerate absence and reject non-directory paths', (t) => {
   const temporaryRoot = mkdtempSync(resolve(tmpdir(), 'atlas-task-cache-'));
   t.after(() => rmSync(temporaryRoot, { recursive: true, force: true }));
 
@@ -68,7 +68,7 @@ test('optional task caches tolerate missing directories but reject non-directory
   }
 });
 
-test('task cache structure cannot classify the same packet as active and archived', () => {
+test('task caches do not classify the same packet as active and archived', () => {
   const active = new Set(readOptionalCache(ACTIVE_TASKS));
   const archived = new Set(readOptionalCache(ARCHIVED_TASKS));
   const overlap = [...active].filter((name) => archived.has(name)).sort();

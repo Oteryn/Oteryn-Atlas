@@ -6,7 +6,7 @@ Parent: Oteryn/Oteryn#140
 
 ## Outcome
 
-Prove that an Atlas reusable GPT-5.6 Sol prompt can stay a task-specific delta while current repository authorities govern execution and integration.
+Prove that an Atlas reusable prompt can stay a task-specific delta while current repository authorities govern execution and integration.
 
 ## Scope
 
@@ -24,6 +24,6 @@ Prove that an Atlas reusable GPT-5.6 Sol prompt can stay a task-specific delta w
 ## Acceptance
 
 - No duplicate mutable prompt/task lifecycle registry remains.
-- Terminal task packets are archived while packets owned by open Issues remain active.
-- Deterministic verification accepts this four-section task-delta shape and rejects copied repository-policy sections.
-- Exact-head repository checks and independent review are clean before normal protected integration.
+- Terminal task packets do not remain on the active dispatch surface; Git history retains historical provenance.
+- Deterministic structural verification accepts this four-section task-delta shape and rejects copied repository-policy sections.
+- Exact-head repository-selected checks and independent review are clean before normal protected integration.
