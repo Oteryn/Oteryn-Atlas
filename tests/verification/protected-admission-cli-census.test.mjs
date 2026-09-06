@@ -86,7 +86,7 @@ test('actual CLI still rejects malformed protected census before API or publicat
 test('CLI regression uses an owned fixture when source checkout is ownership-untrusted',t=>{
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'atlas-untrusted-source-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
  const realGit=execFileSync('sh',['-c','command -v git'],{encoding:'utf8'}).trim();
- fs.writeFileSync(path.join(dir,'git'),`#!${process.execPath}\nconst {spawnSync}=require('node:child_process'),path=require('node:path');const args=process.argv.slice(2),i=args.indexOf('-C'),env={...process.env};if(i>=0&&path.resolve(args[i+1])===${JSON.stringify(path.resolve(root))})env.GIT_TEST_ASSUME_DIFFERENT_OWNER='1';const r=spawnSync(${JSON.stringify(realGit)},args,{env,stdio:'inherit'});if(r.error)throw r.error;process.exit(r.status);\n`,{mode:0o755});
+ fs.writeFileSync(path.join(dir,'git'),`#!${process.execPath}\nconst {spawnSync}=require('node:child_process'),path=require('node:path');const args=process.argv.slice(2),i=args.indexOf('-C'),env={...process.env};if(i>=0&&path.resolve(args[i+1])===${JSON.stringify(path.resolve(root))}){env.GIT_TEST_ASSUME_DIFFERENT_OWNER='1';args.unshift('-c','safe.directory=');}const r=spawnSync(${JSON.stringify(realGit)},args,{env,stdio:'inherit'});if(r.error)throw r.error;process.exit(r.status);\n`,{mode:0o755});
  const originalPath=process.env.PATH;
  try {
   process.env.PATH=`${dir}:${originalPath}`;
