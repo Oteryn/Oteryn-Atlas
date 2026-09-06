@@ -196,7 +196,7 @@ export function validateProtectedAdmissionEvidence(input) {
   const qualification = browser.partitions.find(partition => partition.dataCapability === 'qualification_fixture');
   const references=evidence.proof.visualReferences;
   if(references!==undefined&&!Array.isArray(references))fail('visual reference list');
-  if(authority.visualReference?.required===true&&qualification) {
+  if(authority.visualReference?.required===true&&qualification&&plan.review.length) {
     if(references?.length!==1)fail('required independent visual reference missing');
   }
   if(references?.length) {

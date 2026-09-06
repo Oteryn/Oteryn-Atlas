@@ -128,7 +128,7 @@ export function resolveQualificationScenarioBindings({ productRoot, expectedProd
 
 const BINDING_FILES = new Set([
   'tests/runtime.mjs', 'tests/audit-desktop.spec.mjs', 'tests/state-desktop.spec.mjs',
-  'tests/race-desktop.spec.mjs', 'tests/desktop.spec.mjs', 'tests/mobile.spec.mjs',
+  'tests/race-desktop.spec.mjs', 'tests/render-probes-desktop.spec.mjs', 'tests/desktop.spec.mjs', 'tests/mobile.spec.mjs',
   'tests/degraded-search-desktop.spec.mjs', 'tests/visual-desktop.spec.mjs',
   'tests/visual-mobile.spec.mjs', 'tests/creatures-desktop.spec.mjs',
   'tests/creature-presentation-desktop.spec.mjs', 'tests/creature-presentation-mobile.spec.mjs',
