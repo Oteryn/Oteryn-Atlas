@@ -102,6 +102,7 @@ function queryAll(raw) {
 }
 
 function navigate(record, rawQuery) {
+  if (!(record.capabilities?.includes('navigation') || (record.record_id && record.capabilities?.includes('static-placement')))) return;
   const params = navigationSearchParams(record, location.search, state.index, rawQuery);
   if (record.record_id) params.set('creature', record.record_id);
   else params.delete('creature');
@@ -162,6 +163,8 @@ function renderResults(host, raw) {
     button.type = 'button';
     button.className = 'semantic-search-result';
     button.setAttribute('role', 'option');
+    button.disabled = !(record.capabilities?.includes('navigation') || (record.record_id && record.capabilities?.includes('static-placement')));
+    button.setAttribute('aria-disabled', String(button.disabled));
     const label = document.createElement('strong');
     label.textContent = record.label;
     const kind = document.createElement('span');
@@ -169,6 +172,7 @@ function renderResults(host, raw) {
     kind.textContent = kindLabel(record.kind);
     const coords = document.createElement('small');
     coords.textContent = `${record.position.x}, ${record.position.y}, ${displayFloor(record.position.floor, state.index)}`;
+    if (button.disabled) coords.textContent += ' · Navigation not published';
     button.append(label, kind, coords);
     button.addEventListener('click', () => navigate(record, query));
     host.append(button);
@@ -234,10 +238,10 @@ function renderActiveInspector() {
   if (recordId) recordId.textContent = `Placement record id: ${record.record_id}`;
   const caps = document.createElement('p'); caps.textContent = `Public capabilities: ${record.capabilities.length ? record.capabilities.join(', ') : 'none published'}`;
   const source = document.createElement('p');
-  source.textContent = record.provenance?.source_capability === 'static-creatures-v1'
+  source.textContent = SOURCE_EXPECTATIONS.mode !== 'qualification_fixture' && record.provenance?.source_capability === 'static-creatures-v1'
     ? 'Source: Oteryn/Oteryn-Game · static-creatures-v1'
-    : `Source: Oteryn/Oteryn-Game@${state.index.source.game_revision.slice(0, 12)} · ${state.index.source.profile_id}`;
-  const bounds = document.createElement('p'); bounds.textContent = record.bounds ? 'Authoritative bounds published.' : 'Authoritative bounds: not published by Game.';
+    : `Source: ${SOURCE_EXPECTATIONS.semanticSearch.authority}@${state.index.source.game_revision.slice(0, 12)} · ${state.index.source.profile_id}`;
+  const bounds = document.createElement('p'); bounds.textContent = record.bounds ? 'Authoritative bounds published.' : SOURCE_EXPECTATIONS.mode === 'qualification_fixture' ? 'Authoritative bounds: not published by fixture.' : 'Authoritative bounds: not published by Game.';
   inspector.replaceChildren(card, position, id);
   if (recordId) inspector.append(recordId);
   inspector.append(caps, bounds, source);
