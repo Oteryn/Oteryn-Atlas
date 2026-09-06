@@ -1,8 +1,9 @@
+const __atlasQualification = process.env.ATLAS_E2E_DATA_CAPABILITY === 'qualification_fixture';
 import { expect, test } from '@playwright/test';
 import { gotoAtlas, waitForAtlas } from './runtime.mjs';
 
 test('layer controls expose correct availability and fail-closed states', async ({ page }) => {
-  await gotoAtlas(page, '/web/fullworld.html?x=32369&y=32241&floor=-7&zoom=0.48');
+  await gotoAtlas(page, (__atlasQualification ? "/web/fullworld.html?x=32280&y=32155&floor=-7&zoom=0.48" : '/web/fullworld.html?x=32369&y=32241&floor=-7&zoom=0.48'));
   await waitForAtlas(page);
 
   await expect(page.getByText('Base semantic pixels', { exact: true })).toBeVisible();

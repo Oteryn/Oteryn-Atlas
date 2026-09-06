@@ -658,7 +658,7 @@ function setup() {
     panel.hidden = true;
     inspectorContent.after(panel);
     state.inspector = panel;
-    state.gameplayProfiles = createCreatureGameplayProfileService({ baseUrl: GAMEPLAY_ROOT });
+    state.gameplayProfiles = createCreatureGameplayProfileService({ baseUrl: GAMEPLAY_ROOT, trust: FULLWORLD_TRUST });
     state.gameplayInspector = createCreatureGameplayInspectorController({
       panel,
       baseInspector: inspectorContent,
