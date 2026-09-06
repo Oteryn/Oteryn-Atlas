@@ -1,18 +1,7 @@
 name: Protected qualification repair
 
 on:
-  pull_request_target:
-    types: [opened, synchronize, reopened]
-    paths:
-      - src/browser/animation-runtime-service.mjs
-      - src/browser/fullworld-trust.mjs
-      - src/browser/semantic-search.mjs
-      - tools/verification/qualification-fixture-definition.mjs
-      - tools/verification/qualification-world.mjs
-      - web/fullworld-app.mjs
-      - web/fullworld-creatures.mjs
-      - web/fullworld-farm-explorer.mjs
-      - web/fullworld-search.mjs
+  workflow_dispatch:
 
 permissions:
   contents: read

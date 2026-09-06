@@ -1,0 +1,5 @@
+services:
+  e2e:
+    volumes:
+      - ${ATLAS_REFERENCE_SNAPSHOTS:?independent reference snapshots required}:/workspace/e2e/tests/visual-desktop.spec.mjs-snapshots/protected-reference:ro
+      - ${ATLAS_REFERENCE_SNAPSHOTS:?independent reference snapshots required}:/workspace/e2e/tests/visual-mobile.spec.mjs-snapshots/protected-reference:ro

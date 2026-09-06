@@ -177,7 +177,7 @@ test('protected promotion workflow proves authority repin against its exact sour
   assert.doesNotMatch(job, /group:\s*atlas-runners|labels:\s*oteryn-atlas-pc|visual-review\.json|synology|real_fullworld/i);
 });
 
-test('one-shot stabilization bootstrap consumes exact protected legacy heavy proof rather than manual local status', () => {
+test('legacy validator stays bounded but is no longer wired into the required PR gate', () => {
   assert.equal(typeof protectedGate.validateLegacyTransitionBootstrapGate, 'function');
   const protectedBaseSha = 'e31015d0880e9f81a4b96f990658490af45e8fa6';
   const candidateHeadSha = sha('d');
@@ -230,12 +230,9 @@ test('one-shot stabilization bootstrap consumes exact protected legacy heavy pro
 
   const ci = fs.readFileSync(path.join(ROOT, '.github/workflows/ci.yml'), 'utf8');
   const browserJob = ci.split('  verification-browser:')[1]?.split('  atlas-gate:')[0] ?? '';
-  assert.match(browserJob, /ATLAS_LEGACY_CUTOVER_BASE_SHA:\s*e31015d0880e9f81a4b96f990658490af45e8fa6/);
-  assert.match(browserJob, /ATLAS_LEGACY_CUTOVER_HEAD_REF:\s*feat\/issue-179-legacy-transition-qualifier/);
-  assert.match(browserJob, /validateLegacyTransitionBootstrapGate/);
-  assert.match(browserJob, /legacy-molehill-transition-qualification\.yml/);
-  const cutover = browserJob.split('ATLAS_LEGACY_CUTOVER_BASE_SHA')[1]?.split('expected_name=')[0] ?? '';
-  assert.doesNotMatch(cutover, /atlas-local-e2e/);
+  assert.match(browserJob, /node admission-authority\/tools\/verification\/consume-protected-admission\.mjs/);
+  assert.doesNotMatch(browserJob, /ATLAS_LEGACY_CUTOVER|validateLegacyTransitionBootstrapGate|legacy-molehill-transition-qualification|atlas-local-e2e/);
+
 });
 
 

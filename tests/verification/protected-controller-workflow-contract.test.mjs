@@ -8,7 +8,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const workflow = fs.readFileSync(path.join(ROOT, '.github/workflows/protected-verification-controller.yml'), 'utf8');
 const legacyTransition = fs.readFileSync(path.join(ROOT, '.github/workflows/legacy-molehill-transition-qualification.yml'), 'utf8').replace(/\r\n/g, '\n');
 test('protected controller resolves the live PR and checks out its protected base with PR-scoped cancellation', () => {
-  assert.match(workflow, /pull_request_target:/);
+  assert.doesNotMatch(workflow, /^  (?:pull_request_target|pull_request|workflow_run):/m);
   assert.match(workflow, /workflow_dispatch:/);
   assert.match(workflow, /pulls\/\$GITHUB_REPOSITORY\/|repos\/\$GITHUB_REPOSITORY\/pulls\/\$ATLAS_REQUESTED_PR_NUMBER/);
   assert.match(workflow, /Requested lifecycle PR is not an open same-repository main-targeting PR/);

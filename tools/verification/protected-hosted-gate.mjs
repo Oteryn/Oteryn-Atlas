@@ -27,6 +27,17 @@ function exactPositiveInteger(value, label) {
   return value;
 }
 
+function validateAssociatedRepository(repo, liveRepo, expectedRepository, label) {
+  if (!isPlainObject(repo)) throw new TypeError(`${label} is invalid`);
+  if (Object.hasOwn(repo, 'id')) {
+    const repositoryId = exactPositiveInteger(repo.id, `${label} ID`);
+    const liveRepositoryId = exactPositiveInteger(liveRepo?.id, `${label} live PR ID`);
+    if (repositoryId !== liveRepositoryId) throw new TypeError(`${label} ID mismatch`);
+  } else if (repo.full_name !== expectedRepository) {
+    throw new TypeError(`${label} full name mismatch`);
+  }
+}
+
 function exactArray(value, label) {
   if (!Array.isArray(value) || value.some((item) => typeof item !== 'string')
     || new Set(value).size !== value.length) throw new TypeError(`${label} is invalid`);
@@ -247,6 +258,7 @@ export function validateProtectedProductQualificationGate(input) {
   const protectedBaseSha = exactSha(input.expectedProtectedBaseSha, 'protected qualification repair gate protected base');
 
   validateLivePr(input.livePr, { repository, prNumber, candidateHeadSha, protectedBaseSha });
+  const candidateHeadRef = nonEmptyString(input.livePr?.head?.ref, 'protected qualification repair candidate head ref');
 
   const status = input.status;
   if (!isPlainObject(status)
@@ -263,25 +275,37 @@ export function validateProtectedProductQualificationGate(input) {
     || run.conclusion !== 'success'
     || run.path !== QUALIFICATION_REPAIR_WORKFLOW_PATH
     || run.event !== 'pull_request_target'
-    || run.repository?.full_name !== repository
-    || run.head_branch !== 'main') {
+    || run.repository?.full_name !== repository) {
     throw new TypeError('protected qualification repair producer run is not authoritative');
   }
   const runId = exactPositiveInteger(Number(run.id), 'protected qualification repair producer run ID');
   const runAttempt = exactPositiveInteger(Number(run.run_attempt), 'protected qualification repair producer run attempt');
   if (runAttempt !== 1) throw new TypeError('protected qualification repair producer run must be attempt 1');
-  if (exactSha(run.head_sha, 'protected qualification repair producer base') !== protectedBaseSha) {
-    throw new TypeError('protected qualification repair producer base is stale');
+  const producerHeadSha = exactSha(run.head_sha, 'protected qualification repair producer head');
+  const candidateRunIdentity = run.head_branch === candidateHeadRef && producerHeadSha === candidateHeadSha;
+  const protectedBaseRunIdentity = run.head_branch === 'main' && producerHeadSha === protectedBaseSha;
+  if (!candidateRunIdentity && !protectedBaseRunIdentity) {
+    throw new TypeError('protected qualification repair producer head is stale');
   }
   const expectedTarget = `https://github.com/${repository}/actions/runs/${runId}`;
   if (status.target_url !== expectedTarget) throw new TypeError('protected qualification repair status target run mismatch');
 
   const associations = Array.isArray(run.pull_requests) ? run.pull_requests : [];
   const association = associations.find((item) => item?.number === prNumber);
-  if (!association
-    || association.head?.repo?.full_name !== repository
-    || association.base?.repo?.full_name !== repository
-    || exactSha(association.head?.sha, 'protected qualification repair associated head') !== candidateHeadSha
+  if (!association) throw new TypeError('protected qualification repair producer PR association mismatch');
+  validateAssociatedRepository(
+    association.head?.repo,
+    input.livePr?.head?.repo,
+    repository,
+    'protected qualification repair associated head repository',
+  );
+  validateAssociatedRepository(
+    association.base?.repo,
+    input.livePr?.base?.repo,
+    repository,
+    'protected qualification repair associated base repository',
+  );
+  if (exactSha(association.head?.sha, 'protected qualification repair associated head') !== candidateHeadSha
     || exactSha(association.base?.sha, 'protected qualification repair associated base') !== protectedBaseSha) {
     throw new TypeError('protected qualification repair producer PR association mismatch');
   }
