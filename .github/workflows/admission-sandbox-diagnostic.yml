@@ -5,6 +5,8 @@ on:
       - '.github/workflows/admission-sandbox-diagnostic.yml'
 permissions:
   contents: read
+  actions: read
+  pull-requests: read
 jobs:
   shadow:
     runs-on: ubuntu-24.04
@@ -13,53 +15,64 @@ jobs:
       - name: Check out exact proposed authority
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: c9224e4b56b591ebb622dda23b87eee6a138e7e7
+          ref: f7e15100c46e456853feb152d4ca9a2836766860
           persist-credentials: false
           fetch-depth: 0
           path: proposed-authority
       - name: Check out exact shadow candidate
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: c879777a23776e30ec3889aee110dc36181b5f0c
+          ref: 05a9c1cadb10b3007b07ea1c0ece9db97ef42e2d
           persist-credentials: false
           fetch-depth: 0
           path: shadow-candidate
-      - name: Execute complete shadow qualification without publication
+      - name: Execute complete proposed recovery without trusted publication
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           cat > shadow-entry.mjs <<'NODE'
           import fs from 'node:fs';
           import path from 'node:path';
           import {execFileSync} from 'node:child_process';
-          const sourcePath='./proposed-authority/tools/verification/run-protected-admission.mjs';
-          let executionSource=fs.readFileSync(sourcePath,'utf8');
-          const reviewGuard="if(!Array.isArray(plan.specialist)||!Array.isArray(plan.review)||plan.specialist.length||plan.review.length)throw new TypeError('independent specialist or review evidence required');";
-          const diagnosticGuard="if(!Array.isArray(plan.specialist)||!Array.isArray(plan.review)||plan.specialist.length)throw new TypeError('specialist execution unsupported in diagnostic'); console.log('UNMET_INDEPENDENT_REVIEW',JSON.stringify(plan.review));";
-          if(executionSource.split(reviewGuard).length!==2)throw Error('diagnostic guard anchor drift');
-          executionSource=executionSource.replace(reviewGuard,diagnosticGuard);
-          const diagnosticModule='./proposed-authority/tools/verification/incomplete-hosted-diagnostic.mjs';
-          fs.writeFileSync(diagnosticModule,executionSource,{flag:'wx'});
-          const {executeProtectedCandidateProof}=await import(diagnosticModule);
+          import {executeProtectedCandidateProof,assertSameCandidate} from './proposed-authority/tools/verification/run-protected-admission.mjs';
           import {validateProtectedExecutionCandidate} from './proposed-authority/tools/verification/protected-admission-policy.mjs';
           const protectedRoot=path.resolve('proposed-authority'),candidateRoot=path.resolve('shadow-candidate');
           const git=(root,...args)=>execFileSync('git',['-C',root,...args],{encoding:'utf8'}).trim();
-          const headSha=git(candidateRoot,'rev-parse','HEAD'),baseSha=git(protectedRoot,'rev-parse','HEAD');
-          const changedFiles=git(candidateRoot,'diff','--no-renames','--name-status',baseSha,headSha).split('\n').map(row=>{const [status,p]=row.split('\t');if(!['M','A','D'].includes(status))throw Error('unexpected status');return {path:p,status:{M:'modified',A:'added',D:'removed'}[status]};});
-          const candidate={repository:process.env.GITHUB_REPOSITORY,prNumber:null,headSha,baseSha,treeSha:git(candidateRoot,'rev-parse','HEAD^{tree}'),changedFiles};
-          console.log('SHADOW_ONLY_IDENTITY',candidate);
+          const api=endpoint=>JSON.parse(execFileSync('gh',['api',endpoint],{encoding:'utf8'}));
+          const repository=process.env.GITHUB_REPOSITORY;
+          const snapshot=()=>{
+           const headSha=git(candidateRoot,'rev-parse','HEAD'),baseSha=git(protectedRoot,'rev-parse','HEAD');
+           const changedFiles=git(candidateRoot,'diff','--no-renames','--name-status',baseSha,headSha).split('\n').map(row=>{const [status,p]=row.split('\t');if(!['M','A','D'].includes(status))throw Error('unexpected status');return {path:p,status:{M:'modified',A:'added',D:'removed'}[status]};});
+           return {repository,prNumber:null,headSha,baseSha,treeSha:git(candidateRoot,'rev-parse','HEAD^{tree}'),changedFiles};
+          };
+          const candidate=snapshot();
+          const liveReadback=async()=>{
+           const main=api('repos/'+repository+'/git/ref/heads/main'),source=api('repos/'+repository+'/pulls/333');
+           if(main.object.sha!=='e96da570cc4b5f9a8ee3d3d4889caea33cfb4d1b'||source.head.sha!=='0be8b5e1cdb2011c19247b3262cf15e43544467b'||source.state!=='open')throw Error('LIVE source authority moved; shadow invalidated');
+           const actual=snapshot();assertSameCandidate(candidate,actual);return actual;
+          };
+          await liveReadback();
+          const jobs=api('repos/'+repository+'/actions/runs/'+process.env.GITHUB_RUN_ID+'/attempts/1/jobs?per_page=100').jobs.filter(job=>job.name==='shadow'&&job.status==='in_progress');
+          if(jobs.length!==1||Number(process.env.GITHUB_RUN_ATTEMPT)!==1)throw Error('exact diagnostic job/attempt missing');
           const admission=validateProtectedExecutionCandidate({protectedRoot,candidateRoot,currentCandidate:candidate});
-          console.log('SHADOW_ADMISSION',admission);
-          const proof=await executeProtectedCandidateProof({protectedRoot,candidateRoot,outputRoot:path.join(process.env.RUNNER_TEMP,'shadow-full-proof'),candidate,admission});
-          console.log('INCOMPLETE_HOSTED_DIAGNOSTIC_NOT_QUALIFICATION',JSON.stringify(proof));
-          throw Error('Diagnostic is intentionally incomplete: independent visual review remains required. No accepted evidence.');
+          console.log('UNTRUSTED_PROPOSED_AUTHORITY_SHADOW',JSON.stringify({candidate,admission,jobId:jobs[0].id}));
+          const outputRoot=path.join(process.env.RUNNER_TEMP,'shadow-full-proof');
+          const proof=await executeProtectedCandidateProof({protectedRoot,candidateRoot,outputRoot,candidate,admission,producerJobId:jobs[0].id,producerWorkflowPath:'.github/workflows/admission-sandbox-diagnostic.yml',freshSnapshot:liveReadback});
+          await liveReadback();
+          fs.writeFileSync(path.join(outputRoot,'shadow-proof.json'),JSON.stringify({kind:'NON_AUTHORITATIVE_RECOVERY_SHADOW',candidate,proof},null,2));
+          console.log('SHADOW_COMPLETE_NOT_PUBLISHED_ACCEPTANCE',JSON.stringify(proof));
           NODE
           node shadow-entry.mjs
-      - name: Retain shadow browser diagnostics only
+      - name: Retain complete shadow diagnostics for actual review
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: shadow-browser-diagnostics-${{ github.run_id }}
-          path: ${{ runner.temp }}/shadow-full-proof/browser-*
+          path: |
+            ${{ runner.temp }}/shadow-full-proof/browser-*
+            ${{ runner.temp }}/shadow-full-proof/private-visual-reference/visual-reference/
+            ${{ runner.temp }}/shadow-full-proof/shadow-proof.json
           if-no-files-found: warn
           retention-days: 3
