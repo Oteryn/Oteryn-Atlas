@@ -1,3 +1,4 @@
+const __atlasQualification = process.env.ATLAS_E2E_DATA_CAPABILITY === 'qualification_fixture';
 import { expect, test } from '@playwright/test';
 import { waitForCreatureAlignedToBase } from '../support/diagnostics.mjs';
 import {
@@ -34,7 +35,7 @@ test('reordered authenticated range completion cannot commit a stale pan target'
   const before = await committedRenderer(page);
   const faults = await installHeldRangeRequests(page, { limit: 2 });
   try {
-    await navigateCoordinates(page, 32469, 32341);
+    await navigateCoordinates(page, (__atlasQualification ? 32304 : 32469), (__atlasQualification ? 32112 : 32341));
     const held = await faults.waitForHeld(2);
     expect(held).toHaveLength(2);
     expect(held[0].range).toMatch(/^bytes=\d+-\d+$/);
@@ -44,8 +45,8 @@ test('reordered authenticated range completion cannot commit a stale pan target'
     faults.release(0);
     const expected = viewFromUrl(page.url());
     const committed = await waitForCommittedView(page, expected, before.generation);
-    expect(committed.transform.centerTileX).toBe(32469);
-    expect(committed.transform.centerTileY).toBe(32341);
+    expect(committed.transform.centerTileX).toBe((__atlasQualification ? 32304 : 32469));
+    expect(committed.transform.centerTileY).toBe((__atlasQualification ? 32112 : 32341));
     expect(faults.evidence().released).toEqual([1, 0]);
     assertNoRuntimeFailures(runtime);
   } finally {
@@ -60,15 +61,15 @@ test('superseded delayed range abort stays expected and newest view is the only 
   const before = await committedRenderer(page);
   const faults = await installHeldRangeRequests(page, { limit: 8 });
   try {
-    await navigateCoordinates(page, 32469, 32341);
+    await navigateCoordinates(page, (__atlasQualification ? 32304 : 32469), (__atlasQualification ? 32112 : 32341));
     await faults.waitForHeld(1);
-    await navigateCoordinates(page, 32569, 32441);
+    await navigateCoordinates(page, (__atlasQualification ? 32336 : 32569), (__atlasQualification ? 32112 : 32441));
     faults.releaseAll();
 
     const expected = viewFromUrl(page.url());
     const committed = await waitForCommittedView(page, expected, before.generation);
-    expect(committed.transform.centerTileX).toBe(32569);
-    expect(committed.transform.centerTileY).toBe(32441);
+    expect(committed.transform.centerTileX).toBe((__atlasQualification ? 32336 : 32569));
+    expect(committed.transform.centerTileY).toBe((__atlasQualification ? 32112 : 32441));
     const qualified = await waitForQualifiedView(page, expected);
     expect(qualified.status).toBe('PASS');
     assertNoRuntimeFailures(runtime);
@@ -88,7 +89,7 @@ test('resize and rapid creature toggles during pending ranges converge on latest
   const faults = await installHeldRangeRequests(page, { limit: 8 });
   try {
     const before = await committedRenderer(page);
-    await navigateCoordinates(page, 32469, 32341);
+    await navigateCoordinates(page, (__atlasQualification ? 32304 : 32469), (__atlasQualification ? 32112 : 32341));
     await faults.waitForHeld(1);
 
     await page.setViewportSize({ width: 1180, height: 760 });
@@ -120,7 +121,7 @@ test('reload during an in-flight range discards the old operation and requalifie
   await waitForAtlas(page);
   const faults = await installHeldRangeRequests(page, { limit: 1 });
   try {
-    await navigateCoordinates(page, 32469, 32341);
+    await navigateCoordinates(page, (__atlasQualification ? 32304 : 32469), (__atlasQualification ? 32112 : 32341));
     await faults.waitForHeld(1);
     const expected = viewFromUrl(page.url());
     await page.reload({ waitUntil: 'domcontentloaded' });
@@ -143,8 +144,8 @@ test('browser back supersedes an in-flight historical view without stale commit'
   const faults = await installHeldRangeRequests(page, { limit: 1 });
   try {
     const moved = new URL(page.url());
-    moved.searchParams.set('x', '32469');
-    moved.searchParams.set('y', '32341');
+    moved.searchParams.set('x', (__atlasQualification ? "32304" : '32469'));
+    moved.searchParams.set('y', (__atlasQualification ? "32112" : '32341'));
     await gotoAtlas(page, moved.href);
     await faults.waitForHeld(1);
     await page.goBack({ waitUntil: 'domcontentloaded' });

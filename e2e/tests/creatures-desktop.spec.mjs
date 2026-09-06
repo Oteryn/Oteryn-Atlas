@@ -1,3 +1,4 @@
+const __atlasQualification = process.env.ATLAS_E2E_DATA_CAPABILITY === 'qualification_fixture';
 import { expect, test } from '@playwright/test';
 import {
   DESKTOP_ENTRY,
@@ -48,8 +49,8 @@ test('desktop creature search creates a stable deep link and inspector state whe
   expect(creatures.status, creatures.error ?? 'creature runtime').toBe('PASS');
 
   const search = page.locator('#creature-search');
-  await search.fill('Sam');
-  const result = page.locator('#creature-results button').filter({ hasText: /Sam/i }).first();
+  await search.fill((__atlasQualification ? "Fixture Guide" : 'Sam'));
+  const result = page.locator('#creature-results button').filter({ hasText: (__atlasQualification ? new RegExp("Fixture Guide", "i") : /Sam/i) }).first();
   await expect(result).toBeVisible();
   await Promise.all([
     page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
@@ -59,13 +60,13 @@ test('desktop creature search creates a stable deep link and inspector state whe
   const selected = await creatureState(page);
   expect(selected.status, selected.error ?? 'creature runtime after selection').toBe('PASS');
   expect(new URL(page.url()).searchParams.get('creature')).toMatch(/^(?:npc|monster):[0-9a-f]{32}$/);
-  await expect(page.locator('#creature-inspector')).toContainText(/Sam/i);
+  await expect(page.locator('#creature-inspector')).toContainText((__atlasQualification ? new RegExp("Fixture Guide", "i") : /Sam/i));
   assertNoRuntimeFailures(runtime);
 });
 
 test('desktop NPC category filter persists and uses functional icon rendering when published', async ({ page }) => {
   const runtime = captureRuntimeFailures(page);
-  const entry = '/web/fullworld.html?x=32361&y=32198&floor=-7&zoom=2&mode=map&creatures=npc&npcRole=shop';
+  const entry = (__atlasQualification ? "/web/fullworld.html?x=32280&y=32155&floor=-7&zoom=2&mode=map&creatures=npc&npcRole=shop" : '/web/fullworld.html?x=32361&y=32198&floor=-7&zoom=2&mode=map&creatures=npc&npcRole=shop');
   await gotoAtlas(page, entry);
   await waitForAtlas(page);
   let creatures = await creatureState(page);
@@ -107,7 +108,7 @@ test('desktop creature overlay repaints in the same turn as continuous pan', asy
       });
     });
   });
-  await gotoAtlas(page, '/web/fullworld.html?x=32364&y=32240.2&floor=-7&zoom=1.04&mode=map&creatures=npc,monster');
+  await gotoAtlas(page, (__atlasQualification ? "/web/fullworld.html?x=32280&y=32155&floor=-7&zoom=1.04&mode=map&creatures=npc,monster" : '/web/fullworld.html?x=32364&y=32240.2&floor=-7&zoom=1.04&mode=map&creatures=npc,monster'));
   await waitForAtlas(page);
   const creatures = await creatureState(page);
   test.skip(creatures.status === 'FAIL' && /HTTP 404/.test(creatures.error ?? ''), 'Current target has no optional creature publication.');

@@ -1,8 +1,9 @@
+const __atlasQualification = process.env.ATLAS_E2E_DATA_CAPABILITY === 'qualification_fixture';
 import { expect, test } from '@playwright/test';
 import { MOBILE_ENTRY, assertNoRuntimeFailures, captureRuntimeFailures, gotoAtlas, waitForAtlas } from './runtime.mjs';
 import { canvasPng, exactPngPixelsEqual } from '../support/visual-oracle.mjs';
 
-const MONSTER_PLAYBACK_ENTRY = '/web/fullworld.html?x=32724&y=31155&floor=-15&zoom=2&mode=minimap&perf=reference&animation=off&creatures=npc,monster';
+const MONSTER_PLAYBACK_ENTRY = (__atlasQualification ? "/web/fullworld.html?x=32280&y=32158&floor=-7&zoom=2&mode=minimap&perf=reference&animation=off&creatures=npc,monster" : '/web/fullworld.html?x=32724&y=31155&floor=-15&zoom=2&mode=minimap&perf=reference&animation=off&creatures=npc,monster');
 import { assertUserVisibleSurface, captureUserVisualEvidence } from '../support/user-acceptance.mjs';
 
 test('mobile Atlas-owned chrome and drawers retain reviewed user-facing visual contracts', async ({ page }, testInfo) => {
@@ -57,10 +58,10 @@ test('mobile Atlas-owned chrome and drawers retain reviewed user-facing visual c
   });
 
   const mobileSearch = page.locator('#mobile-search-input');
-  await mobileSearch.fill('Thais');
+  await mobileSearch.fill((__atlasQualification ? "Fixture Harbor" : 'Thais'));
   const results = page.locator('#semantic-search-results-mobile');
   await expect(results).toBeVisible();
-  const thais = results.getByRole('option').filter({ hasText: 'Thais' }).first();
+  const thais = results.getByRole('option').filter({ hasText: (__atlasQualification ? "Fixture Harbor" : 'Thais') }).first();
   await expect(thais).toBeVisible();
   await captureUserVisualEvidence(page, testInfo, 'mobile.search', {
     note: 'Mobile semantic-search result list as presented inside the controls drawer.',
@@ -70,7 +71,7 @@ test('mobile Atlas-owned chrome and drawers retain reviewed user-facing visual c
     thais.tap(),
   ]);
   await waitForAtlas(page);
-  await expect(page.locator('#inspector-content')).toContainText('Thais');
+  await expect(page.locator('#inspector-content')).toContainText((__atlasQualification ? "Fixture Harbor" : 'Thais'));
 
   const inspectorToggle = page.getByRole('button', { name: 'Open inspector' });
   await inspectorToggle.tap();

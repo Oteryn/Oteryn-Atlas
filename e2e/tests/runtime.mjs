@@ -1,9 +1,10 @@
+const __atlasQualification = process.env.ATLAS_E2E_DATA_CAPABILITY === 'qualification_fixture';
 import { expect } from '@playwright/test';
 
 import { resolveQualificationEntry } from './qualification-navigation.mjs';
 
-export const DESKTOP_ENTRY = '/web/fullworld.html?x=32369&y=32241&floor=-7&zoom=2&mode=map';
-export const MOBILE_ENTRY = '/web/fullworld.html?x=32369&y=32241&floor=-7&zoom=0.25&mode=auto';
+export const DESKTOP_ENTRY = (__atlasQualification ? "/web/fullworld.html?x=32280&y=32155&floor=-7&zoom=2&mode=map" : '/web/fullworld.html?x=32369&y=32241&floor=-7&zoom=2&mode=map');
+export const MOBILE_ENTRY = (__atlasQualification ? "/web/fullworld.html?x=32280&y=32155&floor=-7&zoom=0.25&mode=auto" : '/web/fullworld.html?x=32369&y=32241&floor=-7&zoom=0.25&mode=auto');
 
 const OPTIONAL_HTTP_ALLOWLIST = [
   {
