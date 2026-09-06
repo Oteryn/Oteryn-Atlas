@@ -1,3 +1,4 @@
+const __atlasQualification = process.env.ATLAS_E2E_DATA_CAPABILITY === 'qualification_fixture';
 import { expect, test } from '@playwright/test';
 import {
   MOBILE_ENTRY,
@@ -23,8 +24,8 @@ test('mobile Farm Explorer remains reachable and truthful in the existing contro
   await page.locator('#mobile-controls-toggle').click();
   await expect(page.locator('#mobile-controls-panel')).toHaveClass(/mobile-open/);
   await expect(page.locator('#farm-explorer')).toBeVisible();
-  await page.locator('#farm-creature-search').fill('Cave Rat');
-  const caveRat = page.locator('#farm-creature-results .farm-creature-result').filter({ hasText: /^Cave Rat$/ }).first();
+  await page.locator('#farm-creature-search').fill((__atlasQualification ? "Fixture Sentinel" : 'Cave Rat'));
+  const caveRat = page.locator('#farm-creature-results .farm-creature-result').filter({ hasText: (__atlasQualification ? new RegExp("^Fixture Sentinel$", "") : /^Cave Rat$/) }).first();
   await expect(caveRat).toBeVisible();
   await caveRat.click();
   await page.locator('#farm-target-kills').fill('90');

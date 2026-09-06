@@ -1,3 +1,4 @@
+const __atlasQualification = process.env.ATLAS_E2E_DATA_CAPABILITY === 'qualification_fixture';
 import { expect, test } from '@playwright/test';
 
 import { analyzeGeometryEventLog, compareCreatureAnchors } from '../support/geometry-oracle.mjs';
@@ -14,7 +15,7 @@ import {
   gotoAtlas,
 } from './runtime.mjs';
 
-const NPC_ENTRY = '/web/fullworld.html?x=32361&y=32198&floor=-7&zoom=2&mode=map&animation=on&creatures=npc&npcRole=shop';
+const NPC_ENTRY = (__atlasQualification ? "/web/fullworld.html?x=32280&y=32155&floor=-7&zoom=2&mode=map&animation=on&creatures=npc&npcRole=shop" : '/web/fullworld.html?x=32361&y=32198&floor=-7&zoom=2&mode=map&animation=on&creatures=npc&npcRole=shop');
 const DRIFT_TOLERANCE_PX = 0.25;
 
 async function waitForFinalAlignment(page) {
@@ -69,7 +70,7 @@ test('NPC overlay never commits independently from the base renderer during cont
 });
 
 
-const MONSTER_ENTRY = '/web/fullworld.html?x=33018&y=32009&floor=-7&zoom=2&mode=map&animation=off&creatures=npc,monster';
+const MONSTER_ENTRY = (__atlasQualification ? "/web/fullworld.html?x=32283&y=32158&floor=-7&zoom=2&mode=map&animation=off&creatures=npc,monster" : '/web/fullworld.html?x=33018&y=32009&floor=-7&zoom=2&mode=map&animation=off&creatures=npc,monster');
 
 test('creature geometry remains floor-isolated and restores through moved deep-link reload', async ({ page }, testInfo) => {
   const runtime = captureRuntimeFailures(page);

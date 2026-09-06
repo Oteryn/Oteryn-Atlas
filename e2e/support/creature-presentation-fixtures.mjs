@@ -1,3 +1,4 @@
+const __atlasQualification = process.env.ATLAS_E2E_DATA_CAPABILITY === 'qualification_fixture';
 export const FIXTURE_ATLAS_MAIN = 'ee7c8a53e6b5ac46c7620065bcf5e03694e24c5b';
 
 function record(value) {
@@ -8,30 +9,30 @@ function record(value) {
   });
 }
 
-export const TWO_ROLE_NPC = record({
+export const TWO_ROLE_NPC = record((__atlasQualification ? {"label":"Fixture Guide","kind":"npc","record_id":"npc:11111111111111111111111111111111","position":{"floor":-7,"x":32280,"y":32155},"roles":["shop","quest"]} : {
   label: 'Albinius',
   kind: 'npc',
   record_id: 'npc:994e4a2decd5f718ccbc37c1d94bbbeb',
   position: { floor: -7, x: 32333, y: 32090 },
   roles: ['shop', 'quest'],
-});
-export const OVERFLOW_NPC = record({
+}));
+export const OVERFLOW_NPC = record((__atlasQualification ? {"label":"Fixture Wayfarer","kind":"npc","record_id":"npc:22222222222222222222222222222222","position":{"floor":-7,"x":32282,"y":32155},"roles":["travel","shop","quest","blessing","trainer"]} : {
   label: 'Eremo',
   kind: 'npc',
   record_id: 'npc:d6f7fbe1e22b73f3b04a708fd0a219a5',
   position: { floor: -7, x: 33327, y: 31882 },
   roles: ['travel', 'shop', 'quest', 'blessing', 'trainer'],
-});
+}));
 
-export const LONG_NAME_NPC = record({
+export const LONG_NAME_NPC = record((__atlasQualification ? {"label":"Fixture Cartographer With A Deliberately Long Name","kind":"npc","record_id":"npc:33333333333333333333333333333333","position":{"floor":-7,"x":32284,"y":32155},"roles":[]} : {
   label: 'Gnomish Operative (Resonating)',
   kind: 'npc',
   record_id: 'npc:13130bd68b5ae4f89ed406ae14984f0b',
   position: { floor: -15, x: 33703, y: 32869 },
   roles: [],
-});
+}));
 
-export const NEARBY_NPC_SCENE = Object.freeze({
+export const NEARBY_NPC_SCENE = Object.freeze((__atlasQualification ? {"center":{"floor":-7,"x":32280,"y":32155},"recordIds":["npc:11111111111111111111111111111111","npc:22222222222222222222222222222222","npc:33333333333333333333333333333333","npc:44444444444444444444444444444444","npc:55555555555555555555555555555555","npc:66666666666666666666666666666666"]} : {
   center: Object.freeze({ floor: -7, x: 33910, y: 31514 }),
   recordIds: Object.freeze([
     'npc:ec45630602ceaacbe9b0cc05ae379924',
@@ -40,9 +41,9 @@ export const NEARBY_NPC_SCENE = Object.freeze({
     'npc:da1a1533231fe6bbbd954cc8b553bf85',
     'npc:df0b31cb8d569cf3c8b1eff7a7e408ae',
   ]),
-});
+}));
 
-export const DENSE_MONSTER_SCENE = Object.freeze({
+export const DENSE_MONSTER_SCENE = Object.freeze((__atlasQualification ? {"center":{"floor":-7,"x":32283,"y":32158},"recordIds":["monster:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","monster:cccccccccccccccccccccccccccccccc","monster:dddddddddddddddddddddddddddddddd"]} : {
   center: Object.freeze({ floor: -15, x: 32058, y: 31922 }),
   recordIds: Object.freeze([
     'monster:e28f11745eefb1c8b091426b90983c3f',
@@ -51,9 +52,9 @@ export const DENSE_MONSTER_SCENE = Object.freeze({
     'monster:ebd9bc5d08801b6ad2777d8b2cb6d09d',
     'monster:aaca0b415a44ea25cd27e11c87e22a9d',
   ]),
-});
+}));
 
-export const MIXED_SCENE = Object.freeze({
+export const MIXED_SCENE = Object.freeze((__atlasQualification ? {"center":{"floor":-7,"x":32282,"y":32155},"npcRecordId":"npc:22222222222222222222222222222222","monsterRecordIds":["monster:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","monster:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","monster:cccccccccccccccccccccccccccccccc"]} : {
   center: Object.freeze({ floor: -15, x: 32753, y: 31381 }),
   npcRecordId: 'npc:2523c62f01b475ef58d8ef00fd53a2d7',
   monsterRecordIds: Object.freeze([
@@ -61,7 +62,7 @@ export const MIXED_SCENE = Object.freeze({
     'monster:5311014ca1e6b600488b43e0a2c156b6',
     'monster:ade1bb68b921623a0db5b776cf54c237',
   ]),
-});
+}));
 export function sceneEntry(scene, { zoom = 2, mode = 'map', creatures = 'npc,monster', creature = null, npcRole = null } = {}) {
   const center = scene.position ?? scene.center;
   const params = new URLSearchParams({

@@ -1,3 +1,4 @@
+const __atlasQualification = process.env.ATLAS_E2E_DATA_CAPABILITY === 'qualification_fixture';
 import { expect, test } from '@playwright/test';
 import {
   DENSE_MONSTER_SCENE,
@@ -294,7 +295,7 @@ test('desktop selection, camera/floor changes and animation preserve layout-life
   expect(state.selectedRecordId).toBe(TWO_ROLE_NPC.record_id);
   expect(labelLayoutFor(state, TWO_ROLE_NPC.record_id)?.priority).toBe('selected');
 
-  state = await openScenario(page, '/web/fullworld.html?x=32831&y=32596&floor=-12&zoom=2&mode=map&animation=off&creatures=monster');
+  state = await openScenario(page, (__atlasQualification ? "/web/fullworld.html?x=32280&y=32158&floor=-7&zoom=2&mode=map&animation=off&creatures=monster" : '/web/fullworld.html?x=32831&y=32596&floor=-12&zoom=2&mode=map&animation=off&creatures=monster'));
   render = assertPresentationContract(state);
   expect(state.pixelDrawnRecords, 'animation layout probe requires factual pixel-rendered creatures').toBeGreaterThan(0);
   const stableLayoutGeneration = render.labelLayoutGeneration;
