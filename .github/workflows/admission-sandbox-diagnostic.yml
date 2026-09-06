@@ -1,4 +1,4 @@
-name: Protected sandbox diagnosis (non-authoritative)
+name: Protected sandbox full proof (non-authoritative)
 on:
   push:
     paths:
@@ -6,23 +6,42 @@ on:
 permissions:
   contents: read
 jobs:
-  diagnose:
+  qualify:
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: 563370409880d40b0b7e334b9a5d4fc86b08b459
+          ref: 3f17cdace5c7cec4eea552483ce0e157cd2ad238
           persist-credentials: false
           path: protected
-      - name: Reproduce exact protected CLI regression sandbox
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ee876a8285a21df5f4a955f8c40059d708644f67
+          persist-credentials: false
+          path: candidate
+      - name: Full exact sandbox suites and independent census equality
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/diag-out"
-          chmod 777 "$RUNNER_TEMP/diag-out"
-          cat > "$RUNNER_TEMP/diag.mjs" <<'JS'
-          import {spawnSync} from 'node:child_process';
-          const r=spawnSync('node',['--test','/candidate/tests/verification/protected-admission-cli-census.test.mjs'],{stdio:'inherit',cwd:'/candidate',env:process.env});process.exit(r.status??1);
+          cat > "$RUNNER_TEMP/full-sandbox.mjs" <<'JS'
+          import fs from 'node:fs';import path from 'node:path';import {execFileSync} from 'node:child_process';
+          const base=path.resolve('protected'),candidate=path.resolve('candidate'),out=process.env.RUNNER_TEMP+'/sandbox-proof';
+          const {candidateSandboxArgs,collectDeterministicCensus,resolveProtectedDeterministicPatterns,validateDeterministicCensus}=await import(base+'/tools/verification/run-protected-admission.mjs');
+          fs.mkdirSync(out,{recursive:true});
+          const patterns=resolveProtectedDeterministicPatterns(fs.readFileSync(base+'/.github/workflows/ci.yml','utf8'));
+          const script=out+'/run.mjs';
+          fs.writeFileSync(script,`import fs from 'node:fs';import path from 'node:path';import {execFileSync} from 'node:child_process';
+          fs.mkdirSync('/tmp/bin');fs.symlinkSync('/usr/bin/python3','/tmp/bin/python');
+          process.chdir('/candidate');process.env.PATH='/tmp/bin:'+process.env.PATH;process.env.PYTHONPYCACHEPREFIX='/tmp/pycache';
+          const patterns=${JSON.stringify(patterns)};const files=[];
+          for(const pattern of patterns){const d=path.dirname(pattern),b=path.basename(pattern);const selected=b==='*.test.mjs'?fs.readdirSync('/candidate/'+d).filter(n=>n.endsWith('.test.mjs')).sort().map(n=>d+'/'+n):[pattern];if(!selected.length)throw Error('empty pattern');for(const relative of selected){if(process.argv[2]==='protected-tests'&&['tests/verification/qualification-world.test.mjs','tests/verification/protected-hosted-product-identities.test.mjs'].includes(relative))continue;files.push('/candidate/'+relative);}}
+          if(process.argv[2]==='protected-tests'){const collect=${collectDeterministicCensus.toString()};process.stdout.write(JSON.stringify(await collect(files)));}
+          else execFileSync('node',['--test',...files],{stdio:'inherit',cwd:'/candidate',env:{PATH:process.env.PATH,PYTHONPYCACHEPREFIX:'/tmp/pycache',TMPDIR:'/out'}});
+          `);
+          function run(source,name,census=false){const dest=out+'/'+name;fs.mkdirSync(dest,{mode:0o777});fs.chmodSync(dest,0o777);const args=candidateSandboxArgs({source,output:dest,script,...(census?{protectedTests:base+'/tests'}:{})});console.log('EXACT_SANDBOX '+name);if(census){const result=execFileSync('docker',args,{encoding:'utf8',maxBuffer:32*1024*1024,timeout:600000});fs.writeFileSync(dest+'/census.json',result);return JSON.parse(result);}execFileSync('docker',args,{stdio:'inherit',timeout:600000});}
+          run(base,'base-full');run(candidate,'candidate-full');
+          const expected=run(base,'base-census',true),actual=run(candidate,'candidate-census',true);validateDeterministicCensus(expected,actual);
+          console.log(JSON.stringify({diagnosticOnly:true,base:'3f17cdace5c7cec4eea552483ce0e157cd2ad238',candidate:'ee876a8285a21df5f4a955f8c40059d708644f67',fullSuites:'PASS',censusCount:expected.length,censusEquality:'PASS',browser:'NOT_RUN',protectedAcceptance:false}));
           JS
-          docker run --rm --env TMPDIR=/out --network none --read-only --cap-drop ALL --security-opt no-new-privileges --pids-limit 256 --memory 1536m --cpus 2 --user 1000:1000 --tmpfs /tmp:rw,nosuid,nodev,size=256m --mount "type=bind,src=$PWD/protected,dst=/candidate,readonly" --mount "type=bind,src=$RUNNER_TEMP/diag-out,dst=/out" --mount "type=bind,src=$RUNNER_TEMP/diag.mjs,dst=/run-proof.mjs,readonly" mcr.microsoft.com/playwright:v1.62.0-noble@sha256:baed2032d533817f3dbe6425de795788430ba345e819a1201337009ba17c9d07 node /run-proof.mjs
+          node "$RUNNER_TEMP/full-sandbox.mjs"
