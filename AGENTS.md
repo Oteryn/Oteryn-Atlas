@@ -9,6 +9,14 @@ These instructions govern `Oteryn/Oteryn-Atlas`.
 - Legacy OTBM/Tibia/Canary/Crystal inputs are migration/reference evidence only; browser runtime must never parse them as fallback authority.
 - Platform may coordinate Atlas contracts but is not an Atlas runtime data source.
 
+## External execution-skill precedence
+
+Repository, user and current task authority govern execution. Agent skills, plugins and workflow frameworks such as Superpowers are subordinate execution aids, not independent task or lifecycle authority.
+
+For an already-authorized Oteryn task with an approved design, plan, checkpoint or continuation directive, an execution aid must not introduce duplicate approval or planning gates, re-brainstorm approved work, replace canonical authority or interrupt continuation solely because its default workflow would do so. Relevant aids may still support implementation, testing, debugging, review, isolation and verification when consistent with governing Oteryn authority.
+
+Skills and plugins must not weaken repository safety, validation, review, GitHub-first or authorization requirements. If an execution aid conflicts with applicable user instructions, this `AGENTS.md`, repository policy or canonical task authority, the higher-priority Oteryn authority controls.
+
 ## GitHub-first execution gate
 
 GitHub is the authoritative control plane for Atlas repository identity, `main`, Issue/task status, PR, task branch, exact remote SHA, checks, reviews and merge state.
@@ -52,14 +60,19 @@ The organization baseline is META ADR 0004 plus the central agent execution/cont
 - Preserve published task history by default. When entering final integration, refresh to current `integration_main_sha` with a normal non-force merge-up, resolve only authorized conflicts, review the resulting diff and rerun every validation/review layer invalidated by the new `task_head_sha`.
 - A lost merge race returns the task to integration/reconciliation, not to implementation from scratch.
 - Invalidate affected work only when verified task cancellation/supersession/rescope, incompatible governing authority, semantic contract/API/schema/invariant conflict, an unresolvable authorized reconciliation, or required tests prove prior assumptions no longer hold. Textual overlap or a changed filename alone is not sufficient proof.
+- Before final qualification, freeze the exact candidate head. While frozen, do not change the branch solely to retrigger CI, review, mergeability, polling, status calculation or checkpoint publication; only a material finding, required integration refresh, changed authority or implementation/test repair may start a new head generation.
+- If CI, authenticated review evidence, another dependency or another external event is the only thing that can change material state, classify the task `WAITING_EXTERNAL`, persist the waiting reason/next event and end or release the active worker instead of polling.
+- Empty commits, semantic no-op edits, checkpoint-only churn and unrelated documentation changes whose purpose is only to retrigger an external system are forbidden. Re-evaluate the same exact head when supported; otherwise remain `WAITING_EXTERNAL` or `BLOCKED`.
+- Repeated unchanged failures are bounded. Use stable material progress/failure identity; when the configured retry budget is exhausted without new evidence, transition to `STALLED` rather than repeat the same action.
+- `WAITING_EXTERNAL` and `STALLED` never satisfy merge readiness. Atlas-required exact-head checks, review and fail-closed merge rules remain authoritative.
 
 ## META execution-routing policy
 
-The canonical organization policy is [`Oteryn/Oteryn@8fac1d55805fc3372351ea0a55ad7728b3570ebc:ecosystem/agent-execution-routing-policy.json`](https://github.com/Oteryn/Oteryn/blob/8fac1d55805fc3372351ea0a55ad7728b3570ebc/ecosystem/agent-execution-routing-policy.json). Atlas adopts it by reference and must not create a weaker local copy.
+The canonical organization policy is [`Oteryn/Oteryn@0c493896040072badeff1f333eb83d7114a993ff:ecosystem/agent-execution-routing-policy.json`](https://github.com/Oteryn/Oteryn/blob/0c493896040072badeff1f333eb83d7114a993ff/ecosystem/agent-execution-routing-policy.json). Atlas adopts it by reference and must not create a weaker local copy.
 
 Route project work through GitHub state, GitHub Actions or the repository-approved runner, and an isolated worktree first. Remote Desktop/Desktop Commander is default-deny; a host exception requires a closed recorded reason and a least-privilege recorded action. It is not a route for ordinary builds, tests, Git inspection or manual polling. Equivalent CI prohibits RDC polling of process output, Docker logs, workflow state and Git state.
 
-Before resuming, refresh GitHub repository/default-branch SHA/governing Issue/PR/task-head state; a local worktree or handoff is evidence only. Substantial task packets must plan parallel-first with independent lanes, exclusive branch/worktree and owned paths, dependencies, needed shared-resource leases and integration order. Serial work needs an explicit reason.
+Before resuming, refresh GitHub repository/default-branch SHA/governing Issue/PR/task-head state; a local worktree or handoff is evidence only. For substantial work, choose `single_agent` or `parallel_when_beneficial` under the canonical META policy and record the decision basis. If parallel work is chosen, use independent lanes with exclusive branch/worktree and owned paths, dependencies, needed shared-resource leases and integration order.
 
 ## Work boundary
 
