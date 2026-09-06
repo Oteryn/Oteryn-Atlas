@@ -1,4 +1,5 @@
 import { sha256ContentId } from './loader.mjs';
+import { ancillarySourceExpectations, PRODUCTION_FULLWORLD_TRUST, resolveQualificationManifestTrust, resolveBoundedRealManifestTrust } from './fullworld-trust.mjs';
 
 export const GAMEPLAY_EXPECTATIONS = Object.freeze({
   contractId: 'oteryn-game-atlas-export-v1',
@@ -321,6 +322,7 @@ function validateShard(value, descriptor) {
 
 export function createCreatureGameplayProfileService({
   baseUrl,
+  trust = PRODUCTION_FULLWORLD_TRUST,
   fetchImpl = fetch,
   expectedSemanticDigest = GAMEPLAY_EXPECTATIONS.semanticDigest,
   maxCacheShards = GAMEPLAY_LIMITS.defaultCacheShards,
@@ -330,6 +332,16 @@ export function createCreatureGameplayProfileService({
   fail(typeof fetchImpl === 'function', 'gameplay fetch implementation required');
   fail(Number.isSafeInteger(maxCacheShards) && maxCacheShards >= 1 && maxCacheShards <= GAMEPLAY_LIMITS.maxCacheShards, 'gameplay cache shard bound invalid');
   fail(Number.isSafeInteger(maxCacheBytes) && maxCacheBytes >= PRODUCER_LIMITS.max_shard_bytes, 'gameplay cache byte bound invalid');
+  const sources = ancillarySourceExpectations(trust);
+  // Revalidate all product roots before deriving availability from fixture trust.
+  // Ancillary expectations alone validate only the roots used by those sources.
+  if (sources.mode === 'qualification_fixture') {
+    resolveQualificationManifestTrust({ ...trust, fixtureId: trust.qualificationFixtureId,
+      dataCapability: sources.mode, productDigest: trust.qualificationProductDigest });
+  } else if (sources.mode === 'bounded_real_world') {
+    resolveBoundedRealManifestTrust({ ...trust, fixtureId: trust.boundedRealFixtureId,
+      dataCapability: sources.mode, productDigest: trust.boundedRealProductDigest });
+  }
   const root = new URL(baseUrl);
   const cache = new Map();
   let cacheBytes = 0;
@@ -388,6 +400,7 @@ export function createCreatureGameplayProfileService({
       try {
         const match = typeof entityId === 'string' ? ENTITY_ID.exec(entityId) : null;
         if (!match) return Object.freeze({ status: 'unavailable', reason: 'invalid-entity-id' });
+        if (sources.mode === 'qualification_fixture') return Object.freeze({ status: 'unavailable', reason: 'qualification-profile-intentionally-unavailable' });
         const currentManifest = await manifest();
         const kind = match[1]; const key = match[2].slice(0, 2);
         const descriptor = currentManifest.shards.find((entry) => entry.kind === kind && entry.key === key);

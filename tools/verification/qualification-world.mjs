@@ -259,9 +259,26 @@ async function buildQualificationAnimation(root, semanticRoot, pixelRoot, conten
   }));
   const program = {
     profile: 'oteryn-atlas-animation-runtime-v1',
-    object_programs: [],
+    object_programs: [{
+      animation_program_id: 'animation-program:qualification-world-ground',
+      appearance_source_id: 1,
+      animation: {
+        default_start_phase: 0,
+        loop_count: 0,
+        loop_type: 'infinite',
+        presentation_durations_ms: [120, 120],
+        synchronized: true,
+      },
+      phase_count: 2,
+      layers: 1,
+      patterns: { width: 1, height: 1, depth: 1 },
+      sprite_source_ids: [1, 2],
+    }],
     creature_programs: dynamic,
-    sprite_index: {},
+    sprite_index: {
+      '1': { content_id: contentId },
+      '2': { content_id: secondContentId },
+    },
     blob_index: {
       [contentId]: { bucket: bucketId, bytes: pixels.length, height: 32, offset: 0, width: 32 },
       [secondContentId]: { bucket: bucketId, bytes: secondPhase.length, height: 32, offset: pixels.length, width: 32 },
