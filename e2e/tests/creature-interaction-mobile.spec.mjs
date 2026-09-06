@@ -1,3 +1,4 @@
+const __atlasQualification = process.env.ATLAS_E2E_DATA_CAPABILITY === 'qualification_fixture';
 import { expect, test } from '@playwright/test';
 import { assertNoRuntimeFailures, captureRuntimeFailures, gotoAtlas, waitForAtlas } from './runtime.mjs';
 
@@ -44,7 +45,7 @@ async function tapCommittedTarget(page, record) {
 for (const kind of ['npc', 'monster']) {
   test(`mobile ${kind} tap activates fresh creature geometry without base tile selection`, async ({ page }) => {
     const runtime = captureRuntimeFailures(page);
-    await gotoAtlas(page, '/web/fullworld.html?x=32369&y=32241&floor=-7&zoom=2&mode=map&creatures=npc,monster');
+    await gotoAtlas(page, (__atlasQualification ? "/web/fullworld.html?x=32280&y=32155&floor=-7&zoom=2&mode=map&creatures=npc,monster" : '/web/fullworld.html?x=32369&y=32241&floor=-7&zoom=2&mode=map&creatures=npc,monster'));
     await waitForAtlas(page);
     const initial = await creatureState(page);
     test.skip(initial.status === 'FAIL' && /HTTP 404/.test(initial.error ?? ''), 'Current target has no optional creature publication.');
@@ -66,7 +67,7 @@ for (const kind of ['npc', 'monster']) {
 
 test('mobile Details opens the existing inspector above the card and Escape dismisses topmost only', async ({ page }) => {
   const runtime = captureRuntimeFailures(page);
-  await gotoAtlas(page, '/web/fullworld.html?x=32369&y=32241&floor=-7&zoom=2&mode=map&creatures=npc,monster');
+  await gotoAtlas(page, (__atlasQualification ? "/web/fullworld.html?x=32280&y=32155&floor=-7&zoom=2&mode=map&creatures=npc,monster" : '/web/fullworld.html?x=32369&y=32241&floor=-7&zoom=2&mode=map&creatures=npc,monster'));
   await waitForAtlas(page);
   const initial = await creatureState(page);
   test.skip(initial.status === 'FAIL' && /HTTP 404/.test(initial.error ?? ''), 'Current target has no optional creature publication.');
