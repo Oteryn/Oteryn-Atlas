@@ -1,5 +1,6 @@
 import { deepFreeze, exactDigest, exactSha, isPlainObject } from './anti-loop-common.mjs';
 import { canonicalJson } from './verification-plan-schema.mjs';
+import {assertProtectedReviewBundle} from './protected-review-evidence.mjs';
 
 function fail(label) { throw new TypeError(`protected admission evidence: ${label}`); }
 function object(value, keys, label) {
@@ -49,6 +50,31 @@ function candidateIdentity(value) {
   return { ...value, changedFiles: files };
 }
 
+/** The authenticated protected producer has already checked actual reference PNGs.
+ * Consumption checks their provenance/metadata; it does not re-hash absent pixels.
+ */
+export function validateProtectedReferenceMetadata(manifest,identity) {
+  object(manifest,['schemaVersion','identity','contractDigest','images'],'visual reference manifest');
+  if(manifest.schemaVersion!==1)fail('visual reference schema');
+  object(manifest.identity,['repository','pr','headSha','baseSha','candidateTree','referenceTree','productDigest','workflow','runId','jobId','attempt','browserImage'],'visual reference identity');
+  equal(manifest.identity,identity,'visual reference identity');
+  for(const key of ['headSha','baseSha','candidateTree','referenceTree'])exactSha(identity[key],key);
+  exactDigest(identity.productDigest,'visual reference product');
+  integer(identity.pr,'visual reference PR');integer(identity.runId,'visual reference run');integer(identity.jobId,'visual reference job');
+  if(identity.attempt!==1)fail('visual reference attempt');
+  text(identity.repository,'visual reference repository');text(identity.workflow,'visual reference workflow');text(identity.browserImage,'visual reference browser');
+  exactDigest(manifest.contractDigest,'visual reference protected contract');
+  const expected=[['desktop-chromium','desktop-inspector.png'],['mobile-chromium','mobile-inspector-panel.png']];
+  if(!Array.isArray(manifest.images)||manifest.images.length!==expected.length)fail('visual reference image census');
+  manifest.images.forEach((image,index)=>{
+    object(image,['project','name','bytes','sha256','width','height'],'visual reference image');
+    equal([image.project,image.name],expected[index],'visual reference project/name');
+    integer(image.bytes,'visual reference bytes');integer(image.width,'visual reference width');integer(image.height,'visual reference height');
+    if(image.bytes<33)fail('visual reference PNG incomplete');exactDigest(image.sha256,'visual reference image digest');
+  });
+  return deepFreeze({accepted:true,identity:structuredClone(identity),contractDigest:manifest.contractDigest});
+}
+
 /**
  * Pure PR/MQ contract. The caller must obtain authority from protected-base code,
  * currentCandidate from a final complete GitHub re-read, and producerRun/jobs from
@@ -78,7 +104,14 @@ export function validateProtectedAdmissionEvidence(input) {
   });
   equal(strings(propertyIds, 'property obligation census', true), strings(plan.scenarioIds, 'property scenario census', true), 'protected property coverage');
   if (!Array.isArray(plan.hostedPartitions) || !Array.isArray(plan.specialist) || !Array.isArray(plan.review)) fail('protected partition obligations missing');
-  if (plan.specialist.length || plan.review.length) fail('independent specialist/review evidence required');
+  if (plan.specialist.length) fail('independent specialist evidence required');
+  for(const review of plan.review) {
+    object(review,['dataCapability','scenarioIds','groupIds','evidenceKind'],'protected review obligation');
+    if(review.evidenceKind!=='restricted-visual-review')fail('unsupported independent review evidence');
+    strings(review.groupIds,'review groups');strings(review.scenarioIds,'review scenarios');
+    const partition=plan.hostedPartitions.find(row=>row.dataCapability===review.dataCapability);
+    if(!partition||review.scenarioIds.some(id=>!partition.scenarioIds.includes(id)))fail('independent review capture partition missing');
+  }
   exactDigest(plan.semanticDigest, 'protected semantic plan');
   text(plan.profile, 'protected profile');
   strings(plan.dataCapabilities, 'protected capabilities', true);
@@ -137,8 +170,10 @@ export function validateProtectedAdmissionEvidence(input) {
   const jobEnd = time(job.completed_at, 'GitHub job completion');
   if (created < jobStart || created > jobEnd || jobStart < runStart || jobEnd > runEnd
     || runEnd > clock || clock - runStart > authority.maxAgeMs) fail('stale or inconsistent evidence time');
-  object(evidence.proof, ['plan', 'deterministic', 'browser'], 'required proof');
+  object(evidence.proof, ['plan', 'deterministic', 'browser',...['reviewCaptures','visualReferences'].filter(key=>Object.hasOwn(evidence.proof??{},key))], 'required proof');
   equal(evidence.proof.plan, plan, 'independent semantic plan');
+  if(plan.review.length)assertProtectedReviewBundle(input.independentReview,current,evidence.proof.reviewCaptures);
+  else if(evidence.proof.reviewCaptures!==undefined&&(!Array.isArray(evidence.proof.reviewCaptures)||evidence.proof.reviewCaptures.length))fail('unexpected visual review captures');
   const deterministic = object(evidence.proof.deterministic, ['groups', 'result'], 'deterministic proof');
   equal(strings(deterministic.groups, 'executed deterministic groups', true), requiredGroups, 'deterministic groups');
   if (deterministic.result !== 'PASS') fail('deterministic proof failed');
@@ -159,6 +194,15 @@ export function validateProtectedAdmissionEvidence(input) {
     equal(strings(actualIds, 'partition executed census'), strings(expected.scenarioIds, 'partition protected census'), 'partition protected census');
   }
   const qualification = browser.partitions.find(partition => partition.dataCapability === 'qualification_fixture');
+  const references=evidence.proof.visualReferences;
+  if(references!==undefined&&!Array.isArray(references))fail('visual reference list');
+  if(authority.visualReference?.required===true&&qualification&&plan.review.length) {
+    if(references?.length!==1)fail('required independent visual reference missing');
+  }
+  if(references?.length) {
+    if(!qualification||references.length!==1||!authority.visualReference)fail('unexpected visual reference');
+    validateProtectedReferenceMetadata(references[0],{repository:current.repository,pr:current.prNumber,headSha:current.headSha,baseSha:current.baseSha,candidateTree:current.treeSha,referenceTree:authority.visualReference.referenceTree,productDigest:qualification.productDigest,workflow:p.workflowPath,runId:p.runId,jobId:p.jobId,attempt:p.runAttempt,browserImage:authority.visualReference.browserImage});
+  }
   const qualificationIds = plan.hostedPartitions.find(partition => partition.dataCapability === 'qualification_fixture')?.scenarioIds ?? [];
   const hostedIds = [...new Set(plan.hostedPartitions.flatMap(partition => partition.scenarioIds))].sort();
   equal(hostedIds, requiredIds, 'complete hosted plan census');

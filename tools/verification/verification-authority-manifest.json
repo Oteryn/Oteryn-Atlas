@@ -3,6 +3,18 @@
   "authorityId": "atlas-protected-verification-authority-v1",
   "components": [
     {
+      "id": "admission-collect-protected-visual-capture",
+      "path": "tools/verification/collect-protected-visual-capture.mjs"
+    },
+    {
+      "id": "admission-compose.protected-visual-consumer",
+      "path": "e2e/compose.protected-visual-consumer.yml"
+    },
+    {
+      "id": "admission-compose.protected-visual-reference",
+      "path": "e2e/compose.protected-visual-reference.yml"
+    },
+    {
       "id": "admission-consume-protected-admission",
       "path": "tools/verification/consume-protected-admission.mjs"
     },
@@ -43,6 +55,10 @@
       "path": "tools/verification/protected-qualification-oracle.mjs"
     },
     {
+      "id": "admission-protected-review-evidence",
+      "path": "tools/verification/protected-review-evidence.mjs"
+    },
+    {
       "id": "admission-protected-routing",
       "path": "tools/verification/protected-routing.json"
     },
@@ -57,6 +73,14 @@
     {
       "id": "admission-protected-semantic-routing",
       "path": "tools/verification/protected-semantic-routing.mjs"
+    },
+    {
+      "id": "admission-protected-visual-capture-contract",
+      "path": "tools/verification/protected-visual-capture-contract.json"
+    },
+    {
+      "id": "admission-protected-visual-reference",
+      "path": "tools/verification/protected-visual-reference.mjs"
     },
     {
       "id": "admission-protected-workflow-configuration",
@@ -85,6 +109,10 @@
     {
       "id": "admission-run-protected-merge-group",
       "path": "tools/verification/run-protected-merge-group.mjs"
+    },
+    {
+      "id": "admission-run-protected-visual-reference",
+      "path": "tools/verification/run-protected-visual-reference.mjs"
     },
     {
       "id": "anti-loop-common",

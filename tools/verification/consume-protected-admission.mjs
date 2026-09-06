@@ -6,6 +6,7 @@ import { validateProtectedAdmissionEvidence } from './protected-admission-eviden
 import { validateStableIdCensus } from './stable-id-census.mjs';
 import { canonicalJson } from './verification-plan-schema.mjs';
 import { exactSha } from './anti-loop-common.mjs';
+import {selectLatestProtectedReview, validateProtectedReviewBundle} from './protected-review-evidence.mjs';
 
 const workflow = '.github/workflows/protected-admission.yml';
 function fail(message) { throw new TypeError(`protected admission consumer: ${message}`); }
@@ -54,6 +55,29 @@ async function readCandidate({ request, repository, protectedBaseSha }, number, 
   return { repository, prNumber: number, headSha: pr.head.sha, baseSha: protectedBaseSha,
     treeSha: commit.commit.tree.sha, changedFiles: files.map(file => ({ path: file.filename, status: file.status,
       ...(file.status === 'renamed' ? { previousPath: file.previous_filename } : {}) })).sort((a, b) => a.path.localeCompare(b.path)) };
+}
+
+function reviewCaptures(options,candidate,executionPlan,evidence,run,artifact) {
+  const contract=options.authority.visualCaptureContract,execution=options.authority.visualCaptureExecution;
+  if(contract?.schemaVersion!==1||!Array.isArray(contract.requiredFrames)||!contract.requiredFrames.length||!execution)fail('protected visual capture authority missing');
+  if(new Set(contract.requiredFrames.map(row=>row.frameId)).size!==contract.requiredFrames.length)fail('protected frame IDs duplicate');
+  const supplied=evidence.proof?.reviewCaptures;
+  if(!Array.isArray(supplied)||!supplied.length)fail('required review captures missing');
+  const partitionIds=executionPlan.hostedPartitions.flatMap(partition=>partition.scenarioIds);
+  if(contract.requiredFrames.some(frame=>!partitionIds.includes(frame.stableTestId)))fail('protected frame owner absent from plan');
+  const expected=executionPlan.hostedPartitions.flatMap(partition=>{
+    const requiredFrames=contract.requiredFrames.filter(frame=>partition.scenarioIds.includes(frame.stableTestId)).map(frame=>({frameId:frame.frameId,scenarioId:frame.stableTestId}));
+    if(!requiredFrames.length)return [];
+    const capture=supplied.filter(row=>row.dataCapability===partition.dataCapability);
+    if(capture.length!==1)fail('unique partition review capture required');
+    const product=evidence.proof.browser.partitions.filter(row=>row.dataCapability===partition.dataCapability);
+    if(product.length!==1)fail('unique review product required');
+    const reviewIds=executionPlan.review.filter(row=>row.dataCapability===partition.dataCapability).flatMap(row=>row.scenarioIds);
+    const scenarioIds=[...new Set([...reviewIds,...requiredFrames.map(frame=>frame.scenarioId)])].sort();
+    return [{captureBytes:canonicalJson(capture[0]),authority:{...execution,repositoryId:run.repository.id,protectedBaseSha:candidate.baseSha,workflowPath:workflow,artifactName:artifact.name,maxAgeMs:options.authority.maxAgeMs,planDigest:executionPlan.semanticDigest,oracleDigest:options.authority.oracleDigest,productDigest:product[0].productDigest,dataCapability:partition.dataCapability,scenarioIds,summaryScenarioIds:partition.scenarioIds,requiredFrames}}];
+  });
+  if(expected.length!==supplied.length)fail('unexpected review capture partition');
+  return expected;
 }
 
 /** Both PR and MQ use this function with independently fetched GitHub state. */
@@ -124,9 +148,18 @@ export async function consumeProtectedAdmission(options) {
   if (matches.length !== 1 || matches[0].expired === true) fail('independent evidence artifact missing or expired');
   if (!Number.isSafeInteger(matches[0].id) || matches[0].id < 1) fail('artifact ID');
   const evidence = await options.downloadEvidence(matches[0].id);
-  const current = await readCandidate(options, number, candidate.headSha);
-  same(current, candidate, 'final candidate reread');
-  if (queueTree) same((await request(`${prefix}/commits/${codeRevision}`)).commit?.tree?.sha, queueTree, 'final queue tree');
+  let independentReview,reviewSnapshot;
+  if(executionPlan.review?.length) {
+    const captures=reviewCaptures(options,candidate,executionPlan,evidence,run,matches[0]);
+    const endpoint=`${prefix}/pulls/${number}/reviews`,reviews=await pages(request,endpoint);
+    const review=selectLatestProtectedReview(reviews,candidate);
+    if(!review)return {accepted:false,eligible:true,reason:'missing-independent-visual-review'};
+    if(!/^[A-Za-z0-9-]+$/.test(review.user?.login??''))fail('reviewer login required');
+    const permissionEndpoint=`${prefix}/collaborators/${encodeURIComponent(review.user.login)}/permission`;
+    const reviewerPermission=await request(permissionEndpoint);
+    independentReview=validateProtectedReviewBundle({currentCandidate:candidate,captures,captureRun:run,captureJobs:{jobs},captureArtifact:matches[0],review,reviewerPermission,now:options.now??new Date().toISOString()});
+    reviewSnapshot={endpoint,reviews,permissionEndpoint,reviewerPermission};
+  }
   const finalRun = await request(`${prefix}/actions/runs/${locator.id}`);
   same(finalRun, run, 'final producer reread');
   const finalJobs = await pages(request, `${prefix}/actions/runs/${locator.id}/attempts/1/jobs`, 'jobs');
@@ -134,7 +167,15 @@ export async function consumeProtectedAdmission(options) {
   const finalRuns = await pages(request, `${prefix}/actions/workflows/protected-admission.yml/runs`, 'workflow_runs');
   const latest = finalRuns.filter(matchesCandidateRun).sort((a, b) => Number(b.id) - Number(a.id))[0];
   if (latest?.id !== locator.id || latest.run_attempt !== 1 || latest.status !== 'completed' || latest.conclusion !== 'success') fail('latest producer changed during consumption');
-  const result = validateProtectedAdmissionEvidence({ evidence,
+  if(reviewSnapshot) {
+    same(await pages(request,reviewSnapshot.endpoint),reviewSnapshot.reviews,'final visual review timeline');
+    same(await request(reviewSnapshot.permissionEndpoint),reviewSnapshot.reviewerPermission,'final reviewer authority');
+    same(await pages(request,`${prefix}/actions/runs/${locator.id}/artifacts`,'artifacts'),artifacts,'final capture artifacts');
+  }
+  const current = await readCandidate(options, number, candidate.headSha);
+  same(current, candidate, 'final candidate reread');
+  if (queueTree) same((await request(`${prefix}/commits/${codeRevision}`)).commit?.tree?.sha, queueTree, 'final queue tree');
+  const result = validateProtectedAdmissionEvidence({ evidence,independentReview,
     authority: { ...options.authority, executionPlan,
       requiredGroups: executionPlan.requiredGroups.filter(group => group.startsWith('deterministic.')),
       requiredScenarioIds: executionPlan.scenarioIds, protectedBaseSha, expectedRunId: locator.id, expectedJobId: proofJobs[0].id,
@@ -165,7 +206,7 @@ async function main() {
   const root = options['--protected-root'] ? path.resolve(options['--protected-root']) : path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
   const catalog = JSON.parse(readFileSync(path.join(root, 'tools/verification/verification-catalog.json'), 'utf8'));
   const census = validateStableIdCensus(JSON.parse(readFileSync(path.join(root, 'tools/verification/full-safety-net-stable-ids.json'), 'utf8')));
-  const { protectedOracleDigest } = await import('./run-protected-admission.mjs');
+  const { protectedOracleDigest,CANDIDATE_IMAGE } = await import('./run-protected-admission.mjs');
   const { validateProtectedExecutionScope } = await import('./protected-admission-policy.mjs');
   const { evaluateProtectedRouting } = await import('./protected-semantic-routing.mjs');
   const manifest = JSON.parse(readFileSync(path.join(root, 'tools/verification/impact-manifest.json'), 'utf8'));
@@ -185,7 +226,10 @@ async function main() {
         dataCapabilities: plan.capabilities, profile: plan.profile, proofPurpose: plan.proofPurpose, evidenceKind: plan.evidenceKind, propertyObligations: plan.propertyObligations, hostedPartitions: plan.hostedPartitions, specialist: plan.specialist, review: plan.review };
     },
     request: githubRequest, downloadEvidence: id => downloadEvidence(repository, id),
-    authority: { oracleDigest: protectedOracleDigest(root), maxAgeMs: 24 * 60 * 60 * 1000 } });
+    authority: { oracleDigest: protectedOracleDigest(root), maxAgeMs: 24 * 60 * 60 * 1000,
+      visualCaptureContract:JSON.parse(readFileSync(path.join(root,'tools/verification/protected-visual-capture-contract.json'),'utf8')),
+      visualReference:{required:true,referenceTree:execFileSync('git',[...gitArgs,'rev-parse','HEAD^{tree}'],{encoding:'utf8'}).trim(),browserImage:CANDIDATE_IMAGE},
+      visualCaptureExecution:{runnerKind:'github-hosted',runnerGroupId:0,runnerLabels:['ubuntu-24.04'],jobName:'Protected admission proof'} } });
   if (options['--output']) writeFileSync(options['--output'], `${JSON.stringify(result)}\n`);
   if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `admission_accepted=${result.accepted}\nadmission_eligible=${result.eligible}\n`);
   console.log(JSON.stringify(result));

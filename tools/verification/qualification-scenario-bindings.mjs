@@ -63,6 +63,13 @@ export function resolveQualificationScenarioBindings({ productRoot, expectedProd
   const roleNpc = one(creatures,r=>r.kind==='npc' && canonicalJson(r.roles)===canonicalJson(['shop','quest']),'shop/quest NPC');
   const overflowNpc = one(creatures,r=>r.kind==='npc' && canonicalJson(r.roles)===canonicalJson(['travel','shop','quest','blessing','trainer']),'five-role overflow NPC');
   const longNpc = one(creatures,r=>r.kind==='npc' && r.label.length >= 32,'long-name NPC');
+  // The edge-label oracle requires available annotation space, not crowd suppression.
+  // Four vertical tiles or eight horizontal tiles separate the protected label
+  // envelope at zoom 2 from other NPC labels, markers and badges.
+  if (creatures.some(r => r.kind === 'npc' && r.record_id !== longNpc.record_id
+    && r.position.floor === longNpc.position.floor
+    && Math.abs(r.position.y - longNpc.position.y) < 4
+    && Math.abs(r.position.x - longNpc.position.x) < 8)) reject('requires isolated long-name NPC');
   const manifest = json('animation/manifest.json');
   const programs = json(`animation/${relativePath(manifest.programs?.path)}`);
   if (programs.profile !== 'oteryn-atlas-animation-runtime-v1') reject('invalid animation profile');
@@ -89,6 +96,11 @@ export function resolveQualificationScenarioBindings({ productRoot, expectedProd
   const monsters=creatures.filter(r=>r.kind==='monster');
   const overlap=monsters.filter(r=>monsters.filter(o=>same(r,o)).length>=3);
   if(overlap.length<3 || overlap.some(r=>!same(r,overlap[0]))) reject('requires one dense monster scene');
+  // Rendering preserves publication order; interaction prioritizes the last
+  // drawn overlapping marker. Search order is not interaction authority.
+  const overlapIds = new Set(overlap.map(r => r.record_id));
+  const lastPublishedOverlap = published.filter(r => overlapIds.has(r.record_id)).at(-1);
+  const overlapTopmost = creatures.find(r => r.record_id === lastPublishedOverlap.record_id);
   const nearbyNpcs=creatures.filter(r=>r.kind==='npc'&&r.position.floor===roleNpc.position.floor&&Math.abs(r.position.x-roleNpc.position.x)<=8&&Math.abs(r.position.y-roleNpc.position.y)<=8);
   if(nearbyNpcs.length<3) reject('requires nearby NPC scene');
   const floor=json(`runtime-index/floors/f${navigation.position.floor}.json`);
@@ -105,14 +117,18 @@ export function resolveQualificationScenarioBindings({ productRoot, expectedProd
   if(distinct.length!==4) reject('requires four distinct published anchor targets');
   // A final fresh enumeration detects product changes during resolution.
   snapshot(productRoot,expectedProductDigest);
-  const result = freeze({schemaVersion:1,dataCapability:'qualification_fixture',productDigest:expectedProductDigest,navigation,roleNpc,overflowNpc,longNpc,animatedNpc,animatedMonster,overlap,nearbyNpcs,creatures,distinct});
+  const racePublication = { floor: { bounds: floor.bounds, regionSpan: floor.regionSpan,
+    chunks: floor.chunks.map(c => ({ logicalAddress: c.logicalAddress, contentId: c.contentId, groups: c.groups })) },
+    anchors, initial: navigation.position };
+  const result = freeze({racePublication,schemaVersion:1,dataCapability:'qualification_fixture',productDigest:expectedProductDigest,navigation,navigationBounds:floor.bounds,roleNpc,overflowNpc,longNpc,animatedNpc,animatedMonster,overlap,overlapTopmost,nearbyNpcs,creatures,distinct});
+
   admittedBindings.add(result);
   return result;
 }
 
 const BINDING_FILES = new Set([
   'tests/runtime.mjs', 'tests/audit-desktop.spec.mjs', 'tests/state-desktop.spec.mjs',
-  'tests/race-desktop.spec.mjs', 'tests/desktop.spec.mjs', 'tests/mobile.spec.mjs',
+  'tests/race-desktop.spec.mjs', 'tests/render-probes-desktop.spec.mjs', 'tests/desktop.spec.mjs', 'tests/mobile.spec.mjs',
   'tests/degraded-search-desktop.spec.mjs', 'tests/visual-desktop.spec.mjs',
   'tests/visual-mobile.spec.mjs', 'tests/creatures-desktop.spec.mjs',
   'tests/creature-presentation-desktop.spec.mjs', 'tests/creature-presentation-mobile.spec.mjs',
@@ -148,6 +164,7 @@ function productionSource(source) {
     if(separator<0||end<0)reject('malformed protected binding expression');
     result=result.slice(0,start)+result.slice(separator+2,end)+result.slice(end+1);
   }
+  result=result.replace('  const __atlasRaceTarget = null;\n', '');
   if(result.includes('__atlasQualification'))reject('unknown protected binding residue');
   return result;
 }
@@ -178,6 +195,8 @@ export function renderQualificationHarnessBindings({ protectedSources, bindings 
     ['x=32724&y=31155&floor=-15', at(b.animatedMonster)],
   ]);
   const values = new Map([
+    ['desktop-inspector.png',['protected-reference','desktop-inspector.png']],
+    ['mobile-inspector-panel.png',['protected-reference','mobile-inspector-panel.png']],
     ['Thais',b.navigation.label],['Sam',b.roleNpc.label],['Cave Rat',b.animatedMonster.label],
     ['monster-entity:8b41afe4c98e72744557d7adc250f7e6',b.animatedMonster.entity_id],
     ['Misguided Thief',b.overlap[0].label],
@@ -197,9 +216,14 @@ export function renderQualificationHarnessBindings({ protectedSources, bindings 
     const original=productionSource(protectedSources[name]);
     // Matching a complete quoted token prevents data from becoming JavaScript.
     // Known regex selectors become RegExp expressions with escaped literal data.
-    let transformed=original.replace(/'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*"|\/\^Cave Rat\$\/|\/Sam\/i|\/Thais\/i|\b(?:32369|32241|32380|32250|32390|32260|32469|32341|32569|32441)\b/g, token=>{
+    let transformed=original.replace(/'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*"|\/\^Cave Rat\$\/|\/Sam\/i|\/Thais\/i|\b(?:32369|32241|32380|32250|32390|32260|32469|32341|32569|32441)\b/g, (token,offset)=>{
       if(token[0]==="'" || token[0]==='"') {
         const raw=token.slice(1,-1);
+        if(name==='tests/visual-desktop.spec.mjs' && original.slice(0,offset).endsWith('const VISUAL_ENTRY = ') && raw.startsWith('/web/fullworld.html?')) {
+          const q=new URL(raw,'https://protected.invalid').searchParams;
+          const x=Number(q.get('x')),y=Number(q.get('y')),floor=Number(q.get('floor')),bounds=b.navigationBounds;
+          if(Number.isFinite(x)&&Number.isFinite(y)&&floor===b.navigation.position.floor&&x>=bounds.x_min&&x<bounds.x_max_exclusive&&y>=bounds.y_min&&y<bounds.y_max_exclusive)return token;
+        }
         let next=values.get(raw);
         if(next===undefined && raw.startsWith('/web/fullworld.html?')) for(const [before,after] of urls) if(raw.includes(before)) {next=raw.replace(before,after);break;}
         return next===undefined?token:conditional(token,JSON.stringify(next));
@@ -211,8 +235,40 @@ export function renderQualificationHarnessBindings({ protectedSources, bindings 
       }
       return conditional(token,values.get(token));
     });
+    // Keep the selected fixture's own label consistent with its record identity;
+    // only the chooser's first-hit expectation uses publication draw priority.
+    const firstChoice = `expect(choices.first()).toContainText(${conditional("'Misguided Thief'", JSON.stringify(b.overlap[0].label))})`;
+    const topmostChoice = `expect(choices.first()).toContainText(${conditional("'Misguided Thief'", JSON.stringify(b.overlapTopmost.label))})`;
+    transformed = transformed.replace(firstChoice, topmostChoice);
     const oldPosition='{ floor: -10, x: 32522, y: 32419 }';
     if(transformed.includes(oldPosition)) transformed=transformed.replace(oldPosition,conditional(oldPosition,JSON.stringify(b.overlap[0].position)));
+    if (name === 'tests/runtime.mjs') {
+      const legacyResolution = `await resolveQualificationEntry(entry, {
+    qualificationTrustJson: process.env.ATLAS_QUALIFICATION_TRUST_JSON,
+    readSemanticIndex: () => readQualificationSemanticIndex(page),
+  })`;
+      if (transformed.split(legacyResolution).length !== 2) reject('unknown protected navigation binding slot');
+      // This complete harness has already been emitted and independently checked
+      // against protected publication bindings. Preserve its explicit targets.
+      transformed = transformed.replace(legacyResolution, conditional(legacyResolution, 'entry'));
+    }
+    if (name === 'tests/race-desktop.spec.mjs') {
+      const end = transformed.indexOf("test('superseded delayed range");
+      if (end < 0) reject('missing protected race scenario boundary');
+      let race = transformed.slice(0, end);
+      const declaration = `  const __atlasRaceTarget = ${conditional('null', `(${selectQualificationRaceTarget.toString()})(${JSON.stringify(b.racePublication)}, await page.locator('#atlas').boundingBox())`)};\n`;
+      race = race.replace('  const faults = await installHeldRangeRequests(page, { limit: 2 });', declaration + '  const faults = await installHeldRangeRequests(page, { limit: 2 });');
+      for (const [value, axis] of [[32469,'x'],[32341,'y']]) {
+        const emitted = conditional(String(value),values.get(String(value)));
+        race = race.split(emitted).join(conditional(String(value),`__atlasRaceTarget.${axis}`));
+      }
+      transformed = race + transformed.slice(end);
+    }
+    if (name === 'tests/geometry-mobile.spec.mjs') {
+      const first = 'aligned = await resizeAndAlign(page, 390, 844);';
+      if (!transformed.includes(first)) reject('missing protected portrait resize slot');
+      transformed = transformed.replace(first, `aligned = await resizeAndAlign(page, ${conditional('390','375')}, ${conditional('844','812')});`);
+    }
     result[name]=transformed===original?original:QUALIFICATION_PREFIX+transformed;
   }
   const helper='support/creature-presentation-fixtures.mjs';
@@ -236,4 +292,34 @@ export function validateQualificationHarnessBindings({ protectedSources, candida
   if(canonicalJson(Object.keys(expected).sort())!==canonicalJson(Object.keys(candidateSources).sort())) reject('candidate source inventory drift');
   for(const [name,source] of Object.entries(expected)) if(candidateSources[name]!==source) reject(`candidate oracle source differs from protected binding contract: ${name}`);
   return freeze({accepted:true,dataCapability:'qualification_fixture',productDigest:bindings.productDigest,sourceDigest:digest(canonicalJson(expected))});
+}
+
+// The protected race source fixes zoom=2 and the default profile's four-tile
+// prefetch. CSS viewport dimensions come from the same #atlas canvas as runtime.
+// Candidate publication is immutable bound data; this selector is protected code.
+export function selectQualificationRaceTarget(publication, viewport) {
+  const { floor, anchors, initial } = publication;
+  const fail = () => { throw new TypeError('qualification race requires two uncached ranges and a visible anchor'); };
+  if (![viewport?.width, viewport?.height].every(n => Number.isFinite(n) && n > 0)) fail();
+  const bounds = (p, margin) => ({
+    left: Math.max(floor.bounds.x_min, p.x - viewport.width / 128 - margin),
+    right: Math.min(floor.bounds.x_max_exclusive, p.x + viewport.width / 128 + margin),
+    top: Math.max(floor.bounds.y_min, p.y - viewport.height / 128 - margin),
+    bottom: Math.min(floor.bounds.y_max_exclusive, p.y + viewport.height / 128 + margin),
+  });
+  const groups = p => {
+    const b = bounds(p, 4);
+    return floor.chunks.flatMap(c => c.logicalAddress.region_x * floor.regionSpan >= b.right || (c.logicalAddress.region_x + 1) * floor.regionSpan <= b.left ? [] : c.groups.filter(g => g.yMin < b.bottom && g.yMaxExclusive > b.top).map(g => `${c.contentId}:${g.offset}:${g.bytes}`));
+  };
+  const cached = new Set(groups(initial));
+  for (const anchor of anchors) {
+    for (let dx = 0; dx <= Math.ceil(viewport.width / 128); dx++) {
+      const p = { x: anchor.x + dx, y: anchor.y, floor: initial.floor };
+      if (p.x < floor.bounds.x_min || p.x >= floor.bounds.x_max_exclusive || p.y < floor.bounds.y_min || p.y >= floor.bounds.y_max_exclusive) continue;
+      const visible = bounds(p, 0);
+      if (anchor.x < visible.left || anchor.x >= visible.right || anchor.y < visible.top || anchor.y >= visible.bottom) continue;
+      if (new Set(groups(p).filter(key => !cached.has(key))).size >= 2) return Object.freeze(p);
+    }
+  }
+  fail();
 }

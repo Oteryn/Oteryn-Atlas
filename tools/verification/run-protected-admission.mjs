@@ -57,7 +57,7 @@ export function validateDeterministicCensus(expected, actual) {
   if(!Array.isArray(expected)||!expected.length||JSON.stringify(expected)!==JSON.stringify(actual))throw new TypeError('protected deterministic census drift');
 }
 export function candidateSandboxArgs({ source, output, script, protectedTests }) {
-  return ['run', '--rm', '--network', 'none', '--read-only', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges', '--pids-limit', '256', '--memory', '1536m', '--cpus', '2', '--user', '1000:1000', '--tmpfs', '/tmp:rw,nosuid,nodev,size=256m', '--mount', `type=bind,src=${source},dst=/candidate,readonly`, '--mount', `type=bind,src=${output},dst=/out`, '--mount', `type=bind,src=${script},dst=/run-proof.mjs,readonly`, ...(protectedTests ? ['--mount', `type=bind,src=${protectedTests},dst=/candidate/tests,readonly`] : []), CANDIDATE_IMAGE, 'node', '/run-proof.mjs', ...(protectedTests ? ['protected-tests'] : [])];
+  return ['run', '--rm', '--env', 'TMPDIR=/out', '--network', 'none', '--read-only', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges', '--pids-limit', '256', '--memory', '1536m', '--cpus', '2', '--user', '1000:1000', '--tmpfs', '/tmp:rw,nosuid,nodev,size=256m', '--mount', `type=bind,src=${source},dst=/candidate,readonly`, '--mount', `type=bind,src=${output},dst=/out`, '--mount', `type=bind,src=${script},dst=/run-proof.mjs,readonly`, ...(protectedTests ? ['--mount', `type=bind,src=${protectedTests},dst=/candidate/tests,readonly`] : []), CANDIDATE_IMAGE, 'node', '/run-proof.mjs', ...(protectedTests ? ['protected-tests'] : [])];
 }
 export function resolveProtectedBrowserCensus(listText, catalog) {
   const specs = new Set(catalog.groups?.['e2e.full']?.specs ?? []);
@@ -88,7 +88,7 @@ export function resolveProtectedBrowserInventory(listText, catalog) {
 export function validateExecutionPlan(plan) {
   if(plan.workers!==1||plan.retries!==0)throw new TypeError('protected execution lower bounds invalid');
   if(!Array.isArray(plan.scenarioIds)||!Array.isArray(plan.capabilities)||plan.capabilities.some(capability=>!['qualification_fixture','bounded_real_world'].includes(capability)))throw new TypeError('required data capability unavailable to protected executor');
-  if(!Array.isArray(plan.specialist)||!Array.isArray(plan.review)||plan.specialist.length||plan.review.length)throw new TypeError('independent specialist or review evidence required');
+  if(!Array.isArray(plan.specialist)||!Array.isArray(plan.review)||plan.specialist.length)throw new TypeError('independent specialist evidence required');
   if(!Array.isArray(plan.hostedPartitions))throw new TypeError('protected execution partitions missing');
   const caps=new Set(),ids=[];
   for(const partition of plan.hostedPartitions){
@@ -96,6 +96,14 @@ export function validateExecutionPlan(plan) {
     caps.add(partition.dataCapability);ids.push(...partition.scenarioIds);
   }
   if(new Set(ids).size!==ids.length||JSON.stringify([...ids].sort())!==JSON.stringify([...plan.scenarioIds].sort()))throw new TypeError('protected execution partition census mismatch');
+  if(plan.review.length){
+    const required=JSON.parse(fs.readFileSync(new URL('./protected-visual-capture-contract.json',import.meta.url),'utf8')).requiredFrames;
+    if(JSON.stringify(plan.requiredFrames)!==JSON.stringify(required)||required.some(frame=>!ids.includes(frame.stableTestId)))throw new TypeError('independent protected review frame contract missing');
+    for(const review of plan.review){
+      const partition=plan.hostedPartitions.find(p=>p.dataCapability===review.dataCapability);
+      if(review.evidenceKind!=='restricted-visual-review'||!Array.isArray(review.scenarioIds)||!review.scenarioIds.length||new Set(review.scenarioIds).size!==review.scenarioIds.length||!partition||review.scenarioIds.some(id=>!partition.scenarioIds.includes(id)))throw new TypeError('protected review execution obligation invalid');
+    }
+  }
 }
 export function protectedOracleDigest(root) {
   const hash = crypto.createHash('sha256');
@@ -117,7 +125,15 @@ const write = (target, value) => fs.writeFileSync(target, JSON.stringify(value, 
 const run = (command, args, options = {}) => execFileSync(command, args, { stdio: 'inherit', timeout: 600_000, ...options });
 const text = (command, args, options = {}) => execFileSync(command, args, { encoding: 'utf8', timeout: 60_000, ...options }).trim();
 
-export async function executeProtectedCandidateProof({ protectedRoot, candidateRoot, outputRoot, candidate, admission, proofPurpose = 'candidate', env = process.env }) {
+export function requiresProtectedVisualCapture({plan,proofPurpose='candidate',producerJobId,freshSnapshot,env=process.env}) {
+  if(!Array.isArray(plan?.review))throw new TypeError('protected review plan missing');
+  if(!plan.review.length)return false;
+  if(env.GITHUB_EVENT_NAME==='merge_group')throw new TypeError('review-bearing Merge Queue requires exact independent PR evidence through the shared consumer');
+  if(proofPurpose!=='candidate'||!Number.isSafeInteger(producerJobId)||producerJobId<1||typeof freshSnapshot!=='function'||!/^\d+$/.test(env.GITHUB_RUN_ID??'')||!Number.isSafeInteger(Number(env.GITHUB_RUN_ID))||Number(env.GITHUB_RUN_ID)<1||env.GITHUB_RUN_ATTEMPT!=='1')throw new TypeError('review capture requires bound producer job, run attempt and fresh snapshot');
+  return true;
+}
+
+export async function executeProtectedCandidateProof({ protectedRoot, candidateRoot, outputRoot, candidate, admission, proofPurpose = 'candidate', producerWorkflowPath = '.github/workflows/protected-admission.yml', referenceRoot = protectedRoot, producerJobId, freshSnapshot, env = process.env }) {
   protectedRoot=path.resolve(protectedRoot);candidateRoot=path.resolve(candidateRoot);outputRoot=path.resolve(outputRoot);
   if (!fs.existsSync(outputRoot)) fs.mkdirSync(outputRoot,{recursive:true});
   else if (fs.readdirSync(outputRoot).length) throw new TypeError('proof output must be fresh');
@@ -128,6 +144,7 @@ export async function executeProtectedCandidateProof({ protectedRoot, candidateR
   if(!['candidate','depth'].includes(proofPurpose))throw new TypeError('invalid protected proof purpose');
   const plan=evaluateProtectedRouting({candidate,proofPurpose,manifest:read(path.join(protectedRoot,'tools/verification/impact-manifest.json')),catalog:read(path.join(protectedRoot,'tools/verification/verification-catalog.json')),census:read(path.join(protectedRoot,'tools/verification/full-safety-net-stable-ids.json')),inventory:read(path.join(protectedRoot,'tools/verification/protected-scenario-inventory.json')),routing:read(path.join(protectedRoot,'tools/verification/protected-routing.json')),forceFull:admission.forceFull===true});
   validateExecutionPlan(plan);
+  const visualCaptureRequired=requiresProtectedVisualCapture({plan,proofPurpose,producerJobId,freshSnapshot,env});
   const oracleDigest=protectedOracleDigest(protectedRoot);
   const proof={plan:{semanticDigest:plan.semanticDigest,requiredGroups:plan.requiredGroups,scenarioIds:plan.scenarioIds,dataCapabilities:plan.capabilities,profile:plan.profile,proofPurpose:plan.proofPurpose,evidenceKind:plan.evidenceKind,propertyObligations:plan.propertyObligations,hostedPartitions:plan.hostedPartitions,specialist:plan.specialist,review:plan.review},deterministic:{groups:plan.requiredGroups.filter(group=>group.startsWith('deterministic.')),result:'PASS'},browser:{scenarioResults:[],workers:1,retries:0,dataCapability:null,oracleDigest,productDigest:null,partitions:[]}};
   // Candidate test code has no credentials, network, authority writes or writable checkout.
@@ -153,7 +170,7 @@ if(process.argv[2]==='protected-tests') {
  const collect=${collectDeterministicCensus.toString()};
  process.stdout.write(JSON.stringify(await collect(files)));
 } else {
- execFileSync('node',['--test',...files],{stdio:'inherit',cwd:'/candidate',env:{PATH:'/tmp/bin:'+process.env.PATH,PYTHONPYCACHEPREFIX:'/tmp/pycache'}});
+ execFileSync('node',['--test',...files],{stdio:'inherit',cwd:'/candidate',env:{PATH:'/tmp/bin:'+process.env.PATH,PYTHONPYCACHEPREFIX:'/tmp/pycache',TMPDIR:'/out'}});
 }
 `);
   const deterministicOutput=path.join(outputRoot,'deterministic');fs.mkdirSync(deterministicOutput,{mode:0o777});fs.chmodSync(deterministicOutput,0o777);
@@ -211,7 +228,7 @@ fs.writeFileSync('/out/trust.json',JSON.stringify(trust),{flag:'wx'});
     walk();return result;
   }
   validateQualificationHarnessBindings({protectedSources:sources(protectedRoot),candidateSources:sources(candidateRoot),bindings});
-  products.qualification_fixture={productRoot,trust};
+  products.qualification_fixture={productRoot,trust,bindings};
   }
   if(plan.hostedPartitions.some(partition=>partition.dataCapability==='bounded_real_world')){
     const {buildBoundedRealWorld,verifyBoundedRealWorld,boundedTrustDescriptor}=await import(module('tools/verification/protected-bounded-oracle.mjs'));
@@ -236,20 +253,49 @@ fs.writeFileSync('/out/trust.json',JSON.stringify(trust),{flag:'wx'});
   const authority=await buildVerificationAuthorityIdentity({manifest:read(path.join(protectedRoot,'tools/verification/verification-authority-manifest.json')),readFile:async relative=>fs.readFileSync(path.join(protectedRoot,relative))});
   const environment=buildProtectedExecutionEnvironmentIdentity(read(path.join(protectedRoot,'tools/verification/protected-execution-environment.json')));
   const semantic=plan.semanticDigest;
+  if(plan.review.length)proof.reviewCaptures=[];
   for(const partition of plan.hostedPartitions){
     const {productRoot,trust}=products[partition.dataCapability];
     const census=selectProtectedBrowserCensus(inventory,partition.scenarioIds);
     const listPath=path.join(outputRoot,`test-list-${partition.dataCapability}.txt`);fs.writeFileSync(listPath,census.testList);
   const browserArtifacts=path.join(outputRoot,`browser-${partition.dataCapability}`);fs.mkdirSync(browserArtifacts,{mode:0o777});fs.chmodSync(browserArtifacts,0o777);
-  const composeEnv={...env,COMPOSE_PROJECT_NAME:`atlas-admission-${env.GITHUB_RUN_ID}-${partition.dataCapability.replaceAll('_','-')}`,ATLAS_CODE_REVISION:candidate.headSha,ATLAS_PLAN_SEMANTIC_DIGEST:semantic,ATLAS_PLAN_INSTANCE_DIGEST:canonicalDigest({semantic,runId:env.GITHUB_RUN_ID,attempt:1}),ATLAS_AUTHORITY_DIGEST:authority.authorityDigest,ATLAS_ENVIRONMENT_DIGEST:environment.environmentDigest,ATLAS_E2E_SHARD:'1/1',ATLAS_E2E_WORKERS:'1',ATLAS_E2E_DATA_CAPABILITY:partition.dataCapability,ATLAS_QUALIFICATION_PUBLICATION_HOST:productRoot,ATLAS_QUALIFICATION_TRUST_JSON:JSON.stringify(trust),ATLAS_EXECUTION_CONTEXT:candidateRoot,ATLAS_E2E_ARTIFACTS_HOST:browserArtifacts,ATLAS_PROTECTED_TEST_LIST:listPath};
+  const composeEnv={...env,ATLAS_USER_VISUAL_EVIDENCE:plan.review.length?'1':'0',COMPOSE_PROJECT_NAME:`atlas-admission-${env.GITHUB_RUN_ID}-${partition.dataCapability.replaceAll('_','-')}`,ATLAS_CODE_REVISION:candidate.headSha,ATLAS_PLAN_SEMANTIC_DIGEST:semantic,ATLAS_PLAN_INSTANCE_DIGEST:canonicalDigest({semantic,runId:env.GITHUB_RUN_ID,attempt:1}),ATLAS_AUTHORITY_DIGEST:authority.authorityDigest,ATLAS_ENVIRONMENT_DIGEST:environment.environmentDigest,ATLAS_E2E_SHARD:'1/1',ATLAS_E2E_WORKERS:'1',ATLAS_E2E_DATA_CAPABILITY:partition.dataCapability,ATLAS_QUALIFICATION_PUBLICATION_HOST:productRoot,ATLAS_QUALIFICATION_TRUST_JSON:JSON.stringify(trust),ATLAS_EXECUTION_CONTEXT:candidateRoot,ATLAS_E2E_ARTIFACTS_HOST:browserArtifacts,ATLAS_PROTECTED_TEST_LIST:listPath};
   const compose=['compose','-f',path.join(protectedRoot,'e2e/compose.protected-hosted-executor.yml'),'-f',path.join(protectedRoot,'e2e/compose.github-hosted.yml')];
+  let revalidateVisualReference;
+  if(visualCaptureRequired&&partition.dataCapability==='qualification_fixture'){
+    const {runProtectedVisualReference}=await import(module('tools/verification/run-protected-visual-reference.mjs'));
+    const referenceTree=text('git',['rev-parse',`${candidate.baseSha}^{tree}`],{cwd:referenceRoot}).trim();
+    const identity={repository:candidate.repository,pr:candidate.prNumber,headSha:candidate.headSha,baseSha:candidate.baseSha,candidateTree:candidate.treeSha,referenceTree,productDigest:trust.productDigest,workflow:producerWorkflowPath,runId:Number(env.GITHUB_RUN_ID),jobId:producerJobId,attempt:1,browserImage:CANDIDATE_IMAGE};
+    const freshReadback=async()=>{
+      if(typeof freshSnapshot!=='function')throw new TypeError('reference requires fresh protected snapshot');
+      assertSameCandidate(candidate,await freshSnapshot());
+      const {resolveQualificationScenarioBindings}=await import(module('tools/verification/qualification-scenario-bindings.mjs'));
+      resolveQualificationScenarioBindings({productRoot,expectedProductDigest:trust.productDigest});
+    };
+    const reference=await runProtectedVisualReference({protectedRoot,referenceRoot,outputRoot:path.join(outputRoot,'private-visual-reference'),identity,navigation:products.qualification_fixture.bindings.navigation,composeEnv,freshReadback,candidateWritablePaths:[browserArtifacts]});
+    revalidateVisualReference=reference.revalidate;
+    (proof.visualReferences??=[]).push(reference.manifest);
+    composeEnv.ATLAS_REFERENCE_SNAPSHOTS=reference.snapshots;
+    compose.push('-f',path.join(protectedRoot,'e2e/compose.protected-visual-consumer.yml'));
+  }
   try {
     run('docker',[...compose,'up','-d','--wait','atlas-publication','atlas-web'],{env:composeEnv});
     run('docker',[...compose,'build','e2e'],{env:composeEnv});
     run('docker',[...compose,'run','--rm','e2e','bash','-lc','exec ./node_modules/.bin/playwright test --config=playwright.config.mjs --test-list=/run/atlas-protected-test-list.txt --workers=1 --retries=0'],{env:composeEnv,timeout:3_600_000});
   } finally { run('docker',[...compose,'down','-v','--remove-orphans'],{env:composeEnv}); }
+  if(revalidateVisualReference)await revalidateVisualReference();
   const scenarioResults=validateBrowserSummary(read(path.join(browserArtifacts,'summary.json')),census.scenarioIds,candidate.headSha);
   const result={scenarioResults,workers:1,retries:0,dataCapability:partition.dataCapability,oracleDigest,productDigest:trust.productDigest};
+  if(plan.review.length){
+    const requiredFrames=plan.requiredFrames.filter(frame=>census.scenarioIds.includes(frame.stableTestId)).map(frame=>({frameId:frame.frameId,scenarioId:frame.stableTestId}));
+    if(requiredFrames.length){
+      const scenarioIds=[...new Set([...requiredFrames.map(frame=>frame.scenarioId),...plan.review.filter(row=>row.dataCapability===partition.dataCapability).flatMap(row=>row.scenarioIds)])].sort();
+      const {collectProtectedVisualCapture}=await import(module('tools/verification/collect-protected-visual-capture.mjs'));
+      const captureAuthority={protectedBaseSha:candidate.baseSha,workflowPath:producerWorkflowPath,planDigest:semantic,oracleDigest,productDigest:trust.productDigest,dataCapability:partition.dataCapability,scenarioIds,summaryScenarioIds:census.scenarioIds,requiredFrames};
+      const {capture}=collectProtectedVisualCapture({artifactRoot:browserArtifacts,currentCandidate:candidate,authority:captureAuthority,producer:{workflowPath:captureAuthority.workflowPath,sourceSha:candidate.baseSha,runId:Number(env.GITHUB_RUN_ID),jobId:producerJobId,runAttempt:1}});
+      proof.reviewCaptures.push(capture);
+    }
+  }
   proof.browser.partitions.push(result);
   if(partition.dataCapability==='qualification_fixture')Object.assign(proof.browser,result);
   }
@@ -303,15 +349,19 @@ export async function runProtectedAdmission({ protectedRoot, candidateRoot, outp
     return admission;
   }
   if (admission.eligible !== true) throw new TypeError('protected admission rejected candidate');
-  const proof=await executeProtectedCandidateProof({protectedRoot,candidateRoot,outputRoot,candidate,admission,env});
+  const initialJobs=await api(`actions/runs/${env.GITHUB_RUN_ID}/attempts/1/jobs?per_page=100`);
+  const initialMatches=initialJobs.jobs.filter(job=>job.name==='Protected admission proof'&&job.status==='in_progress');
+  if(initialMatches.length!==1||initialJobs.total_count>100)throw new TypeError('producer job association invalid before proof');
+  const proof=await executeProtectedCandidateProof({protectedRoot,candidateRoot,outputRoot,candidate,admission,producerJobId:initialMatches[0].id,freshSnapshot:snapshot,env});
   const jobs=await api(`actions/runs/${env.GITHUB_RUN_ID}/attempts/1/jobs?per_page=100`);
   const matches=jobs.jobs.filter(job=>job.name==='Protected admission proof'&&job.status==='in_progress');
-  if(matches.length!==1||jobs.total_count>100)throw new TypeError('producer job association invalid');
+  if(matches.length!==1||jobs.total_count>100||matches[0].id!==initialMatches[0].id)throw new TypeError('producer job association invalid');
   const finalAdmission=await validateProtectedExecutionCandidate({protectedRoot,candidateRoot,currentCandidate:candidate});
   if(JSON.stringify(finalAdmission)!==JSON.stringify(admission))throw new TypeError('local execution admission drift before publication');
   const finalCandidate=await snapshot();assertSameCandidate(candidate,finalCandidate);
   const envelope={schemaVersion:1,kind:'protected-admission',candidate,producer:{workflowPath:'.github/workflows/protected-admission.yml',event:producerEvent,runId:Number(env.GITHUB_RUN_ID),jobId:matches[0].id,runAttempt:1,sourceSha:candidate.baseSha},createdAt:new Date().toISOString(),proof};
   write(path.join(outputRoot,'protected-admission-evidence.json'),envelope);
+  if(env.GITHUB_OUTPUT)fs.appendFileSync(env.GITHUB_OUTPUT,`visual_capture_required=${Boolean(proof.reviewCaptures?.length)}\n`);
   if (env.GITHUB_OUTPUT) fs.appendFileSync(env.GITHUB_OUTPUT, 'admission_eligible=true\n');
   return envelope;
 }

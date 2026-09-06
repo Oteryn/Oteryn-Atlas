@@ -83,6 +83,11 @@ test('successful PR consumes exact independent artifact and performs final rerea
   assert.equal(result.accepted, true); assert.equal(state.reads, 2);
   assert.equal(result.evidence.candidate.headSha, state.head);
 });
+test('nonreview qualification proof does not require PR-only visual references',async()=>{
+  const {consumeProtectedAdmission}=await api(),{options}=successfulFixture();
+  options.authority.visualReference={required:true,referenceTree:sha('e'),browserImage:'protected-image'};
+  assert.equal((await consumeProtectedAdmission(options)).accepted,true);
+});
 test('successful MQ consumes same evidence contract for exact candidate tree', async () => {
   const { consumeProtectedAdmission } = await api(); const { options } = successfulFixture(); delete options.prNumber; options.codeRevision = sha('d');
   assert.equal((await consumeProtectedAdmission(options)).accepted, true);
