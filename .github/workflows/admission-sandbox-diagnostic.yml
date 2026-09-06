@@ -15,14 +15,14 @@ jobs:
       - name: Check out exact proposed authority
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: f7e15100c46e456853feb152d4ca9a2836766860
+          ref: 5e097ca84f20c137b8af623df6f3c1c9b727a502
           persist-credentials: false
           fetch-depth: 0
           path: proposed-authority
       - name: Check out exact shadow candidate
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: 05a9c1cadb10b3007b07ea1c0ece9db97ef42e2d
+          ref: a653743a3a734804ef848b5d7a765b274e9ba253
           persist-credentials: false
           fetch-depth: 0
           path: shadow-candidate
