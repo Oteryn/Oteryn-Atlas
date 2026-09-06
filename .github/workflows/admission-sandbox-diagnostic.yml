@@ -1,0 +1,58 @@
+name: Admission sandbox diagnostic (non-authoritative)
+on:
+  push:
+    paths:
+      - '.github/workflows/admission-sandbox-diagnostic.yml'
+permissions:
+  contents: read
+jobs:
+  diagnose:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: e96da570cc4b5f9a8ee3d3d4889caea33cfb4d1b
+          persist-credentials: false
+          path: protected-source
+      - name: Diagnose exact protected sandbox without acceptance publication
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/admission-diagnostic/out"
+          chmod 777 "$RUNNER_TEMP/admission-diagnostic/out"
+          cat > "$RUNNER_TEMP/admission-diagnostic/observe.mjs" <<'NODE'
+          import fs from 'node:fs';
+          import path from 'node:path';
+          import util from 'node:util';
+          import {spawnSync} from 'node:child_process';
+          import {run} from 'node:test';
+          import {resolveProtectedDeterministicPatterns} from '/candidate/tools/verification/run-protected-admission.mjs';
+          console.log('DIAGNOSTIC ONLY; no accepted evidence',process.version);
+          console.log('MOUNTS',fs.readFileSync('/proc/mounts','utf8').split('\n').filter(x=>x.includes(' /tmp ')));
+          for(const command of ['python3','git']) {
+            const r=spawnSync(command,['--version'],{encoding:'utf8'});
+            console.log('DEPENDENCY',command,{status:r.status,error:r.error?.code,stdout:r.stdout,stderr:r.stderr});
+          }
+          fs.mkdirSync('/tmp/bin');fs.symlinkSync('/usr/bin/python3','/tmp/bin/python');
+          process.chdir('/candidate');process.env.PATH='/tmp/bin:'+process.env.PATH;process.env.PYTHONPYCACHEPREFIX='/tmp/pycache';
+          const patterns=resolveProtectedDeterministicPatterns(fs.readFileSync('/candidate/.github/workflows/ci.yml','utf8'));
+          const files=patterns.flatMap(p=>p.endsWith('*.test.mjs')?fs.readdirSync('/candidate/'+path.dirname(p)).filter(n=>n.endsWith('.test.mjs')).sort().map(n=>path.join(path.dirname(p),n)):[p]).filter(p=>!['tests/verification/qualification-world.test.mjs','tests/verification/protected-hosted-product-identities.test.mjs'].includes(p)).map(p=>'/candidate/'+p);
+          let passed=0,failed=0;
+          for await(const e of run({files,isolation:'process',concurrency:1})) {
+            if(e.type==='test:pass')passed++;
+            if(e.type==='test:fail'||e.data?.skip||e.data?.todo) {failed++;console.log('FAILED_EVENT',util.inspect(e,{depth:8,maxStringLength:12000}));}
+            if(e.type==='test:stderr')console.log('TEST_STDERR',e.data);
+          }
+          console.log('DIAGNOSTIC_TOTAL',{passed,failed});
+          process.exitCode=failed?1:0;
+          NODE
+          docker run --rm --network none --read-only --cap-drop ALL \
+            --security-opt no-new-privileges --pids-limit 256 --memory 1536m --cpus 2 \
+            --user 1000:1000 --tmpfs /tmp:rw,nosuid,nodev,size=256m \
+            --mount "type=bind,src=$PWD/protected-source,dst=/candidate,readonly" \
+            --mount "type=bind,src=$PWD/protected-source/tests,dst=/candidate/tests,readonly" \
+            --mount "type=bind,src=$RUNNER_TEMP/admission-diagnostic/out,dst=/out" \
+            --mount "type=bind,src=$RUNNER_TEMP/admission-diagnostic/observe.mjs,dst=/run-proof.mjs,readonly" \
+            mcr.microsoft.com/playwright:v1.62.0-noble@sha256:baed2032d533817f3dbe6425de795788430ba345e819a1201337009ba17c9d07 \
+            node /run-proof.mjs
