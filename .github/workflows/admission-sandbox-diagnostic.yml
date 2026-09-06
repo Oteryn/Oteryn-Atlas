@@ -32,7 +32,19 @@ jobs:
           import fs from 'node:fs';
           import path from 'node:path';
           import {execFileSync} from 'node:child_process';
-          import {executeProtectedCandidateProof} from './proposed-authority/tools/verification/run-protected-admission.mjs';
+          const sourcePath='./proposed-authority/tools/verification/run-protected-admission.mjs';
+          let executionSource=fs.readFileSync(sourcePath,'utf8');
+          const reviewGuard="if(!Array.isArray(plan.specialist)||!Array.isArray(plan.review)||plan.specialist.length||plan.review.length)throw new TypeError('independent specialist or review evidence required');";
+          const diagnosticGuard="if(!Array.isArray(plan.specialist)||!Array.isArray(plan.review)||plan.specialist.length)throw new TypeError('specialist execution unsupported in diagnostic'); console.log('UNMET_INDEPENDENT_REVIEW',JSON.stringify(plan.review));";
+          if(executionSource.split(reviewGuard).length!==2)throw Error('diagnostic guard anchor drift');
+          executionSource=executionSource.replace(reviewGuard,diagnosticGuard);
+          const completeCensus="JSON.stringify([...plan.scenarioIds].sort())";
+          const hostedCensus="JSON.stringify(plan.scenarioIds.filter(id=>!plan.review.some(group=>group.scenarioIds.includes(id))).sort())";
+          if(executionSource.split(completeCensus).length!==2)throw Error('diagnostic partition anchor drift');
+          executionSource=executionSource.replace(completeCensus,hostedCensus);
+          const diagnosticModule='./proposed-authority/tools/verification/incomplete-hosted-diagnostic.mjs';
+          fs.writeFileSync(diagnosticModule,executionSource,{flag:'wx'});
+          const {executeProtectedCandidateProof}=await import(diagnosticModule);
           import {validateProtectedExecutionCandidate} from './proposed-authority/tools/verification/protected-admission-policy.mjs';
           const protectedRoot=path.resolve('proposed-authority'),candidateRoot=path.resolve('shadow-candidate');
           const git=(root,...args)=>execFileSync('git',['-C',root,...args],{encoding:'utf8'}).trim();
@@ -43,7 +55,8 @@ jobs:
           const admission=validateProtectedExecutionCandidate({protectedRoot,candidateRoot,currentCandidate:candidate});
           console.log('SHADOW_ADMISSION',admission);
           const proof=await executeProtectedCandidateProof({protectedRoot,candidateRoot,outputRoot:path.join(process.env.RUNNER_TEMP,'shadow-full-proof'),candidate,admission});
-          console.log('SHADOW_PROOF_ONLY_NOT_ACCEPTED_EVIDENCE',JSON.stringify(proof));
+          console.log('INCOMPLETE_HOSTED_DIAGNOSTIC_NOT_QUALIFICATION',JSON.stringify(proof));
+          throw Error('Diagnostic is intentionally incomplete: independent visual review remains required. No accepted evidence.');
           NODE
           node shadow-entry.mjs
       - name: Retain shadow browser diagnostics only
