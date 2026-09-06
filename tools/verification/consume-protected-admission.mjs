@@ -205,7 +205,10 @@ async function main() {
   }
   const root = options['--protected-root'] ? path.resolve(options['--protected-root']) : path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
   const catalog = JSON.parse(readFileSync(path.join(root, 'tools/verification/verification-catalog.json'), 'utf8'));
-  const census = validateStableIdCensus(JSON.parse(readFileSync(path.join(root, 'tools/verification/full-safety-net-stable-ids.json'), 'utf8')));
+  const census = JSON.parse(readFileSync(path.join(root, 'tools/verification/full-safety-net-stable-ids.json'), 'utf8'));
+  // Validate without substituting the enriched validator result: producer and
+  // consumer must hash the same protected file value, not an added digest field.
+  validateStableIdCensus(census);
   const { protectedOracleDigest,CANDIDATE_IMAGE } = await import('./run-protected-admission.mjs');
   const { validateProtectedExecutionScope } = await import('./protected-admission-policy.mjs');
   const { evaluateProtectedRouting } = await import('./protected-semantic-routing.mjs');

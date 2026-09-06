@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { deflateSync } from 'node:zlib';
 
 import { canonicalJsonBytes, sha256ContentId } from '../../src/browser/loader.mjs';
 import { loadAnimationRuntime } from '../../src/browser/animation-runtime.mjs';
@@ -31,9 +32,7 @@ const CHUNK_PATH = 'chunks/f-7-r1008-c1004.jsonl';
 const REGION_XS = Object.freeze([1007, 1008, 1009, 1010, 1011, 1012, 1013, 1014, 1015]);
 const REGION_YS = Object.freeze([1003, 1004, 1005, 1006, 1007, 1008, 1009, 1010, 1011]);
 const BOUNDS = Object.freeze({ x_min: 32224, x_max_exclusive: 32512, y_min: 32096, y_max_exclusive: 32384 });
-const MINIMAP_BOUNDS = Object.freeze({ x_min: 32256, x_max_exclusive: 32512, y_min: 32000, y_max_exclusive: 32256 });
 const PIXEL_BYTES = 32 * 32 * 4;
-const MINIMAP_PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64');
 
 function sha(bytes) { return `sha256:${crypto.createHash('sha256').update(bytes).digest('hex')}`; }
 function canonicalDigest(value) { return sha(canonicalJsonBytes(value)); }
@@ -48,9 +47,11 @@ function writeBytes(root, relative, value) {
   const target = path.join(root, relative); fs.mkdirSync(path.dirname(target), { recursive: true }); fs.writeFileSync(target, value);
 }
 function fixtureTile(position = QUALIFICATION_CENTER) {
+  const identity = position.x === QUALIFICATION_CENTER.x && position.y === QUALIFICATION_CENTER.y && position.floor === QUALIFICATION_CENTER.floor
+    ? 'qualification-fixture-anchor' : `qualification-fixture-${position.floor}-${position.x}-${position.y}`;
   return {
     record_type: 'tile', position: { ...position }, source_position: { legacy_x: position.x, legacy_y: position.y, legacy_z: 7 },
-    tile_record_id: 'tile:qualification-fixture-anchor', presentation: [{ export_record_id: 'presentation:qualification-fixture-anchor', appearance_source_id: 1, entity_identity_state: 'UNRESOLVED', presentation_order: { order: 0, plane: 0 }, source_role: 'ground', resolved_primitives: [{ sprite_source_id: 1, width_units: 32, height_units: 32, displacement: { dx_units: 0, dy_units: 0 }, source_profile_id: 'oteryn-atlas-15-32-appearance-spatial-v1', layer_index: 0, phase: 0, pattern: { x: 0, y: 0, z: 0 }, visual_coverage_offsets: [0, 0] }] }],
+    tile_record_id: `tile:${identity}`, presentation: [{ export_record_id: `presentation:${identity}`, appearance_source_id: 1, entity_identity_state: 'UNRESOLVED', presentation_order: { order: 0, plane: 0 }, source_role: 'ground', resolved_primitives: [{ sprite_source_id: 1, width_units: 32, height_units: 32, displacement: { dx_units: 0, dy_units: 0 }, source_profile_id: 'oteryn-atlas-15-32-appearance-spatial-v1', layer_index: 0, phase: 0, pattern: { x: 0, y: 0, z: 0 }, visual_coverage_offsets: [0, 0] }] }],
   };
 }
 function fixturePixels() {
@@ -165,42 +166,61 @@ async function buildOverview(root, publicationRoot, semanticWorld, semanticFloor
   return world;
 }
 
-async function buildMinimap(root, publicationRoot, pixelRoot, sourceContentId) {
-  const tileContentId = await sha256ContentId(MINIMAP_PNG);
-  const tileRelative = 'tiles/f-7-r126-c125.png';
+// A deterministic RGBA PNG with unfiltered rows; pixels are the bounded
+// visual projection of published tile pixels, never terrain/gameplay authority.
+function minimapPng(rgba) {
+  function chunk(type, data) {
+    const body = Buffer.concat([Buffer.from(type), data]);
+    let crc = 0xffffffff;
+    for (const byte of body) {
+      crc ^= byte;
+      for (let bit = 0; bit < 8; bit++) crc = (crc >>> 1) ^ ((crc & 1) ? 0xedb88320 : 0);
+    }
+    const size = Buffer.alloc(4), checksum = Buffer.alloc(4);
+    size.writeUInt32BE(data.length); checksum.writeUInt32BE((crc ^ 0xffffffff) >>> 0);
+    return Buffer.concat([size, body, checksum]);
+  }
+  const header = Buffer.alloc(13); header.writeUInt32BE(256, 0); header.writeUInt32BE(256, 4); header[8] = 8; header[9] = 6;
+  const rows = Buffer.alloc(256 * 1025);
+  for (let y = 0; y < 256; y++) rgba.copy(rows, y * 1025 + 1, y * 1024, (y + 1) * 1024);
+  return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', header), chunk('IDAT', deflateSync(rows, { level: 9 })), chunk('IEND', Buffer.alloc(0))]);
+}
+
+async function buildMinimap(root, publicationRoot, pixelRoot, activeChunks, pixels) {
+  const color = [0, 0, 0, 255];
+  for (let channel = 0; channel < 3; channel++) {
+    let sum = 0;
+    for (let offset = channel; offset < pixels.length; offset += 4) sum += pixels[offset];
+    color[channel] = Math.round(sum / (pixels.length / 4));
+  }
+  const tiles = [];
+  for (let regionX = Math.floor(BOUNDS.x_min / 256); regionX <= Math.floor((BOUNDS.x_max_exclusive - 1) / 256); regionX++) {
+    for (let regionY = Math.floor(BOUNDS.y_min / 256); regionY <= Math.floor((BOUNDS.y_max_exclusive - 1) / 256); regionY++) {
+      const rgba = Buffer.alloc(256 * 256 * 4);
+      const sources = activeChunks.filter(chunk => Math.floor(chunk.position.x / 256) === regionX && Math.floor(chunk.position.y / 256) === regionY);
+      for (const source of sources) {
+        const offset = ((source.position.y - regionY * 256) * 256 + source.position.x - regionX * 256) * 4;
+        rgba.set(color, offset);
+      }
+      const png = minimapPng(rgba), relative = `tiles/f${ACTIVE_FLOOR}-r${regionX}-c${regionY}.png`;
+      writeBytes(root, `minimap/${relative}`, png);
+      tiles.push({ logicalAddress: { floor: ACTIVE_FLOOR, region_x: regionX, region_y: regionY }, path: relative,
+        bytes: png.length, contentId: await sha256ContentId(png), sourceContentId: canonicalDigest(sources.map(source => source.contentId)) });
+    }
+  }
   const floors = [];
   for (const floor of FLOORS) {
-    const active = floor === ACTIVE_FLOOR;
-    const chunks = active ? [{
-      logicalAddress: { floor, region_x: 126, region_y: 125 },
-      path: tileRelative,
-      bytes: MINIMAP_PNG.byteLength,
-      contentId: tileContentId,
-      sourceContentId,
-    }] : [];
-    const floorCore = {
-      profile: minimapProfiles.floor,
-      floor,
-      regionSpan: 256,
-      pixelPerWorldTile: 1,
-      bounds: MINIMAP_BOUNDS,
-      chunks,
-      counts: { chunks: chunks.length, tiles: chunks.length },
-    };
+    const chunks = floor === ACTIVE_FLOOR ? tiles : [];
+    const floorCore = { profile: minimapProfiles.floor, floor, regionSpan: 256, pixelPerWorldTile: 1,
+      bounds: BOUNDS, chunks, counts: { chunks: chunks.length, tiles: chunks.length } };
     const floorManifest = { ...floorCore, rootContentId: await domainRoot(minimapDomains.floor, floorCore) };
     writeJson(root, `minimap/floors/f${floor}.json`, floorManifest);
     floors.push({ floor, path: `floors/f${floor}.json`, rootContentId: floorManifest.rootContentId });
   }
-  writeBytes(root, `minimap/${tileRelative}`, MINIMAP_PNG);
-  const worldCore = {
-    profile: minimapProfiles.world,
-    regionSpan: 256,
-    pixelPerWorldTile: 1,
+  const worldCore = { profile: minimapProfiles.world, regionSpan: 256, pixelPerWorldTile: 1,
     source: { authority: 'Oteryn/Oteryn-Game', publicationRoot, pixelRoot },
-    semantics: { terrainClassification: 'NOT_CLAIMED', walkability: 'NOT_CLAIMED' },
-    floors,
-    counts: { floors: FLOORS.length, chunks: 1, tiles: 1 },
-  };
+    semantics: { terrainClassification: 'NOT_CLAIMED', walkability: 'NOT_CLAIMED' }, floors,
+    counts: { floors: FLOORS.length, chunks: tiles.length, tiles: tiles.length } };
   const world = { ...worldCore, rootContentId: await domainRoot(minimapDomains.world, worldCore) };
   writeJson(root, 'minimap/world.json', world);
   return world;
@@ -509,7 +529,7 @@ export async function buildQualificationWorld(destination) {
   writeJson(root, 'runtime-index/world.json', runtimeWorld);
   const pixelBuckets = await buildRuntimePixelBuckets(root, publication.rootContentId, pixel.manifest.rootContentId, pixel.pixelContentId, pixel.pixels);
   const overview = await buildOverview(root, publication.rootContentId, semanticWorld, semanticFloors, activeChunks);
-  const minimap = await buildMinimap(root, publication.rootContentId, pixel.manifest.rootContentId, anchorChunk.contentId);
+  const minimap = await buildMinimap(root, publication.rootContentId, pixel.manifest.rootContentId, activeChunks, pixel.pixels);
 
   const animation = await buildQualificationAnimation(root, semanticWorld.rootContentId, pixel.manifest.rootContentId, pixel.pixelContentId, pixel.pixels);
   const creatures = await buildQualificationCreatures(root, semanticWorld.rootContentId, animation);

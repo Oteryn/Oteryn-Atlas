@@ -141,3 +141,69 @@ test('published qualification long-name NPC has isolated annotation space and co
   assert.ok(target.position.x >= floor.bounds.x_min && target.position.x < floor.bounds.x_max_exclusive);
   assert.ok(target.position.y >= floor.bounds.y_min && target.position.y < floor.bounds.y_max_exclusive);
 });
+
+test('published qualification tiles retain distinct committed renderer anchors and presentation identities', async t => {
+  const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-distinct-tiles-'));
+  const root = path.join(parent, 'world');
+  t.after(() => fs.rmSync(parent, { recursive: true, force: true }));
+  await buildQualificationWorld(root);
+  const floor = JSON.parse(fs.readFileSync(path.join(root, 'publication/semantic/floors/f-7.json')));
+  const tiles = floor.chunks.flatMap(c => fs.readFileSync(path.join(root, 'publication/semantic', c.path), 'utf8').trim().split('\n').map(JSON.parse));
+  assert.equal(new Set(tiles.map(t => t.tile_record_id)).size, tiles.length, 'every published tile needs a distinct renderer anchor identity');
+  const { runInNewContext } = await import('node:vm');
+  const app = fs.readFileSync(new URL('../../web/fullworld-app.mjs', import.meta.url), 'utf8');
+  const source = app.slice(app.indexOf('function committedRendererAnchors()'), app.indexOf('function commitRenderer()'));
+  const selected = tiles.slice(0, 24);
+  const anchors = runInNewContext(`${source}; committedRendererAnchors()`, { sceneRecords: selected.map(t => ({ tileRecordId: t.tile_record_id, ...t.position })) });
+  assert.equal(anchors.length, selected.length, 'actual committed renderer anchors must retain all distinct visible tiles');
+  const presentations = tiles.flatMap(t => t.presentation.map(p => p.export_record_id));
+  assert.equal(new Set(presentations).size, presentations.length, 'presentation identity cannot alias another position');
+  const anchor = tiles.find(t => t.position.x === 32280 && t.position.y === 32155);
+  assert.equal(anchor.tile_record_id, 'tile:qualification-fixture-anchor');
+  assert.equal(anchor.presentation[0].export_record_id, 'presentation:qualification-fixture-anchor');
+});
+
+test('qualification minimap covers runtime bounds with decoded projection of every published tile', async t => {
+  const { inflateSync } = await import('node:zlib');
+  const { loadMinimapWorld, loadMinimapFloor, loadVerifiedMinimapTile, selectMinimapChunks } = await import('../../src/layers/minimap.mjs');
+  const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-minimap-coverage-'));
+  const root = path.join(parent, 'world');
+  t.after(() => fs.rmSync(parent, { recursive: true, force: true }));
+  const product = await buildQualificationWorld(root);
+  const fetcher = async url => new Response(fs.readFileSync(path.join(root, new URL(url).pathname)));
+  const base = new URL('https://fixture.invalid/minimap/');
+  const world = await loadMinimapWorld(base, { rootContentId: product.minimapRoot, publicationRoot: product.publicationRoot, pixelRoot: product.pixelRoot }, fetcher);
+  const floor = await loadMinimapFloor(base, world, world.floors.find(f => f.floor === -7), fetcher);
+  const runtime = JSON.parse(fs.readFileSync(path.join(root, 'runtime-index/floors/f-7.json')));
+  const tiles = runtime.chunks.flatMap(c => fs.readFileSync(path.join(root, 'publication/semantic', c.path), 'utf8').trim().split('\n').map(JSON.parse));
+  for (let x = runtime.bounds.x_min; x < runtime.bounds.x_max_exclusive; x++) for (let y = runtime.bounds.y_min; y < runtime.bounds.y_max_exclusive; y++) {
+    assert.equal(selectMinimapChunks(floor, { x_min:x, x_max_exclusive:x+1, y_min:y, y_max_exclusive:y+1 }).length, 1, `minimap coverage missing/duplicated at ${x},${y}`);
+  }
+  const decoded = new Map();
+  for (const chunk of floor.chunks) {
+    const png = Buffer.from(await loadVerifiedMinimapTile(base, chunk, fetcher));
+    assert.equal(png.readUInt32BE(16), 256); assert.equal(png.readUInt32BE(20), 256);
+    assert.equal(png[24], 8); assert.equal(png[25], 6);
+    const idat = []; for (let offset=8; offset<png.length;) { const size=png.readUInt32BE(offset); if(png.toString('ascii',offset+4,offset+8)==='IDAT') idat.push(png.subarray(offset+8,offset+8+size)); offset+=size+12; }
+    const rows=inflateSync(Buffer.concat(idat)); assert.equal(rows.length,256*1025);
+    for(let y=0;y<256;y++)assert.equal(rows[y*1025],0,'independent decoder expects unfiltered rows');
+    decoded.set(`${chunk.logicalAddress.region_x}:${chunk.logicalAddress.region_y}`,rows);
+  }
+  const pixelPack = fs.readFileSync(path.join(root, 'publication/pixels/packs/p0.rgba'));
+  const average = [0, 1, 2].map(channel => Math.round(Array.from(pixelPack).filter((_, i) => i % 4 === channel).reduce((a, b) => a + b, 0) / (pixelPack.length / 4)));
+  const expected = new Set(tiles.map(t => `${t.position.x}:${t.position.y}`));
+  let opaque=0;
+  for(const chunk of floor.chunks) {
+    const rows=decoded.get(`${chunk.logicalAddress.region_x}:${chunk.logicalAddress.region_y}`);
+    for(let y=0;y<256;y++)for(let x=0;x<256;x++) {
+      const alpha=rows[y*1025+1+x*4+3];
+      const present=expected.has(`${chunk.logicalAddress.region_x*256+x}:${chunk.logicalAddress.region_y*256+y}`);
+      assert.equal(alpha,present?255:0,'decoded minimap must project actual occupied tiles only');
+      if(alpha) {
+        assert.deepEqual(Array.from(rows.subarray(y*1025+1+x*4,y*1025+1+x*4+3)),average,'minimap color must derive from published pixel bytes');
+        opaque++;
+      }
+    }
+  }
+  assert.equal(opaque,tiles.length);
+});
