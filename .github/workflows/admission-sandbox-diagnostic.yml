@@ -12,12 +12,12 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: 3f17cdace5c7cec4eea552483ce0e157cd2ad238
+          ref: d89218adfb6d45b3cce5cc25a5ef3935abd34875
           persist-credentials: false
           path: protected
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: ee876a8285a21df5f4a955f8c40059d708644f67
+          ref: 3d1a3fc02ba167def42d43a0a840209c76574860
           persist-credentials: false
           path: candidate
       - name: Full exact sandbox suites and independent census equality
@@ -42,6 +42,6 @@ jobs:
           function run(source,name,census=false){const dest=out+'/'+name;fs.mkdirSync(dest,{mode:0o777});fs.chmodSync(dest,0o777);const args=candidateSandboxArgs({source,output:dest,script,...(census?{protectedTests:base+'/tests'}:{})});console.log('EXACT_SANDBOX '+name);if(census){const result=execFileSync('docker',args,{encoding:'utf8',maxBuffer:32*1024*1024,timeout:600000});fs.writeFileSync(dest+'/census.json',result);return JSON.parse(result);}execFileSync('docker',args,{stdio:'inherit',timeout:600000});}
           run(base,'base-full');run(candidate,'candidate-full');
           const expected=run(base,'base-census',true),actual=run(candidate,'candidate-census',true);validateDeterministicCensus(expected,actual);
-          console.log(JSON.stringify({diagnosticOnly:true,base:'3f17cdace5c7cec4eea552483ce0e157cd2ad238',candidate:'ee876a8285a21df5f4a955f8c40059d708644f67',fullSuites:'PASS',censusCount:expected.length,censusEquality:'PASS',browser:'NOT_RUN',protectedAcceptance:false}));
+          console.log(JSON.stringify({diagnosticOnly:true,base:'d89218adfb6d45b3cce5cc25a5ef3935abd34875',candidate:'3d1a3fc02ba167def42d43a0a840209c76574860',fullSuites:'PASS',censusCount:expected.length,censusEquality:'PASS',browser:'NOT_RUN',protectedAcceptance:false}));
           JS
           node "$RUNNER_TEMP/full-sandbox.mjs"
