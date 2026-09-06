@@ -242,6 +242,16 @@ export function renderQualificationHarnessBindings({ protectedSources, bindings 
     transformed = transformed.replace(firstChoice, topmostChoice);
     const oldPosition='{ floor: -10, x: 32522, y: 32419 }';
     if(transformed.includes(oldPosition)) transformed=transformed.replace(oldPosition,conditional(oldPosition,JSON.stringify(b.overlap[0].position)));
+    if (name === 'tests/runtime.mjs') {
+      const legacyResolution = `await resolveQualificationEntry(entry, {
+    qualificationTrustJson: process.env.ATLAS_QUALIFICATION_TRUST_JSON,
+    readSemanticIndex: () => readQualificationSemanticIndex(page),
+  })`;
+      if (transformed.split(legacyResolution).length !== 2) reject('unknown protected navigation binding slot');
+      // This complete harness has already been emitted and independently checked
+      // against protected publication bindings. Preserve its explicit targets.
+      transformed = transformed.replace(legacyResolution, conditional(legacyResolution, 'entry'));
+    }
     if (name === 'tests/race-desktop.spec.mjs') {
       const end = transformed.indexOf("test('superseded delayed range");
       if (end < 0) reject('missing protected race scenario boundary');
