@@ -1,4 +1,4 @@
-import { canonicalJsonBytes, sha256ContentId } from '../browser/loader.mjs';
+import { canonicalJsonBytes, readBoundedResponseBytes, resolveTrustedRelativeUrl, sha256ContentId, validateRelativePath } from '../browser/loader.mjs';
 
 const WORLD_PROFILE = 'oteryn-atlas-overview-world-v0';
 const FLOOR_PROFILE = 'oteryn-atlas-overview-floor-v0';
@@ -16,11 +16,12 @@ function requireValue(condition, message) {
 }
 
 function safeRelativePath(path) {
-  requireValue(typeof path === 'string' && path.length > 0, 'overview path missing');
-  requireValue(!path.startsWith('/') && !path.includes('\\'), 'unsafe overview path');
-  const parts = path.split('/');
-  requireValue(!parts.some((part) => part === '..' || part === '.' || part === ''), 'unsafe overview path');
-  return path;
+  try {
+    return validateRelativePath(path, 'overview path', { errorClass: OverviewLoadError });
+  } catch (error) {
+    if (error instanceof OverviewLoadError) throw new OverviewLoadError('unsafe overview path');
+    throw error;
+  }
 }
 
 function joinBytes(a, b) {
@@ -38,12 +39,7 @@ export async function computeOverviewRoot(value, domain) {
 }
 
 async function readBounded(response, limit, label) {
-  requireValue(response?.ok, `${label} fetch failed: ${response?.status ?? 'unknown'}`);
-  const declared = response.headers?.get?.('content-length');
-  if (declared !== null && declared !== undefined) requireValue(Number(declared) <= limit, `${label} declared bytes exceed limit`);
-  const bytes = new Uint8Array(await response.arrayBuffer());
-  requireValue(bytes.byteLength <= limit, `${label} bytes exceed limit`);
-  return bytes;
+  return readBoundedResponseBytes(response, limit, label, { errorClass: OverviewLoadError });
 }
 
 function decodeCanonical(bytes, label) {
@@ -147,7 +143,7 @@ export async function loadOverviewWorld(url, expected, fetcher = fetch) {
 }
 
 export async function loadOverviewFloor(baseUrl, world, entry, fetcher = fetch) {
-  const url = new URL(safeRelativePath(entry.path), baseUrl).toString();
+  const url = resolveTrustedRelativeUrl(entry.path, baseUrl, 'overview floor path', { errorClass: OverviewLoadError }).toString();
   const response = await fetcher(url, { cache: 'no-store' });
   const bytes = await readBounded(response, MAX_FLOOR_BYTES, 'overview floor');
   const floor = validateOverviewFloor(decodeCanonical(bytes, 'overview floor'), world, entry);
@@ -156,7 +152,7 @@ export async function loadOverviewFloor(baseUrl, world, entry, fetcher = fetch) 
 }
 
 export async function loadOverviewChunk(baseUrl, world, floor, entry, fetcher = fetch) {
-  const url = new URL(safeRelativePath(entry.path), baseUrl).toString();
+  const url = resolveTrustedRelativeUrl(entry.path, baseUrl, 'overview chunk path', { errorClass: OverviewLoadError }).toString();
   const response = await fetcher(url, { cache: 'no-store' });
   const bytes = await readBounded(response, MAX_CHUNK_BYTES, 'overview chunk');
   requireValue(bytes.byteLength === entry.bytes, 'overview chunk byte count mismatch');
