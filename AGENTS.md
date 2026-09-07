@@ -33,7 +33,11 @@ For an already-authorized write to an existing task branch/PR, if `GH_TOKEN` and
 - Verification-test deletion is not path-pattern authority. A verification contract may be deleted only when its exact path is already present in protected-base `docs/maintenance/OBSOLETE_VERIFICATION_CONTRACTS.json`. Editing that inventory and deleting a newly listed path in the same candidate fails closed.
 - The active workflow inventory remains exactly `.github/workflows/merge-authority-audit.yml`, `.github/workflows/merge-group-gate.yml`, and `.github/workflows/terminal-branch-lifecycle.yml`. Normal remediation does not authorize workflow additions or restoration of the retired aggregate stack.
 - The repository ruleset requires the strict `Merge authority audit / protected-base validate` status from GitHub Actions and Merge Queue. The retained merge-group workflow emits an additional `atlas-gate` check for merge groups; `atlas-gate` is not the configured required status during maintenance. Both retained gates run protected-base maintenance authority.
-- Test restoration remains a later #315 phase: restore each group in non-blocking shadow mode, qualify it through real PR/MQ canaries, then make only impact-applicable coverage blocking.
+- Issue #315 authorizes only R1-R3 verification contract, ownership and routing
+  implementation through the separate protected-base exact-path restoration
+  allowlist. This preparation does not activate execution. Shadow mode, PR/MQ
+  product canaries, blocking promotion, workflow restoration, deployment and
+  publication remain paused and require later explicit lifecycle authority.
 
 ## Projection, provenance, and rendering invariants
 
