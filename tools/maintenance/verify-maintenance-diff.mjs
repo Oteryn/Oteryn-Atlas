@@ -11,6 +11,8 @@ const RETAINED_WORKFLOWS=new Set([
 ]);
 const TEMPLATE='tools/maintenance/minimal-merge-group-gate.yml';
 const ARCHIVE_ROOT='docs/maintenance/suspended-workflows/';
+const REMEDIATION_ALLOWLIST='docs/maintenance/ATLAS_REMEDIATION_ALLOWLIST.json';
+const OBSOLETE_VERIFICATION_CONTRACTS='docs/maintenance/OBSOLETE_VERIFICATION_CONTRACTS.json';
 const sha=/^[0-9a-f]{40}$/;
 
 function fail(message){throw new TypeError(message);}
@@ -33,6 +35,69 @@ function mode(root,revision,name){
   return row?row.split(/\s+/,1)[0]:null;
 }
 function sameList(actual,expected){return JSON.stringify([...actual].sort())===JSON.stringify([...expected].sort());}
+function plainObject(value){return value!==null&&typeof value==='object'&&!Array.isArray(value);}
+function exactKeys(value,keys,label){
+  if(!plainObject(value)||!sameList(Object.keys(value),keys))fail(`${label} has invalid shape`);
+}
+function protectedJson(base,name){
+  let value;
+  try{value=JSON.parse(blob(trustedRoot,base,name).toString('utf8'));}catch{fail(`protected authority is invalid JSON: ${name}`);}
+  return value;
+}
+function assertPolicyPath(name,label){
+  assertSafePath(name);
+  if(name.startsWith('tools/maintenance/')||name.startsWith('.github/workflows/')||name.startsWith(ARCHIVE_ROOT))fail(`${label} targets protected control-plane path: ${name}`);
+}
+function loadRemediationAuthority(base){
+  const raw=protectedJson(base,REMEDIATION_ALLOWLIST);
+  exactKeys(raw,['schemaVersion','programme','lanes'],'remediation allowlist');
+  if(raw.schemaVersion!==1||raw.programme!=='atlas-f01-f16-remediation'||!plainObject(raw.lanes))fail('remediation allowlist identity is invalid');
+  const lanes=new Map();
+  const entries=Object.entries(raw.lanes);
+  if(entries.length<1||entries.length>16)fail('remediation allowlist lane count is invalid');
+  for(const [lane,value] of entries){
+    if(!/^[a-z0-9][a-z0-9-]{0,63}$/.test(lane))fail(`remediation lane id is invalid: ${lane}`);
+    exactKeys(value,['findings','rules'],`remediation lane ${lane}`);
+    if(!Array.isArray(value.findings)||!value.findings.length||!value.findings.every(item=>/^F(?:0[1-9]|1[0-6])$/.test(item)))fail(`remediation findings are invalid: ${lane}`);
+    if(!Array.isArray(value.rules)||!value.rules.length||value.rules.length>64)fail(`remediation rules are invalid: ${lane}`);
+    const rules=[];
+    for(const rule of value.rules){
+      if(!plainObject(rule))fail(`remediation rule is invalid: ${lane}`);
+      const hasPath=Object.hasOwn(rule,'path'),hasPrefix=Object.hasOwn(rule,'prefix');
+      const expected=hasPath?['operations','path']:['operations','prefix'];
+      if(hasPath===hasPrefix)fail(`remediation rule locator is invalid: ${lane}`);
+      exactKeys(rule,expected,`remediation rule ${lane}`);
+      const locator=hasPath?rule.path:rule.prefix;
+      if(typeof locator!=='string'||!locator)fail(`remediation rule locator is invalid: ${lane}`);
+      if(hasPrefix&&!locator.endsWith('/'))fail(`remediation prefix must end in slash: ${locator}`);
+      assertPolicyPath(hasPrefix?locator.slice(0,-1):locator,`remediation rule ${lane}`);
+      if(!Array.isArray(rule.operations)||!rule.operations.length||!rule.operations.every(op=>op==='A'||op==='M')||new Set(rule.operations).size!==rule.operations.length)fail(`remediation operations are invalid: ${lane}`);
+      rules.push(Object.freeze({path:hasPath?locator:null,prefix:hasPrefix?locator:null,operations:new Set(rule.operations)}));
+    }
+    lanes.set(lane,Object.freeze(rules));
+  }
+  return lanes;
+}
+function loadObsoleteAuthority(base){
+  const raw=protectedJson(base,OBSOLETE_VERIFICATION_CONTRACTS);
+  exactKeys(raw,['schemaVersion','paths'],'obsolete verification inventory');
+  if(raw.schemaVersion!==1||!Array.isArray(raw.paths)||raw.paths.length>128)fail('obsolete verification inventory is invalid');
+  const result=new Set();
+  for(const name of raw.paths){
+    assertSafePath(name);
+    if(!/^tests\/verification\/[A-Za-z0-9][A-Za-z0-9._/-]*\.test\.mjs$/.test(name))fail(`obsolete verification path is invalid: ${name}`);
+    if(result.has(name))fail(`duplicate obsolete verification path: ${name}`);
+    result.add(name);
+  }
+  return result;
+}
+function remediationLanes(change,lanes){
+  const matches=new Set();
+  for(const [lane,rules] of lanes){
+    if(rules.some(rule=>rule.operations.has(change.status)&&(rule.path===change.path||(rule.prefix&&change.path.startsWith(rule.prefix)))))matches.add(lane);
+  }
+  return matches;
+}
 
 function parseChanges(root,base,head){
   const tokens=git(root,['diff','--name-status','-z','-M','-C',base,head,'--'],{buffer:true}).toString('utf8').split('\0');
@@ -69,26 +134,37 @@ function verifyRegularText(root,revision,name){
   try{new TextDecoder('utf-8',{fatal:true}).decode(bytes);}catch{fail(`candidate path is not UTF-8 text content: ${name}`);}
 }
 
-function allowedNormal(change){
+function allowedNormal(change,authority){
   const {status,path:name}=change;
   if(change.oldPath)fail(`rename or copy is forbidden: ${change.oldPath} -> ${name}`);
-  if(name.startsWith('tools/maintenance/'))fail(`maintenance authority is immutable: ${name}`);
+  if(name.startsWith('tools/maintenance/')||name===REMEDIATION_ALLOWLIST||name===OBSOLETE_VERIFICATION_CONTRACTS)fail(`maintenance authority is immutable: ${name}`);
   if(name.startsWith('.github/workflows/')||name.startsWith(ARCHIVE_ROOT))fail('workflow transition is not the complete suspension cutover');
-  if(name==='AGENTS.md')return status==='M';
-  if(name.startsWith('docs/agents/')||name.startsWith('docs/evidence/')||name.startsWith('docs/maintenance/'))return ['A','M','D'].includes(status);
-  if(name.startsWith('tools/governance/'))return ['A','M','D'].includes(status);
-  if(/^tests\/verification\/[A-Za-z0-9][A-Za-z0-9._/-]*\.test\.mjs$/.test(name))return status==='D';
-  return false;
+  if(name==='AGENTS.md')return status==='M'?{kind:'maintenance'}:null;
+  if(name.startsWith('docs/agents/')||name.startsWith('docs/evidence/')||name.startsWith('docs/maintenance/'))return ['A','M','D'].includes(status)?{kind:'maintenance'}:null;
+  if(name.startsWith('tools/governance/'))return ['A','M','D'].includes(status)?{kind:'maintenance'}:null;
+  if(status==='D'&&authority.obsolete.has(name))return {kind:'obsolete-removal'};
+  const lanes=remediationLanes(change,authority.lanes);
+  if(lanes.size)return {kind:'remediation',lanes};
+  return null;
 }
 
 function verifyNormal(changes,base,head){
+  const authority={lanes:loadRemediationAuthority(base),obsolete:loadObsoleteAuthority(base)};
+  let candidateLanes=null;
   for(const change of changes){
-    if(!allowedNormal(change))fail(`maintenance path is frozen: ${change.path}`);
+    const admission=allowedNormal(change,authority);
+    if(!admission)fail(`maintenance path is frozen: ${change.path}`);
+    if(admission.kind==='remediation'){
+      candidateLanes=candidateLanes===null?admission.lanes:new Set([...candidateLanes].filter(lane=>admission.lanes.has(lane)));
+      if(!candidateLanes.size)fail('maintenance diff spans multiple remediation lanes');
+    }
     if(change.status==='D'){
       if(mode(candidateRoot,base,change.path)!=='100644')fail(`removed path was not a regular 100644 file: ${change.path}`);
     }else verifyRegularText(candidateRoot,head,change.path);
   }
-  return {mode:'maintenance-only',changedPaths:changes.map(change=>change.path).sort()};
+  if(candidateLanes&&candidateLanes.size!==1)fail('maintenance diff is ambiguous across multiple remediation lanes');
+  const remediationLane=candidateLanes?[...candidateLanes][0]:null;
+  return {mode:remediationLane?'bounded-remediation':'maintenance-only',remediationLane,changedPaths:changes.map(change=>change.path).sort()};
 }
 
 function verifyCutover(changes,base,head){
