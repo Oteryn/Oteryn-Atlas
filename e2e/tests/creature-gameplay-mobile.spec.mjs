@@ -1,9 +1,14 @@
 import { expect, test } from '@playwright/test';
 import { assertNoRuntimeFailures, captureRuntimeFailures, gotoAtlas, waitForAtlas } from './runtime.mjs';
 import { assertUserVisibleSurface, captureUserVisualEvidence } from '../support/user-acceptance.mjs';
+import { installQualificationGameplayRoute } from '../support/qualification-gameplay.mjs';
 
 const GUIDE = Object.freeze({ entityId: `npc-entity:${'1'.repeat(32)}`, label: 'Fixture Guide' });
 const SENTINEL = Object.freeze({ entityId: `monster-entity:${'a'.repeat(32)}`, label: 'Fixture Sentinel' });
+
+test.beforeEach(async ({ page }) => {
+  await installQualificationGameplayRoute(page);
+});
 
 async function creatureState(page) {
   await page.waitForFunction(() => ['PASS', 'FAIL'].includes(globalThis.__OTERYN_ATLAS_CREATURES__?.status), null, { timeout: 30_000 });
