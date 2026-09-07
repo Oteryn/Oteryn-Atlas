@@ -6,19 +6,36 @@ const ROOT_DOMAIN = 'OTERYN-DYN-ATLAS-COMPACT-JSON-V0\0';
 
 export class LoadError extends Error {}
 
-function sortCanonical(value) {
-  if (Array.isArray(value)) return value.map(sortCanonical);
-  if (value && typeof value === 'object') {
-    const result = {};
-    for (const key of Object.keys(value).sort()) result[key] = sortCanonical(value[key]);
-    return result;
+function compareUnicodeCodePoints(left, right) {
+  let leftIndex = 0;
+  let rightIndex = 0;
+  while (leftIndex < left.length && rightIndex < right.length) {
+    const leftPoint = left.codePointAt(leftIndex);
+    const rightPoint = right.codePointAt(rightIndex);
+    if (leftPoint !== rightPoint) return leftPoint < rightPoint ? -1 : 1;
+    leftIndex += leftPoint > 0xffff ? 2 : 1;
+    rightIndex += rightPoint > 0xffff ? 2 : 1;
   }
-  return value;
+  if (leftIndex < left.length) return 1;
+  if (rightIndex < right.length) return -1;
+  return 0;
+}
+
+function canonicalJsonText(value) {
+  if (Array.isArray(value)) return `[${value.map(canonicalJsonText).join(',')}]`;
+  if (value && typeof value === 'object') {
+    const entries = Object.keys(value)
+      .sort(compareUnicodeCodePoints)
+      .map((key) => `${JSON.stringify(key)}:${canonicalJsonText(value[key])}`);
+    return `{${entries.join(',')}}`;
+  }
+  const text = JSON.stringify(value);
+  if (text === undefined) throw new TypeError('unsupported canonical JSON value');
+  return text;
 }
 
 export function canonicalJsonBytes(value) {
-  const text = `${JSON.stringify(sortCanonical(value))}\n`;
-  return new TextEncoder().encode(text);
+  return new TextEncoder().encode(`${canonicalJsonText(value)}\n`);
 }
 
 const SHA256_K = Object.freeze([
