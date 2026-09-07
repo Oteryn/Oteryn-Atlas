@@ -18,9 +18,9 @@ The initial #345 binding selected the v3 introduction merge `8673d109d1a364efa79
 - **Adoption and delivery:** root `AGENTS.md` contains the affirmative binding bootstrap, and the provider consumer loads policy and validator bytes from that exact authenticated commit. This proves the repository delivery path used by the validator; it does not claim every external client automatically loads remote META text.
 - **Behavior:** `ATLAS-LEAN-PROMPT-CANARY.md` remains the representative task-delta contract and its deterministic structural test passes. New controlled model trials were **NOT_EVALUATED** in this maintenance lane, so static checks and reduced text volume are not represented as behavioral improvement.
 
-## Source volume
+## Initial-adoption source volume
 
-Counts use UTF-8 tracked source at Atlas admission main and this candidate worktree before commit. Lines use `splitlines()`; words use whitespace splitting.
+These frozen #345 measurements compare UTF-8 tracked source at Atlas admission main with the initial META-adoption candidate before its commit. They do not include the later W4 prompt cleanup recorded below. Lines use `splitlines()`; words use whitespace splitting.
 
 | Surface | Files before → after | Lines before → after | Words before → after | Bytes before → after |
 | --- | ---: | ---: | ---: | ---: |
