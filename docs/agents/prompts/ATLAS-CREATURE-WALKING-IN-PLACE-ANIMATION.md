@@ -58,19 +58,9 @@ Before changing code, read the current-main versions of all applicable instructi
 
 Use Superpowers/TDD workflow if available. Every implementation defect must be reproduced RED before the fix and retained as a permanent regression.
 
-## Mandatory GitHub-first preflight
+## Task-specific live locators and dependencies
 
-Before local or remote mutation:
-
-1. Resolve exact current `main` SHA for both repositories.
-2. Read current branch protection and required checks.
-3. Refresh Atlas #145 and Game #127.
-4. Search open PRs/branches touching Game appearance/creature exporters or Atlas animation/creature runtime.
-5. Refresh Atlas #113 and #115 because they may own shared creature presentation geometry and interaction/label seams.
-6. Refresh #111/#118/#85 and use the strongest currently merged exact-head visual/browser verification path.
-7. Confirm this prompt has landed on Atlas `main`; do not implement product code on the docs/prompt branch.
-8. Create dedicated implementation branches from refreshed `main` in each repository that actually needs changes.
-9. Record exact starting SHAs and overlap reconciliation in each PR.
+Use current authority in both repositories to resolve Atlas #145, Game #127, and active ownership of Game appearance/creature exporters or Atlas animation/creature runtime. Atlas #113/#115 own shared creature presentation geometry and interaction/label seams; #111/#118/#85 identify relevant visual/browser qualification work. Preserve the cross-repository phase ordering below and mutate Game only when the required authoritative playback projection is absent.
 
 If the current Game publication already exposes a complete explicit moving-in-place playback projection that lets Atlas consume moving frames without choosing frame-group/direction semantics, prove that with exact path/schema evidence and skip unnecessary Game mutation. Otherwise implement Game #127 first.
 
