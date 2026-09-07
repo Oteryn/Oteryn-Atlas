@@ -8,6 +8,8 @@ Resolve `docs/agents/META_AGENT_POLICY_BINDING.json` before material mutation. T
 
 GitHub Issues remain Atlas lifecycle authority. Use one dedicated task branch and writable worktree per mutating owner, preserve unrelated work, and integrate only through the repository's protected PR and Merge Queue path. Repository, user, and task authority govern; skills and plugins are subordinate execution aids.
 
+For an already-authorized write to an existing task branch/PR, if `GH_TOKEN` and `GITHUB_TOKEN` are unset but agent-visible `GH` is present, it may be mapped transiently to `GH_TOKEN` for the exact authorized `gh` command. Never embed that credential in a remote URL or persist a new credential helper. Credential presence does not broaden repository, branch, path, merge, production, or secret authority.
+
 ## Atlas authority and data boundaries
 
 - Oteryn-Game is canonical World/Content authority.

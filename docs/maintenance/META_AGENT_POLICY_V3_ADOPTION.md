@@ -1,8 +1,11 @@
 # Atlas META Agent Policy v3 Adoption
 
-**Lifecycle authority:** Oteryn/Oteryn-Atlas#315; organization programme Oteryn/Oteryn#140 and #142  
-**Atlas admission main:** `51623c7dab2346cee39cd51e3caa845bf4b65426`  
-**Bound META authority:** `8673d109d1a364efa7936133082a39750ca74cf9` (META PR #145)  
+**Lifecycle authority:** Oteryn/Oteryn-Atlas#315; organization programme Oteryn/Oteryn#140 and #142
+
+**Atlas admission main:** `51623c7dab2346cee39cd51e3caa845bf4b65426`
+
+**Bound META authority:** `8673d109d1a364efa7936133082a39750ca74cf9` (META PR #145)
+
 **Live META main observed by the adoption resolver:** `16a9718e5fe54ab1c153fe78aac789e9bc5da64e`
 
 This maintenance-only adoption binds Atlas to `OTERYN_ORGANIZATION_AGENT_POLICY@3.0.0`, reduces the root instructions to an organization-policy bootstrap plus Atlas-owned invariants, and installs a fail-closed consumer for the binding, root overlay, and reusable prompt catalog. It does not change runtime, publication data, rendering, deployment, workflows, branch protection, or the suspended verification stack.
@@ -19,12 +22,12 @@ Counts use UTF-8 tracked source at Atlas admission main and this candidate workt
 
 | Surface | Files before → after | Lines before → after | Words before → after | Bytes before → after |
 | --- | ---: | ---: | ---: | ---: |
-| root `AGENTS.md` | 1 → 1 | 151 → 60 | 2,860 → 887 | 22,060 → 7,040 |
+| root `AGENTS.md` | 1 → 1 | 151 → 62 | 2,860 → 947 | 22,060 → 7,447 |
 | reusable prompts | 38 → 38 | 9,008 → 9,009 | 51,587 → 51,602 | 403,160 → 403,288 |
 | all `docs/agents/**` | 45 → 46 | 10,572 → 10,582 | 58,439 → 58,499 | 460,633 → 461,441 |
 | `tools/governance/**` | 3 → 5 | 388 → 826 | 1,395 → 2,780 | 17,010 → 35,263 |
 
-The always-loaded root is 68.1% smaller by words and 68.1% smaller by bytes. Total tracked adoption-surface size grows because the deterministic provider consumer and its regression suite are retained outside the always-loaded instruction surface.
+The always-loaded root is 66.9% smaller by words and 66.2% smaller by bytes. Total tracked adoption-surface size grows because the deterministic provider consumer and its regression suite are retained outside the always-loaded instruction surface.
 
 ## W4 prompt-cleanup inventory
 
