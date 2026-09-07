@@ -120,8 +120,8 @@ const vectors = [
       assetZipSha256: 'a'.repeat(64),
       pixelHashDomain: 'OTERYN-DYN-ATLAS-PIXEL-RGBA-V0',
       spriteIndex: {
-        2: { bytes: 4096, contentId: `sha256:${'2'.repeat(64)}`, height: 32, width: 32 },
-        10: { bytes: 8192, contentId: `sha256:${'1'.repeat(64)}`, height: 64, width: 32 },
+        2: { contentId: `sha256:${'2'.repeat(64)}`, height: 32, width: 32 },
+        10: { contentId: `sha256:${'1'.repeat(64)}`, height: 64, width: 32 },
       },
       blobs: [],
       packs: [],
