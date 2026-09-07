@@ -36,18 +36,15 @@ Use the implementation plan task-by-task. If Superpowers is available, prefer `s
 
 Design-time SHAs are historical evidence only. Refresh GitHub before mutation and before final qualification.
 
-## Mandatory GitHub-first preflight
+## Task-specific live locators and dependencies
 
-1. Resolve exact current Atlas `main` SHA, branch protection and required checks from GitHub.
-2. Confirm this design, plan and prompt have already landed on `main`. Never implement ordinary product changes on the planning/docs branch.
-3. Refresh Issue #113 and every open PR touching `web/fullworld-creatures.mjs`, creature rendering, animation, labels/badges, visual acceptance, mobile drawers or map pointer handling.
-4. Treat Issue #64 / merged PR #83 as the shipped NPC role/icon/filter baseline. Issue #61 is historical context only.
-5. Refresh #108/#112. If animation-coverage work is still unmerged and overlaps the same runtime files, do not create competing stale mutations; wait for/rebase after its merge unless ownership is explicitly transferred.
-6. Refresh #115. Merged PR #116 defines the shared presentation-bounds contract. If canonical product geometry/layout code has since landed, reuse it rather than create a second seam.
-7. Refresh #111/#118/#85. Use the strongest current exact-head visual-user/browser qualification path.
-8. Refresh #114/#117 only to preserve compatibility with shared `record_id`/`entity_id` and geometry seams; do not implement those product scopes.
-9. Create one fresh implementation branch from refreshed `main` and one implementation PR for #113.
-10. Record exact starting base SHA and dependency reconciliation in the PR.
+Use current repository authority to resolve Issue #113 and overlapping work in creature rendering, animation, labels/badges, visual acceptance, mobile drawers, and map pointer handling. Preserve these task-specific relationships:
+
+- Issue #64 and merged PR #83 are the shipped NPC role/icon/filter baseline; Issue #61 is historical context only.
+- #108/#112 may overlap animation runtime files. Reconcile active ownership before mutation.
+- Merged PR #116 for #115 defines the shared presentation-bounds contract; reuse the canonical geometry/layout seam.
+- #111/#118/#85 identify the relevant visual-user and browser qualification work.
+- #114/#117 are compatibility inputs for shared `record_id`/`entity_id` and geometry seams, not implementation scope.
 
 ## Hard authority boundary
 

@@ -57,23 +57,17 @@ Oteryn-Game remains canonical World/Content/gameplay-fact authority. This progra
 
 These aliases are canonical. The dispatcher/integrator must not replace them with broader improvised worker scopes.
 
-## Mandatory GitHub-first preflight
+## Task-specific live locators and dependencies
 
-Before creating any implementation Issue/branch/task packet:
+Use current repository authority to resolve programme #185, the durable alias set, design and plan, and active ownership of `web/fullworld*`, shell-adjacent `src/browser/**`, `e2e/**`, or verification policy. Preserve these dependency coordinates:
 
-1. Resolve exact current protected `Oteryn/Oteryn-Atlas` `main` SHA and branch protection.
-2. Read current root and every applicable nearer `AGENTS.md`.
-3. Verify this prompt, all eight durable worker/integrator aliases, the design spec and implementation plan are present on protected `main`.
-4. Refresh programme #185 and docs-worker-alias lifecycle history.
-5. Refresh Atlas PR #162 / Issue #145.
-6. Refresh Atlas PR #170 / Issue #165.
-7. Refresh Atlas Issue #117.
-8. Refresh Oteryn-Game Issue #75 read-only.
-9. Search current open PRs/branches touching `web/fullworld*`, shell-adjacent `src/browser/**`, `e2e/**` or verification policy.
-10. Resolve the current heavy-E2E runner/slot policy.
-11. Resolve current merged-main/live revision only as baseline evidence; do not mutate live during bootstrap.
+- Atlas PR #162 / Issue #145;
+- Atlas PR #170 / Issue #165;
+- Atlas Issue #117;
+- Oteryn-Game Issue #75, read-only;
+- the current heavy-E2E runner/slot policy.
 
-Planning-time SHAs are historical evidence only. Always use fresh GitHub state.
+The merged-main/live revision is baseline evidence only; bootstrap does not authorize live mutation.
 
 ## Hard dependency/ownership gate
 
