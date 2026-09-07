@@ -56,6 +56,12 @@
       "requiredGroups": ["deterministic.core", "integration.source-contract"]
     },
     {
+      "pathPrefix": "src/browser/creature-gameplay-profiles.mjs",
+      "domains": ["creatures", "source-contract"],
+      "minimumProfile": "targeted",
+      "requiredGroups": ["integration.source-contract"]
+    },
+    {
       "pathPrefix": "src/browser/creature-",
       "domains": ["creatures"],
       "minimumProfile": "targeted",
@@ -87,6 +93,12 @@
     },
     {
       "pathPrefix": "e2e/tests/api-contract-desktop.spec.mjs",
+      "domains": ["source-contract", "verification-governance"],
+      "minimumProfile": "full",
+      "requiredGroups": ["deterministic.core", "e2e.full", "integration.source-contract"]
+    },
+    {
+      "pathPrefix": "e2e/tests/creature-gameplay-source-contract-desktop.spec.mjs",
       "domains": ["source-contract", "verification-governance"],
       "minimumProfile": "full",
       "requiredGroups": ["deterministic.core", "e2e.full", "integration.source-contract"]
