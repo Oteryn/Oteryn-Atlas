@@ -12,15 +12,15 @@ The organization ruleset requires `.github/workflows/merge-authority-audit.yml` 
 
 The validator binds repository, event, base and head identity; derives the complete diff from Git; rejects rename escapes, unsafe paths, non-regular modes, symlinks, gitlinks, binary/invalid UTF-8 and oversized content; and enforces a closed path/operation allowlist.
 
-The repository ruleset continues to require `atlas-gate` and Merge Queue. During the suspension cutover, `.github/workflows/merge-group-gate.yml` is replaced byte-for-byte from the protected `tools/maintenance/minimal-merge-group-gate.yml` template. It runs the same protected-base maintenance validator and no test or candidate executable.
+The repository ruleset requires the strict `Merge authority audit / protected-base validate` status from GitHub Actions and Merge Queue. The retained `.github/workflows/merge-group-gate.yml` emits an additional `atlas-gate` check for merge groups. It runs the same protected-base maintenance validator and no test or candidate executable; `atlas-gate` is not the configured required status during maintenance.
 
-## Staged cutover
+## Completed cutover
 
-1. Stage A merges the independent protected maintenance validator and repoints the organization-required audit to it.
-2. Protected-main readback confirms Stage A is active.
-3. Stage B archives every suspended workflow byte-for-byte under `docs/maintenance/suspended-workflows/`, leaves only the audit, minimal MQ gate and terminal branch lifecycle active, and integrates as the real maintenance PR/MQ canary.
-4. The #140 prompt/AGENTS/governance cleanup proceeds through that path.
-5. Test groups return incrementally in shadow mode and become blocking only after real canaries.
+1. Stage A merged the independent protected maintenance validator and repointed the organization-required audit to it.
+2. Protected-main readback confirmed Stage A was active.
+3. Stage B archived every suspended workflow byte-for-byte under `docs/maintenance/suspended-workflows/` and left only the audit, minimal MQ gate and terminal branch lifecycle active.
+4. The #140 prompt/AGENTS/governance cleanup proceeds through the resulting maintenance path.
+5. Test restoration remains a later #315 phase. Each group must return incrementally in shadow mode and become blocking only after real canaries.
 
 ## Frozen scope
 
@@ -30,6 +30,6 @@ No direct merge, ruleset bypass, fabricated success, candidate code execution or
 
 ## Current state
 
-Stage A is active on protected `main` at `d0e2f143ae678c97c0657cdd8e446725ab0a11f3`; the organization-required workflow was read back from that exact revision and invokes only the protected maintenance validator.
+Stages A and B are integrated on protected `main`. Twenty-five old workflows are preserved byte-for-byte under `docs/maintenance/suspended-workflows/`. The active workflow inventory is exactly `.github/workflows/merge-authority-audit.yml`, `.github/workflows/merge-group-gate.yml`, and `.github/workflows/terminal-branch-lifecycle.yml`.
 
-This Stage B candidate archives 25 old workflows byte-for-byte and leaves three active workflow files: the protected maintenance audit, the minimal Merge Queue `atlas-gate`, and terminal branch-lifecycle governance. Full test/deployment suspension becomes active only after this cutover is merged and the exact protected-main workflow inventory is read back.
+The maintenance validator, test/deployment suspension and current required-status configuration remain authoritative until a later #315 phase explicitly changes them through the applicable protected path.

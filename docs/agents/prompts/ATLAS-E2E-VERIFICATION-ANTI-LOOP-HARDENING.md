@@ -1,19 +1,21 @@
 # ATLAS-E2E-VERIFICATION-ANTI-LOOP-HARDENING
 
+> **Lifecycle status: HISTORICAL / SUSPENDED.** Issue #179 is closed. This prompt is retained only as design and safety input for a later restoration phase explicitly authorized by live Issue #315 and current protected repository authority. It does not authorize execution, test or workflow restoration, deployment, or copying these procedures into active instructions.
+
 ALIAS:
 ATLAS-E2E-VERIFICATION-ANTI-LOOP-HARDENING
 
-MODE:
-Autonomous senior verification-architecture implementation + migration + negative proof + protected integration + closeout.
+HISTORICAL MODE:
+Senior verification-architecture implementation + migration + negative proof + protected integration + closeout under the former #179 lifecycle.
 
-EFFORT:
-Use the highest available reasoning/implementation effort. This is a correctness-critical protected CI architecture change; do not downgrade it to a quick workflow patch.
+HISTORICAL EXECUTION PROFILE:
+The former #179 contract requested the highest available reasoning/implementation effort for this correctness-critical protected CI architecture change.
 
 Repository:
 - `Oteryn/Oteryn-Atlas`
 
-Lifecycle authority:
-- Issue #179 `Implement plan-bound, resource-aware Atlas E2E verification`
+Historical lifecycle authority:
+- Issue #179 `Implement plan-bound, resource-aware Atlas E2E verification` (closed)
 
 Normative design:
 - `docs/superpowers/specs/2026-08-30-atlas-e2e-verification-anti-loop-hardening-design.md`
