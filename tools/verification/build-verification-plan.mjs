@@ -77,7 +77,12 @@ function matchesForPath(path, manifest) {
       requiredGroups: [],
     }];
   }
-  return manifest.entries.filter((entry) => path.startsWith(entry.pathPrefix));
+  const matches = manifest.entries.filter((entry) => (entry.exactMatch ? path === entry.pathPrefix : path.startsWith(entry.pathPrefix))
+    && !(entry.excludedPaths ?? []).includes(path));
+  // Only explicitly designated catchalls yield. Every semantic match remains
+  // additive; protected and candidate manifests are classified independently.
+  const semantic = matches.filter((entry) => !entry.defaultRule);
+  return semantic.length ? semantic : matches;
 }
 
 function classify(paths, manifest) {
@@ -261,6 +266,15 @@ function selectedGroups(groupIds, catalog) {
   return [...resolved].sort().map((id) => ({ id, ...catalog.groups[id] }));
 }
 
+// Planning can expose useful partial proof while retaining unresolved obligations.
+// Every future executor/fan-in must call this guard; a broad profile alone is not
+// permission to accept an unknown source or an unowned changed test.
+export function assertPlanExecutable(plan) {
+  if (!plan || !Array.isArray(plan.executionBlockers)) throw new TypeError('plan execution blocker metadata is missing');
+  if (plan.executionBlockers.length) throw new TypeError(`plan execution has unresolved obligations: ${JSON.stringify(plan.executionBlockers)}`);
+  return plan;
+}
+
 export function buildVerificationPlan(input) {
   if (!input || typeof input !== 'object' || typeof input.repository !== 'string' || !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(input.repository)) {
     throw new TypeError('repository must be an owner/repository identity');
@@ -273,6 +287,19 @@ export function buildVerificationPlan(input) {
   const changedPaths = allEvidencePaths(input.changedFiles);
   const trusted = classify(changedPaths, trustedImpactManifest);
   const candidate = classify(changedPaths, candidateImpactManifest);
+  const executionBlockers = [];
+  if (!changedPaths) executionBlockers.push({ reason: 'invalid-change-evidence', path: null });
+  for (const path of changedPaths ?? []) {
+    const blockers = new Set([...matchesForPath(path, trustedImpactManifest), ...matchesForPath(path, candidateImpactManifest)].map(entry => entry.executionBlocker).filter(Boolean));
+    for (const reason of blockers) executionBlockers.push({ reason, path });
+    if (!matchesForPath(path, trustedImpactManifest).some(entry => !entry.defaultRule) || !matchesForPath(path, candidateImpactManifest).some(entry => !entry.defaultRule)) {
+      executionBlockers.push({ reason: 'unknown-impact', path });
+    }
+    if ((path.startsWith('tests/') || path.startsWith('e2e/tests/')) && /\.(?:mjs|py)$/.test(path)
+      && !Object.values(verificationCatalog.groups).some(group => group.specs.some(pattern => !pattern.includes('*') && pattern === path))) {
+      executionBlockers.push({ reason: 'unowned-test', path });
+    }
+  }
   const baseClassification = unionClassification(trusted, candidate, bootstrapChanged(changedPaths));
   const result = applyCrossDomainEscalations(baseClassification, [trustedImpactManifest, candidateImpactManifest]);
   const requiredGroupFloor = normalizeRequiredGroupFloor(input.requiredGroupFloor);
@@ -281,8 +308,17 @@ export function buildVerificationPlan(input) {
     result.groups = unionStrings(result.groups, requiredGroupFloor);
     result.domains = unionStrings(result.domains, ['explicit-verification-widening']);
   }
+  if (result.profile === 'full') {
+    result.groups = unionStrings(result.groups, Object.entries(verificationCatalog.groups)
+      .filter(([, group]) => group.fullSafetyNet).map(([id]) => id));
+  }
   const groups = selectedGroups(result.groups, verificationCatalog);
   result.groups = groups.map((group) => group.id);
+  for (const group of groups) {
+    if (group.specs.some(spec => spec.includes('*'))) {
+      executionBlockers.push({ reason: 'unexpanded-test-ownership', group: group.id });
+    }
+  }
   const visualGroupIds = groups.filter((group) => group.evidence === 'restricted-visual-review').map((group) => group.id);
   const resourceClasses = [...new Set(groups.map((group) => group.resourceClass))].sort();
   const requiredDataCapabilities = [...new Set(groups.map((group) => group.capabilities.dataCapability))].sort();
@@ -302,6 +338,7 @@ export function buildVerificationPlan(input) {
     impactPolicyDigest: digest({ trustedImpactManifest, candidateImpactManifest, requiredGroupFloor }),
     verificationCatalogDigest: digest({ trustedVerificationCatalog, candidateVerificationCatalog }),
     requiredGroupFloor,
+    executionBlockers,
     profile: result.profile,
     impactDomains: result.domains,
     appliedCrossDomainEscalations: result.applied,
