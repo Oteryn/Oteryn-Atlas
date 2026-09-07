@@ -14,8 +14,8 @@ assert SPEC and SPEC.loader
 atlas = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(atlas)
 
-PIN = "8673d109d1a364efa7936133082a39750ca74cf9"
-MAIN = "5ed3f14400af450b5875c091e443da70f2d67ab9"
+PIN = "1dedfc0f264fe0e23e5365dbe9280c2d96df50c5"
+MAIN = PIN
 
 
 def valid_binding() -> dict[str, object]:
