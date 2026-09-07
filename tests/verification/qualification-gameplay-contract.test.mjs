@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import {
@@ -60,4 +61,24 @@ test('qualification gameplay service loads synthetic NPC and large-shop profiles
   assert.equal(large.status, 'ready');
   assert.equal(large.profile.shop.sells.length, 124);
   assert.equal(large.profile.shop.sells.at(-1).item_name, 'Fixture Bulk Item 124');
+});
+
+test('gameplay impact routing always selects functional fixture and bounded source-contract coverage', () => {
+  const catalog = JSON.parse(readFileSync(new URL('../../tools/verification/verification-catalog.json', import.meta.url), 'utf8'));
+  const impact = JSON.parse(readFileSync(new URL('../../tools/verification/impact-manifest.json', import.meta.url), 'utf8'));
+
+  const creatureSpecs = catalog.groups['e2e.creatures'].specs;
+  assert.ok(creatureSpecs.includes('e2e/tests/creature-gameplay-desktop.spec.mjs'));
+  assert.ok(creatureSpecs.includes('e2e/tests/creature-gameplay-mobile.spec.mjs'));
+  assert.equal(catalog.groups['e2e.creatures'].capabilities.dataCapability, 'qualification_fixture');
+
+  const gameplayRule = impact.entries.find((entry) => entry.pathPrefix === 'src/browser/creature-gameplay-profiles.mjs');
+  assert.ok(gameplayRule, 'gameplay runtime requires a dedicated impact rule');
+  assert.ok(gameplayRule.requiredGroups.includes('integration.source-contract'));
+  assert.equal(catalog.groups['integration.source-contract'].capabilities.dataCapability, 'bounded_real_world');
+  assert.ok(catalog.groups['integration.source-contract'].specs.includes('e2e/tests/creature-gameplay-source-contract-desktop.spec.mjs'));
+
+  const sourceSpecRule = impact.entries.find((entry) => entry.pathPrefix === 'e2e/tests/creature-gameplay-source-contract-desktop.spec.mjs');
+  assert.ok(sourceSpecRule, 'source-contract spec requires an explicit impact rule');
+  assert.ok(sourceSpecRule.requiredGroups.includes('integration.source-contract'));
 });
