@@ -114,6 +114,16 @@ test('F08 loader rejects encoded traversal before invoking the fetcher', async (
   assert.equal(fetches, 0);
 });
 
+test('F08 generic loader rejects scheme-like path before invoking the fetcher', async () => {
+  let fetches = 0;
+  const entry = { bytes: 1, contentId: sha('11'), path: 'http:evil.example/escape.json' };
+  await assert.rejects(
+    () => loadChunk('http://atlas.example/data/', entry, {}, async () => { fetches += 1; return response(new Uint8Array([0])); }),
+    /unsafe|relative path/i,
+  );
+  assert.equal(fetches, 0);
+});
+
 test('F08 full-world path validation rejects encoded and scheme escapes', () => {
   assert.throws(() => safeRelativePath('%2e%2e/escape.json'), /unsafe path/);
   assert.throws(() => safeRelativePath('safe/%2fescape.json'), /unsafe path/);
