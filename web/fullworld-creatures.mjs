@@ -1,4 +1,4 @@
-import { readBoundedResponseBytes, resolveTrustedRelativeUrl, sha256ContentId, validateRelativePath } from '../src/browser/loader.mjs';
+import { sha256ContentId } from '../src/browser/loader.mjs';
 import { getAnimationRuntime } from '../src/browser/animation-runtime-service.mjs';
 import { ancillarySourceExpectations, FULLWORLD_PATHS, FULLWORLD_TRUST } from '../src/browser/fullworld-trust.mjs';
 import { createCreatureRenderSnapshot } from '../src/browser/creature-render-diagnostics.mjs';
@@ -78,22 +78,19 @@ function requireValue(condition, message) {
 }
 
 function safeRelativePath(path) {
-  requireValue(typeof path === 'string' && !/^[a-z][a-z0-9+.-]*:/i.test(path), 'unsafe creature path');
-  try {
-    return validateRelativePath(path, 'creature path', { errorClass: Error });
-  } catch {
-    throw new Error('unsafe creature path');
-  }
-}
-
-function trustedCreatureUrl(path, baseUrl, label) {
-  safeRelativePath(path);
-  return resolveTrustedRelativeUrl(path, baseUrl, label, { errorClass: Error });
+  requireValue(typeof path === 'string' && path.length > 0 && !path.startsWith('/') && !path.includes('\\'), 'unsafe creature path');
+  requireValue(!path.split('/').some((part) => part === '' || part === '.' || part === '..'), 'unsafe creature path');
+  return path;
 }
 
 async function boundedJson(url, maxBytes, expectedDigest = null, expectedBytes = null) {
   const response = await fetch(url, { cache: 'no-store' });
-  const bytes = await readBoundedResponseBytes(response, maxBytes, url.pathname, { errorClass: Error, expectedBytes });
+  requireValue(response.ok, `${url.pathname} HTTP ${response.status}`);
+  const declared = response.headers.get('content-length');
+  if (declared != null) requireValue(Number(declared) <= maxBytes, `${url.pathname} exceeds byte limit`);
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  requireValue(bytes.byteLength <= maxBytes, `${url.pathname} exceeds byte limit`);
+  if (expectedBytes != null) requireValue(bytes.byteLength === expectedBytes, `${url.pathname} byte count mismatch`);
   if (expectedDigest) requireValue(await sha256ContentId(bytes) === expectedDigest, `${url.pathname} digest mismatch`);
   return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
 }
@@ -239,7 +236,7 @@ async function loadEntry(entry) {
   }
   requireValue(Number.isSafeInteger(entry.bytes) && entry.bytes > 0 && entry.bytes <= MAX_CHUNK_BYTES, 'invalid creature chunk byte bound');
   requireValue(typeof entry.digest === 'string' && /^sha256:[0-9a-f]{64}$/.test(entry.digest), 'invalid creature chunk digest');
-  const promise = boundedJson(trustedCreatureUrl(entry.path, ROOT, 'creature chunk path'), MAX_CHUNK_BYTES, entry.digest, entry.bytes).then((value) => {
+  const promise = boundedJson(new URL(safeRelativePath(entry.path), ROOT), MAX_CHUNK_BYTES, entry.digest, entry.bytes).then((value) => {
     requireValue(value.floor === entry.floor && value.chunk_x === entry.chunk_x && value.chunk_y === entry.chunk_y, 'creature chunk identity mismatch');
     requireValue(Array.isArray(value.records) && value.records.length === entry.records && value.records.length <= MAX_CHUNK_RECORDS, 'creature chunk count mismatch');
     for (const record of value.records) {
@@ -1047,7 +1044,7 @@ async function boot() {
     requireValue(Number.isSafeInteger(index.search_bytes) && index.search_bytes > 0 && index.search_bytes <= MAX_SEARCH_BYTES, 'invalid creature search byte bound');
     requireValue(/^sha256:[0-9a-f]{64}$/.test(index.search_digest), 'invalid creature search digest');
     state.index = index;
-    const search = await boundedJson(trustedCreatureUrl(index.search_path, ROOT, 'creature search path'), MAX_SEARCH_BYTES, index.search_digest, index.search_bytes);
+    const search = await boundedJson(new URL(safeRelativePath(index.search_path), ROOT), MAX_SEARCH_BYTES, index.search_digest, index.search_bytes);
     requireValue(Array.isArray(search.records) && search.records.length === index.counts.search_records && search.records.length <= 20_000, 'creature search index count mismatch');
     requireValue(search.records.every((record) => RECORD_ID.test(record.record_id)), 'creature search record identity missing');
     for (const record of search.records) {
