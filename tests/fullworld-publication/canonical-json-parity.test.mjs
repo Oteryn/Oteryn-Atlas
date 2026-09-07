@@ -4,7 +4,13 @@ import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
 import { canonicalJsonBytes } from '../../src/browser/loader.mjs';
-import { PUBLICATION_DOMAIN, rootedContentId } from '../../src/browser/fullworld.mjs';
+import {
+  FLOOR_DOMAIN,
+  PUBLICATION_DOMAIN,
+  SEMANTIC_DOMAIN,
+  rootedContentId,
+} from '../../src/browser/fullworld.mjs';
+import { PIXEL_ROOT_DOMAIN } from '../../src/browser/fullworld-pixels.mjs';
 
 const PUBLICATION_TOOL = fileURLToPath(new URL('../../tools/fullworld-publication/publication.py', import.meta.url));
 const PYTHON_PARITY = String.raw`
@@ -18,14 +24,15 @@ module = importlib.util.module_from_spec(spec)
 assert spec.loader is not None
 spec.loader.exec_module(module)
 value = json.load(sys.stdin)
+domain = getattr(module, sys.argv[2])
 print(json.dumps({
     "canonicalHex": module.canonical(value).hex(),
-    "rootContentId": module.rooted(module.PUBLICATION_DOMAIN, value),
+    "rootContentId": module.rooted(domain, value),
 }, sort_keys=True))
 `;
 
-function pythonCanonical(value) {
-  const run = spawnSync('python3', ['-c', PYTHON_PARITY, PUBLICATION_TOOL], {
+function pythonCanonical(value, domainName) {
+  const run = spawnSync('python3', ['-c', PYTHON_PARITY, PUBLICATION_TOOL, domainName], {
     input: JSON.stringify(value),
     encoding: 'utf8',
   });
@@ -36,10 +43,14 @@ function pythonCanonical(value) {
 const vectors = [
   {
     label: 'integer-like object keys',
+    domain: PUBLICATION_DOMAIN,
+    pythonDomain: 'PUBLICATION_DOMAIN',
     value: { 2: 'two', 10: 'ten', alpha: 1 },
   },
   {
     label: 'nested objects and arrays',
+    domain: PUBLICATION_DOMAIN,
+    pythonDomain: 'PUBLICATION_DOMAIN',
     value: {
       array: [{ 2: 2, 10: 10 }, null, true, -7],
       nested: { 2: { value: 'two' }, 10: { value: 'ten' } },
@@ -47,6 +58,8 @@ const vectors = [
   },
   {
     label: 'Unicode code-point key ordering',
+    domain: PUBLICATION_DOMAIN,
+    pythonDomain: 'PUBLICATION_DOMAIN',
     value: {
       '💡': 'lamp',
       '𐀀': 'supplementary-plane',
@@ -55,7 +68,53 @@ const vectors = [
     },
   },
   {
+    label: 'representative FullWorld semantic floor core',
+    domain: FLOOR_DOMAIN,
+    pythonDomain: 'FLOOR_DOMAIN',
+    value: {
+      profile: 'oteryn-atlas-fullworld-semantic-publication-v0',
+      floor: -7,
+      bounds: { x_min: 32256, x_max_exclusive: 32288, y_min: 32128, y_max_exclusive: 32160 },
+      sourceFingerprint: `sha256:${'a'.repeat(64)}`,
+      chunks: [{
+        logicalAddress: { floor: -7, region_x: 1008, region_y: 1004 },
+        contentId: `sha256:${'b'.repeat(64)}`,
+        bytes: 4096,
+        tiles: 32,
+        resolvedPrimitives: 48,
+        path: 'chunks/f-7-r1008-c1004.jsonl',
+      }],
+      counts: { tiles: 32, resolvedPrimitives: 48, bytes: 4096 },
+    },
+  },
+  {
+    label: 'representative FullWorld semantic world core',
+    domain: SEMANTIC_DOMAIN,
+    pythonDomain: 'SEMANTIC_DOMAIN',
+    value: {
+      profile: 'oteryn-atlas-fullworld-semantic-publication-v0',
+      fabricRoot: `sha256:${'c'.repeat(64)}`,
+      sourceFingerprint: `sha256:${'a'.repeat(64)}`,
+      floors: [{
+        floor: -7,
+        path: 'floors/f-7.json',
+        rootContentId: `sha256:${'d'.repeat(64)}`,
+        counts: { tiles: 32, resolvedPrimitives: 48, bytes: 4096 },
+      }],
+      counts: {
+        floors: 16,
+        shards: 1197,
+        tiles: 24311,
+        resolvedPrimitives: 39282,
+        uniqueSpriteRefs: 2048,
+        bytes: 1234567,
+      },
+    },
+  },
+  {
     label: 'representative FullWorld pixel manifest core',
+    domain: PIXEL_ROOT_DOMAIN,
+    pythonDomain: 'PIXEL_ROOT_DOMAIN',
     value: {
       profile: 'oteryn-atlas-fullworld-pixel-publication-v0',
       assetZipSha256: 'a'.repeat(64),
@@ -78,6 +137,8 @@ const vectors = [
   },
   {
     label: 'representative FullWorld publication core',
+    domain: PUBLICATION_DOMAIN,
+    pythonDomain: 'PUBLICATION_DOMAIN',
     value: {
       profile: 'oteryn-atlas-fullworld-publication-v0',
       source: {
@@ -99,10 +160,10 @@ const vectors = [
 test('canonical JSON matches the Python publication serializer byte-for-byte', async (t) => {
   for (const vector of vectors) {
     await t.test(vector.label, async () => {
-      const python = pythonCanonical(vector.value);
+      const python = pythonCanonical(vector.value, vector.pythonDomain);
       const javascript = canonicalJsonBytes(vector.value);
       assert.equal(Buffer.from(javascript).toString('hex'), python.canonicalHex);
-      assert.equal(await rootedContentId(PUBLICATION_DOMAIN, vector.value), python.rootContentId);
+      assert.equal(await rootedContentId(vector.domain, vector.value), python.rootContentId);
     });
   }
 });
