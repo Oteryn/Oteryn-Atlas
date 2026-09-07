@@ -10,6 +10,12 @@ GitHub Issues remain Atlas lifecycle authority. Use one dedicated task branch an
 
 For an already-authorized write to an existing task branch/PR, if `GH_TOKEN` and `GITHUB_TOKEN` are unset but agent-visible `GH` is present, it may be mapped transiently to `GH_TOKEN` for the exact authorized `gh` command. Never embed that credential in a remote URL or persist a new credential helper. Credential presence does not broaden repository, branch, path, merge, production, or secret authority.
 
+## Retired framework routing
+
+- `docs/superpowers/**` is retained historical provenance only. It is not current execution, lifecycle, review, testing, or merge authority and must not be loaded by default.
+- Legacy prompt text that asks an agent to use Superpowers tooling or treats a `docs/superpowers/**` document as a mandatory execution contract is superseded by this rule. Use the current repository-selected workflow, live GitHub Issue/task state, current contracts, and strict TDD where the task requires TDD.
+- Consult `docs/superpowers/**` only when current live authority explicitly requires investigation of a specific historical decision. Historical framework availability never changes task authority or completion requirements.
+
 ## Atlas authority and data boundaries
 
 - Oteryn-Game is canonical World/Content authority.
@@ -18,16 +24,14 @@ For an already-authorized write to an existing task branch/PR, if `GH_TOKEN` and
 - Platform may coordinate Atlas contracts but is not an Atlas runtime data source.
 - Treat unknown provenance, rights, coordinates, or semantics as a blocker to the affected claim, never permission to guess.
 
-## Active maintenance remediation mode
+## Active maintenance freeze
 
-- Issue #315 is lifecycle authority. The old Atlas test/verification/depth/dispatcher/publication/deployment workflow stack remains suspended. Production deployment and automatic publication remain outside the F01-F16 remediation programme and require separate authority.
-- The organization-required `.github/workflows/merge-authority-audit.yml` evaluates the complete exact candidate diff with protected-base code and never executes candidate code. The maintenance validator and active workflow control plane remain self-frozen in steady state.
-- Ordinary maintenance changes remain limited to the closed documentation/governance allowlist enforced by the protected validator.
-- Corrective engineering for audit findings F01-F16 is not categorically frozen. It is admitted only by the protected-base `docs/maintenance/ATLAS_REMEDIATION_ALLOWLIST.json`. A candidate may use at most one remediation lane; allowed remediation operations are additions/modifications only. Candidate edits to that allowlist do not authorize any other path in the same candidate because admission is resolved from the protected base.
-- Verification-test deletion is not path-pattern authority. A verification contract may be deleted only when its exact path is already present in protected-base `docs/maintenance/OBSOLETE_VERIFICATION_CONTRACTS.json`. Editing that inventory and deleting the newly listed path in the same candidate must fail closed.
-- The active workflow inventory remains exactly `.github/workflows/merge-authority-audit.yml`, `.github/workflows/merge-group-gate.yml`, and `.github/workflows/terminal-branch-lifecycle.yml`. Normal remediation does not authorize workflow additions or restoration of the retired aggregate stack.
-- The repository ruleset requires the strict `Merge authority audit / protected-base validate` status from GitHub Actions and Merge Queue. The retained merge-group workflow emits an additional `atlas-gate` check for merge groups; `atlas-gate` is not the configured required status during maintenance. Both retained gates run only protected-base maintenance authority.
-- Test restoration remains a later #315 phase: restore each group in non-blocking shadow mode, qualify it through real PR/MQ canaries, then make only impact-applicable coverage blocking.
+- Issue #315 is lifecycle authority for the temporary Atlas maintenance freeze. The organization-required `.github/workflows/merge-authority-audit.yml` evaluates the complete exact candidate diff with protected-base code and never executes candidate code.
+- Product/runtime, publication inputs, deployment behavior, verification authority, and maintenance-gate code are frozen. Mixed maintenance/runtime changes are rejected. Automatic publication and deployment remain suspended.
+- Normal maintenance changes are limited to the gate's closed operation/path allowlist: `AGENTS.md`, `docs/agents/**`, `docs/evidence/**`, `docs/maintenance/**`, `tools/governance/**`, and removal of obsolete `tests/verification/*.test.mjs` governance contracts. Matching a path is insufficient when its mode, content type, size, or operation is disallowed.
+- The suspension cutover is integrated. The active workflow inventory is exactly the protected maintenance audit, the minimal Merge Queue `atlas-gate`, and terminal branch-lifecycle governance. The cutover was the only admitted workflow transition; normal maintenance does not authorize further workflow changes.
+- The repository ruleset requires the strict `Merge authority audit / protected-base validate` status from GitHub Actions and Merge Queue. The retained merge-group workflow emits an additional `atlas-gate` check for merge groups; `atlas-gate` is not the configured required status during maintenance. Both retained gates run only the protected-base maintenance validator.
+- Test restoration is a later #315 phase: restore each group in non-blocking shadow mode, qualify it through real PR/MQ canaries, then make only impact-applicable coverage blocking.
 
 ## Projection, provenance, and rendering invariants
 
@@ -41,15 +45,14 @@ For an already-authorized write to an existing task branch/PR, if `GH_TOKEN` and
 
 ## Verification capability route
 
-Before selecting a verification profile, data capability or runner, or performing specialist/nightly verification, read `docs/agents/operations/VERIFICATION_CAPABILITY.md`. This route does not restore suspended verification or alter protected maintenance admission.
+Before selecting a verification profile, data capability or runner, or performing specialist/nightly verification, read `docs/agents/operations/VERIFICATION_CAPABILITY.md`. This route does not restore suspended verification or change the active maintenance freeze.
 
 ## Integration and live deployment
 
-- During F01-F16 remediation, run the narrow focused checks that prove the edited behavior and review the complete changed-file set and exact final-head diff. Suspended historical workflows are not current qualification evidence and must not be resurrected as a prerequisite.
-- Require the repository's configured exact-candidate protected maintenance status and normal Merge Queue before integration. A remediation PR is not qualified merely because local focused tests pass.
-- Verify that browser runtime consumes Atlas projection data only.
+- Run repository-selected checks and every verification layer applicable to the changed behavior. Review the complete changed-file set and exact final-head diff.
+- Verify that browser runtime consumes Atlas projection data only. Require the repository's exact-head aggregate gate before Merge Queue integration.
 
-Before any separately authorized deployment, live acceptance or rollback, read `docs/agents/operations/LIVE_DEPLOYMENT.md`. Deployment sources remain clean, merged `main` revisions; active maintenance restrictions still govern whether the operation is permitted.
+Before any separately authorized deployment, live acceptance or rollback, read `docs/agents/operations/LIVE_DEPLOYMENT.md`. Deployment sources remain clean, merged `main` revisions; the active maintenance freeze still governs whether the operation is permitted.
 
 ## Safety
 

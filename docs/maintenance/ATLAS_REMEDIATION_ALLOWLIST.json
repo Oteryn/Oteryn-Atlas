@@ -7,7 +7,6 @@
       "rules": [
         {"path": "src/browser/loader.mjs", "operations": ["M"]},
         {"path": "tools/fullworld-publication/publication.py", "operations": ["M"]},
-        {"path": "tests/browser-semantic.mjs", "operations": ["M"]},
         {"prefix": "tests/fullworld-publication/", "operations": ["A", "M"]}
       ]
     },
@@ -21,34 +20,39 @@
     "verification": {
       "findings": ["F11", "F12", "F13"],
       "rules": [
-        {"path": "tools/dyn-atlas-semantic/benchmark.py", "operations": ["M"]},
-        {"path": "tools/dyn-atlas-semantic/compiler.py", "operations": ["M"]},
-        {"path": "tools/fullworld-runtime/qualify_browser.mjs", "operations": ["M"]},
-        {"path": "tools/verification/e2e-data-capability-inventory.json", "operations": ["M"]},
-        {"path": "tools/verification/verification-catalog.json", "operations": ["M"]},
+        {"path": "e2e/support/qualification-gameplay.mjs", "operations": ["A"]},
         {"path": "e2e/tests/creature-gameplay-desktop.spec.mjs", "operations": ["M"]},
         {"path": "e2e/tests/creature-gameplay-mobile.spec.mjs", "operations": ["M"]},
-        {"path": "tests/verification/e2e-data-capability-inventory.test.mjs", "operations": ["M"]},
-        {"path": "tests/gui-contract.mjs", "operations": ["M"]},
-        {"prefix": "tests/dyn-atlas-semantic/", "operations": ["A", "M"]},
-        {"prefix": "tests/fullworld-runtime/", "operations": ["A", "M"]}
+        {"path": "e2e/tests/creature-gameplay-source-contract-desktop.spec.mjs", "operations": ["A"]},
+        {"path": "src/browser/creature-gameplay-profiles.mjs", "operations": ["M"]},
+        {"path": "tests/fullworld-runtime/cdp-session.test.mjs", "operations": ["A"]},
+        {"path": "tests/verification/qualification-gameplay-contract.test.mjs", "operations": ["A"]},
+        {"path": "tools/dyn-atlas-semantic/benchmark.py", "operations": ["M"]},
+        {"path": "tools/dyn-atlas-semantic/self_test.py", "operations": ["M"]},
+        {"path": "tools/fullworld-runtime/cdp-session.mjs", "operations": ["A"]},
+        {"path": "tools/fullworld-runtime/qualify_browser.mjs", "operations": ["M"]},
+        {"path": "tools/verification/e2e-data-capability-inventory.json", "operations": ["M"]},
+        {"path": "tools/verification/qualification-gameplay.mjs", "operations": ["A"]},
+        {"path": "tools/verification/verification-catalog.json", "operations": ["M"]}
       ]
     },
     "docs-dependencies": {
       "findings": ["F09", "F10", "F14", "F15"],
       "rules": [
-        {"path": "e2e/README.md", "operations": ["M"]},
         {"path": ".github/dependabot.yml", "operations": ["A", "M"]},
-        {"path": "e2e/package.json", "operations": ["M"]},
+        {"path": "README.md", "operations": ["M"]},
         {"path": "docs/operations/ATLAS-LIVE-OPERATIONS.md", "operations": ["M"]},
         {"path": "docs/recovery/ATLAS-LIVE-RECOVERY.md", "operations": ["M"]},
-        {"path": "README.md", "operations": ["M"]}
+        {"path": "e2e/README.md", "operations": ["M"]}
       ]
     },
     "publication-safety": {
       "findings": ["F02"],
       "rules": [
         {"path": "tools/fullworld-publication/publication.py", "operations": ["M"]},
+        {"path": "tools/fullworld-runtime/build_pixel_buckets.py", "operations": ["M"]},
+        {"path": "tools/fullworld-layers/build_overview.py", "operations": ["M"]},
+        {"path": "tools/fullworld-generation/fabric.py", "operations": ["M"]},
         {"prefix": "tests/fullworld-publication/", "operations": ["A", "M"]}
       ]
     },
