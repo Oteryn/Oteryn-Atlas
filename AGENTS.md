@@ -37,23 +37,16 @@ For an already-authorized write to an existing task branch/PR, if `GH_TOKEN` and
 - Every reproducible defect receives a deterministic regression test before acceptance. Tests must prove behavior, failure paths, state transitions, reload/history behavior, malformed or unavailable inputs, and integration boundaries as applicable.
 - Do not add user-facing verification/status UI. Executable exact-revision evidence is the source of truth.
 
-## Verification capability placement
+## Verification capability route
 
-- Verification profile (`none`, `focused`, `targeted`, `broad`, `full`) and data capability (`qualification_fixture`, `bounded_real_world`, `real_fullworld`) are independent. `profile=full` does not imply `real_fullworld`.
-- GitHub-hosted CI owns ordinary functional E2E against the smallest immutable source that proves the oracle. `bounded_real_world` is only for bounded compatibility checks that depend on selected real bytes.
-- Molehill-PC (`oteryn-molehill-atlas`, label `oteryn-atlas-pc`) is specialist-only for a protected plan that requires complete-product bytes, native Windows/GPU, restricted visual review, or another approved specialist capability. Its PowerShell steps use `powershell`.
-- `real_fullworld` is reserved for complete publication/census/root linkage, generator/compiler determinism, full-product scale/performance/soak, overview/minimap consistency, or explicit release acceptance.
-- Synology (`oteryn-synology-atlas`, label `oteryn-atlas`) is limited to trusted merged-main deployment and live acceptance. It is not an ordinary build/E2E farm or a substitute for Molehill.
-- Unavailable specialist capacity blocks only the selected specialist proof. Do not move it to Synology, reuse stale evidence, or weaken failure semantics.
-- Nightly specialist depth is additive and must remain read-only. It fails closed unless `X-Oteryn-Atlas-Revision` equals the exact nightly SHA before and after execution, and it must not share concurrency in a way that can cancel deployment.
+Before selecting a verification profile, data capability or runner, or performing specialist/nightly verification, read `docs/agents/operations/VERIFICATION_CAPABILITY.md`. This route does not restore suspended verification or change the active maintenance freeze.
 
 ## Integration and live deployment
 
 - Run repository-selected checks and every verification layer applicable to the changed behavior. Review the complete changed-file set and exact final-head diff.
 - Verify that browser runtime consumes Atlas projection data only. Require the repository's exact-head aggregate gate before Merge Queue integration.
-- Live deployment originates only from a clean, merged `main` revision selected by GitHub Actions. Task branches and detached experimental revisions are never deployment sources.
-- The deployed revision must match both the live container `org.oteryn.revision` label and the `X-Oteryn-Atlas-Revision` header before acceptance.
-- Historical Atlas SHAs are not live deployment targets. Emergency rollback may restore only a previously merged `main` revision and must be requalified.
+
+Before any separately authorized deployment, live acceptance or rollback, read `docs/agents/operations/LIVE_DEPLOYMENT.md`. Deployment sources remain clean, merged `main` revisions; the active maintenance freeze still governs whether the operation is permitted.
 
 ## Safety
 
