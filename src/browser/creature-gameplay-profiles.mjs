@@ -1,6 +1,7 @@
 import { sha256ContentId } from './loader.mjs';
 
 export const GAMEPLAY_EXPECTATIONS = Object.freeze({
+  mode: 'production',
   contractId: 'oteryn-game-atlas-export-v1',
   semanticRevision: 1,
   capability: 'creature-gameplay-profiles-v1',
@@ -12,6 +13,20 @@ export const GAMEPLAY_EXPECTATIONS = Object.freeze({
   shardKeyRule: 'entity-hash-prefix-2',
   limitProfile: 'creature-gameplay-profiles-v1-e417-census-v1',
 });
+
+export const QUALIFICATION_GAMEPLAY_EXPECTATIONS = Object.freeze({
+  mode: 'qualification_fixture',
+  contractId: 'oteryn-atlas-qualification-fixture-v1',
+  semanticRevision: 1,
+  capability: 'qualification-creature-gameplay-v1',
+  profileSchemaVersion: 1,
+  fixtureId: 'atlas-qualification-world-v2',
+  semanticDigest: null,
+  shardKeyRule: 'entity-hash-prefix-2',
+  limitProfile: 'qualification-creature-gameplay-v1',
+});
+
+const QUALIFICATION_TRUST_MARKER = 'oteryn-atlas-qualification-trust-v1';
 
 const PRODUCER_LIMITS = Object.freeze({
   max_manifest_bytes: 262144,
@@ -225,18 +240,37 @@ function descriptorCounts(manifest) {
   return result;
 }
 
-export async function validateCreatureGameplayManifest(manifest, { expectedSemanticDigest = GAMEPLAY_EXPECTATIONS.semanticDigest } = {}) {
-  exactKeys(manifest, ['contract_id', 'semantic_revision', 'capability', 'profile_schema_version', 'producer_repository_sha', 'source_evidence', 'shard_key_rule', 'limit_profile', 'limits', 'counts', 'shards', 'semantic_digest'], [], 'gameplay manifest');
-  fail(manifest.contract_id === GAMEPLAY_EXPECTATIONS.contractId, 'gameplay contract mismatch');
-  fail(manifest.semantic_revision === GAMEPLAY_EXPECTATIONS.semanticRevision, 'gameplay semantic revision mismatch');
-  fail(manifest.capability === GAMEPLAY_EXPECTATIONS.capability, 'gameplay capability mismatch');
-  fail(manifest.profile_schema_version === GAMEPLAY_EXPECTATIONS.profileSchemaVersion, 'gameplay profile schema mismatch');
-  fail(typeof manifest.producer_repository_sha === 'string' && SHA.test(manifest.producer_repository_sha), 'gameplay Game SHA invalid');
-  fail(manifest.producer_repository_sha === GAMEPLAY_EXPECTATIONS.gameSha, 'gameplay Game SHA mismatch');
-  exactKeys(manifest.source_evidence, ['repository', 'sha'], [], 'gameplay source evidence');
-  fail(manifest.source_evidence.repository === GAMEPLAY_EXPECTATIONS.sourceRepository && manifest.source_evidence.sha === GAMEPLAY_EXPECTATIONS.sourceSha, 'gameplay source evidence mismatch');
-  fail(manifest.shard_key_rule === GAMEPLAY_EXPECTATIONS.shardKeyRule, 'gameplay shard rule mismatch');
-  fail(manifest.limit_profile === GAMEPLAY_EXPECTATIONS.limitProfile, 'gameplay limit profile mismatch');
+function defaultManifestExpectations(scope = globalThis) {
+  const trust = scope?.__OTERYN_ATLAS_QUALIFICATION_TRUST__;
+  if (trust?.marker === QUALIFICATION_TRUST_MARKER && trust.fixtureId === QUALIFICATION_GAMEPLAY_EXPECTATIONS.fixtureId) return QUALIFICATION_GAMEPLAY_EXPECTATIONS;
+  return GAMEPLAY_EXPECTATIONS;
+}
+
+function validateManifestIdentity(manifest, expectations) {
+  if (expectations?.mode === 'qualification_fixture') {
+    exactKeys(manifest, ['contract_id', 'semantic_revision', 'capability', 'profile_schema_version', 'fixture_id', 'shard_key_rule', 'limit_profile', 'limits', 'counts', 'shards', 'semantic_digest'], [], 'gameplay manifest');
+    fail(manifest.contract_id === expectations.contractId, 'gameplay qualification contract mismatch');
+    fail(manifest.semantic_revision === expectations.semanticRevision, 'gameplay qualification semantic revision mismatch');
+    fail(manifest.capability === expectations.capability, 'gameplay qualification capability mismatch');
+    fail(manifest.profile_schema_version === expectations.profileSchemaVersion, 'gameplay qualification profile schema mismatch');
+    fail(manifest.fixture_id === expectations.fixtureId, 'gameplay qualification fixture mismatch');
+  } else {
+    exactKeys(manifest, ['contract_id', 'semantic_revision', 'capability', 'profile_schema_version', 'producer_repository_sha', 'source_evidence', 'shard_key_rule', 'limit_profile', 'limits', 'counts', 'shards', 'semantic_digest'], [], 'gameplay manifest');
+    fail(manifest.contract_id === GAMEPLAY_EXPECTATIONS.contractId, 'gameplay contract mismatch');
+    fail(manifest.semantic_revision === GAMEPLAY_EXPECTATIONS.semanticRevision, 'gameplay semantic revision mismatch');
+    fail(manifest.capability === GAMEPLAY_EXPECTATIONS.capability, 'gameplay capability mismatch');
+    fail(manifest.profile_schema_version === GAMEPLAY_EXPECTATIONS.profileSchemaVersion, 'gameplay profile schema mismatch');
+    fail(typeof manifest.producer_repository_sha === 'string' && SHA.test(manifest.producer_repository_sha), 'gameplay Game SHA invalid');
+    fail(manifest.producer_repository_sha === GAMEPLAY_EXPECTATIONS.gameSha, 'gameplay Game SHA mismatch');
+    exactKeys(manifest.source_evidence, ['repository', 'sha'], [], 'gameplay source evidence');
+    fail(manifest.source_evidence.repository === GAMEPLAY_EXPECTATIONS.sourceRepository && manifest.source_evidence.sha === GAMEPLAY_EXPECTATIONS.sourceSha, 'gameplay source evidence mismatch');
+  }
+  fail(manifest.shard_key_rule === expectations.shardKeyRule, 'gameplay shard rule mismatch');
+  fail(manifest.limit_profile === expectations.limitProfile, 'gameplay limit profile mismatch');
+}
+
+export async function validateCreatureGameplayManifest(manifest, { expectedSemanticDigest, expectations = GAMEPLAY_EXPECTATIONS } = {}) {
+  validateManifestIdentity(manifest, expectations);
   fail(sameJson(manifest.limits, PRODUCER_LIMITS), 'gameplay producer limits mismatch');
 
   exactKeys(manifest.counts, ['npc_profiles', 'monster_profiles', 'referenced_items'], [], 'gameplay counts');
@@ -264,7 +298,8 @@ export async function validateCreatureGameplayManifest(manifest, { expectedSeman
   const unsigned = { ...manifest }; delete unsigned.semantic_digest;
   const actual = await sha256ContentId(canonicalGameplayJsonBytes(unsigned));
   fail(actual === manifest.semantic_digest, 'gameplay semantic digest mismatch');
-  fail(expectedSemanticDigest == null || manifest.semantic_digest === expectedSemanticDigest, 'gameplay trusted semantic digest mismatch');
+  const trustedDigest = expectedSemanticDigest === undefined ? expectations.semanticDigest : expectedSemanticDigest;
+  fail(trustedDigest == null || manifest.semantic_digest === trustedDigest, 'gameplay trusted semantic digest mismatch');
   return deepFreeze(manifest);
 }
 
@@ -322,7 +357,8 @@ function validateShard(value, descriptor) {
 export function createCreatureGameplayProfileService({
   baseUrl,
   fetchImpl = fetch,
-  expectedSemanticDigest = GAMEPLAY_EXPECTATIONS.semanticDigest,
+  expectedSemanticDigest,
+  expectations = defaultManifestExpectations(),
   maxCacheShards = GAMEPLAY_LIMITS.defaultCacheShards,
   maxCacheBytes = GAMEPLAY_LIMITS.maxCacheBytes,
 } = {}) {
@@ -351,7 +387,7 @@ export function createCreatureGameplayProfileService({
   async function manifest() {
     if (!manifestPromise) manifestPromise = (async () => {
       const value = await fetchCanonical(new URL('manifest.json', root), fetchImpl, PRODUCER_LIMITS.max_manifest_bytes, null, null, 'gameplay manifest');
-      return validateCreatureGameplayManifest(value, { expectedSemanticDigest });
+      return validateCreatureGameplayManifest(value, { expectedSemanticDigest, expectations });
     })().catch((error) => { manifestPromise = null; throw error; });
     return manifestPromise;
   }

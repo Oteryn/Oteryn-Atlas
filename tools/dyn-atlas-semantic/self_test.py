@@ -10,6 +10,7 @@ import unittest
 from copy import deepcopy
 from pathlib import Path
 
+import benchmark
 import compiler
 import verify
 
@@ -57,6 +58,22 @@ class SyntheticTests(unittest.TestCase):
         self.assertEqual(compact[:6], [32280, 32155, -7, 32280, 32155, 7])
         self.assertEqual(compact[7][0][2], 0)
         self.assertEqual(compact[7][0][3:6], [0, 0, 0])
+
+    def test_compact_chunks_parse_negative_floor_from_chunk_metadata(self) -> None:
+        original_expected = (compiler.EXPECTED_TILES, compiler.EXPECTED_PRESENTATIONS, compiler.EXPECTED_PRIMITIVES)
+        try:
+            compiler.EXPECTED_TILES = 1
+            compiler.EXPECTED_PRESENTATIONS = 1
+            compiler.EXPECTED_PRIMITIVES = 1
+            chunks = benchmark.compact_chunks([self._tile(32280, 32155, "negative-floor")], 32)
+            self.assertEqual(list(chunks), [(-7, 0, 0)])
+        finally:
+            compiler.EXPECTED_TILES, compiler.EXPECTED_PRESENTATIONS, compiler.EXPECTED_PRIMITIVES = original_expected
+
+    def test_compact_chunk_key_rejects_path_metadata_mismatch(self) -> None:
+        payload = compiler.canonical_bytes({"address": {"cx": 0, "cy": 0, "floor": -7, "span": 32}})
+        with self.assertRaisesRegex(compiler.CompileError, "path/metadata mismatch"):
+            benchmark.compact_chunk_key("chunks/f7-x0-y0.json", payload, 32)
 
     def test_locality_on_bounded_synthetic_grid(self) -> None:
         original_expected = (compiler.EXPECTED_TILES, compiler.EXPECTED_PRESENTATIONS, compiler.EXPECTED_PRIMITIVES)
