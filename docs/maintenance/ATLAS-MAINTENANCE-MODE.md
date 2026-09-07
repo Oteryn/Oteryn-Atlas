@@ -1,35 +1,55 @@
-# Atlas maintenance mode
+# Atlas maintenance remediation mode
 
 Lifecycle authority: [Issue #315](https://github.com/Oteryn/Oteryn-Atlas/issues/315).
 
 ## Purpose
 
-Temporarily suspend the existing Atlas verification/bootstrap stack so prompt, Markdown, AGENTS and governance cleanup can integrate through a normal pull request and Merge Queue path without allowing product/runtime or deployment changes to bypass verification.
+Keep the retired Atlas test/verification/depth/dispatcher/publication/deployment workflow stack suspended while allowing the bounded F01–F16 corrective-engineering programme to proceed through protected pull requests and Merge Queue. Production deployment and automatic publication remain outside this programme.
 
 ## Enforcement
 
-The organization ruleset requires `.github/workflows/merge-authority-audit.yml` from protected `main`. That workflow checks out the exact protected base and the candidate into separate directories, then runs only `trusted-base/tools/maintenance/verify-maintenance-diff.mjs`. Candidate code is inert input.
+The organization ruleset requires `.github/workflows/merge-authority-audit.yml` from protected `main`. That workflow checks out the exact protected base and candidate separately, then runs only `trusted-base/tools/maintenance/verify-maintenance-diff.mjs`. Candidate code remains inert input.
 
-The validator binds repository, event, base and head identity; derives the complete diff from Git; rejects rename escapes, unsafe paths, non-regular modes, symlinks, gitlinks, binary/invalid UTF-8 and oversized content; and enforces a closed path/operation allowlist.
+The validator binds repository/event/base/head identity, derives the complete diff from Git, rejects rename/copy escapes, unsafe paths, non-regular modes, symlinks/gitlinks, binary/invalid UTF-8 and oversized content, and resolves admission only from protected-base authority.
 
-The repository ruleset requires the strict `Merge authority audit / protected-base validate` status from GitHub Actions and Merge Queue. The retained `.github/workflows/merge-group-gate.yml` emits an additional `atlas-gate` check for merge groups. It runs the same protected-base maintenance validator and no test or candidate executable; `atlas-gate` is not the configured required status during maintenance.
+Ordinary documentation/governance maintenance retains its closed path/operation allowlist. F01–F16 remediation is separately controlled by protected-base `ATLAS_REMEDIATION_ALLOWLIST.json`: all remediation paths in a candidate must resolve to exactly one lane and use only the lane's allowed add/modify operations. Candidate edits to the manifest are immutable for that candidate and cannot self-authorize scope.
 
-## Completed cutover
+Verification-contract deletion is controlled by exact protected-base `OBSOLETE_VERIFICATION_CONTRACTS.json`. Matching `tests/verification/**` by pattern is not deletion authority. A candidate cannot extend the inventory and consume the new entry in the same PR.
 
-1. Stage A merged the independent protected maintenance validator and repointed the organization-required audit to it.
-2. Protected-main readback confirmed Stage A was active.
-3. Stage B archived every suspended workflow byte-for-byte under `docs/maintenance/suspended-workflows/` and left only the audit, minimal MQ gate and terminal branch lifecycle active.
-4. The #140 prompt/AGENTS/governance cleanup proceeds through the resulting maintenance path.
-5. Test restoration remains a later #315 phase. Each group must return incrementally in shadow mode and become blocking only after real canaries.
+The repository ruleset requires `Merge authority audit / protected-base validate` and Merge Queue. The retained `.github/workflows/merge-group-gate.yml` also emits `atlas-gate` for merge groups; it is additional maintenance evidence, not the configured required status. Both gates execute protected-base maintenance authority only.
 
-## Frozen scope
+## Completed transitions
 
-Product/runtime files, publication roots and inputs, deployment behavior, active workflow additions, the maintenance validator and its template are frozen. `docs/**` is not a blanket exception. Automatic Synology publication/deployment is suspended in Stage B.
+1. Stage A installed the independent protected maintenance validator and protected-main audit entrypoint.
+2. Stage B suspended the old workflow stack byte-for-byte under `docs/maintenance/suspended-workflows/`, leaving only the audit, minimal MQ gate and terminal branch lifecycle active.
+3. P0 integrated the protected remediation allowlist and exact obsolete-contract inventory through the normal required check and Merge Queue at `main@9db8e55a3ef2da851e34c4931fe60cf07633f02f`.
+4. P1 activated protected-base consumption of those manifests at `main@5d7e9a7b3d5972d030c874c57d59eea40af16f8e`, including exact-one-lane resolution and fail-closed ambiguity handling.
+5. Current instructions/documentation now describe the active bounded remediation authority; this prose does not grant authority beyond the protected validator.
 
-No direct merge, ruleset bypass, fabricated success, candidate code execution or unprotected transition interval is authorized.
+## Current admitted remediation lanes
 
-## Current state
+- `canonical-foundation` — F01;
+- `geometry` — F06;
+- `verification` — F11/F12/F13;
+- `docs-dependencies` — F09/F10/F14/F15;
+- `publication-safety` — F02;
+- `runtime-safety` — F04/F05/F07/F08.
 
-Stages A and B are integrated on protected `main`. Twenty-five old workflows are preserved byte-for-byte under `docs/maintenance/suspended-workflows/`. The active workflow inventory is exactly `.github/workflows/merge-authority-audit.yml`, `.github/workflows/merge-group-gate.yml`, and `.github/workflows/terminal-branch-lifecycle.yml`.
+Publication Safety and Runtime Safety remain sequencing-dependent on Canonical Foundation as recorded by the active F01–F16 programme. Path admission does not waive lane prerequisites, focused regression evidence, review requirements, Game authority, or normal Merge Queue integration.
 
-The maintenance validator, test/deployment suspension and current required-status configuration remain authoritative until a later #315 phase explicitly changes them through the applicable protected path.
+## Still suspended or frozen
+
+- production deployment and live-system mutation;
+- automatic publication/deployment workflows;
+- restoration of the retired aggregate verification stack;
+- ordinary edits to active workflows or `tools/maintenance/**`;
+- arbitrary product/runtime paths outside the protected remediation allowlist;
+- verification-test deletion outside the exact protected obsolete inventory.
+
+## Current protected state
+
+The active workflow inventory remains exactly `.github/workflows/merge-authority-audit.yml`, `.github/workflows/merge-group-gate.yml`, and `.github/workflows/terminal-branch-lifecycle.yml`.
+
+Repository ruleset `22103758` retains strict required-status freshness, squash-only protected PR integration and ALLGREEN Merge Queue. Organization ruleset `22352928` retains the protected-main required workflow source. No ruleset or workflow weakening is part of the Authority Fix.
+
+Restored verification groups return only incrementally: first non-blocking/shadow qualification and real PR/MQ canaries, then impact-applicable blocking coverage after qualification. `AUDIT_COMPLETE`, local focused PASS, or path admission alone is not product qualification.
