@@ -6,6 +6,8 @@ const panels = { controls: $('#mobile-controls-panel'), inspector: $('#mobile-in
 const desktopOpen = { controls: true, inspector: true };
 let drawer = null;
 let returnFocus = null;
+let savedPanels = null;
+let findMode = false;
 
 function focus(element) {
   if (element instanceof HTMLElement && element.isConnected && !element.closest('[inert]')) element.focus({ preventScroll: true });
@@ -13,6 +15,13 @@ function focus(element) {
 
 function sync() {
   const mobile = mobileQuery.matches;
+  panels.controls.classList.toggle('find-mode', mobile && drawer === 'controls' && findMode);
+  $('#controls-panel-title').textContent = mobile && findMode ? 'Find in Oteryn' : 'Explore the world';
+  panels.controls.setAttribute('aria-label', mobile && findMode ? 'Find in Oteryn' : 'Atlas controls');
+  $('#mobile-find-toggle')?.setAttribute('aria-expanded', String(mobile && drawer === 'controls' && findMode));
+  $('#map-focus-toggle')?.setAttribute('aria-pressed', String(savedPanels !== null));
+  $('#map-focus-toggle')?.setAttribute('aria-label', savedPanels ? 'Restore Atlas panels' : 'Focus on the map');
+  $('#map-focus-toggle')?.setAttribute('title', savedPanels ? 'Restore panels (Escape)' : 'Focus on the map');
   // Release background inertness before a closing drawer restores focus.
   $('.topbar').inert = mobile && drawer !== null;
   $('.map-stage').inert = mobile && drawer !== null;
@@ -47,6 +56,7 @@ function closeDrawer({ restore = true } = {}) {
   const wasOpen = drawer !== null;
   const target = returnFocus;
   drawer = null;
+  findMode = false;
   returnFocus = null;
   sync();
   if (wasOpen && restore) focus(target);
@@ -57,16 +67,18 @@ function openPanel(name, { moveFocus = true } = {}) {
     if (!drawer) returnFocus = document.activeElement;
     if (name === 'controls') $('#mobile-search-input').value = $('#search-input').value;
     drawer = name;
-  } else desktopOpen[name] = true;
+  } else { savedPanels = null; desktopOpen[name] = true; }
   sync();
   if (moveFocus) focus($(`#mobile-${name}-close`));
 }
 
 function togglePanel(name) {
+  findMode = false;
   if (mobileQuery.matches) {
     if (drawer === name) closeDrawer();
     else openPanel(name);
   } else {
+    savedPanels = null;
     desktopOpen[name] = !desktopOpen[name];
     sync();
   }
@@ -91,6 +103,19 @@ function tabbable(panel) {
 }
 
 document.addEventListener('keydown', event => {
+  if (event.defaultPrevented) return;
+  const editing = event.target.closest?.('input, textarea, select, [contenteditable]:not([contenteditable="false"])');
+  if (event.key === '/' && !editing && !event.isComposing && !event.ctrlKey && !event.metaKey && !event.altKey) {
+    event.preventDefault();
+    openFind();
+    return;
+  }
+  if (event.key === 'Escape' && !mobileQuery.matches && savedPanels && $('#creature-quick-card')?.hidden) {
+    event.preventDefault();
+    toggleMapFocus();
+    focus($('#map-focus-toggle'));
+    return;
+  }
   if (!mobileQuery.matches || !drawer) return;
   if (event.key === 'Escape') {
     event.preventDefault();
@@ -105,6 +130,12 @@ document.addEventListener('keydown', event => {
   }
 });
 
+// These are two responsive inputs for one query, not a second search state.
+// Mirror user edits only; do not submit or wake a hidden result list.
+for (const [from, to] of [['#search-input', '#mobile-search-input'], ['#mobile-search-input', '#search-input']]) {
+  $(from)?.addEventListener('input', () => { if ($(to)) $(to).value = $(from).value; });
+}
+
 $('#mobile-search-form')?.addEventListener('submit', event => {
   event.preventDefault();
   const input = $('#search-input'), form = $('#search-form'), mobileInput = $('#mobile-search-input');
@@ -113,6 +144,24 @@ $('#mobile-search-form')?.addEventListener('submit', event => {
   form.requestSubmit();
   closeDrawer();
 });
+
+
+function openFind() {
+  if (mobileQuery.matches) {
+    findMode = true;
+    openPanel('controls', { moveFocus: false });
+    focus($('#mobile-search-input'));
+  } else focus($('#search-input'));
+}
+$('#mobile-find-toggle')?.addEventListener('click', openFind);
+
+function toggleMapFocus() {
+  if (mobileQuery.matches) return;
+  if (savedPanels) { Object.assign(desktopOpen, savedPanels); savedPanels = null; }
+  else { savedPanels = { ...desktopOpen }; desktopOpen.controls = false; desktopOpen.inspector = false; }
+  sync();
+}
+$('#map-focus-toggle')?.addEventListener('click', toggleMapFocus);
 
 window.addEventListener('oteryn-atlas-open-inspector', () => openPanel('inspector', { moveFocus: mobileQuery.matches }));
 $('#skip-to-map')?.addEventListener('click', () => focus($('#map-frame')));
