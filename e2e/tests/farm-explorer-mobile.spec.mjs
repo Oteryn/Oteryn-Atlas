@@ -22,6 +22,7 @@ test('mobile Farm Explorer remains reachable and truthful in the existing contro
   expect(farm.presentationEnrichmentState).toBe('DEPENDENCY_BLOCKED');
   await page.locator('#mobile-controls-toggle').click();
   await expect(page.locator('#mobile-controls-panel')).toHaveClass(/mobile-open/);
+  await page.locator('#farm-custom-disclosure > summary').click();
   await expect(page.locator('#farm-explorer')).toBeVisible();
   await page.locator('#farm-creature-search').fill('Cave Rat');
   const caveRat = page.locator('#farm-creature-results .farm-creature-result').filter({ hasText: /^Cave Rat$/ }).first();

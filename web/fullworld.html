@@ -3,42 +3,45 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Oteryn Atlas — Full-world verified runtime</title>
+  <title>Oteryn Atlas — World explorer</title>
   <link rel="stylesheet" href="./style.css">
   <link rel="stylesheet" href="./fullworld.css">
 </head>
 <body>
+  <button class="skip-link" id="skip-to-map" type="button">Skip to map</button>
   <main class="app-shell fullworld-shell">
     <header class="topbar">
       <div class="brand">
-        <div class="brand-mark">OA</div>
-        <div><strong>OTERYN ATLAS</strong><small>FULL-WORLD VERIFIED RUNTIME · G5</small></div>
+        <div class="brand-mark" aria-hidden="true">OA</div>
+        <div><h1><span class="brand-prefix">Oteryn </span>Atlas</h1><small>WORLD EXPLORER</small></div>
       </div>
+      <form class="search" id="search-form">
+        <input id="search-input" type="search" enterkeyhint="search" autocomplete="off" aria-label="Global semantic Atlas search" placeholder="Search places, creatures or coordinates">
+        <button type="submit">Go</button>
+      </form>
       <div class="coordinate-strip" aria-label="Current world coordinates">
         <span>X <b id="coord-x">—</b></span><span>Y <b id="coord-y">—</b></span><span>FLOOR <b id="coord-floor">—</b></span>
       </div>
-      <form class="search" id="search-form">
-        <input id="search-input" autocomplete="off" aria-label="Global semantic Atlas search" placeholder="Search NPC, town, coordinates or type:query">
-        <button type="submit">Go</button>
-      </form>
       <div class="zoom-controls">
         <button id="zoom-out" aria-label="Zoom out">−</button><output id="zoom-output">—</output><button id="zoom-in" aria-label="Zoom in">+</button>
       </div>
-      <div class="mobile-actions" aria-label="Mobile Atlas panels">
-        <button id="mobile-controls-toggle" class="mobile-icon-button" type="button" aria-controls="mobile-controls-panel" aria-expanded="false" aria-label="Open Atlas controls">☰</button>
-        <button id="mobile-inspector-toggle" class="mobile-icon-button" type="button" aria-controls="mobile-inspector-panel" aria-expanded="false" aria-label="Open inspector">ⓘ</button>
+      <div class="panel-actions" aria-label="Atlas panels">
+        <button id="desktop-controls-toggle" class="panel-toggle desktop-only" type="button" aria-controls="mobile-controls-panel" aria-expanded="true" aria-label="Hide Atlas controls" title="Hide Atlas controls">☰</button>
+        <button id="desktop-inspector-toggle" class="panel-toggle desktop-only" type="button" aria-controls="mobile-inspector-panel" aria-expanded="true" aria-label="Hide inspector" title="Hide inspector">ⓘ</button>
+        <button id="mobile-controls-toggle" class="panel-toggle mobile-only" type="button" aria-controls="mobile-controls-panel" aria-expanded="false" aria-label="Open Atlas controls">☰</button>
+        <button id="mobile-inspector-toggle" class="panel-toggle mobile-only" type="button" aria-controls="mobile-inspector-panel" aria-expanded="false" aria-label="Open inspector">ⓘ</button>
       </div>
     </header>
 
     <div class="workspace">
       <button class="mobile-drawer-backdrop" id="mobile-drawer-backdrop" type="button" aria-label="Close mobile panel" hidden></button>
       <aside class="panel left-rail" id="mobile-controls-panel" aria-label="Atlas controls">
-        <div class="mobile-drawer-heading">
-          <strong>Atlas controls</strong>
+        <div class="panel-heading mobile-drawer-heading">
+          <strong>Map controls</strong>
           <button id="mobile-controls-close" type="button" aria-label="Close Atlas controls">×</button>
         </div>
         <form class="mobile-search" id="mobile-search-form">
-          <input id="mobile-search-input" autocomplete="off" aria-label="Global semantic Atlas search" placeholder="Search NPC, town or coordinates">
+          <input id="mobile-search-input" type="search" enterkeyhint="search" autocomplete="off" aria-label="Global semantic Atlas search" placeholder="Search Atlas">
           <button type="submit">Go</button>
         </form>
         <section>
@@ -49,7 +52,19 @@
             <button type="button" data-mode="classic">CLASSIC</button>
             <button type="button" data-mode="map">MAP</button>
           </div>
+          <details class="control-help"><summary>About map modes</summary>
           <p class="rail-note" id="lod-policy-note">AUTO uses the bounded visual minimap at world scale and authenticated detail when qualified. CLASSIC is a presentation-only palette preview of the same verified minimap tiles.</p>
+          </details>
+        </section>
+
+        <section>
+          <h2>Floor</h2>
+          <div class="floor-select-row">
+            <button id="floor-up" aria-label="Higher floor">↑</button>
+            <select id="floor-select" aria-label="Exported floor"></select>
+            <button id="floor-down" aria-label="Lower floor">↓</button>
+          </div>
+          <p class="rail-note" id="floor-bounds">Loading verified floor bounds…</p>
         </section>
 
         <section>
@@ -60,6 +75,16 @@
           <div id="semantic-layer-list"></div>
         </section>
 
+        <section>
+          <h2>Animation</h2>
+          <label class="layer"><input id="animation-toggle" type="checkbox"><span class="layer-name">Playback</span><span>VERIFIED</span></label>
+          <details class="control-help"><summary>Playback details</summary>
+          <p class="rail-note" id="animation-note">Verified Game-owned 15.32 timing is opt-in; disabling playback preserves the published static phase.</p>
+          </details>
+        </section>
+
+        <details class="rail-disclosure" id="farm-custom-disclosure">
+          <summary>Item &amp; task explorer</summary>
         <section class="farm-explorer" id="farm-explorer">
           <div class="farm-heading"><h2>Item &amp; Task Explorer</h2><span class="pill warn">UPSTREAM_BLOCKED</span></div>
           <div class="farm-trust-block"><strong>VERIFIED FACTS</strong><p>Monster drop sources and authoritative tasks are unavailable until Oteryn-Game publishes an accepted farm-intelligence product.</p></div>
@@ -77,7 +102,10 @@
           </details>
           <p class="rail-note"><strong>Monster drop sources</strong>: UPSTREAM_BLOCKED · no external/wiki fallback is used.</p>
         </section>
+        </details>
 
+        <details class="rail-disclosure" id="area-tools-disclosure">
+          <summary>Areas &amp; subareas</summary>
         <section id="region-controls">
           <h2>Areas & Subareas</h2>
           <input id="region-search" type="search" placeholder="Search authenticated regions" disabled aria-label="Search Areas and Subareas">
@@ -88,22 +116,9 @@
           <div id="region-results" class="region-results" aria-live="polite">Unavailable: current Game export publishes no authenticated Area/Subarea records.</div>
           <p class="rail-note">Consumer supports labels, hierarchy, floor geometry, filtering, highlight and zoom-to-area once Game publishes authenticated records.</p>
         </section>
+        </details>
 
-        <section>
-          <h2>Animation</h2>
-          <label class="layer"><input id="animation-toggle" type="checkbox"><span class="layer-name">Playback</span><span>VERIFIED</span></label>
-          <p class="rail-note" id="animation-note">Verified Game-owned 15.32 timing is opt-in; disabling playback preserves the published static phase.</p>
-        </section>
 
-        <section>
-          <h2>Floor</h2>
-          <div class="floor-select-row">
-            <button id="floor-up" aria-label="Higher floor">↑</button>
-            <select id="floor-select" aria-label="Exported floor"></select>
-            <button id="floor-down" aria-label="Lower floor">↓</button>
-          </div>
-          <p class="rail-note" id="floor-bounds">Loading verified floor bounds…</p>
-        </section>
 
         <section>
           <h2>Technical overview</h2>
@@ -113,7 +128,7 @@
       </aside>
 
       <section class="map-stage fullworld-stage">
-        <div class="map-frame" id="map-frame">
+        <div class="map-frame" id="map-frame" tabindex="-1" aria-label="World map workspace">
           <canvas id="atlas" aria-label="Full-world WebGL2 Atlas"></canvas>
           <canvas id="animation-overlay" aria-label="Verified animated world presentations"></canvas>
           <canvas id="minimap-layer" aria-label="Verified visual minimap"></canvas>
@@ -142,6 +157,8 @@
           <span id="status-detail">Viewport ranges not loaded yet</span>
           <span id="status-layer">Overview: verifying…</span>
         </div>
+        <details class="runtime-details" id="runtime-details">
+          <summary>Runtime details</summary>
         <div class="diagnostics fullworld-diagnostics">
           <div><span>Backend</span><strong id="diag-backend">—</strong></div>
           <div><span>Floor chunks</span><strong id="diag-chunks">—</strong></div>
@@ -154,11 +171,12 @@
           <div><span>Render</span><strong id="diag-render">—</strong></div>
           <div><span>JS heap</span><strong id="diag-heap">—</strong></div>
         </div>
+        </details>
       </section>
 
       <aside class="panel inspector" id="mobile-inspector-panel" aria-label="Inspector and provenance">
         <div class="inspector-heading">
-          <div><span class="eyebrow">VERIFIED FACTS</span><h2>Inspector & provenance</h2></div>
+          <div><span class="eyebrow">DETAILS &amp; PROVENANCE</span><h2>Inspector</h2></div>
           <span class="pill" id="inspector-pill">ROOTS</span>
           <button id="mobile-inspector-close" class="mobile-drawer-close" type="button" aria-label="Close inspector">×</button>
         </div>
