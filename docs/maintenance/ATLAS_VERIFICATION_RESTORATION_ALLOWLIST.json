@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "programme": "atlas-verification-restoration",
+  "phase": "r1-r3",
+  "rules": [
+    {"path": "docs/evidence/r1-contract-reset.md", "operations": ["A"]},
+    {"path": "tests/creature-presentation-browser-contract.mjs", "operations": ["M"]},
+    {"path": "tests/verification/browser-execution.test.mjs", "operations": ["A"]},
+    {"path": "tests/verification/browser-semantic-ownership.test.mjs", "operations": ["A"]},
+    {"path": "tests/verification/deterministic-execution.test.mjs", "operations": ["A"]},
+    {"path": "tests/verification/deterministic-ownership-closure.test.mjs", "operations": ["A"]},
+    {"path": "tests/verification/gameplay-routing-closure.test.mjs", "operations": ["A"]},
+    {"path": "tests/verification/impact-default-rules.test.mjs", "operations": ["A"]},
+    {"path": "tests/verification/plan-execution-readiness.test.mjs", "operations": ["A"]},
+    {"path": "tests/verification/restoration-contract-ownership.test.mjs", "operations": ["A"]},
+    {"path": "tools/verification/browser-execution.mjs", "operations": ["A"]},
+    {"path": "tools/verification/browser-semantic-ownership.json", "operations": ["A"]},
+    {"path": "tools/verification/build-verification-plan.mjs", "operations": ["M"]},
+    {"path": "tools/verification/deterministic-execution.mjs", "operations": ["A"]},
+    {"path": "tools/verification/deterministic-test-ownership.json", "operations": ["A"]},
+    {"path": "tools/verification/impact-manifest.json", "operations": ["M"]},
+    {"path": "tools/verification/restoration-contract-ownership.json", "operations": ["A"]},
+    {"path": "tools/verification/verification-catalog.json", "operations": ["M"]},
+    {"path": "tools/verification/verification-plan-schema.mjs", "operations": ["M"]}
+  ]
+}

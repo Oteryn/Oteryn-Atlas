@@ -13,6 +13,7 @@ const TEMPLATE='tools/maintenance/minimal-merge-group-gate.yml';
 const ARCHIVE_ROOT='docs/maintenance/suspended-workflows/';
 const REMEDIATION_ALLOWLIST='docs/maintenance/ATLAS_REMEDIATION_ALLOWLIST.json';
 const OBSOLETE_VERIFICATION_CONTRACTS='docs/maintenance/OBSOLETE_VERIFICATION_CONTRACTS.json';
+const VERIFICATION_RESTORATION_ALLOWLIST='docs/maintenance/ATLAS_VERIFICATION_RESTORATION_ALLOWLIST.json';
 const sha=/^[0-9a-f]{40}$/;
 
 function fail(message){throw new TypeError(message);}
@@ -91,12 +92,32 @@ function loadObsoleteAuthority(base){
   }
   return result;
 }
+function loadVerificationRestorationAuthority(base){
+  if(mode(trustedRoot,base,VERIFICATION_RESTORATION_ALLOWLIST)===null)return [];
+  const raw=protectedJson(base,VERIFICATION_RESTORATION_ALLOWLIST);
+  exactKeys(raw,['schemaVersion','programme','phase','rules'],'restoration allowlist');
+  if(raw.schemaVersion!==1||raw.programme!=='atlas-verification-restoration'||raw.phase!=='r1-r3'||!Array.isArray(raw.rules)||!raw.rules.length||raw.rules.length>64)fail('restoration allowlist identity is invalid');
+  const paths=new Set(),rules=[];
+  for(const rule of raw.rules){
+    exactKeys(rule,['operations','path'],'restoration rule');
+    if(typeof rule.path!=='string'||!rule.path)fail('restoration rule path is invalid');
+    assertPolicyPath(rule.path,'restoration rule');
+    if([REMEDIATION_ALLOWLIST,OBSOLETE_VERIFICATION_CONTRACTS,VERIFICATION_RESTORATION_ALLOWLIST,'AGENTS.md'].includes(rule.path))fail(`restoration rule targets protected authority path: ${rule.path}`);
+    if(paths.has(rule.path))fail(`duplicate restoration path: ${rule.path}`);paths.add(rule.path);
+    if(!Array.isArray(rule.operations)||!rule.operations.length||!rule.operations.every(op=>op==='A'||op==='M')||new Set(rule.operations).size!==rule.operations.length)fail(`restoration operations are invalid: ${rule.path}`);
+    rules.push(Object.freeze({path:rule.path,operations:new Set(rule.operations)}));
+  }
+  return Object.freeze(rules);
+}
 function remediationLanes(change,lanes){
   const matches=new Set();
   for(const [lane,rules] of lanes){
     if(rules.some(rule=>rule.operations.has(change.status)&&(rule.path===change.path||(rule.prefix&&change.path.startsWith(rule.prefix)))))matches.add(lane);
   }
   return matches;
+}
+function verificationRestoration(change,rules){
+  return !change.oldPath&&rules.some(rule=>rule.path===change.path&&rule.operations.has(change.status));
 }
 
 function parseChanges(root,base,head){
@@ -137,33 +158,44 @@ function verifyRegularText(root,revision,name){
 function allowedNormal(change,authority){
   const {status,path:name}=change;
   if(change.oldPath)fail(`rename or copy is forbidden: ${change.oldPath} -> ${name}`);
-  if(name.startsWith('tools/maintenance/')||name===REMEDIATION_ALLOWLIST||name===OBSOLETE_VERIFICATION_CONTRACTS)fail(`maintenance authority is immutable: ${name}`);
+  if(name.startsWith('tools/maintenance/')||name===REMEDIATION_ALLOWLIST||name===OBSOLETE_VERIFICATION_CONTRACTS||name===VERIFICATION_RESTORATION_ALLOWLIST)fail(`maintenance authority is immutable: ${name}`);
   if(name.startsWith('.github/workflows/')||name.startsWith(ARCHIVE_ROOT))fail('workflow transition is not the complete suspension cutover');
+  const restoration=verificationRestoration(change,authority.restoration);
+  const lanes=remediationLanes(change,authority.lanes);
+  if(restoration||lanes.size)return {kind:'bounded-authority',restoration,lanes};
   if(name==='AGENTS.md')return status==='M'?{kind:'maintenance'}:null;
   if(name.startsWith('docs/agents/')||name.startsWith('docs/evidence/')||name.startsWith('docs/maintenance/'))return ['A','M','D'].includes(status)?{kind:'maintenance'}:null;
   if(name.startsWith('tools/governance/'))return ['A','M','D'].includes(status)?{kind:'maintenance'}:null;
   if(status==='D'&&authority.obsolete.has(name))return {kind:'obsolete-removal'};
-  const lanes=remediationLanes(change,authority.lanes);
-  if(lanes.size)return {kind:'remediation',lanes};
   return null;
 }
 
 function verifyNormal(changes,base,head){
-  const authority={lanes:loadRemediationAuthority(base),obsolete:loadObsoleteAuthority(base)};
-  let candidateLanes=null;
+  const authority={lanes:loadRemediationAuthority(base),obsolete:loadObsoleteAuthority(base),restoration:loadVerificationRestorationAuthority(base)};
+  if(changes.some(change=>change.path===VERIFICATION_RESTORATION_ALLOWLIST||change.oldPath===VERIFICATION_RESTORATION_ALLOWLIST))fail(`maintenance authority is immutable: ${VERIFICATION_RESTORATION_ALLOWLIST}`);
+  const boundedAdmissions=[];
   for(const change of changes){
     const admission=allowedNormal(change,authority);
     if(!admission)fail(`maintenance path is frozen: ${change.path}`);
-    if(admission.kind==='remediation'){
-      candidateLanes=candidateLanes===null?admission.lanes:new Set([...candidateLanes].filter(lane=>admission.lanes.has(lane)));
-      if(!candidateLanes.size)fail('maintenance diff spans multiple remediation lanes');
-    }
+    if(admission.kind==='bounded-authority')boundedAdmissions.push(admission);
     if(change.status==='D'){
       if(mode(candidateRoot,base,change.path)!=='100644')fail(`removed path was not a regular 100644 file: ${change.path}`);
     }else verifyRegularText(candidateRoot,head,change.path);
   }
+  const restorationOnly=boundedAdmissions.some(item=>item.restoration&&!item.lanes.size);
+  const remediationOnly=boundedAdmissions.some(item=>!item.restoration&&item.lanes.size);
+  if(restorationOnly&&remediationOnly)fail('maintenance diff spans multiple authority lanes');
+  const useRestoration=restorationOnly||(boundedAdmissions.some(item=>item.restoration)&&!remediationOnly);
+  let candidateLanes=null;
+  if(!useRestoration){
+    for(const admission of boundedAdmissions.filter(item=>item.lanes.size)){
+      candidateLanes=candidateLanes===null?admission.lanes:new Set([...candidateLanes].filter(lane=>admission.lanes.has(lane)));
+      if(!candidateLanes.size)fail('maintenance diff spans multiple remediation lanes');
+    }
+  }
   if(candidateLanes&&candidateLanes.size!==1)fail('maintenance diff is ambiguous across multiple remediation lanes');
   const remediationLane=candidateLanes?[...candidateLanes][0]:null;
+  if(useRestoration)return {mode:'verification-restoration-r1-r3',changedPaths:changes.map(change=>change.path).sort()};
   return {mode:remediationLane?'bounded-remediation':'maintenance-only',remediationLane,changedPaths:changes.map(change=>change.path).sort()};
 }
 

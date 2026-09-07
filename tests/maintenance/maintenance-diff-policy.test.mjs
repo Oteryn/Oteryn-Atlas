@@ -8,8 +8,11 @@ import {fileURLToPath} from 'node:url';
 
 const sourceRoot=fileURLToPath(new URL('../..',import.meta.url));
 const verifier=path.join(sourceRoot,'tools/maintenance/verify-maintenance-diff.mjs');
+const restorationAllowlist='docs/maintenance/ATLAS_VERIFICATION_RESTORATION_ALLOWLIST.json';
 const suspended=['ci.yml','codeql.yml'];
 const readSource=name=>fs.readFileSync(path.join(sourceRoot,name),'utf8');
+const restorationRules=JSON.parse(readSource(restorationAllowlist)).rules;
+const restorationModified=restorationRules.filter(rule=>rule.operations.includes('M')).map(rule=>rule.path);
 const verificationModified=[
   'e2e/tests/creature-gameplay-desktop.spec.mjs',
   'e2e/tests/creature-gameplay-mobile.spec.mjs',
@@ -39,7 +42,7 @@ function git(root,...args){return execFileSync('git',['-C',root,'-c','core.hooks
 function put(root,name,content,mode=0o644){const target=path.join(root,name);fs.mkdirSync(path.dirname(target),{recursive:true});fs.writeFileSync(target,content,{mode});}
 function change(root,name){put(root,name,`candidate:${name}\n`);}
 
-function fixture(t){
+function fixture(t,{includeRestorationAuthority=true,restorationAuthorityContent=null}={}){
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'atlas-maintenance-policy-'));
   t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
   const trusted=path.join(dir,'trusted'),candidate=path.join(dir,'candidate');
@@ -49,6 +52,7 @@ function fixture(t){
   put(trusted,'docs/agents/current.md','# Current\n');
   put(trusted,'docs/maintenance/ATLAS_REMEDIATION_ALLOWLIST.json',readSource('docs/maintenance/ATLAS_REMEDIATION_ALLOWLIST.json'));
   put(trusted,'docs/maintenance/OBSOLETE_VERIFICATION_CONTRACTS.json',readSource('docs/maintenance/OBSOLETE_VERIFICATION_CONTRACTS.json'));
+  if(includeRestorationAuthority)put(trusted,restorationAllowlist,restorationAuthorityContent??readSource(restorationAllowlist));
   put(trusted,'tests/verification/anti-loop-transition-compose-contract.test.mjs','export {};\n');
   put(trusted,'tests/verification/bootstrap-catalog-workflow-contract.test.mjs','export {};\n');
   put(trusted,'tests/verification/unrelated.test.mjs','export {};\n');
@@ -59,6 +63,7 @@ function fixture(t){
     'src/browser/fullworld.mjs',
     ...publicationBuilders,
     ...verificationModified,
+    ...restorationModified,
   ]) put(trusted,name,`base:${name}\n`);
   put(trusted,'web/rogue.mjs','export const rogue=1;\n');
   put(trusted,'tools/maintenance/minimal-merge-group-gate.yml','name: Minimal MQ\n');
@@ -153,6 +158,79 @@ test('current F02 four-builder candidate resolves exactly to publication-safety'
 test('current F11 F12 F13 fourteen-path candidate resolves exactly to verification',t=>{
   const f=fixture(t);applyVerificationLane(f);f.commit();
   const result=f.invoke();assert.equal(result.status,0,result.stderr);assert.match(result.stdout,/"remediationLane":"verification"/);
+});
+
+test('protected restoration authority admits exact R1 R2 and R3 additions or modifications',t=>{
+  for(const rule of restorationRules){
+    const name=rule.path,status=rule.operations[0];
+    const f=fixture(t);
+    if(status==='A')put(f.candidate,name,'export {};\n');else change(f.candidate,name);
+    f.commit();
+    const result=f.invoke();
+    assert.equal(result.status,0,result.stderr);
+    assert.match(result.stdout,/"mode":"verification-restoration-r1-r3"/);
+  }
+});
+
+test('restoration authority grants only each exact operation',t=>{
+  const deletion=fixture(t);fs.rmSync(path.join(deletion.candidate,'tools/verification/verification-catalog.json'));deletion.commit();
+  assert.match(deletion.invoke().stderr,/maintenance path is frozen/);
+
+  const product=fixture(t);change(product.candidate,'web/rogue.mjs');product.commit();
+  assert.match(product.invoke().stderr,/maintenance path is frozen/);
+});
+
+test('missing protected restoration manifest denies restoration without breaking normal maintenance',t=>{
+  const docs=fixture(t,{includeRestorationAuthority:false});
+  put(docs.candidate,'docs/evidence/ordinary.md','# Evidence\n');docs.commit();
+  assert.equal(docs.invoke().status,0,docs.invoke().stderr);
+
+  const restoration=fixture(t,{includeRestorationAuthority:false});
+  put(restoration.candidate,'tests/verification/restoration-contract-ownership.test.mjs','export {};\n');restoration.commit();
+  const result=restoration.invoke();assert.equal(result.status,1);assert.match(result.stderr,/maintenance path is frozen/);
+});
+
+test('candidate restoration manifest cannot authorize its own same-candidate path',t=>{
+  const f=fixture(t);
+  const manifest=JSON.parse(fs.readFileSync(path.join(f.candidate,restorationAllowlist),'utf8'));
+  manifest.rules.push({path:'tests/verification/unrelated-new.test.mjs',operations:['A']});
+  put(f.candidate,restorationAllowlist,`${JSON.stringify(manifest,null,2)}\n`);
+  put(f.candidate,'tests/verification/unrelated-new.test.mjs','export {};\n');
+  f.commit();
+  const result=f.invoke();assert.equal(result.status,1);assert.match(result.stderr,/maintenance authority is immutable/);
+});
+
+test('restoration authority rejects unlisted paths workflow widening and mixed remediation lanes',t=>{
+  const unlisted=fixture(t);put(unlisted.candidate,'tests/verification/unrelated-new.test.mjs','export {};\n');unlisted.commit();
+  assert.match(unlisted.invoke().stderr,/maintenance path is frozen/);
+
+  const workflow=fixture(t);put(workflow.candidate,'.github/workflows/restored.yml','name: Restored\n');workflow.commit();
+  assert.match(workflow.invoke().stderr,/workflow transition is not the complete suspension cutover/);
+
+  const mixed=fixture(t);put(mixed.candidate,'tests/verification/browser-semantic-ownership.test.mjs','export {};\n');change(mixed.candidate,'src/browser/semantic.mjs');mixed.commit();
+  assert.match(mixed.invoke().stderr,/spans multiple authority lanes/);
+});
+
+test('invalid protected restoration schema fails closed only when authority is present',t=>{
+  const f=fixture(t,{restorationAuthorityContent:'{"schemaVersion":2}\n'});
+  change(f.candidate,'tools/verification/verification-catalog.json');f.commit();
+  const result=f.invoke();
+  assert.equal(result.status,1);assert.match(result.stderr,/restoration allowlist/);
+});
+
+test('protected restoration authority rejects prefix rules',t=>{
+  const content=JSON.stringify({schemaVersion:1,programme:'atlas-verification-restoration',phase:'r1-r3',rules:[{prefix:'tests/verification/',operations:['A']}]});
+  const f=fixture(t,{restorationAuthorityContent:content});
+  put(f.candidate,'tests/verification/browser-semantic-ownership.test.mjs','export {};\n');f.commit();
+  const result=f.invoke();assert.equal(result.status,1);assert.match(result.stderr,/restoration rule has invalid shape/);
+});
+
+test('restoration lane preserves equivalent PR and merge-group identity handling',t=>{
+  const f=fixture(t);change(f.candidate,'tools/verification/verification-catalog.json');f.commit();
+  const pr=f.invoke();assert.equal(pr.status,0,pr.stderr);assert.match(pr.stdout,/"mode":"verification-restoration-r1-r3"/);
+  const head=git(f.candidate,'rev-parse','HEAD');
+  const mq=f.invoke({GITHUB_EVENT_NAME:'merge_group',ATLAS_BASE_REF:'refs/heads/main',ATLAS_EVENT_ACTION:'checks_requested',ATLAS_PR_NUMBER:'',GITHUB_SHA:head});
+  assert.equal(mq.status,0,mq.stderr);assert.equal(pr.stdout,mq.stdout);
 });
 
 test('rejects a mixed verification and runtime candidate',t=>{
