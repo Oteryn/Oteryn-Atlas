@@ -231,11 +231,27 @@ export function validateImpactManifest(candidate, catalogCandidate) {
     if (prefixes.has(entry.pathPrefix)) invalid(kind, 'contains duplicate pathPrefix');
     prefixes.add(entry.pathPrefix);
     if (!PROFILE_ORDER.includes(entry.minimumProfile)) invalid(kind, 'entry minimumProfile is invalid');
+    if (entry.defaultRule !== undefined && typeof entry.defaultRule !== 'boolean') invalid(kind, 'entry defaultRule must be boolean');
+    if (entry.exactMatch !== undefined && typeof entry.exactMatch !== 'boolean') invalid(kind, 'entry exactMatch must be boolean');
+    if (entry.exactMatch && entry.defaultRule) invalid(kind, 'exact entries cannot be default catchalls');
+    const excludedPaths = uniqueStrings(entry.excludedPaths ?? [], kind, 'entry excludedPaths');
+    if (excludedPaths.some(path => !safePrefix(path) || !path.startsWith(entry.pathPrefix) || path.endsWith('/') || path.includes('*'))
+      || (excludedPaths.length && (entry.exactMatch || entry.defaultRule))) invalid(kind, 'entry excludedPaths must be exact children of a semantic prefix');
+    if (entry.executionBlocker !== undefined && !['unqualified-complete-product-oracle', 'unresolved-source-impact'].includes(entry.executionBlocker)) invalid(kind, 'entry executionBlocker is not allowlisted');
     const domains = uniqueStrings(entry.domains, kind, 'entry domains');
     if (domains.some((domain) => !GROUP_ID.test(domain))) invalid(kind, 'entry domains are invalid');
     const requiredGroups = uniqueStrings(entry.requiredGroups ?? [], kind, 'entry requiredGroups');
     if (requiredGroups.some((group) => !Object.hasOwn(catalog.groups, group))) invalid(kind, 'entry references unknown group');
-    return { pathPrefix: entry.pathPrefix, domains, minimumProfile: entry.minimumProfile, requiredGroups };
+    if (entry.defaultRule && (entry.pathPrefix !== 'tests/'
+      || domains.some(domain => !['test-contract', 'test-default'].includes(domain))
+      || requiredGroups.some(group => !['deterministic.core', 'e2e.full'].includes(group)))) {
+      invalid(kind, 'defaultRule is reserved for the tests/ ownership catchall');
+    }
+    return { pathPrefix: entry.pathPrefix, domains, minimumProfile: entry.minimumProfile, requiredGroups,
+      ...(entry.defaultRule === true ? { defaultRule: true } : {}),
+      ...(entry.exactMatch === true ? { exactMatch: true } : {}),
+      ...(excludedPaths.length ? { excludedPaths: excludedPaths.sort() } : {}),
+      ...(entry.executionBlocker ? { executionBlocker: entry.executionBlocker } : {}) };
   });
 
   const declaredDomains = new Set(entries.flatMap((entry) => entry.domains));

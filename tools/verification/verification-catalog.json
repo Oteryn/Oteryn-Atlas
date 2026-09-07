@@ -2,19 +2,41 @@
   "schemaVersion": 2,
   "groups": {
     "deterministic.core": {
-      "specs": ["tests/verification/*.test.mjs"],
+      "specs": [
+        "tests/verification/*.test.mjs"
+      ],
       "projects": [],
       "resourceClass": "cpu-light",
       "evidence": "machine-summary",
-      "capabilities": { "browser": false, "hosted": true, "requiresPublication": false, "dataCapability": "qualification_fixture", "visualReview": false, "specialistReason": null },
+      "capabilities": {
+        "browser": false,
+        "hosted": true,
+        "requiresPublication": false,
+        "dataCapability": "qualification_fixture",
+        "visualReview": false,
+        "specialistReason": null
+      },
       "fullSafetyNet": true
     },
     "e2e.common-smoke": {
-      "specs": ["e2e/tests/desktop.spec.mjs", "e2e/tests/mobile.spec.mjs"],
-      "projects": ["desktop-chromium", "mobile-chromium"],
+      "specs": [
+        "e2e/tests/desktop.spec.mjs",
+        "e2e/tests/mobile.spec.mjs"
+      ],
+      "projects": [
+        "desktop-chromium",
+        "mobile-chromium"
+      ],
       "resourceClass": "browser-targeted",
       "evidence": "machine-summary",
-      "capabilities": { "browser": true, "hosted": true, "requiresPublication": true, "dataCapability": "qualification_fixture", "visualReview": false, "specialistReason": null },
+      "capabilities": {
+        "browser": true,
+        "hosted": true,
+        "requiresPublication": true,
+        "dataCapability": "qualification_fixture",
+        "visualReview": false,
+        "specialistReason": null
+      },
       "fullSafetyNet": true
     },
     "e2e.creatures": {
@@ -25,10 +47,20 @@
         "e2e/tests/creature-gameplay-desktop.spec.mjs",
         "e2e/tests/creature-gameplay-mobile.spec.mjs"
       ],
-      "projects": ["desktop-chromium", "mobile-chromium"],
+      "projects": [
+        "desktop-chromium",
+        "mobile-chromium"
+      ],
       "resourceClass": "browser-targeted",
       "evidence": "machine-summary",
-      "capabilities": { "browser": true, "hosted": true, "requiresPublication": true, "dataCapability": "qualification_fixture", "visualReview": false, "specialistReason": null },
+      "capabilities": {
+        "browser": true,
+        "hosted": true,
+        "requiresPublication": true,
+        "dataCapability": "qualification_fixture",
+        "visualReview": false,
+        "specialistReason": null
+      },
       "fullSafetyNet": true
     },
     "e2e.full": {
@@ -67,18 +99,39 @@
         "e2e/tests/visual-mobile.spec.mjs",
         "e2e/tests/workflows-desktop.spec.mjs"
       ],
-      "projects": ["desktop-chromium", "mobile-chromium"],
+      "projects": [
+        "desktop-chromium",
+        "mobile-chromium"
+      ],
       "resourceClass": "browser-full",
       "evidence": "machine-summary",
-      "capabilities": { "browser": true, "hosted": true, "requiresPublication": true, "dataCapability": "qualification_fixture", "visualReview": false, "specialistReason": null },
+      "capabilities": {
+        "browser": true,
+        "hosted": true,
+        "requiresPublication": true,
+        "dataCapability": "qualification_fixture",
+        "visualReview": false,
+        "specialistReason": null
+      },
       "fullSafetyNet": true
     },
     "fullworld.animation-census": {
-      "specs": ["e2e/tests/fullworld-animation-census-desktop.spec.mjs"],
-      "projects": ["desktop-chromium"],
+      "specs": [
+        "e2e/tests/fullworld-animation-census-desktop.spec.mjs"
+      ],
+      "projects": [
+        "desktop-chromium"
+      ],
       "resourceClass": "browser-full",
       "evidence": "machine-summary",
-      "capabilities": { "browser": true, "hosted": false, "requiresPublication": true, "dataCapability": "real_fullworld", "visualReview": false, "specialistReason": "real-fullworld-product" },
+      "capabilities": {
+        "browser": true,
+        "hosted": false,
+        "requiresPublication": true,
+        "dataCapability": "real_fullworld",
+        "visualReview": false,
+        "specialistReason": "real-fullworld-product"
+      },
       "fullSafetyNet": false
     },
     "integration.source-contract": {
@@ -86,19 +139,334 @@
         "e2e/tests/api-contract-desktop.spec.mjs",
         "e2e/tests/creature-gameplay-source-contract-desktop.spec.mjs"
       ],
-      "projects": ["desktop-chromium"],
+      "projects": [
+        "desktop-chromium"
+      ],
       "resourceClass": "browser-targeted",
       "evidence": "machine-summary",
-      "capabilities": { "browser": true, "hosted": true, "requiresPublication": true, "dataCapability": "bounded_real_world", "visualReview": false, "specialistReason": null },
+      "capabilities": {
+        "browser": true,
+        "hosted": true,
+        "requiresPublication": true,
+        "dataCapability": "bounded_real_world",
+        "visualReview": false,
+        "specialistReason": null
+      },
       "fullSafetyNet": false
     },
     "visual.creatures": {
-      "specs": ["e2e/tests/visual-desktop.spec.mjs", "e2e/tests/visual-mobile.spec.mjs"],
-      "projects": ["desktop-chromium", "mobile-chromium"],
+      "specs": [
+        "e2e/tests/visual-desktop.spec.mjs",
+        "e2e/tests/visual-mobile.spec.mjs"
+      ],
+      "projects": [
+        "desktop-chromium",
+        "mobile-chromium"
+      ],
       "resourceClass": "browser-targeted",
       "evidence": "restricted-visual-review",
-      "capabilities": { "browser": true, "hosted": true, "requiresPublication": true, "dataCapability": "qualification_fixture", "visualReview": true, "specialistReason": null },
+      "capabilities": {
+        "browser": true,
+        "hosted": true,
+        "requiresPublication": true,
+        "dataCapability": "qualification_fixture",
+        "visualReview": true,
+        "specialistReason": null
+      },
       "fullSafetyNet": false
+    },
+    "deterministic.search": {
+      "specs": [
+        "tests/browser-semantic.mjs",
+        "tests/semantic-search-creatures.mjs",
+        "tests/semantic-search.mjs"
+      ],
+      "projects": [],
+      "resourceClass": "cpu-light",
+      "evidence": "machine-summary",
+      "capabilities": {
+        "browser": false,
+        "hosted": true,
+        "requiresPublication": false,
+        "dataCapability": "qualification_fixture",
+        "visualReview": false,
+        "specialistReason": null
+      },
+      "fullSafetyNet": true
+    },
+    "deterministic.gameplay": {
+      "specs": [
+        "tests/creature-gameplay-model.mjs",
+        "tests/creature-gameplay-profiles.mjs",
+        "tests/creature-gameplay-runtime-contract.mjs",
+        "tests/fullworld-runtime/creature-gameplay-runtime-safety.test.mjs"
+      ],
+      "projects": [],
+      "resourceClass": "cpu-light",
+      "evidence": "machine-summary",
+      "capabilities": {
+        "browser": false,
+        "hosted": true,
+        "requiresPublication": false,
+        "dataCapability": "qualification_fixture",
+        "visualReview": false,
+        "specialistReason": null
+      },
+      "fullSafetyNet": true
+    },
+    "deterministic.creature-interaction": {
+      "specs": [
+        "tests/creature-inspector-state.mjs",
+        "tests/creature-interaction-runtime-contract.mjs",
+        "tests/creature-interaction-target.mjs",
+        "tests/creature-interaction.mjs",
+        "tests/creature-map-activation-contract.mjs"
+      ],
+      "projects": [],
+      "resourceClass": "cpu-light",
+      "evidence": "machine-summary",
+      "capabilities": {
+        "browser": false,
+        "hosted": true,
+        "requiresPublication": false,
+        "dataCapability": "qualification_fixture",
+        "visualReview": false,
+        "specialistReason": null
+      },
+      "fullSafetyNet": true
+    },
+    "deterministic.creature-presentation": {
+      "specs": [
+        "tests/creature-presentation-browser-contract.mjs",
+        "tests/creature-presentation-contract.mjs",
+        "tests/creature-presentation-controller.mjs",
+        "tests/creature-presentation-layout.mjs",
+        "tests/creature-presentation-lod.mjs",
+        "tests/creature-presentation-runtime.mjs",
+        "tests/npc-badge-primitives.mjs",
+        "tests/npc-markers.mjs"
+      ],
+      "projects": [],
+      "resourceClass": "cpu-light",
+      "evidence": "machine-summary",
+      "capabilities": {
+        "browser": false,
+        "hosted": true,
+        "requiresPublication": false,
+        "dataCapability": "qualification_fixture",
+        "visualReview": false,
+        "specialistReason": null
+      },
+      "fullSafetyNet": true
+    },
+    "deterministic.creature-products": {
+      "specs": [
+        "tests/creature-index-roles.py"
+      ],
+      "projects": [],
+      "resourceClass": "cpu-light",
+      "evidence": "machine-summary",
+      "capabilities": {
+        "browser": false,
+        "hosted": true,
+        "requiresPublication": false,
+        "dataCapability": "qualification_fixture",
+        "visualReview": false,
+        "specialistReason": null
+      },
+      "fullSafetyNet": true
+    },
+    "deterministic.farm-products": {
+      "specs": [
+        "tests/farm-bundle.py",
+        "tests/farm-intelligence-build.py",
+        "tests/farm-spatial-index.py"
+      ],
+      "projects": [],
+      "resourceClass": "cpu-light",
+      "evidence": "machine-summary",
+      "capabilities": {
+        "browser": false,
+        "hosted": true,
+        "requiresPublication": false,
+        "dataCapability": "qualification_fixture",
+        "visualReview": false,
+        "specialistReason": null
+      },
+      "fullSafetyNet": true
+    },
+    "deterministic.farm-ui": {
+      "specs": [
+        "tests/farm-gui-contract.mjs",
+        "tests/farm-intelligence.mjs",
+        "tests/farm-lod.mjs",
+        "tests/farm-state.mjs"
+      ],
+      "projects": [],
+      "resourceClass": "cpu-light",
+      "evidence": "machine-summary",
+      "capabilities": {
+        "browser": false,
+        "hosted": true,
+        "requiresPublication": false,
+        "dataCapability": "qualification_fixture",
+        "visualReview": false,
+        "specialistReason": null
+      },
+      "fullSafetyNet": true
+    },
+    "deterministic.browser-core": {
+      "specs": [
+        "tests/animation-runtime.mjs",
+        "tests/gui-contract.mjs",
+        "tests/map-activation.mjs",
+        "tests/pixel-store.mjs"
+      ],
+      "projects": [],
+      "resourceClass": "cpu-light",
+      "evidence": "machine-summary",
+      "capabilities": {
+        "browser": false,
+        "hosted": true,
+        "requiresPublication": false,
+        "dataCapability": "qualification_fixture",
+        "visualReview": false,
+        "specialistReason": null
+      },
+      "fullSafetyNet": true
+    },
+    "deterministic.publication": {
+      "specs": [
+        "tests/fullworld-publication/canonical-json-parity.test.mjs",
+        "tests/fullworld-publication/test_output_safety.py",
+        "tests/fullworld-publication/test_publication.py"
+      ],
+      "projects": [],
+      "resourceClass": "cpu-light",
+      "evidence": "machine-summary",
+      "capabilities": {
+        "browser": false,
+        "hosted": true,
+        "requiresPublication": false,
+        "dataCapability": "qualification_fixture",
+        "visualReview": false,
+        "specialistReason": null
+      },
+      "fullSafetyNet": true
+    },
+    "deterministic.fullworld-runtime": {
+      "specs": [
+        "tests/fullworld-runtime/cdp-session.test.mjs",
+        "tests/fullworld-runtime/incremental_content_graph_self_test.py",
+        "tests/fullworld-runtime/performance.test.mjs",
+        "tests/fullworld-runtime/pixel-bucket-timeout.test.mjs",
+        "tests/fullworld-runtime/progressive.test.mjs",
+        "tests/fullworld-runtime/runtime-safety.test.mjs",
+        "tests/fullworld-runtime/runtime.test.mjs",
+        "tests/fullworld-runtime/runtime_index_self_test.py"
+      ],
+      "projects": [],
+      "resourceClass": "cpu-light",
+      "evidence": "machine-summary",
+      "capabilities": {
+        "browser": false,
+        "hosted": true,
+        "requiresPublication": false,
+        "dataCapability": "qualification_fixture",
+        "visualReview": false,
+        "specialistReason": null
+      },
+      "fullSafetyNet": true
+    },
+    "deterministic.fullworld-layers": {
+      "specs": [
+        "tests/fullworld-layers/overview-browser.test.mjs",
+        "tests/fullworld-layers/test_authority_registry.py",
+        "tests/fullworld-layers/test_overview.py"
+      ],
+      "projects": [],
+      "resourceClass": "cpu-light",
+      "evidence": "machine-summary",
+      "capabilities": {
+        "browser": false,
+        "hosted": true,
+        "requiresPublication": false,
+        "dataCapability": "qualification_fixture",
+        "visualReview": false,
+        "specialistReason": null
+      },
+      "fullSafetyNet": true
+    },
+    "deterministic.fullworld-minimap": {
+      "specs": [
+        "tests/fullworld-minimap/minimap_builder_self_test.py",
+        "tests/fullworld-runtime/minimap-palette.test.mjs"
+      ],
+      "projects": [],
+      "resourceClass": "cpu-light",
+      "evidence": "machine-summary",
+      "capabilities": {
+        "browser": false,
+        "hosted": true,
+        "requiresPublication": false,
+        "dataCapability": "qualification_fixture",
+        "visualReview": false,
+        "specialistReason": null
+      },
+      "fullSafetyNet": true
+    },
+    "deterministic.geometry": {
+      "specs": [
+        "tests/creature-presentation-geometry.mjs",
+        "tests/properties/viewport-transform.test.mjs"
+      ],
+      "projects": [],
+      "resourceClass": "cpu-light",
+      "evidence": "machine-summary",
+      "capabilities": {
+        "browser": false,
+        "hosted": true,
+        "requiresPublication": false,
+        "dataCapability": "qualification_fixture",
+        "visualReview": false,
+        "specialistReason": null
+      },
+      "fullSafetyNet": true
+    },
+    "deterministic.maintenance": {
+      "specs": [
+        "tests/maintenance/maintenance-diff-policy.test.mjs"
+      ],
+      "projects": [],
+      "resourceClass": "cpu-light",
+      "evidence": "machine-summary",
+      "capabilities": {
+        "browser": false,
+        "hosted": true,
+        "requiresPublication": false,
+        "dataCapability": "qualification_fixture",
+        "visualReview": false,
+        "specialistReason": null
+      },
+      "fullSafetyNet": true
+    },
+    "deterministic.deployment": {
+      "specs": [
+        "tests/deployment-policy.mjs",
+        "tests/synology-live-workflow.mjs"
+      ],
+      "projects": [],
+      "resourceClass": "cpu-light",
+      "evidence": "machine-summary",
+      "capabilities": {
+        "browser": false,
+        "hosted": true,
+        "requiresPublication": false,
+        "dataCapability": "qualification_fixture",
+        "visualReview": false,
+        "specialistReason": null
+      },
+      "fullSafetyNet": true
     }
   }
 }

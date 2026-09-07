@@ -3,151 +3,1506 @@
   "entries": [
     {
       "pathPrefix": "docs/",
-      "domains": ["documentation"],
+      "domains": [
+        "documentation"
+      ],
       "minimumProfile": "none",
       "requiredGroups": []
     },
     {
       "pathPrefix": "tools/dyn-atlas-semantic/",
-      "domains": ["generator"],
+      "domains": [
+        "generator"
+      ],
       "minimumProfile": "focused",
-      "requiredGroups": ["deterministic.core"]
+      "requiredGroups": [
+        "deterministic.core"
+      ]
     },
     {
       "pathPrefix": "tools/animation-runtime/",
-      "domains": ["animation-product"],
+      "domains": [
+        "animation-product"
+      ],
       "minimumProfile": "broad",
-      "requiredGroups": ["deterministic.core", "e2e.full", "fullworld.animation-census"]
+      "requiredGroups": [
+        "deterministic.core",
+        "e2e.full",
+        "fullworld.animation-census"
+      ]
     },
     {
       "pathPrefix": "tools/fullworld-generation/",
-      "domains": ["fullworld-complete-product"],
+      "domains": [
+        "fullworld-complete-product"
+      ],
       "minimumProfile": "broad",
-      "requiredGroups": ["deterministic.core", "e2e.full"]
+      "requiredGroups": [
+        "deterministic.core",
+        "e2e.full"
+      ],
+      "executionBlocker": "unqualified-complete-product-oracle"
     },
     {
       "pathPrefix": "tools/fullworld-publication/",
-      "domains": ["fullworld-complete-product"],
+      "domains": [
+        "fullworld-complete-product"
+      ],
       "minimumProfile": "broad",
-      "requiredGroups": ["deterministic.core", "e2e.full"]
+      "requiredGroups": [
+        "deterministic.core",
+        "e2e.full"
+      ],
+      "executionBlocker": "unqualified-complete-product-oracle"
     },
     {
       "pathPrefix": "tools/fullworld-runtime/",
-      "domains": ["fullworld-complete-product"],
+      "domains": [
+        "fullworld-complete-product"
+      ],
       "minimumProfile": "broad",
-      "requiredGroups": ["deterministic.core", "e2e.full"]
+      "requiredGroups": [
+        "deterministic.core",
+        "e2e.full"
+      ],
+      "executionBlocker": "unqualified-complete-product-oracle",
+      "excludedPaths": [
+        "tools/fullworld-runtime/cdp-session.mjs"
+      ]
     },
     {
       "pathPrefix": "tools/fullworld-layers/",
-      "domains": ["fullworld-complete-product"],
+      "domains": [
+        "fullworld-complete-product"
+      ],
       "minimumProfile": "broad",
-      "requiredGroups": ["deterministic.core", "e2e.full"]
+      "requiredGroups": [
+        "deterministic.core",
+        "e2e.full"
+      ],
+      "executionBlocker": "unqualified-complete-product-oracle",
+      "excludedPaths": [
+        "tools/fullworld-layers/verify_authority_registry.py"
+      ]
     },
     {
       "pathPrefix": "tools/fullworld-minimap/",
-      "domains": ["fullworld-complete-product"],
+      "domains": [
+        "fullworld-complete-product"
+      ],
       "minimumProfile": "broad",
-      "requiredGroups": ["deterministic.core", "e2e.full"]
+      "requiredGroups": [
+        "deterministic.core",
+        "e2e.full"
+      ],
+      "executionBlocker": "unqualified-complete-product-oracle"
     },
     {
       "pathPrefix": "tools/build-semantic-search-index.py",
-      "domains": ["source-contract"],
+      "domains": [
+        "source-contract"
+      ],
       "minimumProfile": "targeted",
-      "requiredGroups": ["deterministic.core", "integration.source-contract"]
+      "requiredGroups": [
+        "deterministic.core",
+        "integration.source-contract"
+      ]
     },
     {
       "pathPrefix": "src/browser/creature-",
-      "domains": ["creatures"],
+      "domains": [
+        "creatures"
+      ],
       "minimumProfile": "targeted",
-      "requiredGroups": ["deterministic.core", "e2e.common-smoke", "e2e.creatures", "visual.creatures"]
+      "requiredGroups": [
+        "deterministic.core",
+        "e2e.common-smoke",
+        "e2e.creatures",
+        "visual.creatures"
+      ]
     },
     {
       "pathPrefix": "src/browser/",
-      "domains": ["browser-runtime"],
+      "domains": [
+        "browser-runtime"
+      ],
       "minimumProfile": "broad",
-      "requiredGroups": ["deterministic.core", "e2e.common-smoke"]
+      "requiredGroups": [
+        "deterministic.core",
+        "e2e.common-smoke"
+      ]
     },
     {
       "pathPrefix": "web/semantic-search/",
-      "domains": ["source-contract"],
+      "domains": [
+        "source-contract"
+      ],
       "minimumProfile": "targeted",
-      "requiredGroups": ["deterministic.core", "integration.source-contract"]
+      "requiredGroups": [
+        "deterministic.core",
+        "integration.source-contract"
+      ]
     },
     {
       "pathPrefix": "web/",
-      "domains": ["browser-ui"],
+      "domains": [
+        "browser-ui"
+      ],
       "minimumProfile": "broad",
-      "requiredGroups": ["deterministic.core", "e2e.full"]
+      "requiredGroups": [
+        "deterministic.core",
+        "e2e.full"
+      ]
     },
     {
       "pathPrefix": "e2e/tests/fullworld-animation-census-desktop.spec.mjs",
-      "domains": ["animation-product", "verification-governance"],
+      "domains": [
+        "animation-product",
+        "verification-governance"
+      ],
       "minimumProfile": "full",
-      "requiredGroups": ["deterministic.core", "e2e.full", "fullworld.animation-census"]
+      "requiredGroups": [
+        "deterministic.core",
+        "e2e.full",
+        "fullworld.animation-census"
+      ]
     },
     {
       "pathPrefix": "e2e/tests/api-contract-desktop.spec.mjs",
-      "domains": ["source-contract", "verification-governance"],
+      "domains": [
+        "source-contract",
+        "verification-governance"
+      ],
       "minimumProfile": "full",
-      "requiredGroups": ["deterministic.core", "e2e.full", "integration.source-contract"]
+      "requiredGroups": [
+        "deterministic.core",
+        "e2e.full",
+        "integration.source-contract"
+      ]
     },
     {
       "pathPrefix": "e2e/",
-      "domains": ["verification-governance"],
+      "domains": [
+        "verification-governance"
+      ],
       "minimumProfile": "full",
-      "requiredGroups": ["deterministic.core", "e2e.full"]
+      "requiredGroups": [
+        "deterministic.core",
+        "e2e.full"
+      ]
     },
     {
       "pathPrefix": "tests/verification/",
-      "domains": ["test-contract"],
+      "domains": [
+        "test-contract"
+      ],
       "minimumProfile": "focused",
-      "requiredGroups": ["deterministic.core"]
+      "requiredGroups": [
+        "deterministic.core"
+      ]
     },
     {
       "pathPrefix": "tests/",
-      "domains": ["test-contract"],
+      "domains": [
+        "test-contract"
+      ],
       "minimumProfile": "focused",
-      "requiredGroups": ["deterministic.core"]
+      "requiredGroups": [
+        "deterministic.core"
+      ],
+      "defaultRule": true
     },
     {
       "pathPrefix": "tools/verification/",
-      "domains": ["verification-governance"],
+      "domains": [
+        "verification-governance"
+      ],
       "minimumProfile": "full",
-      "requiredGroups": ["deterministic.core", "e2e.full"]
+      "requiredGroups": [
+        "deterministic.core",
+        "e2e.full"
+      ]
     },
     {
       "pathPrefix": ".github/workflows/",
-      "domains": ["verification-governance"],
+      "domains": [
+        "verification-governance"
+      ],
       "minimumProfile": "full",
-      "requiredGroups": ["deterministic.core", "e2e.full"]
+      "requiredGroups": [
+        "deterministic.core",
+        "e2e.full"
+      ]
     },
     {
       "pathPrefix": ".github/workflows/legacy-molehill-transition-qualification.yml",
-      "domains": ["legacy-fullworld-transition"],
+      "domains": [
+        "legacy-fullworld-transition"
+      ],
       "minimumProfile": "full",
-      "requiredGroups": ["deterministic.core", "e2e.full", "fullworld.animation-census", "integration.source-contract"]
+      "requiredGroups": [
+        "deterministic.core",
+        "e2e.full",
+        "fullworld.animation-census",
+        "integration.source-contract"
+      ]
+    },
+    {
+      "pathPrefix": "src/browser/creature-gameplay-profiles.mjs",
+      "domains": [
+        "creatures",
+        "source-contract"
+      ],
+      "minimumProfile": "targeted",
+      "requiredGroups": [
+        "deterministic.core",
+        "deterministic.gameplay",
+        "e2e.creatures",
+        "integration.source-contract"
+      ],
+      "exactMatch": true
+    },
+    {
+      "pathPrefix": "e2e/tests/creature-gameplay-source-contract-desktop.spec.mjs",
+      "domains": [
+        "creatures",
+        "source-contract"
+      ],
+      "minimumProfile": "targeted",
+      "requiredGroups": [
+        "deterministic.core",
+        "e2e.creatures",
+        "integration.source-contract"
+      ],
+      "exactMatch": true
+    },
+    {
+      "pathPrefix": "tests/animation-runtime.mjs",
+      "domains": [
+        "test-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.browser-core"
+      ],
+      "exactMatch": true
+    },
+    {
+      "pathPrefix": "tests/browser-semantic.mjs",
+      "domains": [
+        "test-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.search"
+      ],
+      "exactMatch": true
+    },
+    {
+      "pathPrefix": "tests/creature-gameplay-model.mjs",
+      "domains": [
+        "test-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.gameplay"
+      ],
+      "exactMatch": true
+    },
+    {
+      "pathPrefix": "tests/creature-gameplay-profiles.mjs",
+      "domains": [
+        "test-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.gameplay"
+      ],
+      "exactMatch": true
+    },
+    {
+      "pathPrefix": "tests/creature-gameplay-runtime-contract.mjs",
+      "domains": [
+        "test-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.gameplay"
+      ],
+      "exactMatch": true
+    },
+    {
+      "pathPrefix": "tests/creature-index-roles.py",
+      "domains": [
+        "test-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.creature-products"
+      ],
+      "exactMatch": true
+    },
+    {
+      "pathPrefix": "tests/creature-inspector-state.mjs",
+      "domains": [
+        "test-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.creature-interaction"
+      ],
+      "exactMatch": true
+    },
+    {
+      "pathPrefix": "tests/creature-interaction-runtime-contract.mjs",
+      "domains": [
+        "test-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.creature-interaction"
+      ],
+      "exactMatch": true
+    },
+    {
+      "pathPrefix": "tests/creature-interaction-target.mjs",
+      "domains": [
+        "test-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.creature-interaction"
+      ],
+      "exactMatch": true
+    },
+    {
+      "pathPrefix": "tests/creature-interaction.mjs",
+      "domains": [
+        "test-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.creature-interaction"
+      ],
+      "exactMatch": true
+    },
+    {
+      "pathPrefix": "tests/creature-map-activation-contract.mjs",
+      "domains": [
+        "test-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.creature-interaction"
+      ],
+      "exactMatch": true
+    },
+    {
+      "pathPrefix": "tests/creature-presentation-browser-contract.mjs",
+      "domains": [
+        "test-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.creature-presentation"
+      ],
+      "exactMatch": true
+    },
+    {
+      "pathPrefix": "tests/creature-presentation-contract.mjs",
+      "domains": [
+        "test-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.creature-presentation"
+      ],
+      "exactMatch": true
+    },
+    {
+      "pathPrefix": "tests/creature-presentation-controller.mjs",
+      "domains": [
+        "test-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.creature-presentation"
+      ],
+      "exactMatch": true
+    },
+    {
+      "pathPrefix": "tests/creature-presentation-geometry.mjs",
+      "domains": [
+        "test-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.geometry"
+      ],
+      "exactMatch": true
+    },
+    {
+      "pathPrefix": "tests/creature-presentation-layout.mjs",
+      "domains": [
+        "test-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.creature-presentation"
+      ],
+      "exactMatch": true
+    },
+    {
+      "pathPrefix": "tests/creature-presentation-lod.mjs",
+      "domains": [
+        "test-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.creature-presentation"
+      ],
+      "exactMatch": true
+    },
+    {
+      "pathPrefix": "tests/creature-presentation-runtime.mjs",
+      "domains": [
+        "test-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.creature-presentation"
+      ],
+      "exactMatch": true
+    },
+    {
+      "pathPrefix": "tests/deployment-policy.mjs",
+      "domains": [
+        "test-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.deployment"
+      ],
+      "exactMatch": true
+    },
+    {
+      "pathPrefix": "tests/farm-bundle.py",
+      "domains": [
+        "test-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.farm-products"
+      ],
+      "exactMatch": true
+    },
+    {
+      "pathPrefix": "tests/farm-gui-contract.mjs",
+      "domains": [
+        "test-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.farm-ui"
+      ],
+      "exactMatch": true
+    },
+    {
+      "pathPrefix": "tests/farm-intelligence-build.py",
+      "domains": [
+        "test-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.farm-products"
+      ],
+      "exactMatch": true
+    },
+    {
+      "pathPrefix": "tests/farm-intelligence.mjs",
+      "domains": [
+        "test-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.farm-ui"
+      ],
+      "exactMatch": true
+    },
+    {
+      "pathPrefix": "tests/farm-lod.mjs",
+      "domains": [
+        "test-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.farm-ui"
+      ],
+      "exactMatch": true
+    },
+    {
+      "pathPrefix": "tests/farm-spatial-index.py",
+      "domains": [
+        "test-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.farm-products"
+      ],
+      "exactMatch": true
+    },
+    {
+      "pathPrefix": "tests/farm-state.mjs",
+      "domains": [
+        "test-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.farm-ui"
+      ],
+      "exactMatch": true
+    },
+    {
+      "pathPrefix": "tests/fullworld-layers/overview-browser.test.mjs",
+      "domains": [
+        "test-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.fullworld-layers"
+      ],
+      "exactMatch": true
+    },
+    {
+      "pathPrefix": "tests/fullworld-layers/test_authority_registry.py",
+      "domains": [
+        "test-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.fullworld-layers"
+      ],
+      "exactMatch": true
+    },
+    {
+      "pathPrefix": "tests/fullworld-layers/test_overview.py",
+      "domains": [
+        "test-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.fullworld-layers"
+      ],
+      "exactMatch": true
+    },
+    {
+      "pathPrefix": "tests/fullworld-minimap/minimap_builder_self_test.py",
+      "domains": [
+        "test-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.fullworld-minimap"
+      ],
+      "exactMatch": true
+    },
+    {
+      "pathPrefix": "tests/fullworld-publication/canonical-json-parity.test.mjs",
+      "domains": [
+        "test-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.publication"
+      ],
+      "exactMatch": true
+    },
+    {
+      "pathPrefix": "tests/fullworld-publication/test_output_safety.py",
+      "domains": [
+        "test-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.publication"
+      ],
+      "exactMatch": true
+    },
+    {
+      "pathPrefix": "tests/fullworld-publication/test_publication.py",
+      "domains": [
+        "test-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.publication"
+      ],
+      "exactMatch": true
+    },
+    {
+      "pathPrefix": "tests/fullworld-runtime/cdp-session.test.mjs",
+      "domains": [
+        "test-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.fullworld-runtime"
+      ],
+      "exactMatch": true
+    },
+    {
+      "pathPrefix": "tests/fullworld-runtime/creature-gameplay-runtime-safety.test.mjs",
+      "domains": [
+        "test-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.gameplay"
+      ],
+      "exactMatch": true
+    },
+    {
+      "pathPrefix": "tests/fullworld-runtime/incremental_content_graph_self_test.py",
+      "domains": [
+        "test-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.fullworld-runtime"
+      ],
+      "exactMatch": true
+    },
+    {
+      "pathPrefix": "tests/fullworld-runtime/minimap-palette.test.mjs",
+      "domains": [
+        "test-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.fullworld-minimap"
+      ],
+      "exactMatch": true
+    },
+    {
+      "pathPrefix": "tests/fullworld-runtime/performance.test.mjs",
+      "domains": [
+        "test-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.fullworld-runtime"
+      ],
+      "exactMatch": true
+    },
+    {
+      "pathPrefix": "tests/fullworld-runtime/pixel-bucket-timeout.test.mjs",
+      "domains": [
+        "test-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.fullworld-runtime"
+      ],
+      "exactMatch": true
+    },
+    {
+      "pathPrefix": "tests/fullworld-runtime/progressive.test.mjs",
+      "domains": [
+        "test-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.fullworld-runtime"
+      ],
+      "exactMatch": true
+    },
+    {
+      "pathPrefix": "tests/fullworld-runtime/runtime-safety.test.mjs",
+      "domains": [
+        "test-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.fullworld-runtime"
+      ],
+      "exactMatch": true
+    },
+    {
+      "pathPrefix": "tests/fullworld-runtime/runtime.test.mjs",
+      "domains": [
+        "test-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.fullworld-runtime"
+      ],
+      "exactMatch": true
+    },
+    {
+      "pathPrefix": "tests/fullworld-runtime/runtime_index_self_test.py",
+      "domains": [
+        "test-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.fullworld-runtime"
+      ],
+      "exactMatch": true
+    },
+    {
+      "pathPrefix": "tests/gui-contract.mjs",
+      "domains": [
+        "test-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.browser-core"
+      ],
+      "exactMatch": true
+    },
+    {
+      "pathPrefix": "tests/maintenance/maintenance-diff-policy.test.mjs",
+      "domains": [
+        "test-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.maintenance"
+      ],
+      "exactMatch": true
+    },
+    {
+      "pathPrefix": "tests/map-activation.mjs",
+      "domains": [
+        "test-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.browser-core"
+      ],
+      "exactMatch": true
+    },
+    {
+      "pathPrefix": "tests/npc-badge-primitives.mjs",
+      "domains": [
+        "test-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.creature-presentation"
+      ],
+      "exactMatch": true
+    },
+    {
+      "pathPrefix": "tests/npc-markers.mjs",
+      "domains": [
+        "test-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.creature-presentation"
+      ],
+      "exactMatch": true
+    },
+    {
+      "pathPrefix": "tests/pixel-store.mjs",
+      "domains": [
+        "test-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.browser-core"
+      ],
+      "exactMatch": true
+    },
+    {
+      "pathPrefix": "tests/properties/viewport-transform.test.mjs",
+      "domains": [
+        "test-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.geometry"
+      ],
+      "exactMatch": true
+    },
+    {
+      "pathPrefix": "tests/semantic-search-creatures.mjs",
+      "domains": [
+        "test-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.search"
+      ],
+      "exactMatch": true
+    },
+    {
+      "pathPrefix": "tests/semantic-search.mjs",
+      "domains": [
+        "test-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.search"
+      ],
+      "exactMatch": true
+    },
+    {
+      "pathPrefix": "tests/synology-live-workflow.mjs",
+      "domains": [
+        "test-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.deployment"
+      ],
+      "exactMatch": true
+    },
+    {
+      "pathPrefix": "tools/fullworld-runtime/cdp-session.mjs",
+      "exactMatch": true,
+      "domains": [
+        "fixture-product-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.fullworld-runtime"
+      ]
+    },
+    {
+      "pathPrefix": "tools/fullworld-layers/verify_authority_registry.py",
+      "exactMatch": true,
+      "domains": [
+        "fixture-product-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.fullworld-layers"
+      ]
+    },
+    {
+      "pathPrefix": "tools/fullworld-generation/fabric.py",
+      "exactMatch": true,
+      "domains": [
+        "fixture-product-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.publication"
+      ]
+    },
+    {
+      "pathPrefix": "tools/fullworld-publication/publication.py",
+      "exactMatch": true,
+      "domains": [
+        "fixture-product-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.publication"
+      ]
+    },
+    {
+      "pathPrefix": "tools/fullworld-publication/verify_publication.py",
+      "exactMatch": true,
+      "domains": [
+        "fixture-product-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.publication"
+      ]
+    },
+    {
+      "pathPrefix": "tools/fullworld-runtime/build_runtime_index.py",
+      "exactMatch": true,
+      "domains": [
+        "fixture-product-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.fullworld-runtime"
+      ]
+    },
+    {
+      "pathPrefix": "tools/fullworld-runtime/build_pixel_buckets.py",
+      "exactMatch": true,
+      "domains": [
+        "fixture-product-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.publication"
+      ]
+    },
+    {
+      "pathPrefix": "tools/fullworld-layers/build_overview.py",
+      "exactMatch": true,
+      "domains": [
+        "fixture-product-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.fullworld-layers",
+        "deterministic.publication"
+      ]
+    },
+    {
+      "pathPrefix": "tools/fullworld-layers/verify_overview.py",
+      "exactMatch": true,
+      "domains": [
+        "fixture-product-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.fullworld-layers"
+      ]
+    },
+    {
+      "pathPrefix": "tools/fullworld-minimap/build_minimap.py",
+      "exactMatch": true,
+      "domains": [
+        "fixture-product-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.fullworld-minimap"
+      ]
+    },
+    {
+      "pathPrefix": "src/browser/animation-runtime.mjs",
+      "exactMatch": true,
+      "domains": [
+        "fixture-product-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.browser-core"
+      ]
+    },
+    {
+      "pathPrefix": "src/browser/creature-gameplay-model.mjs",
+      "exactMatch": true,
+      "domains": [
+        "fixture-product-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.gameplay"
+      ]
+    },
+    {
+      "pathPrefix": "src/browser/creature-inspector-state.mjs",
+      "exactMatch": true,
+      "domains": [
+        "fixture-product-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.creature-interaction"
+      ]
+    },
+    {
+      "pathPrefix": "src/browser/creature-interaction-target.mjs",
+      "exactMatch": true,
+      "domains": [
+        "fixture-product-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.creature-interaction"
+      ]
+    },
+    {
+      "pathPrefix": "src/browser/creature-interaction.mjs",
+      "exactMatch": true,
+      "domains": [
+        "fixture-product-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.creature-interaction"
+      ]
+    },
+    {
+      "pathPrefix": "src/browser/creature-presentation-controller.mjs",
+      "exactMatch": true,
+      "domains": [
+        "fixture-product-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.creature-presentation"
+      ]
+    },
+    {
+      "pathPrefix": "src/browser/creature-presentation-geometry.mjs",
+      "exactMatch": true,
+      "domains": [
+        "fixture-product-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.geometry"
+      ]
+    },
+    {
+      "pathPrefix": "src/browser/creature-presentation-layout.mjs",
+      "exactMatch": true,
+      "domains": [
+        "fixture-product-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.creature-presentation"
+      ]
+    },
+    {
+      "pathPrefix": "src/browser/creature-presentation-lod.mjs",
+      "exactMatch": true,
+      "domains": [
+        "fixture-product-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.creature-presentation"
+      ]
+    },
+    {
+      "pathPrefix": "src/browser/creature-presentation-runtime.mjs",
+      "exactMatch": true,
+      "domains": [
+        "fixture-product-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.creature-presentation"
+      ]
+    },
+    {
+      "pathPrefix": "src/browser/creature-render-diagnostics.mjs",
+      "exactMatch": true,
+      "domains": [
+        "fixture-product-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.creature-presentation"
+      ]
+    },
+    {
+      "pathPrefix": "src/browser/creature-search.mjs",
+      "exactMatch": true,
+      "domains": [
+        "fixture-product-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.search"
+      ]
+    },
+    {
+      "pathPrefix": "src/browser/farm-intelligence.mjs",
+      "exactMatch": true,
+      "domains": [
+        "fixture-product-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.farm-ui"
+      ]
+    },
+    {
+      "pathPrefix": "src/browser/farm-lod.mjs",
+      "exactMatch": true,
+      "domains": [
+        "fixture-product-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.farm-ui"
+      ]
+    },
+    {
+      "pathPrefix": "src/browser/farm-state.mjs",
+      "exactMatch": true,
+      "domains": [
+        "fixture-product-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.farm-ui"
+      ]
+    },
+    {
+      "pathPrefix": "src/browser/frame-scheduler.mjs",
+      "exactMatch": true,
+      "domains": [
+        "fixture-product-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.fullworld-runtime"
+      ]
+    },
+    {
+      "pathPrefix": "src/browser/fullworld-performance.mjs",
+      "exactMatch": true,
+      "domains": [
+        "fixture-product-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.fullworld-runtime"
+      ]
+    },
+    {
+      "pathPrefix": "src/browser/fullworld-pixel-buckets.mjs",
+      "exactMatch": true,
+      "domains": [
+        "fixture-product-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.fullworld-runtime"
+      ]
+    },
+    {
+      "pathPrefix": "src/browser/fullworld-pixels.mjs",
+      "exactMatch": true,
+      "domains": [
+        "fixture-product-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.fullworld-runtime",
+        "deterministic.publication"
+      ]
+    },
+    {
+      "pathPrefix": "src/browser/fullworld-progressive.mjs",
+      "exactMatch": true,
+      "domains": [
+        "fixture-product-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.fullworld-runtime"
+      ]
+    },
+    {
+      "pathPrefix": "src/browser/fullworld.mjs",
+      "exactMatch": true,
+      "domains": [
+        "fixture-product-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.fullworld-runtime",
+        "deterministic.publication"
+      ]
+    },
+    {
+      "pathPrefix": "src/browser/loader.mjs",
+      "exactMatch": true,
+      "domains": [
+        "fixture-product-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.browser-core",
+        "deterministic.fullworld-layers",
+        "deterministic.fullworld-runtime",
+        "deterministic.gameplay",
+        "deterministic.publication",
+        "deterministic.search"
+      ]
+    },
+    {
+      "pathPrefix": "src/browser/map-activation.mjs",
+      "exactMatch": true,
+      "domains": [
+        "fixture-product-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.browser-core"
+      ]
+    },
+    {
+      "pathPrefix": "src/browser/npc-badge-primitives.mjs",
+      "exactMatch": true,
+      "domains": [
+        "fixture-product-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.creature-presentation"
+      ]
+    },
+    {
+      "pathPrefix": "src/browser/npc-markers.mjs",
+      "exactMatch": true,
+      "domains": [
+        "fixture-product-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.creature-presentation"
+      ]
+    },
+    {
+      "pathPrefix": "src/browser/pixels.mjs",
+      "exactMatch": true,
+      "domains": [
+        "fixture-product-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.browser-core",
+        "deterministic.fullworld-runtime"
+      ]
+    },
+    {
+      "pathPrefix": "src/browser/semantic-search.mjs",
+      "exactMatch": true,
+      "domains": [
+        "fixture-product-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.search"
+      ]
+    },
+    {
+      "pathPrefix": "src/browser/semantic.mjs",
+      "exactMatch": true,
+      "domains": [
+        "fixture-product-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.search"
+      ]
+    },
+    {
+      "pathPrefix": "src/browser/verified-content-cache.mjs",
+      "exactMatch": true,
+      "domains": [
+        "fixture-product-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.fullworld-runtime"
+      ]
+    },
+    {
+      "pathPrefix": "src/browser/viewport-transform.mjs",
+      "exactMatch": true,
+      "domains": [
+        "fixture-product-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.geometry"
+      ]
+    },
+    {
+      "pathPrefix": "src/browser/world-query.mjs",
+      "exactMatch": true,
+      "domains": [
+        "fixture-product-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.fullworld-runtime"
+      ]
+    },
+    {
+      "pathPrefix": "src/layers/minimap-lod.mjs",
+      "exactMatch": true,
+      "domains": [
+        "fixture-product-contract"
+      ],
+      "minimumProfile": "full",
+      "requiredGroups": [
+        "deterministic.core",
+        "deterministic.fullworld-runtime",
+        "e2e.full"
+      ],
+      "executionBlocker": "unresolved-source-impact"
+    },
+    {
+      "pathPrefix": "src/layers/minimap-palette.mjs",
+      "exactMatch": true,
+      "domains": [
+        "fixture-product-contract"
+      ],
+      "minimumProfile": "full",
+      "requiredGroups": [
+        "deterministic.core",
+        "deterministic.fullworld-minimap",
+        "e2e.full"
+      ],
+      "executionBlocker": "unresolved-source-impact"
+    },
+    {
+      "pathPrefix": "src/layers/overview.mjs",
+      "exactMatch": true,
+      "domains": [
+        "fixture-product-contract"
+      ],
+      "minimumProfile": "full",
+      "requiredGroups": [
+        "deterministic.core",
+        "deterministic.fullworld-layers",
+        "e2e.full"
+      ],
+      "executionBlocker": "unresolved-source-impact"
+    },
+    {
+      "pathPrefix": "tools/build-creature-index.py",
+      "exactMatch": true,
+      "domains": [
+        "fixture-product-contract"
+      ],
+      "minimumProfile": "full",
+      "requiredGroups": [
+        "deterministic.core",
+        "deterministic.creature-products",
+        "e2e.full"
+      ],
+      "executionBlocker": "unresolved-source-impact"
+    },
+    {
+      "pathPrefix": "tools/build-farm-bundle.py",
+      "exactMatch": true,
+      "domains": [
+        "fixture-product-contract"
+      ],
+      "minimumProfile": "full",
+      "requiredGroups": [
+        "deterministic.core",
+        "deterministic.farm-products",
+        "e2e.full"
+      ],
+      "executionBlocker": "unresolved-source-impact"
+    },
+    {
+      "pathPrefix": "tools/build-farm-intelligence.py",
+      "exactMatch": true,
+      "domains": [
+        "fixture-product-contract"
+      ],
+      "minimumProfile": "full",
+      "requiredGroups": [
+        "deterministic.core",
+        "deterministic.farm-products",
+        "e2e.full"
+      ],
+      "executionBlocker": "unresolved-source-impact"
+    },
+    {
+      "pathPrefix": "tools/build-farm-spatial-index.py",
+      "exactMatch": true,
+      "domains": [
+        "fixture-product-contract"
+      ],
+      "minimumProfile": "full",
+      "requiredGroups": [
+        "deterministic.core",
+        "deterministic.farm-products",
+        "e2e.full"
+      ],
+      "executionBlocker": "unresolved-source-impact"
+    },
+    {
+      "pathPrefix": "tools/fullworld-incremental/content_graph.py",
+      "exactMatch": true,
+      "domains": [
+        "fixture-product-contract"
+      ],
+      "minimumProfile": "full",
+      "requiredGroups": [
+        "deterministic.core",
+        "deterministic.fullworld-runtime",
+        "e2e.full"
+      ],
+      "executionBlocker": "unresolved-source-impact"
+    },
+    {
+      "pathPrefix": "tools/maintenance/verify-maintenance-diff.mjs",
+      "exactMatch": true,
+      "domains": [
+        "fixture-product-contract"
+      ],
+      "minimumProfile": "full",
+      "requiredGroups": [
+        "deterministic.core",
+        "deterministic.maintenance",
+        "e2e.full"
+      ],
+      "executionBlocker": "unresolved-source-impact"
+    },
+    {
+      "pathPrefix": "web/fullworld-farm-explorer.mjs",
+      "exactMatch": true,
+      "domains": [
+        "fixture-product-contract"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.farm-ui"
+      ]
     }
   ],
   "crossDomainEscalations": [
     {
-      "whenDomains": ["browser-runtime", "generator"],
+      "whenDomains": [
+        "browser-runtime",
+        "generator"
+      ],
       "minimumProfile": "full",
-      "requiredGroups": ["deterministic.core", "e2e.full"]
+      "requiredGroups": [
+        "deterministic.core",
+        "e2e.full"
+      ]
     },
     {
-      "whenDomains": ["browser-runtime", "browser-ui"],
+      "whenDomains": [
+        "browser-runtime",
+        "browser-ui"
+      ],
       "minimumProfile": "full",
-      "requiredGroups": ["deterministic.core", "e2e.full"]
+      "requiredGroups": [
+        "deterministic.core",
+        "e2e.full"
+      ]
     },
     {
-      "whenDomains": ["animation-product", "browser-runtime"],
+      "whenDomains": [
+        "animation-product",
+        "browser-runtime"
+      ],
       "minimumProfile": "full",
-      "requiredGroups": ["deterministic.core", "e2e.full", "fullworld.animation-census"]
+      "requiredGroups": [
+        "deterministic.core",
+        "e2e.full",
+        "fullworld.animation-census"
+      ]
     },
     {
-      "whenDomains": ["source-contract", "browser-ui"],
+      "whenDomains": [
+        "source-contract",
+        "browser-ui"
+      ],
       "minimumProfile": "broad",
-      "requiredGroups": ["deterministic.core", "e2e.full", "integration.source-contract"]
+      "requiredGroups": [
+        "deterministic.core",
+        "e2e.full",
+        "integration.source-contract"
+      ]
     }
   ]
 }

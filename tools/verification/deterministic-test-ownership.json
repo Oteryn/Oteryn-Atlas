@@ -1,0 +1,1050 @@
+{
+  "schemaVersion": 1,
+  "baselineRevision": "3d1f6f5a0faee512d3d88e472c22ba9aa66affd9",
+  "mode": "Preparation only; ownership is not executable qualification or activation.",
+  "importProof": "Explicit reviewed static ESM or unconditional top-level awaited literal test imports are bound to sourceSha256. All53 sources were inspected for test imports/subprocesses; runtime.test.mjs and farm aggregator subprocess edges remain opaque. Resolver rejects changed proof bytes rather than inferring candidate-controlled import coverage.",
+  "entries": [
+    {
+      "spec": "tests/animation-runtime.mjs",
+      "group": "deterministic.browser-core",
+      "interpreter": "node",
+      "argv": [
+        "--test",
+        "tests/animation-runtime.mjs"
+      ],
+      "sourceSha256": "223ad6c5883da3c6df13de38fb111ec107af2adc4fddccc17b83d18b69f9a078",
+      "imports": [],
+      "subprocessTests": [],
+      "qualification": "unqualified"
+    },
+    {
+      "spec": "tests/browser-semantic.mjs",
+      "group": "deterministic.search",
+      "interpreter": "node",
+      "argv": [
+        "--test",
+        "tests/browser-semantic.mjs"
+      ],
+      "sourceSha256": "a6ff5dac62c5b893c250e3111e7d4ec29ad9aadaa6af17eef12ee473bd39b3a8",
+      "imports": [],
+      "subprocessTests": [],
+      "qualification": "unqualified"
+    },
+    {
+      "spec": "tests/creature-gameplay-model.mjs",
+      "group": "deterministic.gameplay",
+      "interpreter": "node",
+      "argv": [
+        "--test",
+        "tests/creature-gameplay-model.mjs"
+      ],
+      "sourceSha256": "096c55900a16465f7de3ae5b560e841f682b31b8d12c8b1cff5cf0b5d9284aa5",
+      "imports": [],
+      "subprocessTests": [],
+      "qualification": "unqualified"
+    },
+    {
+      "spec": "tests/creature-gameplay-profiles.mjs",
+      "group": "deterministic.gameplay",
+      "interpreter": "node",
+      "argv": [
+        "--test",
+        "tests/creature-gameplay-profiles.mjs"
+      ],
+      "sourceSha256": "c7b8e98edef64b3700513182b39b21bb9fee66e1f53e9a5cb329881ec2879343",
+      "imports": [],
+      "subprocessTests": [],
+      "qualification": "unqualified"
+    },
+    {
+      "spec": "tests/creature-gameplay-runtime-contract.mjs",
+      "group": "deterministic.gameplay",
+      "interpreter": "node",
+      "argv": [
+        "--test",
+        "tests/creature-gameplay-runtime-contract.mjs"
+      ],
+      "sourceSha256": "166a0739d216daea6404527b7c7177801ac7a94304bc4755c4f7f890a08fad2b",
+      "imports": [],
+      "subprocessTests": [],
+      "qualification": "unqualified"
+    },
+    {
+      "spec": "tests/creature-index-roles.py",
+      "group": "deterministic.creature-products",
+      "interpreter": "python3",
+      "argv": [
+        "tests/creature-index-roles.py"
+      ],
+      "sourceSha256": "fae448788731ab8ef2973df6d460356ca5e3f762a242a293b2fb1fac51da4c48",
+      "imports": [],
+      "subprocessTests": [],
+      "qualification": "unqualified"
+    },
+    {
+      "spec": "tests/creature-inspector-state.mjs",
+      "group": "deterministic.creature-interaction",
+      "interpreter": "node",
+      "argv": [
+        "--test",
+        "tests/creature-inspector-state.mjs"
+      ],
+      "sourceSha256": "1db7f82380658fc1c04fe785f67e27d7448a4b391165d13b6bd87ead4ab259ba",
+      "imports": [],
+      "subprocessTests": [],
+      "qualification": "unqualified"
+    },
+    {
+      "spec": "tests/creature-interaction-runtime-contract.mjs",
+      "group": "deterministic.creature-interaction",
+      "interpreter": "node",
+      "argv": [
+        "--test",
+        "tests/creature-interaction-runtime-contract.mjs"
+      ],
+      "sourceSha256": "073f6d808ccb718642c9b1689823d13b57b3195a6aec19e6aa9712a2e460d4e5",
+      "imports": [],
+      "subprocessTests": [],
+      "qualification": "unqualified"
+    },
+    {
+      "spec": "tests/creature-interaction-target.mjs",
+      "group": "deterministic.creature-interaction",
+      "interpreter": "node",
+      "argv": [
+        "--test",
+        "tests/creature-interaction-target.mjs"
+      ],
+      "sourceSha256": "a7c1d66f4c45ef043d5b1a22a61e63c74e9668ebcc6ad4f288cba3ec47e0c101",
+      "imports": [],
+      "subprocessTests": [],
+      "qualification": "unqualified"
+    },
+    {
+      "spec": "tests/creature-interaction.mjs",
+      "group": "deterministic.creature-interaction",
+      "interpreter": "node",
+      "argv": [
+        "--test",
+        "tests/creature-interaction.mjs"
+      ],
+      "sourceSha256": "f421c5ea120904fae1ac3dbd758cd88c16ca422ce1b4f4209e1e858fd86e1876",
+      "imports": [],
+      "subprocessTests": [],
+      "qualification": "unqualified"
+    },
+    {
+      "spec": "tests/creature-map-activation-contract.mjs",
+      "group": "deterministic.creature-interaction",
+      "interpreter": "node",
+      "argv": [
+        "--test",
+        "tests/creature-map-activation-contract.mjs"
+      ],
+      "sourceSha256": "ec495e34b4c98cd31fbddd5e2a59059c7ef4d20af82ef4685501c6770df8e70b",
+      "imports": [],
+      "subprocessTests": [],
+      "qualification": "unqualified"
+    },
+    {
+      "spec": "tests/creature-presentation-browser-contract.mjs",
+      "group": "deterministic.creature-presentation",
+      "interpreter": "node",
+      "argv": [
+        "--test",
+        "tests/creature-presentation-browser-contract.mjs"
+      ],
+      "sourceSha256": "ee76a26a20e68156bb63d876e76f94a28330cd7ebbd4a2c7e152fb4c5140e31d",
+      "imports": [],
+      "subprocessTests": [],
+      "qualification": "unqualified-current-runtime-contract"
+    },
+    {
+      "spec": "tests/creature-presentation-contract.mjs",
+      "group": "deterministic.creature-presentation",
+      "interpreter": "node",
+      "argv": [
+        "--test",
+        "tests/creature-presentation-contract.mjs"
+      ],
+      "sourceSha256": "cccef1d52877898b5b7b5ec9166c873334cfe5dc1bf72ab2acf9c7c4083b85f9",
+      "imports": [],
+      "subprocessTests": [],
+      "qualification": "unqualified"
+    },
+    {
+      "spec": "tests/creature-presentation-controller.mjs",
+      "group": "deterministic.creature-presentation",
+      "interpreter": "node",
+      "argv": [
+        "--test",
+        "tests/creature-presentation-controller.mjs"
+      ],
+      "sourceSha256": "aebea40f78e67562142c929d911bed2e5438a24852e9be2a3af332923fcab206",
+      "imports": [],
+      "subprocessTests": [],
+      "qualification": "unqualified"
+    },
+    {
+      "spec": "tests/creature-presentation-geometry.mjs",
+      "group": "deterministic.geometry",
+      "interpreter": "node",
+      "argv": [
+        "--test",
+        "tests/creature-presentation-geometry.mjs"
+      ],
+      "sourceSha256": "cd3f677f743b7dcbc79a1d23b1b54f11fc3fbf3e7d693a7cc35f1c79c61143b7",
+      "imports": [],
+      "subprocessTests": [],
+      "qualification": "unqualified"
+    },
+    {
+      "spec": "tests/creature-presentation-layout.mjs",
+      "group": "deterministic.creature-presentation",
+      "interpreter": "node",
+      "argv": [
+        "--test",
+        "tests/creature-presentation-layout.mjs"
+      ],
+      "sourceSha256": "d1fcf76ecaa3d4338cb89487b830af301fc1e835c2662a9fbdfeb1b6e6690bff",
+      "imports": [],
+      "subprocessTests": [],
+      "qualification": "unqualified"
+    },
+    {
+      "spec": "tests/creature-presentation-lod.mjs",
+      "group": "deterministic.creature-presentation",
+      "interpreter": "node",
+      "argv": [
+        "--test",
+        "tests/creature-presentation-lod.mjs"
+      ],
+      "sourceSha256": "e5128ec39d690e79ede36b006e0203d5724f1604481cf6bb7c8f02503ab4cce6",
+      "imports": [],
+      "subprocessTests": [],
+      "qualification": "unqualified"
+    },
+    {
+      "spec": "tests/creature-presentation-runtime.mjs",
+      "group": "deterministic.creature-presentation",
+      "interpreter": "node",
+      "argv": [
+        "--test",
+        "tests/creature-presentation-runtime.mjs"
+      ],
+      "sourceSha256": "045e073100d9f80a3777a3b75eabb5cb7fa4b73d83928531197575e1f4607198",
+      "imports": [],
+      "subprocessTests": [],
+      "qualification": "unqualified"
+    },
+    {
+      "spec": "tests/deployment-policy.mjs",
+      "group": "deterministic.deployment",
+      "interpreter": "node",
+      "argv": [
+        "--test",
+        "tests/deployment-policy.mjs"
+      ],
+      "sourceSha256": "5072fdc0faa6934186204d6a11541645d0bb7ce587fbc872ebecf901c4b1d776",
+      "imports": [],
+      "subprocessTests": [],
+      "qualification": "blocked-absent-workflow-rewrite-required"
+    },
+    {
+      "spec": "tests/farm-bundle.py",
+      "group": "deterministic.farm-products",
+      "interpreter": "python3",
+      "argv": [
+        "tests/farm-bundle.py"
+      ],
+      "sourceSha256": "a0cc549b11c8df528bb21387f6aeaa3ae58cb20ac39a53d9747c4762517049ce",
+      "imports": [],
+      "subprocessTests": [],
+      "qualification": "unqualified"
+    },
+    {
+      "spec": "tests/farm-gui-contract.mjs",
+      "group": "deterministic.farm-ui",
+      "interpreter": "node",
+      "argv": [
+        "--test",
+        "tests/farm-gui-contract.mjs"
+      ],
+      "sourceSha256": "9189445a79e891550cd1a3a3429a84566bf0f66f30e38a1532d0ab56c35d2d06",
+      "imports": [],
+      "subprocessTests": [],
+      "qualification": "unqualified"
+    },
+    {
+      "spec": "tests/farm-intelligence-build.py",
+      "group": "deterministic.farm-products",
+      "interpreter": "python3",
+      "argv": [
+        "tests/farm-intelligence-build.py"
+      ],
+      "sourceSha256": "012f02ddaff02dda6f745800dc901a87ace3c276e7a725eceeffa0cb64f19daa",
+      "imports": [],
+      "subprocessTests": [],
+      "qualification": "unqualified"
+    },
+    {
+      "spec": "tests/farm-intelligence.mjs",
+      "group": "deterministic.farm-ui",
+      "interpreter": "node",
+      "argv": [
+        "--test",
+        "tests/farm-intelligence.mjs"
+      ],
+      "sourceSha256": "e87cd786ada65028da2fa5f4f3e1e2729db56622bc24e6681d9f69524b1e9805",
+      "imports": [],
+      "subprocessTests": [],
+      "qualification": "unqualified"
+    },
+    {
+      "spec": "tests/farm-lod.mjs",
+      "group": "deterministic.farm-ui",
+      "interpreter": "node",
+      "argv": [
+        "--test",
+        "tests/farm-lod.mjs"
+      ],
+      "sourceSha256": "23b7ff03807688ea32f2fedd92f319678e58fd0ca4458f716ac35edebe5b67fe",
+      "imports": [],
+      "subprocessTests": [],
+      "qualification": "unqualified"
+    },
+    {
+      "spec": "tests/farm-spatial-index.py",
+      "group": "deterministic.farm-products",
+      "interpreter": "python3",
+      "argv": [
+        "tests/farm-spatial-index.py"
+      ],
+      "sourceSha256": "ce2c3301d38ee6cdff6933aec0bbe8091542eee7e3239942c2a63689f0352685",
+      "imports": [],
+      "subprocessTests": [],
+      "qualification": "unqualified"
+    },
+    {
+      "spec": "tests/farm-state.mjs",
+      "group": "deterministic.farm-ui",
+      "interpreter": "node",
+      "argv": [
+        "--test",
+        "tests/farm-state.mjs"
+      ],
+      "sourceSha256": "d881d125ef8bafa9fad84ed6588f3d07d921ffade6e7abd26a87552537749208",
+      "imports": [],
+      "subprocessTests": [],
+      "qualification": "unqualified"
+    },
+    {
+      "spec": "tests/fullworld-layers/overview-browser.test.mjs",
+      "group": "deterministic.fullworld-layers",
+      "interpreter": "node",
+      "argv": [
+        "--test",
+        "tests/fullworld-layers/overview-browser.test.mjs"
+      ],
+      "sourceSha256": "dff3d10f62a1f050d14945d44c8429222d023ec11463c95b3c8c9942d9ab6d22",
+      "imports": [],
+      "subprocessTests": [],
+      "qualification": "unqualified"
+    },
+    {
+      "spec": "tests/fullworld-layers/test_authority_registry.py",
+      "group": "deterministic.fullworld-layers",
+      "interpreter": "python3",
+      "argv": [
+        "tests/fullworld-layers/test_authority_registry.py"
+      ],
+      "sourceSha256": "2e5697c37f825d59b6a1fee859a7803729ef72f977d5b26cde1cf0ef5e08b898",
+      "imports": [],
+      "subprocessTests": [],
+      "qualification": "unqualified"
+    },
+    {
+      "spec": "tests/fullworld-layers/test_overview.py",
+      "group": "deterministic.fullworld-layers",
+      "interpreter": "python3",
+      "argv": [
+        "tests/fullworld-layers/test_overview.py"
+      ],
+      "sourceSha256": "c94f0cd13e7a3fd2020ad405c3053aafe53062d89106db1ab3a201f0defa74e8",
+      "imports": [],
+      "subprocessTests": [],
+      "qualification": "unqualified"
+    },
+    {
+      "spec": "tests/fullworld-minimap/minimap_builder_self_test.py",
+      "group": "deterministic.fullworld-minimap",
+      "interpreter": "python3",
+      "argv": [
+        "tests/fullworld-minimap/minimap_builder_self_test.py"
+      ],
+      "sourceSha256": "4be1b4ed2af1cea6f5dd7192418097b920aaabae4537304b5ff24d3e71b44f00",
+      "imports": [],
+      "subprocessTests": [],
+      "qualification": "unqualified"
+    },
+    {
+      "spec": "tests/fullworld-publication/canonical-json-parity.test.mjs",
+      "group": "deterministic.publication",
+      "interpreter": "node",
+      "argv": [
+        "--test",
+        "tests/fullworld-publication/canonical-json-parity.test.mjs"
+      ],
+      "sourceSha256": "d000cb8267c043bdf3fc39e60589be4da5b08da2deb649cbb62cf8361859ce2b",
+      "imports": [],
+      "subprocessTests": [],
+      "qualification": "unqualified"
+    },
+    {
+      "spec": "tests/fullworld-publication/test_output_safety.py",
+      "group": "deterministic.publication",
+      "interpreter": "python3",
+      "argv": [
+        "tests/fullworld-publication/test_output_safety.py"
+      ],
+      "sourceSha256": "c59bb03f565da2c04fb7f97176bbc10cb43723d9747ac557899e2d0486fe4cbc",
+      "imports": [],
+      "subprocessTests": [],
+      "qualification": "unqualified"
+    },
+    {
+      "spec": "tests/fullworld-publication/test_publication.py",
+      "group": "deterministic.publication",
+      "interpreter": "python3",
+      "argv": [
+        "tests/fullworld-publication/test_publication.py"
+      ],
+      "sourceSha256": "41b67d9aacf895bb6cd0e0d968ef1aa04bd3a9d59db41c714f64fe78234cd654",
+      "imports": [],
+      "subprocessTests": [],
+      "qualification": "unqualified"
+    },
+    {
+      "spec": "tests/fullworld-runtime/cdp-session.test.mjs",
+      "group": "deterministic.fullworld-runtime",
+      "interpreter": "node",
+      "argv": [
+        "--test",
+        "tests/fullworld-runtime/cdp-session.test.mjs"
+      ],
+      "sourceSha256": "6a1e4d453ce13a7e999b373f831c9543c2385fa6436f73e303440bce32960355",
+      "imports": [],
+      "subprocessTests": [],
+      "qualification": "unqualified"
+    },
+    {
+      "spec": "tests/fullworld-runtime/creature-gameplay-runtime-safety.test.mjs",
+      "group": "deterministic.gameplay",
+      "interpreter": "node",
+      "argv": [
+        "--test",
+        "tests/fullworld-runtime/creature-gameplay-runtime-safety.test.mjs"
+      ],
+      "sourceSha256": "69f193a3f3a2b92301b6217ba8b7f893e4fc52ec092b222652c61fc0fd710ff8",
+      "imports": [],
+      "subprocessTests": [],
+      "qualification": "unqualified"
+    },
+    {
+      "spec": "tests/fullworld-runtime/incremental_content_graph_self_test.py",
+      "group": "deterministic.fullworld-runtime",
+      "interpreter": "python3",
+      "argv": [
+        "tests/fullworld-runtime/incremental_content_graph_self_test.py"
+      ],
+      "sourceSha256": "f53d1eb6ebec24aa161ab4b3f81db62ca806c1eb9ae684cffc6bbcf0d0ffc20c",
+      "imports": [],
+      "subprocessTests": [],
+      "qualification": "unqualified"
+    },
+    {
+      "spec": "tests/fullworld-runtime/minimap-palette.test.mjs",
+      "group": "deterministic.fullworld-minimap",
+      "interpreter": "node",
+      "argv": [
+        "--test",
+        "tests/fullworld-runtime/minimap-palette.test.mjs"
+      ],
+      "sourceSha256": "427cf1f70308edde5ac0961bead646e880f19772e27fc3feb5bea5f5155f1d1b",
+      "imports": [],
+      "subprocessTests": [],
+      "qualification": "unqualified"
+    },
+    {
+      "spec": "tests/fullworld-runtime/performance.test.mjs",
+      "group": "deterministic.fullworld-runtime",
+      "interpreter": "node",
+      "argv": [
+        "--test",
+        "tests/fullworld-runtime/performance.test.mjs"
+      ],
+      "sourceSha256": "d97763e3cd2ac9cb0bc3f8fe5bc82c49b08f27972e17c2f34919c7487f409901",
+      "imports": [],
+      "subprocessTests": [],
+      "qualification": "unqualified"
+    },
+    {
+      "spec": "tests/fullworld-runtime/pixel-bucket-timeout.test.mjs",
+      "group": "deterministic.fullworld-runtime",
+      "interpreter": "node",
+      "argv": [
+        "--test",
+        "tests/fullworld-runtime/pixel-bucket-timeout.test.mjs"
+      ],
+      "sourceSha256": "a17ac076478539c4d04c71d0caabffdb969f7e4a324109a4b488b7a98fc69425",
+      "imports": [],
+      "subprocessTests": [],
+      "qualification": "unqualified"
+    },
+    {
+      "spec": "tests/fullworld-runtime/progressive.test.mjs",
+      "group": "deterministic.fullworld-runtime",
+      "interpreter": "node",
+      "argv": [
+        "--test",
+        "tests/fullworld-runtime/progressive.test.mjs"
+      ],
+      "sourceSha256": "033b386dbd3b82184ed13b43638b1ec91a94280a6b5e05bc9fbc5d38afff8989",
+      "imports": [],
+      "subprocessTests": [],
+      "qualification": "unqualified"
+    },
+    {
+      "spec": "tests/fullworld-runtime/runtime-safety.test.mjs",
+      "group": "deterministic.fullworld-runtime",
+      "interpreter": "node",
+      "argv": [
+        "--test",
+        "tests/fullworld-runtime/runtime-safety.test.mjs"
+      ],
+      "sourceSha256": "b8ae15dc290392cfe2ad844cfaeb1b4d13b162045c2320ad0171979acd1b97bd",
+      "imports": [],
+      "subprocessTests": [],
+      "qualification": "unqualified"
+    },
+    {
+      "spec": "tests/fullworld-runtime/runtime.test.mjs",
+      "group": "deterministic.fullworld-runtime",
+      "interpreter": "node",
+      "argv": [
+        "--test",
+        "tests/fullworld-runtime/runtime.test.mjs"
+      ],
+      "sourceSha256": "38368a0ca2509507d5e1f8c91cbd2702871c89c0a6bef61cbdb521894d378398",
+      "imports": [],
+      "subprocessTests": [
+        "tests/fullworld-runtime/runtime_index_self_test.py",
+        "tests/fullworld-runtime/incremental_content_graph_self_test.py"
+      ],
+      "qualification": "unqualified"
+    },
+    {
+      "spec": "tests/fullworld-runtime/runtime_index_self_test.py",
+      "group": "deterministic.fullworld-runtime",
+      "interpreter": "python3",
+      "argv": [
+        "tests/fullworld-runtime/runtime_index_self_test.py"
+      ],
+      "sourceSha256": "32143fb6b37b80b289f1dc99c753f797773a3f444e3914ce22151cfd817d6bed",
+      "imports": [],
+      "subprocessTests": [],
+      "qualification": "unqualified"
+    },
+    {
+      "spec": "tests/gui-contract.mjs",
+      "group": "deterministic.browser-core",
+      "interpreter": "node",
+      "argv": [
+        "--test",
+        "tests/gui-contract.mjs"
+      ],
+      "sourceSha256": "366fc4557962bd05a68b88f7d4cd660689f7e79989b6fea3ab20a04eed349310",
+      "imports": [
+        "tests/fullworld-runtime/runtime.test.mjs",
+        "tests/fullworld-runtime/minimap-palette.test.mjs",
+        "tests/fullworld-runtime/performance.test.mjs"
+      ],
+      "subprocessTests": [],
+      "qualification": "unqualified"
+    },
+    {
+      "spec": "tests/maintenance/maintenance-diff-policy.test.mjs",
+      "group": "deterministic.maintenance",
+      "interpreter": "node",
+      "argv": [
+        "--test",
+        "tests/maintenance/maintenance-diff-policy.test.mjs"
+      ],
+      "sourceSha256": "e6764aef28cad475823fa96787dc4f7b24e600ba0eb5eeddd16c04f2fdb7d9a6",
+      "imports": [],
+      "subprocessTests": [],
+      "qualification": "unqualified"
+    },
+    {
+      "spec": "tests/map-activation.mjs",
+      "group": "deterministic.browser-core",
+      "interpreter": "node",
+      "argv": [
+        "--test",
+        "tests/map-activation.mjs"
+      ],
+      "sourceSha256": "34ae23c311d7d64b0f51f2442343b35a609add2e785c2ab1c321303341e5f471",
+      "imports": [],
+      "subprocessTests": [],
+      "qualification": "unqualified"
+    },
+    {
+      "spec": "tests/npc-badge-primitives.mjs",
+      "group": "deterministic.creature-presentation",
+      "interpreter": "node",
+      "argv": [
+        "--test",
+        "tests/npc-badge-primitives.mjs"
+      ],
+      "sourceSha256": "08b393e45e4e4e8bd7197bdf02278c4c29f39f4235471e61476ca02ad3397df0",
+      "imports": [],
+      "subprocessTests": [],
+      "qualification": "unqualified"
+    },
+    {
+      "spec": "tests/npc-markers.mjs",
+      "group": "deterministic.creature-presentation",
+      "interpreter": "node",
+      "argv": [
+        "--test",
+        "tests/npc-markers.mjs"
+      ],
+      "sourceSha256": "2bb6f9069edf7a2294cb542d55e8911ab85c3ba40bff14a096372ee7572ffb8b",
+      "imports": [],
+      "subprocessTests": [],
+      "qualification": "unqualified"
+    },
+    {
+      "spec": "tests/pixel-store.mjs",
+      "group": "deterministic.browser-core",
+      "interpreter": "node",
+      "argv": [
+        "--test",
+        "tests/pixel-store.mjs"
+      ],
+      "sourceSha256": "efb5df6b8b88bc26d2dcac5a904c14b566fa4cc85207567e551ded89daa388a2",
+      "imports": [],
+      "subprocessTests": [],
+      "qualification": "unqualified"
+    },
+    {
+      "spec": "tests/properties/viewport-transform.test.mjs",
+      "group": "deterministic.geometry",
+      "interpreter": "node",
+      "argv": [
+        "--test",
+        "tests/properties/viewport-transform.test.mjs"
+      ],
+      "sourceSha256": "c90ade92880fbb997f12d7b824067c442b043f449121ef1572d8b6a70a17ad69",
+      "imports": [],
+      "subprocessTests": [],
+      "qualification": "unqualified"
+    },
+    {
+      "spec": "tests/semantic-search-creatures.mjs",
+      "group": "deterministic.search",
+      "interpreter": "node",
+      "argv": [
+        "--test",
+        "tests/semantic-search-creatures.mjs"
+      ],
+      "sourceSha256": "55186aef31a67a15e2220b27415d9a1d089137a8167320fe9b40056e59fa50a0",
+      "imports": [],
+      "subprocessTests": [],
+      "qualification": "unqualified"
+    },
+    {
+      "spec": "tests/semantic-search.mjs",
+      "group": "deterministic.search",
+      "interpreter": "node",
+      "argv": [
+        "--test",
+        "tests/semantic-search.mjs"
+      ],
+      "sourceSha256": "1776c6252f10a0d4884c619f96338c8b018a6828735bf122f21e02f9dcac7d75",
+      "imports": [],
+      "subprocessTests": [],
+      "qualification": "unqualified"
+    },
+    {
+      "spec": "tests/synology-live-workflow.mjs",
+      "group": "deterministic.deployment",
+      "interpreter": "node",
+      "argv": [
+        "--test",
+        "tests/synology-live-workflow.mjs"
+      ],
+      "sourceSha256": "7a3af825497c8396d3d506e2d1cfdf3568d57d2454d58327091553457ce04349",
+      "imports": [],
+      "subprocessTests": [],
+      "qualification": "blocked-absent-workflow-rewrite-required"
+    }
+  ],
+  "importAggregators": [
+    {
+      "spec": "tests/verification/creature-presentation-integration.test.mjs",
+      "group": "deterministic.core",
+      "interpreter": "node",
+      "argv": [
+        "--test",
+        "tests/verification/creature-presentation-integration.test.mjs"
+      ],
+      "sourceSha256": "07443e23c1d3dcb3bfac47b3a87e15c7f7158d5846deafb9ed38fba53efd71a4",
+      "imports": [
+        "tests/creature-presentation-layout.mjs",
+        "tests/creature-presentation-lod.mjs",
+        "tests/npc-badge-primitives.mjs",
+        "tests/creature-presentation-contract.mjs",
+        "tests/creature-presentation-runtime.mjs",
+        "tests/creature-presentation-controller.mjs",
+        "tests/creature-presentation-browser-contract.mjs"
+      ],
+      "subprocessTests": [],
+      "qualification": "unqualified"
+    },
+    {
+      "spec": "tests/verification/farm-explorer-contract.test.mjs",
+      "group": "deterministic.core",
+      "interpreter": "node",
+      "argv": [
+        "--test",
+        "tests/verification/farm-explorer-contract.test.mjs"
+      ],
+      "sourceSha256": "773cdb6d09521824209feaabfe191477a3ecd98e5aa75ee9ace6b873d84ca18b",
+      "imports": [
+        "tests/farm-intelligence.mjs",
+        "tests/farm-state.mjs",
+        "tests/farm-lod.mjs",
+        "tests/farm-gui-contract.mjs"
+      ],
+      "subprocessTests": [
+        "tests/farm-bundle.py",
+        "tests/farm-intelligence-build.py",
+        "tests/farm-spatial-index.py"
+      ],
+      "qualification": "unqualified"
+    }
+  ],
+  "excludedBrowserHarnesses": [
+    "tests/browser-proof.html",
+    "tests/browser-proof.mjs",
+    "tests/fullworld-mobile-layout-proof.html",
+    "tests/semantic-search-browser-proof.mjs",
+    "tests/semantic-search-browser.html"
+  ],
+  "proposedCatalog": {
+    "schemaVersion": 2,
+    "groups": {
+      "deterministic.search": {
+        "specs": [
+          "tests/browser-semantic.mjs",
+          "tests/semantic-search-creatures.mjs",
+          "tests/semantic-search.mjs"
+        ],
+        "projects": [],
+        "resourceClass": "cpu-light",
+        "evidence": "machine-summary",
+        "capabilities": {
+          "browser": false,
+          "hosted": true,
+          "requiresPublication": false,
+          "dataCapability": "qualification_fixture",
+          "visualReview": false,
+          "specialistReason": null
+        },
+        "fullSafetyNet": true
+      },
+      "deterministic.gameplay": {
+        "specs": [
+          "tests/creature-gameplay-model.mjs",
+          "tests/creature-gameplay-profiles.mjs",
+          "tests/creature-gameplay-runtime-contract.mjs",
+          "tests/fullworld-runtime/creature-gameplay-runtime-safety.test.mjs"
+        ],
+        "projects": [],
+        "resourceClass": "cpu-light",
+        "evidence": "machine-summary",
+        "capabilities": {
+          "browser": false,
+          "hosted": true,
+          "requiresPublication": false,
+          "dataCapability": "qualification_fixture",
+          "visualReview": false,
+          "specialistReason": null
+        },
+        "fullSafetyNet": true
+      },
+      "deterministic.creature-interaction": {
+        "specs": [
+          "tests/creature-inspector-state.mjs",
+          "tests/creature-interaction-runtime-contract.mjs",
+          "tests/creature-interaction-target.mjs",
+          "tests/creature-interaction.mjs",
+          "tests/creature-map-activation-contract.mjs"
+        ],
+        "projects": [],
+        "resourceClass": "cpu-light",
+        "evidence": "machine-summary",
+        "capabilities": {
+          "browser": false,
+          "hosted": true,
+          "requiresPublication": false,
+          "dataCapability": "qualification_fixture",
+          "visualReview": false,
+          "specialistReason": null
+        },
+        "fullSafetyNet": true
+      },
+      "deterministic.creature-presentation": {
+        "specs": [
+          "tests/creature-presentation-browser-contract.mjs",
+          "tests/creature-presentation-contract.mjs",
+          "tests/creature-presentation-controller.mjs",
+          "tests/creature-presentation-layout.mjs",
+          "tests/creature-presentation-lod.mjs",
+          "tests/creature-presentation-runtime.mjs",
+          "tests/npc-badge-primitives.mjs",
+          "tests/npc-markers.mjs"
+        ],
+        "projects": [],
+        "resourceClass": "cpu-light",
+        "evidence": "machine-summary",
+        "capabilities": {
+          "browser": false,
+          "hosted": true,
+          "requiresPublication": false,
+          "dataCapability": "qualification_fixture",
+          "visualReview": false,
+          "specialistReason": null
+        },
+        "fullSafetyNet": true
+      },
+      "deterministic.creature-products": {
+        "specs": [
+          "tests/creature-index-roles.py"
+        ],
+        "projects": [],
+        "resourceClass": "cpu-light",
+        "evidence": "machine-summary",
+        "capabilities": {
+          "browser": false,
+          "hosted": true,
+          "requiresPublication": false,
+          "dataCapability": "qualification_fixture",
+          "visualReview": false,
+          "specialistReason": null
+        },
+        "fullSafetyNet": true
+      },
+      "deterministic.farm-products": {
+        "specs": [
+          "tests/farm-bundle.py",
+          "tests/farm-intelligence-build.py",
+          "tests/farm-spatial-index.py"
+        ],
+        "projects": [],
+        "resourceClass": "cpu-light",
+        "evidence": "machine-summary",
+        "capabilities": {
+          "browser": false,
+          "hosted": true,
+          "requiresPublication": false,
+          "dataCapability": "qualification_fixture",
+          "visualReview": false,
+          "specialistReason": null
+        },
+        "fullSafetyNet": true
+      },
+      "deterministic.farm-ui": {
+        "specs": [
+          "tests/farm-gui-contract.mjs",
+          "tests/farm-intelligence.mjs",
+          "tests/farm-lod.mjs",
+          "tests/farm-state.mjs"
+        ],
+        "projects": [],
+        "resourceClass": "cpu-light",
+        "evidence": "machine-summary",
+        "capabilities": {
+          "browser": false,
+          "hosted": true,
+          "requiresPublication": false,
+          "dataCapability": "qualification_fixture",
+          "visualReview": false,
+          "specialistReason": null
+        },
+        "fullSafetyNet": true
+      },
+      "deterministic.browser-core": {
+        "specs": [
+          "tests/animation-runtime.mjs",
+          "tests/gui-contract.mjs",
+          "tests/map-activation.mjs",
+          "tests/pixel-store.mjs"
+        ],
+        "projects": [],
+        "resourceClass": "cpu-light",
+        "evidence": "machine-summary",
+        "capabilities": {
+          "browser": false,
+          "hosted": true,
+          "requiresPublication": false,
+          "dataCapability": "qualification_fixture",
+          "visualReview": false,
+          "specialistReason": null
+        },
+        "fullSafetyNet": true
+      },
+      "deterministic.publication": {
+        "specs": [
+          "tests/fullworld-publication/canonical-json-parity.test.mjs",
+          "tests/fullworld-publication/test_output_safety.py",
+          "tests/fullworld-publication/test_publication.py"
+        ],
+        "projects": [],
+        "resourceClass": "cpu-light",
+        "evidence": "machine-summary",
+        "capabilities": {
+          "browser": false,
+          "hosted": true,
+          "requiresPublication": false,
+          "dataCapability": "qualification_fixture",
+          "visualReview": false,
+          "specialistReason": null
+        },
+        "fullSafetyNet": true
+      },
+      "deterministic.fullworld-runtime": {
+        "specs": [
+          "tests/fullworld-runtime/cdp-session.test.mjs",
+          "tests/fullworld-runtime/incremental_content_graph_self_test.py",
+          "tests/fullworld-runtime/performance.test.mjs",
+          "tests/fullworld-runtime/pixel-bucket-timeout.test.mjs",
+          "tests/fullworld-runtime/progressive.test.mjs",
+          "tests/fullworld-runtime/runtime-safety.test.mjs",
+          "tests/fullworld-runtime/runtime.test.mjs",
+          "tests/fullworld-runtime/runtime_index_self_test.py"
+        ],
+        "projects": [],
+        "resourceClass": "cpu-light",
+        "evidence": "machine-summary",
+        "capabilities": {
+          "browser": false,
+          "hosted": true,
+          "requiresPublication": false,
+          "dataCapability": "qualification_fixture",
+          "visualReview": false,
+          "specialistReason": null
+        },
+        "fullSafetyNet": true
+      },
+      "deterministic.fullworld-layers": {
+        "specs": [
+          "tests/fullworld-layers/overview-browser.test.mjs",
+          "tests/fullworld-layers/test_authority_registry.py",
+          "tests/fullworld-layers/test_overview.py"
+        ],
+        "projects": [],
+        "resourceClass": "cpu-light",
+        "evidence": "machine-summary",
+        "capabilities": {
+          "browser": false,
+          "hosted": true,
+          "requiresPublication": false,
+          "dataCapability": "qualification_fixture",
+          "visualReview": false,
+          "specialistReason": null
+        },
+        "fullSafetyNet": true
+      },
+      "deterministic.fullworld-minimap": {
+        "specs": [
+          "tests/fullworld-minimap/minimap_builder_self_test.py",
+          "tests/fullworld-runtime/minimap-palette.test.mjs"
+        ],
+        "projects": [],
+        "resourceClass": "cpu-light",
+        "evidence": "machine-summary",
+        "capabilities": {
+          "browser": false,
+          "hosted": true,
+          "requiresPublication": false,
+          "dataCapability": "qualification_fixture",
+          "visualReview": false,
+          "specialistReason": null
+        },
+        "fullSafetyNet": true
+      },
+      "deterministic.geometry": {
+        "specs": [
+          "tests/creature-presentation-geometry.mjs",
+          "tests/properties/viewport-transform.test.mjs"
+        ],
+        "projects": [],
+        "resourceClass": "cpu-light",
+        "evidence": "machine-summary",
+        "capabilities": {
+          "browser": false,
+          "hosted": true,
+          "requiresPublication": false,
+          "dataCapability": "qualification_fixture",
+          "visualReview": false,
+          "specialistReason": null
+        },
+        "fullSafetyNet": true
+      },
+      "deterministic.maintenance": {
+        "specs": [
+          "tests/maintenance/maintenance-diff-policy.test.mjs"
+        ],
+        "projects": [],
+        "resourceClass": "cpu-light",
+        "evidence": "machine-summary",
+        "capabilities": {
+          "browser": false,
+          "hosted": true,
+          "requiresPublication": false,
+          "dataCapability": "qualification_fixture",
+          "visualReview": false,
+          "specialistReason": null
+        },
+        "fullSafetyNet": true
+      },
+      "deterministic.deployment": {
+        "specs": [
+          "tests/deployment-policy.mjs",
+          "tests/synology-live-workflow.mjs"
+        ],
+        "projects": [],
+        "resourceClass": "cpu-light",
+        "evidence": "machine-summary",
+        "capabilities": {
+          "browser": false,
+          "hosted": true,
+          "requiresPublication": false,
+          "dataCapability": "qualification_fixture",
+          "visualReview": false,
+          "specialistReason": null
+        },
+        "fullSafetyNet": true
+      }
+    }
+  },
+  "blockers": [
+    "Deployment tests read absent synology-live-acceptance.yml; ownership does not resolve their required semantic rewrite.",
+    "Farm aggregator runs three Python tests through subprocess; selecting it together with Python leaves fails closed until reviewed execution ownership is reshaped.",
+    "Source proof changes require reviewed import-closure metadata refresh; resolving commands is not permission to execute or restore workflows.",
+    "Creature presentation browser contract reads absent creature-overlays.yml and requires semantic rewrite; its core import aggregator inherits the blocker.",
+    "gui-contract.mjs unconditionally awaits3 FullWorld test modules. runtime.test.mjs runs2 Python tests as subprocesses; selecting overlapping standalone Python commands fails closed."
+  ]
+}
