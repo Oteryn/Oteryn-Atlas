@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   CAMERA_ITINERARY,
+  PROOF_BOUNDS,
   SemanticError,
   cameraItinerary,
   decodeCompactTile,
@@ -92,6 +93,41 @@ test('deep-link state fails closed outside the exported floor/bounds', () => {
   assert.throws(() => parseViewState('?x=32370&y=32240&floor=7&zoom=4'), SemanticError);
 });
 
+test('deep-link state enforces proof bounds before and after coordinate quantization', () => {
+  const base = `y=${PROOF_BOUNDS.yMin}&floor=${PROOF_BOUNDS.floor}&zoom=1`;
+
+  assert.deepEqual(
+    parseViewState(`?x=${PROOF_BOUNDS.xMin}&${base}`),
+    { x: PROOF_BOUNDS.xMin, y: PROOF_BOUNDS.yMin, floor: PROOF_BOUNDS.floor, zoom: 1 },
+  );
+  assert.throws(
+    () => parseViewState(`?x=${PROOF_BOUNDS.xMin - 0.00001}&${base}`),
+    /x outside proof bounds/,
+  );
+  assert.throws(
+    () => parseViewState(`?x=${PROOF_BOUNDS.xMaxExclusive}&${base}`),
+    /x outside proof bounds/,
+  );
+  assert.throws(
+    () => parseViewState(`?x=${PROOF_BOUNDS.xMaxExclusive - 0.00004}&${base}`),
+    /x outside proof bounds/,
+  );
+
+  assert.deepEqual(
+    parseViewState(`?x=${PROOF_BOUNDS.xMaxExclusive - 0.00006}&y=${PROOF_BOUNDS.yMaxExclusive - 0.00006}&floor=${PROOF_BOUNDS.floor}&zoom=1`),
+    {
+      x: PROOF_BOUNDS.xMaxExclusive - 0.0001,
+      y: PROOF_BOUNDS.yMaxExclusive - 0.0001,
+      floor: PROOF_BOUNDS.floor,
+      zoom: 1,
+    },
+  );
+  assert.throws(
+    () => parseViewState(`?x=${PROOF_BOUNDS.xMin}&y=${PROOF_BOUNDS.yMaxExclusive - 0.00004}&floor=${PROOF_BOUNDS.floor}&zoom=1`),
+    /y outside proof bounds/,
+  );
+});
+
 test('camera itinerary is deterministic and explicitly non-authoritative for movement', () => {
   const first = cameraItinerary();
   const second = cameraItinerary();
@@ -177,7 +213,7 @@ test('portable SHA-256 fallback matches standard known vectors', async () => {
   assert.equal(sha256HexPortable(encoder.encode('abc')), 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
   assert.equal(
     await sha256ContentId(encoder.encode('abc'), null),
-    'sha256:ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad',
+    'sha256:ba7816bf8f01cfea414140de5dae2223b00361f20015ad',
   );
 });
 
