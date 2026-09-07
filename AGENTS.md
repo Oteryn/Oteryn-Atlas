@@ -10,6 +10,12 @@ GitHub Issues remain Atlas lifecycle authority. Use one dedicated task branch an
 
 For an already-authorized write to an existing task branch/PR, if `GH_TOKEN` and `GITHUB_TOKEN` are unset but agent-visible `GH` is present, it may be mapped transiently to `GH_TOKEN` for the exact authorized `gh` command. Never embed that credential in a remote URL or persist a new credential helper. Credential presence does not broaden repository, branch, path, merge, production, or secret authority.
 
+## Retired framework routing
+
+- `docs/superpowers/**` is retained historical provenance only. It is not current execution, lifecycle, review, testing, or merge authority and must not be loaded by default.
+- Legacy prompt text that asks an agent to use Superpowers tooling or treats a `docs/superpowers/**` document as a mandatory execution contract is superseded by this rule. Use the current repository-selected workflow, live GitHub Issue/task state, current contracts, and strict TDD where the task requires TDD.
+- Consult `docs/superpowers/**` only when current live authority explicitly requires investigation of a specific historical decision. Historical framework availability never changes task authority or completion requirements.
+
 ## Atlas authority and data boundaries
 
 - Oteryn-Game is canonical World/Content authority.
