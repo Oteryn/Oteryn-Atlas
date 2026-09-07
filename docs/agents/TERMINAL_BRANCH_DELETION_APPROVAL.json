@@ -5,9 +5,9 @@
   "entries_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
   "issue": 1050,
   "policy_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-  "review_summary": "Fail-closed placeholder used only to generate the first exact read-only Atlas branch inventory. Replace with a reviewed live digest before integration.",
-  "reviewed_at": "2026-09-07T19:00:00Z",
+  "review_summary": "Fail-closed refreshed Atlas inventory after terminalizing completed #115/#179/#272/#302/#307 refs and duplicate retired Astra coordinator refs. Active #315 diagnostic/recovery branches remain intentionally preserved; replace with the exact reviewed live digest only after this new artifact is inspected.",
+  "reviewed_at": "2026-09-07T19:27:00Z",
   "reviewed_by": "Oteryn final cleanup #176/#359",
   "schema_version": 1,
-  "source_artifact": "pending terminal-branch-lifecycle read artifact"
+  "source_artifact": "pending refreshed terminal-branch-lifecycle read artifact"
 }
