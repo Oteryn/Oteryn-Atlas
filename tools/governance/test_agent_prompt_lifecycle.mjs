@@ -13,6 +13,13 @@ const REGISTRY_VALIDATOR = resolve(ROOT, 'tools/governance/validate_documentatio
 const REGISTRY_TEST = resolve(ROOT, 'tools/governance/test_documentation_ia.py');
 const ACTIVE_TASKS = resolve(ROOT, 'docs/agents/tasks/active');
 const ARCHIVED_TASKS = resolve(ROOT, 'docs/agents/tasks/archive');
+const TERMINAL_VERIFICATION_PROMPTS = [
+  'ATLAS-E2E-VERIFICATION-ANTI-LOOP-HARDENING.md',
+  'ATLAS-E2E-VERIFICATION-OPTIMIZATION-IMPLEMENTATION-DATA-CAPABILITY-AMENDMENT.md',
+  'ATLAS-E2E-VERIFICATION-OPTIMIZATION-IMPLEMENTATION-P0-AMENDMENT.md',
+  'ATLAS-E2E-VERIFICATION-OPTIMIZATION-IMPLEMENTATION.md',
+  'ATLAS-E2E-VERIFICATION-OPTIMIZATION-PRO-REVIEW.md',
+].map((name) => resolve(ROOT, 'docs/agents/prompts', name));
 
 const REQUIRED_CANARY_SECTIONS = ['Outcome', 'Scope', 'Atlas invariants', 'Acceptance'];
 const FORBIDDEN_CANARY_SECTIONS = [
@@ -73,6 +80,16 @@ test('task caches do not classify the same packet as active and archived', () =>
   const archived = new Set(readOptionalCache(ARCHIVED_TASKS));
   const overlap = [...active].filter((name) => archived.has(name)).sort();
   assert.deepEqual(overlap, [], 'task packet cannot exist in both lifecycle cache directories');
+});
+
+test('terminal verification prompts carry historical authority markers', () => {
+  for (const prompt of TERMINAL_VERIFICATION_PROMPTS) {
+    const banner = readFileSync(prompt, 'utf8').split(/\r?\n/u).slice(0, 5).join('\n');
+    assert.match(banner, /Lifecycle status: HISTORICAL \/ SUSPENDED/u);
+    assert.match(banner, /Issue #179 is closed/u);
+    assert.match(banner, /live Issue #315/u);
+    assert.match(banner, /does not authorize execution, test or workflow restoration, deployment/u);
+  }
 });
 
 test('lean prompt canary is a task delta and does not copy repository policy', () => {

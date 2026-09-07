@@ -1,9 +1,11 @@
 # ATLAS-E2E-VERIFICATION-OPTIMIZATION-PRO-REVIEW
 
-Purpose: independent senior review of the current #179 verification-platform architecture before further implementation/cutover.
+> **Lifecycle status: HISTORICAL / SUSPENDED.** Issue #179 is closed. This prompt is retained only as design and safety input for a later restoration phase explicitly authorized by live Issue #315 and current protected repository authority. It does not authorize execution, test or workflow restoration, deployment, or copying these procedures into active instructions.
+
+Purpose: retained point-in-time independent senior review of the former #179 verification-platform architecture.
 
 Repository: `Oteryn/Oteryn-Atlas`
-Lifecycle: Issue `#179`
+Historical lifecycle: Issue `#179` (closed)
 Admission protected main for this review handoff: `082a7180b6b4dbb63b1990135d24e26afb65c516`
 
 ## Review mode
@@ -27,7 +29,7 @@ Read all of the following from fresh protected `main`:
 9. the current complete `tests/**` and `e2e/**` inventory
 10. Issue #179 and active stacked PRs #190/#195/#200 or their current successors.
 
-For #179, treat the readiness/concurrency contract as mandatory authority alongside the implementation prompt and GitHub-hosted execution audit. If the main prompt does not yet mention it directly in its input list, do not infer that it is optional: Issue #179 explicitly binds it.
+During #179, the readiness/concurrency contract was mandatory authority alongside the implementation prompt and GitHub-hosted execution audit. The closed Issue #179 bound that historical source set.
 
 ## Architecture that must be challenged, not merely accepted
 
