@@ -1,12 +1,17 @@
 import { expect, test } from '@playwright/test';
 import { assertNoRuntimeFailures, captureRuntimeFailures, gotoAtlas, waitForAtlas } from './runtime.mjs';
 import { assertUserVisibleSurface, captureUserVisualEvidence } from '../support/user-acceptance.mjs';
+import { installQualificationGameplayRoute } from '../support/qualification-gameplay.mjs';
 
 const FIXTURES = Object.freeze({
   guide: Object.freeze({ entityId: `npc-entity:${'1'.repeat(32)}`, label: 'Fixture Guide' }),
   sentinel: Object.freeze({ entityId: `monster-entity:${'a'.repeat(32)}`, label: 'Fixture Sentinel' }),
   merchantNorth: Object.freeze({ entityId: `npc-entity:${'4'.repeat(32)}`, label: 'Fixture Merchant North' }),
   merchantSouth: Object.freeze({ entityId: `npc-entity:${'5'.repeat(32)}`, label: 'Fixture Merchant South' }),
+});
+
+test.beforeEach(async ({ page }) => {
+  await installQualificationGameplayRoute(page);
 });
 
 async function creatureState(page) {
