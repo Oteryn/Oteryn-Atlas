@@ -1,4 +1,4 @@
-import { sha256ContentId } from './loader.mjs';
+import { readBoundedResponseBytes, resolveTrustedRelativeUrl, sha256ContentId, validateRelativePath } from './loader.mjs';
 
 export const GAMEPLAY_EXPECTATIONS = Object.freeze({
   mode: 'production',
@@ -101,9 +101,7 @@ function exactKeys(value, required, optional, label) {
 }
 
 function safeRelativePath(path) {
-  fail(typeof path === 'string' && path.length > 0, 'shard path missing');
-  fail(!path.startsWith('/') && !path.includes('\\') && !path.includes('//'), 'unsafe shard path');
-  fail(!path.split('/').some((part) => part === '' || part === '.' || part === '..'), 'unsafe shard path');
+  validateRelativePath(path, 'gameplay shard path', { errorClass: CreatureGameplayProfileError });
   fail(path.startsWith('shards/') && path.endsWith('.json'), 'invalid shard path');
   return path;
 }
@@ -304,13 +302,10 @@ export async function validateCreatureGameplayManifest(manifest, { expectedSeman
 }
 
 async function readBounded(response, maxBytes, expectedBytes, label) {
-  fail(response?.ok, `${label} fetch failed: ${response?.status ?? 'unknown'}`);
-  const declared = response.headers?.get?.('content-length');
-  if (declared != null) fail(Number(declared) <= maxBytes, `${label} declared bytes exceed limit`);
-  const bytes = new Uint8Array(await response.arrayBuffer());
-  fail(bytes.byteLength <= maxBytes, `${label} bytes exceed limit`);
-  if (expectedBytes != null) fail(bytes.byteLength === expectedBytes, `${label} byte count mismatch`);
-  return bytes;
+  return readBoundedResponseBytes(response, maxBytes, label, {
+    errorClass: CreatureGameplayProfileError,
+    expectedBytes,
+  });
 }
 
 function decodeCanonical(bytes, label) {
@@ -386,7 +381,8 @@ export function createCreatureGameplayProfileService({
 
   async function manifest() {
     if (!manifestPromise) manifestPromise = (async () => {
-      const value = await fetchCanonical(new URL('manifest.json', root), fetchImpl, PRODUCER_LIMITS.max_manifest_bytes, null, null, 'gameplay manifest');
+      const manifestUrl = resolveTrustedRelativeUrl('manifest.json', root, 'gameplay manifest path', { errorClass: CreatureGameplayProfileError });
+      const value = await fetchCanonical(manifestUrl, fetchImpl, PRODUCER_LIMITS.max_manifest_bytes, null, null, 'gameplay manifest');
       return validateCreatureGameplayManifest(value, { expectedSemanticDigest, expectations });
     })().catch((error) => { manifestPromise = null; throw error; });
     return manifestPromise;
@@ -397,7 +393,8 @@ export function createCreatureGameplayProfileService({
     if (cache.has(key)) {
       const entry = cache.get(key); cache.delete(key); cache.set(key, entry); return entry.value;
     }
-    const value = await fetchCanonical(new URL(safeRelativePath(descriptor.path), root), fetchImpl, PRODUCER_LIMITS.max_shard_bytes, descriptor.bytes, descriptor.digest, `gameplay shard ${key}`);
+    const shardUrl = resolveTrustedRelativeUrl(safeRelativePath(descriptor.path), root, `gameplay shard ${key} path`, { errorClass: CreatureGameplayProfileError });
+    const value = await fetchCanonical(shardUrl, fetchImpl, PRODUCER_LIMITS.max_shard_bytes, descriptor.bytes, descriptor.digest, `gameplay shard ${key}`);
     const validated = validateShard(value, descriptor);
     remember(key, validated, descriptor.bytes);
     return validated;
