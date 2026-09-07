@@ -9,6 +9,7 @@ import {
   validateCreatureGameplayManifest,
 } from '../../src/browser/creature-gameplay-profiles.mjs';
 import { qualificationGameplayFixture } from '../../e2e/support/qualification-gameplay.mjs';
+import { buildVerificationPlan } from '../../tools/verification/build-verification-plan.mjs';
 
 function fetcher(files) {
   return async (url) => {
@@ -63,7 +64,7 @@ test('qualification gameplay service loads synthetic NPC and large-shop profiles
   assert.equal(large.profile.shop.sells.at(-1).item_name, 'Fixture Bulk Item 124');
 });
 
-test('gameplay impact routing always selects functional fixture and bounded source-contract coverage', () => {
+test('gameplay impact routing executes both functional fixture and bounded source-contract coverage', () => {
   const catalog = JSON.parse(readFileSync(new URL('../../tools/verification/verification-catalog.json', import.meta.url), 'utf8'));
   const impact = JSON.parse(readFileSync(new URL('../../tools/verification/impact-manifest.json', import.meta.url), 'utf8'));
 
@@ -81,4 +82,19 @@ test('gameplay impact routing always selects functional fixture and bounded sour
   const sourceSpecRule = impact.entries.find((entry) => entry.pathPrefix === 'e2e/tests/creature-gameplay-source-contract-desktop.spec.mjs');
   assert.ok(sourceSpecRule, 'source-contract spec requires an explicit impact rule');
   assert.ok(sourceSpecRule.requiredGroups.includes('integration.source-contract'));
+
+  const plan = buildVerificationPlan({
+    repository: 'Oteryn/Oteryn-Atlas',
+    headSha: 'a'.repeat(40),
+    integrationBaseSha: 'b'.repeat(40),
+    mergeBaseSha: 'c'.repeat(40),
+    changedFiles: [{ path: 'src/browser/creature-gameplay-profiles.mjs' }],
+    trustedImpactManifest: impact,
+    candidateImpactManifest: impact,
+    verificationCatalog: catalog,
+  });
+  assert.equal(plan.requiresRealFullWorld, false);
+  assert.deepEqual(plan.requiredDataCapabilities, ['bounded_real_world', 'qualification_fixture']);
+  assert.ok(plan.requiredGroupIds.includes('e2e.creatures'));
+  assert.ok(plan.requiredGroupIds.includes('integration.source-contract'));
 });
