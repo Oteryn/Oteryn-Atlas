@@ -10,7 +10,7 @@ Keep Atlas agent documentation simple by assigning one authority to each concern
 
 ## Authority model
 
-- `docs/agents/prompts/*.md` are reusable prompt contracts. They describe task outcomes, bounded scope, Atlas-specific invariants, and observable acceptance.
+- `docs/agents/prompts/*.md` are reusable prompt contracts. They are task-specific deltas over the prompting standard selected by `docs/agents/META_AGENT_POLICY_BINDING.json` and retain Atlas-specific outcomes, boundaries, invariants, and observable acceptance.
 - GitHub Issues are mutable lifecycle authority. Open/closed state, current ownership, blockers, and terminal disposition come from live GitHub state rather than a repository-maintained mirror.
 - Git history is provenance. Merged commits, pull requests, and removed historical files preserve what was authorized and delivered without a second mutable status database.
 - `docs/agents/tasks/active` is a convenience cache. A packet there may help execution, but it cannot override its owning GitHub Issue, current protected `main`, or newer merged authority.
@@ -19,7 +19,7 @@ There is no machine-readable prompt/task lifecycle registry. Do not recreate `DO
 
 ## Prompt contract
 
-Reusable task prompts are task-specific deltas. Prefer only information that materially changes execution: outcome, bounded scope, Atlas-specific invariants, and acceptance. Repository-wide authorization, tool routing, review, verification, Merge Queue, credential, and deployment rules are inherited from current repository authority rather than copied into every prompt.
+Reusable task prompts are task-specific deltas. Use the bound META prompting and evaluation standards for material prompt authoring or harness evaluation. Prefer only information that changes execution: outcome, bounded scope, Atlas-specific invariants, and acceptance. Repository-wide authorization, tool routing, review, verification, Merge Queue, credential, and deployment rules are inherited from the bound organization policy and current repository authority rather than copied into every prompt.
 
 A historical prompt may remain in Git as provenance. Its presence does not make it dispatchable. Starting or continuing mutable work requires a live GitHub Issue or other current repository authority.
 

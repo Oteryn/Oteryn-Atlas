@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const POLICY = resolve(ROOT, 'docs/agents/DOCUMENTATION_AGENT_IA.md');
+const BINDING = resolve(ROOT, 'docs/agents/META_AGENT_POLICY_BINDING.json');
 const CANARY = resolve(ROOT, 'docs/agents/prompts/ATLAS-LEAN-PROMPT-CANARY.md');
 const REGISTRY = resolve(ROOT, 'docs/agents/DOCUMENTATION_AGENT_IA.json');
 const REGISTRY_VALIDATOR = resolve(ROOT, 'tools/governance/validate_documentation_ia.py');
@@ -40,6 +41,19 @@ test('Atlas Documentation/Agent IA has one mutable lifecycle authority', () => {
   assert.equal(existsSync(REGISTRY_TEST), false, 'registry-only validator test must be removed');
 
   const policy = readFileSync(POLICY, 'utf8');
+  const binding = JSON.parse(readFileSync(BINDING, 'utf8'));
+  assert.deepEqual(
+    {
+      policy_id: binding.policy_id,
+      policy_version: binding.policy_version,
+      authority_repository: binding.authority_repository,
+    },
+    {
+      policy_id: 'OTERYN_ORGANIZATION_AGENT_POLICY',
+      policy_version: '3.0.0',
+      authority_repository: 'Oteryn/Oteryn',
+    },
+  );
   for (const phrase of [
     '`docs/agents/prompts/*.md` are reusable prompt contracts',
     'GitHub Issues are mutable lifecycle authority',
@@ -87,5 +101,5 @@ test('lean prompt canary is a task delta and does not copy repository policy', (
     assert.equal(text.includes(`## ${forbidden}`), false, `canary copied repository policy section: ${forbidden}`);
   }
   assert.match(text, /GitHub Issue #322 owns mutable lifecycle state/u);
-  assert.match(text, /inherits current repository-wide execution, authorization, review, verification and Merge Queue policy/u);
+  assert.match(text, /relies on the bound organization policy and current repository-wide execution/u);
 });
