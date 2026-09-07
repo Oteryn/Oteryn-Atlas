@@ -2,76 +2,35 @@
 
 **Artifact class:** `RUNBOOK_RECOVERY`  
 **Owner:** `Oteryn/Oteryn-Atlas`  
-**Version:** 1  
-**Status:** ACTIVE
+**Version:** 2  
+**Status:** SUSPENDED DURING MAINTENANCE
 
-## Purpose
+## Current state
 
-Define the safe recovery boundary when merged-main Atlas live acceptance or cutover fails. The existing `Synology Live Acceptance` workflow owns normal automatic rollback. This document prevents recovery from turning into an ad-hoc task-branch deployment or an invented revision change.
+Atlas live deployment and its former automated rollback path are suspended by the temporary maintenance lifecycle tracked in Issue #315. This document preserves the recovery contract for a later restored deployment path; it is not current authority to dispatch a suspended workflow or mutate live infrastructure.
 
-## Authority
+Current authority is protected `main`, root `AGENTS.md`, Issue #315 and the workflow files that actually exist under `.github/workflows/` on protected `main`. Historical `synology-live-acceptance.yml` and `synology-runner-health.yml` definitions are retained under `docs/maintenance/suspended-workflows/` only as suspended implementation evidence.
 
-1. protected `Oteryn/Oteryn-Atlas` merged `main` history;
-2. root `AGENTS.md`;
-3. `.github/workflows/synology-live-acceptance.yml` automatic rollback/candidate lifecycle;
-4. `.github/workflows/synology-runner-health.yml` runner identity boundary;
-5. `docs/operations/ATLAS-LIVE-OPERATIONS.md` for normal operation.
+## Recovery contract after restoration
 
-The protected workflow is implementation authority for the rollback mechanics. This runbook deliberately does not duplicate host/container commands that can drift.
+When live deployment is restored and a real incident occurs, recovery must preserve these invariants:
 
-## Recovery triggers
+1. allow the repository-approved deployment/recovery mechanism to finish its owned failure handling before considering any separately authorized intervention;
+2. roll back only to the exact previous live revision recorded by the active deployment mechanism, never to a guessed or remembered commit;
+3. require restored exact-revision and health proof, not merely a running container;
+4. preserve bounded evidence from the failed candidate for diagnosis;
+5. deliver any durable fix through a new protected PR and merged `main`, not by patching the live host.
 
-Use this runbook when any of the following occurs during a merged-main live operation:
-
-- staged candidate qualification fails;
-- cutover occurs but exact-revision/health acceptance fails;
-- the workflow reports rollback/recovery failure;
-- the observed live revision does not match the exact merged-main candidate expected by the run;
-- the trusted runner boundary cannot be proven.
-
-## Preconditions
-
-Before taking recovery action, record without modifying live state:
-
-- failing Atlas merged-main candidate SHA;
-- GitHub Actions run ID and attempt;
-- workflow stage/failure point;
-- previous exact live revision captured by the workflow, when available;
-- available bounded failure artifacts/logs that do not expose secrets.
-
-Never select a rollback SHA from memory, a task branch, a PR head or a dirty worktree.
-
-## Standard recovery
-
-1. **Allow workflow-owned failure handling to finish.** Do not race the live-acceptance workflow with manual host changes. The workflow stages candidates separately and captures the prior live revision for rollback.
-2. **Use only the workflow-captured previous revision.** If rollback is required, the valid recovery target is the previous exact live revision that the workflow observed before cutover. Do not substitute an arbitrary older commit.
-3. **Require restored-revision qualification.** Recovery is not complete merely because a container starts. The restored live surface must identify the exact previous revision and satisfy the current workflow's rollback/health assertions.
-4. **Preserve the failed candidate evidence.** Keep the GitHub run/artifacts needed for diagnosis subject to existing retention. Do not rewrite migration/provenance facts or historical evidence to make the failed attempt look successful.
-5. **Return to normal operations only after proof.** Once the prior exact revision is restored and qualified, subsequent fixes must travel through a new protected PR/main delivery and the standard `docs/operations/ATLAS-LIVE-OPERATIONS.md` path.
+Concrete workflow names, runner labels, commands and rollback mechanics must be taken from the then-current protected-main implementation. Suspended workflow copies are not executable authority.
 
 ## Break-glass boundary
 
-If the existing workflow cannot restore/qualify the previously captured exact live revision, recovery under this runbook is **BLOCKED**. Record the failing run, candidate SHA, captured prior revision if known and exact failed assertion, then use a separately authorized incident/recovery task.
+If the restored repository-approved recovery mechanism cannot restore and qualify the previous exact live revision, recovery is **BLOCKED** until a separately authorized incident/recovery task exists. Record the failed candidate SHA, execution/run identity, captured prior revision when available and the exact failed assertion.
 
-This runbook does not authorize manual Synology/container mutation, arbitrary revision checkout, secret changes, runner reconfiguration, branch-protection changes, migration/provenance edits or direct deployment from a task branch. Lack of a working automated restore path is a blocker, not permission to broaden authority silently.
+This runbook never authorizes manual Synology/container mutation, arbitrary revision checkout, task-branch deployment, secret changes, runner reconfiguration, protection/ruleset changes, provenance edits or invented rollback targets.
 
-## Validation
+## Maintenance behavior
 
-Recovery is accepted only when all applicable statements are proven:
+While Issue #315 keeps deployment suspended, there is no live-operation action to recover through this runbook. Preserve historical recovery material and use current protected authority to decide when a new live path may be restored.
 
-- the restored revision is the exact previous merged-main revision captured by the workflow;
-- the trusted Atlas runner boundary is valid;
-- workflow rollback/health assertions pass;
-- the live revision identity equals the restored revision;
-- no task branch or dirty worktree became deployment authority;
-- recovery did not alter Game authority, generated-data truth, migration/extraction provenance, branch protection, secrets or dependency policy.
-
-Repository contract tests such as `tests/deployment-policy.mjs` verify that failed live acceptance restores the previous exact revision and does not assume old product absence. They are policy evidence; actual merged-main recovery still requires the live workflow's evidence when a real incident occurs.
-
-## Roll-forward
-
-After successful restoration, repair the defect in a new/appropriate GitHub Issue and protected PR. Re-run exact-head required checks, merge to protected `main`, then use the normal merged-main live operation. Never patch the live host as the durable fix.
-
-## Supersession
-
-A protected change to live-acceptance rollback/candidate topology must update this runbook or explicitly prove the recovery contract remains unchanged. When this runbook is superseded, retain Git history as provenance; do not preserve two simultaneously active recovery authorities.
+Normal live-operation guidance is in `docs/operations/ATLAS-LIVE-OPERATIONS.md` and `docs/agents/operations/LIVE_DEPLOYMENT.md`.

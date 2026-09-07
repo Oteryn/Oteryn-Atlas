@@ -2,80 +2,47 @@
 
 **Artifact class:** `RUNBOOK_OPERATIONAL`  
 **Owner:** `Oteryn/Oteryn-Atlas`  
-**Version:** 1  
-**Status:** ACTIVE
+**Version:** 2  
+**Status:** SUSPENDED DURING MAINTENANCE
 
-## Purpose
+## Current state
 
-Provide one safe operator procedure for the recurring Atlas merged-main live publication and acceptance path. This runbook documents **how to use the existing authority**; it does not duplicate the mutable implementation embedded in GitHub Actions and it does not authorize direct host/container mutation.
+Atlas live publication/deployment is suspended by the temporary maintenance lifecycle tracked in Issue #315. This runbook is retained for recovery of the post-maintenance operating model; it is **not** current authorization to deploy, dispatch a suspended workflow or mutate Synology/container state.
 
-## Authority
+Current authority is protected `main`, root `AGENTS.md`, Issue #315 and the workflows that actually exist under `.github/workflows/` on protected `main`. The former `synology-live-acceptance.yml` and `synology-runner-health.yml` definitions are preserved under `docs/maintenance/suspended-workflows/` and are historical implementation material while suspended.
 
-In descending order for this procedure:
+If any text below conflicts with current protected authority, current protected authority wins.
 
-1. protected GitHub `main` and the exact merged commit;
-2. root `AGENTS.md` deployment/verification rules;
-3. `.github/workflows/synology-live-acceptance.yml` for staging, qualification, cutover and automatic rollback;
-4. `.github/workflows/synology-runner-health.yml` for the organization-runner boundary;
-5. `docs/recovery/ATLAS-LIVE-RECOVERY.md` for failure/recovery handling.
+## Post-maintenance operating contract
 
-If this runbook disagrees with a newer protected workflow or `AGENTS.md`, the protected workflow/instruction wins and this runbook must be updated before reuse.
+When live deployment is explicitly restored and separately authorized, the operating path must preserve these invariants:
 
-## Preconditions
+- deploy only an exact clean revision already merged to protected `main`;
+- bind qualification, cutover and observed live identity to that exact revision;
+- use the repository-approved trusted runner/deployment boundary rather than ad-hoc host mutation;
+- stage and qualify before replacing the live revision;
+- retain a known previous exact live revision for rollback;
+- fail closed if runner identity, publication provenance, exact revision or health cannot be proven;
+- never use a task branch, PR merge ref, dirty worktree or remembered SHA as deployment authority.
 
-All of the following are mandatory:
+The concrete workflow names, triggers, checks and runner labels must be taken from the restored protected-main implementation at that time, not from this document or a suspended workflow copy.
 
-- the candidate revision is already merged to protected `main`;
-- the exact target SHA is resolved from GitHub `Oteryn/Oteryn-Atlas` `main`, not from a task branch, local worktree, PR merge ref or remembered value;
-- the required pre-merge repository gates for the delivery have completed according to current branch policy;
-- live acceptance is executed only by the existing main-only workflow on the trusted `atlas-runners` / `oteryn-atlas` runner boundary;
-- no operator has introduced uncommitted host state as deployment authority;
-- no raw legacy/proprietary runtime input is substituted for accepted Game/Atlas publication authority.
+## Evidence required after restoration
 
-A task branch or dirty local checkout is never an acceptable live candidate.
+A successful live operation should record, without secrets:
 
-## Standard procedure
-
-1. **Resolve exact merged authority.** Record the protected Atlas `main` SHA that must be served.
-2. **Observe the merged-main workflow.** Use the `Synology Live Acceptance` run associated with that exact merged-main push. A manual `workflow_dispatch` is acceptable only when it still executes against `refs/heads/main` and the workflow proves `GITHUB_SHA == ATLAS_REV == fetched main`.
-3. **Require runner-boundary proof.** The workflow must pass its existing organization-runner identity and least-privilege boundary checks. If runner identity is not proven, stop and classify the operation as failed; do not bypass the check.
-4. **Require workflow-owned staging.** The workflow stages the exact merged revision into its run-scoped candidate root. Do not replace this with an ad-hoc copy, local branch export or direct container bind-mount change.
-5. **Require candidate qualification before cutover.** All product, semantic, browser and exact-revision checks implemented by the current workflow must pass for the staged candidate before the live container is replaced.
-6. **Require exact-revision cutover evidence.** A successful operation must prove the live surface/container identifies the exact merged Atlas revision required by the workflow. A stale revision is failure even when the page is reachable.
-7. **Record bounded evidence.** Record the Atlas merged SHA, GitHub Actions run ID/attempt, final workflow result and any exact revision/health evidence emitted by the workflow. Do not copy secrets, runner credentials or mutable local tokens into documentation.
-8. **On any failure, use recovery policy.** Do not improvise host repair under this runbook. Follow `docs/recovery/ATLAS-LIVE-RECOVERY.md`; the existing live-acceptance workflow owns its automatic rollback behavior.
-
-## Validation
-
-A live operation is accepted only when:
-
-- the GitHub Actions run is for `Oteryn/Oteryn-Atlas` protected `main`;
-- workflow checkout/fetch proofs bind the run to the recorded merged SHA;
-- runner-boundary checks pass;
-- staged candidate qualification passes before cutover;
-- the final live revision equals the recorded merged-main SHA;
-- the workflow concludes successfully.
-
-Repository-side deterministic policy is additionally covered by `tests/deployment-policy.mjs` and `tests/synology-live-workflow.mjs`. Those tests validate the workflow contract but do **not** substitute for merged-main live acceptance when runtime behavior is being delivered.
+1. the exact protected-main Atlas SHA;
+2. the GitHub Actions run ID/attempt or successor repository-approved execution identity;
+3. the final execution result;
+4. exact live revision/health evidence;
+5. rollback evidence when recovery occurred.
 
 ## Safety boundary
 
-This runbook does not authorize:
+This runbook never authorizes direct edits to Synology/container state, deployment of a branch SHA, protection/ruleset changes, secret changes, runner reconfiguration, provenance rewrites or substitution of legacy/proprietary inputs for accepted Game/Atlas publication authority.
 
-- deployment of a PR/task-branch SHA;
-- direct edits to Synology runner/container state;
-- changing branch protection, required checks, secrets or credentials;
-- changing migration/extraction provenance;
-- inventing a rollback target;
-- treating historical FullWorld handoff paths as current operational authority;
-- using Oteryn-Game data except through accepted authoritative publication contracts.
+During maintenance, do not attempt live deployment. After maintenance, use only the then-current protected implementation and `docs/agents/operations/LIVE_DEPLOYMENT.md`.
 
-If the existing workflow cannot perform the required operation safely, record the failure and open/use a separately authorized incident/task. Do not widen this runbook's authority to make the operation pass.
+## Recovery
 
-## Rollback / recovery
-
-The current live-acceptance workflow captures the prior live revision during staging and owns the automatic restoration path on failed acceptance/cutover. Recovery details and the break-glass boundary are in `docs/recovery/ATLAS-LIVE-RECOVERY.md`.
-
-## Supersession
-
-This runbook remains authoritative only while the protected workflow topology described above remains current. A protected workflow change that materially alters merged-main publication, runner identity, cutover or rollback must update this runbook in the same governed delivery or explicitly record why no runbook change is needed.
+Failure handling is described in `docs/recovery/ATLAS-LIVE-RECOVERY.md`. That runbook is likewise suspended for live execution until deployment is restored; it remains the design boundary for rollback semantics.
