@@ -1,13 +1,13 @@
 {
-  "apply_on_main": false,
-  "candidate_count": 1,
+  "apply_on_main": true,
+  "candidate_count": 27,
   "confirmation": "APPROVE_REVIEWED_TERMINAL_CLOSED_UNMERGED_BRANCHES_ISSUE_1050",
-  "entries_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "entries_sha256": "4898e32668d648e54539d3e69dc02210a7f1a0bf0f752185ade940d27e6755f4",
   "issue": 1050,
-  "policy_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-  "review_summary": "Fail-closed refreshed Atlas inventory after terminalizing completed #115/#179/#272/#302/#307 refs and duplicate retired Astra coordinator refs. Active #315 diagnostic/recovery branches remain intentionally preserved; replace with the exact reviewed live digest only after this new artifact is inspected.",
-  "reviewed_at": "2026-09-07T19:27:00Z",
+  "policy_sha256": "9e31a2cb6c5c74f2aaf34a5f59e66586fedd573a17636368b4909676c5c4fe83",
+  "review_summary": "Reviewed exact live Atlas set of 27 terminal closed-unmerged branches. Open PRs and protected main are excluded. Eight UNKNOWN refs are deliberately preserved fail-closed: diagnostic/315-protected-sandbox, diagnostic/315-unified-shadow, fix/authority-repin-digest-diff-recovery, fix/authority-repin-recovery-self-test, fix/issue-302-authority-repin-recovery-test-model, fix/issue-315-f02-publication-safety, fix/issue-315-f04-f08-runtime-safety, and task/315-verification-architecture. These are recovery-sensitive or current #315 maintenance/remediation refs and are not approved for deletion.",
+  "reviewed_at": "2026-09-07T19:28:00Z",
   "reviewed_by": "Oteryn final cleanup #176/#359",
   "schema_version": 1,
-  "source_artifact": "pending refreshed terminal-branch-lifecycle read artifact"
+  "source_artifact": "terminal-branch-lifecycle-read-1337995824-34155646174 / artifact 10030858046 / sha256:fac007cf0c59dcd54532d3f2979d6fea4a94e600ba6cb8d07d0c0dbd5a8e520c"
 }
