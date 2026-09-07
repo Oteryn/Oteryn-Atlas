@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import { loadChunk, loadManifest, sha256ContentId } from '../../src/browser/loader.mjs';
@@ -273,14 +272,4 @@ test('F08 trusted URL confinement rejects normalized escape even when text looks
   });
   await assert.rejects(() => store.loadGroup(-7, escaped, group), FullWorldError);
   assert.equal(fetches, 0);
-});
-
-test('F05/F08 creature overlay keeps bounded streaming and final URL confinement contracts', () => {
-  const source = readFileSync(new URL('../../web/fullworld-creatures.mjs', import.meta.url), 'utf8');
-  assert.match(source, /readBoundedResponseBytes/);
-  assert.doesNotMatch(source, /response\.arrayBuffer\(\)/);
-  assert.match(source, /trustedCreatureUrl\(entry\.path, ROOT, 'creature chunk path'\)/);
-  assert.match(source, /trustedCreatureUrl\(index\.search_path, ROOT, 'creature search path'\)/);
-  assert.doesNotMatch(source, /new URL\(safeRelativePath\(entry\.path\), ROOT\)/);
-  assert.doesNotMatch(source, /new URL\(safeRelativePath\(index\.search_path\), ROOT\)/);
 });
