@@ -1,0 +1,530 @@
+{
+  "baseline": "f00815858bb5b031c502ad19fb96a05ff66b4d84",
+  "source": "authorized GitHub connector reads; public API workflow registry and failed scanning reads",
+  "rulesets": {
+    "22103758": {
+      "id": 22103758,
+      "name": "Protect main",
+      "source_type": "Repository",
+      "enforcement": "active",
+      "conditions": {
+        "ref_name": {
+          "exclude": [],
+          "include": [
+            "~DEFAULT_BRANCH"
+          ]
+        }
+      },
+      "rules": [
+        {
+          "type": "deletion"
+        },
+        {
+          "type": "required_linear_history"
+        },
+        {
+          "type": "pull_request",
+          "parameters": {
+            "required_approving_review_count": 0,
+            "dismiss_stale_reviews_on_push": true,
+            "required_reviewers": [],
+            "require_code_owner_review": false,
+            "dismissal_restriction": {
+              "enabled": false,
+              "allowed_actors": []
+            },
+            "require_last_push_approval": false,
+            "required_review_thread_resolution": true,
+            "require_extra_approval_for_unattributed_changes": true,
+            "allowed_merge_methods": [
+              "squash"
+            ]
+          }
+        },
+        {
+          "type": "non_fast_forward"
+        },
+        {
+          "type": "required_status_checks",
+          "parameters": {
+            "strict_required_status_checks_policy": true,
+            "do_not_enforce_on_create": false,
+            "required_status_checks": [
+              {
+                "context": "Merge authority audit / protected-base validate",
+                "integration_id": 15368
+              }
+            ]
+          }
+        },
+        {
+          "type": "merge_queue",
+          "parameters": {
+            "merge_method": "SQUASH",
+            "max_entries_to_build": 5,
+            "min_entries_to_merge": 1,
+            "max_entries_to_merge": 5,
+            "min_entries_to_merge_wait_minutes": 0,
+            "grouping_strategy": "ALLGREEN",
+            "check_response_timeout_minutes": 60
+          }
+        }
+      ]
+    },
+    "22352928": {
+      "id": 22352928,
+      "name": "Protected Atlas authority",
+      "source_type": "Organization",
+      "enforcement": "active",
+      "conditions": {
+        "ref_name": {
+          "exclude": [],
+          "include": [
+            "~DEFAULT_BRANCH"
+          ]
+        }
+      },
+      "rules": [
+        {
+          "type": "workflows",
+          "parameters": {
+            "do_not_enforce_on_create": false,
+            "workflows": [
+              {
+                "repository_id": 1337995824,
+                "path": ".github/workflows/merge-authority-audit.yml",
+                "ref": "refs/heads/main"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "observedJobs": [
+    {
+      "id": 101857107613,
+      "run_id": 34159140292,
+      "head_sha": "f00815858bb5b031c502ad19fb96a05ff66b4d84",
+      "name": "Merge authority audit / protected-base validate",
+      "conclusion": "success",
+      "started_at": "2026-09-07T20:22:15Z",
+      "completed_at": "2026-09-07T20:22:22Z",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-09-07T20:22:16Z",
+          "completed_at": "2026-09-07T20:22:16Z"
+        },
+        {
+          "name": "Check out exact protected maintenance authority",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-09-07T20:22:16Z",
+          "completed_at": "2026-09-07T20:22:18Z"
+        },
+        {
+          "name": "Check out inert candidate",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-09-07T20:22:18Z",
+          "completed_at": "2026-09-07T20:22:19Z"
+        },
+        {
+          "name": "Enforce protected maintenance freeze",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-09-07T20:22:19Z",
+          "completed_at": "2026-09-07T20:22:20Z"
+        },
+        {
+          "name": "Post Check out inert candidate",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-09-07T20:22:20Z",
+          "completed_at": "2026-09-07T20:22:20Z"
+        },
+        {
+          "name": "Post Check out exact protected maintenance authority",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-09-07T20:22:20Z",
+          "completed_at": "2026-09-07T20:22:21Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-09-07T20:22:21Z",
+          "completed_at": "2026-09-07T20:22:21Z"
+        }
+      ]
+    },
+    {
+      "id": 101857106985,
+      "run_id": 34159140161,
+      "head_sha": "f00815858bb5b031c502ad19fb96a05ff66b4d84",
+      "name": "atlas-gate",
+      "conclusion": "success",
+      "started_at": "2026-09-07T20:22:16Z",
+      "completed_at": "2026-09-07T20:22:24Z",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-09-07T20:22:16Z",
+          "completed_at": "2026-09-07T20:22:17Z"
+        },
+        {
+          "name": "Check out exact protected maintenance authority",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-09-07T20:22:17Z",
+          "completed_at": "2026-09-07T20:22:19Z"
+        },
+        {
+          "name": "Check out inert merge-group candidate",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-09-07T20:22:19Z",
+          "completed_at": "2026-09-07T20:22:21Z"
+        },
+        {
+          "name": "Enforce protected maintenance freeze",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-09-07T20:22:21Z",
+          "completed_at": "2026-09-07T20:22:21Z"
+        },
+        {
+          "name": "Post Check out inert merge-group candidate",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-09-07T20:22:21Z",
+          "completed_at": "2026-09-07T20:22:21Z"
+        },
+        {
+          "name": "Post Check out exact protected maintenance authority",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-09-07T20:22:21Z",
+          "completed_at": "2026-09-07T20:22:21Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-09-07T20:22:21Z",
+          "completed_at": "2026-09-07T20:22:21Z"
+        }
+      ]
+    },
+    {
+      "id": 101857222133,
+      "run_id": 34159178035,
+      "head_sha": "648c478889e43323c3a83b8a823293f79d977c74",
+      "name": "close / validate-operation",
+      "conclusion": "success",
+      "started_at": "2026-09-07T20:22:52Z",
+      "completed_at": "2026-09-07T20:22:54Z",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-09-07T20:22:53Z",
+          "completed_at": "2026-09-07T20:22:53Z"
+        },
+        {
+          "name": "Validate requested operation",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-09-07T20:22:53Z",
+          "completed_at": "2026-09-07T20:22:53Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-09-07T20:22:53Z",
+          "completed_at": "2026-09-07T20:22:53Z"
+        }
+      ]
+    },
+    {
+      "id": 101857222852,
+      "run_id": 34159178035,
+      "head_sha": "648c478889e43323c3a83b8a823293f79d977c74",
+      "name": "read",
+      "conclusion": "skipped",
+      "started_at": "2026-09-07T20:22:51Z",
+      "completed_at": "2026-09-07T20:22:50Z",
+      "steps": []
+    },
+    {
+      "id": 101857234070,
+      "run_id": 34159178035,
+      "head_sha": "648c478889e43323c3a83b8a823293f79d977c74",
+      "name": "close / close-event-cleanup",
+      "conclusion": "skipped",
+      "started_at": "2026-09-07T20:22:54Z",
+      "completed_at": "2026-09-07T20:22:54Z",
+      "steps": []
+    },
+    {
+      "id": 101857234226,
+      "run_id": 34159178035,
+      "head_sha": "648c478889e43323c3a83b8a823293f79d977c74",
+      "name": "close / apply-reviewed-manifest",
+      "conclusion": "skipped",
+      "started_at": "2026-09-07T20:22:54Z",
+      "completed_at": "2026-09-07T20:22:54Z",
+      "steps": []
+    },
+    {
+      "id": 101857246639,
+      "run_id": 34159178035,
+      "head_sha": "648c478889e43323c3a83b8a823293f79d977c74",
+      "name": "apply",
+      "conclusion": "skipped",
+      "started_at": "2026-09-07T20:22:58Z",
+      "completed_at": "2026-09-07T20:22:50Z",
+      "steps": []
+    }
+  ],
+  "security": {
+    "code-scanning_default-setup": {
+      "error": "HTTP Error 401: Unauthorized"
+    },
+    "code-scanning_analyses": {
+      "error": "HTTP Error 401: Unauthorized"
+    },
+    "security-connector": {
+      "error": "HTTPError: 400: GitHub Fetch URL is not an allowed public GitHub repository or search endpoint. (Response: None)",
+      "error_code": "INVALID_ARGUMENT"
+    }
+  },
+  "workflowRegistry": {
+    "total_count": 33,
+    "workflows": [
+      {
+        "id": 336802782,
+        "name": "Verify 15.32 Drive asset",
+        "path": ".github/workflows/verify-15-32-drive-asset.yml",
+        "state": "active"
+      },
+      {
+        "id": 338447594,
+        "name": "Dependabot Updates",
+        "path": "dynamic/dependabot/dependabot-updates",
+        "state": "active"
+      },
+      {
+        "id": 338672209,
+        "name": "One-shot Atlas mobile preview deploy",
+        "path": ".github/workflows/one-shot-deploy-mobile-preview.yml",
+        "state": "active"
+      },
+      {
+        "id": 338675315,
+        "name": "Inspect Atlas mobile preview deploy",
+        "path": ".github/workflows/inspect-mobile-preview-deploy.yml",
+        "state": "active"
+      },
+      {
+        "id": 338676158,
+        "name": "Cancel queued Atlas preview deploy handoff",
+        "path": ".github/workflows/cancel-queued-atlas-preview-deploy.yml",
+        "state": "active"
+      },
+      {
+        "id": 339463597,
+        "name": "Publish search catalogs once",
+        "path": ".github/workflows/_publish-search-catalog-once.yml",
+        "state": "active"
+      },
+      {
+        "id": 339799771,
+        "name": "Probe Atlas Runner Group Allow",
+        "path": ".github/workflows/probe-atlas-runner-group-allow.yml",
+        "state": "active"
+      },
+      {
+        "id": 339955593,
+        "name": "Animation runtime",
+        "path": ".github/workflows/animation-runtime.yml",
+        "state": "active"
+      },
+      {
+        "id": 340277196,
+        "name": "Terminal Branch Lifecycle",
+        "path": ".github/workflows/terminal-branch-lifecycle.yml",
+        "state": "active"
+      },
+      {
+        "id": 341644909,
+        "name": "Creature walking in place",
+        "path": ".github/workflows/creature-walking-in-place.yml",
+        "state": "active"
+      },
+      {
+        "id": 341645289,
+        "name": "Issue 121 Exact-Head Driver",
+        "path": ".github/workflows/issue121-exact-head-driver.yml",
+        "state": "active"
+      },
+      {
+        "id": 342743667,
+        "name": "Ephemeral PR184 Molehill Qualification",
+        "path": ".github/workflows/pr184-molehill-qualification.yml",
+        "state": "active"
+      },
+      {
+        "id": 343127792,
+        "name": "Issue 121 Final Exact-Head Qualification",
+        "path": ".github/workflows/issue121-final-exact-head-driver.yml",
+        "state": "active"
+      },
+      {
+        "id": 343139900,
+        "name": "Issue 179 Phase D Final Qualification",
+        "path": ".github/workflows/issue179-phase-d-final-driver.yml",
+        "state": "active"
+      },
+      {
+        "id": 344519488,
+        "name": "Protected qualification world promotion",
+        "path": ".github/workflows/protected-qualification-world-promotion.yml",
+        "state": "active"
+      },
+      {
+        "id": 345428561,
+        "name": "Temporary exact source snapshot",
+        "path": ".github/workflows/temporary-exact-source-snapshot.yml",
+        "state": "active"
+      },
+      {
+        "id": 345577697,
+        "name": "Temporary apply protected bootstrap",
+        "path": ".github/workflows/temporary-apply-protected-bootstrap.yml",
+        "state": "active"
+      },
+      {
+        "id": 345579365,
+        "name": "Temporary stage protected bootstrap output",
+        "path": ".github/workflows/temporary-stage-protected-bootstrap-output.yml",
+        "state": "active"
+      },
+      {
+        "id": 345583309,
+        "name": "Temporary apply functional qualification fixture",
+        "path": ".github/workflows/temporary-apply-functional-fixture.yml",
+        "state": "active"
+      },
+      {
+        "id": 345585800,
+        "name": ".github/workflows/temporary-stage-readonly-census-fix.yml",
+        "path": ".github/workflows/temporary-stage-readonly-census-fix.yml",
+        "state": "active"
+      },
+      {
+        "id": 345589650,
+        "name": "Temporary ready protected census fix",
+        "path": ".github/workflows/temporary-ready-pr269.yml",
+        "state": "active"
+      },
+      {
+        "id": 345592620,
+        "name": "Temporary probe Playwright Python runtime",
+        "path": ".github/workflows/temporary-probe-playwright-python.yml",
+        "state": "active"
+      },
+      {
+        "id": 345593438,
+        "name": "Temporary stage protected Python shim fix",
+        "path": ".github/workflows/temporary-stage-python-shim.yml",
+        "state": "active"
+      },
+      {
+        "id": 345594702,
+        "name": "Temporary diagnose protected Python shim",
+        "path": ".github/workflows/temporary-diagnose-python-shim.yml",
+        "state": "active"
+      },
+      {
+        "id": 345594874,
+        "name": "Temporary diagnose Python compile",
+        "path": ".github/workflows/temporary-diagnose-python-compile.yml",
+        "state": "active"
+      },
+      {
+        "id": 346715668,
+        "name": "Temporary export final visual review evidence",
+        "path": ".github/workflows/temporary-export-final-visual-review.yml",
+        "state": "active"
+      },
+      {
+        "id": 348375084,
+        "name": "Merge authority audit",
+        "path": ".github/workflows/merge-authority-audit.yml",
+        "state": "active"
+      },
+      {
+        "id": 348375086,
+        "name": "Atlas maintenance Merge Queue gate",
+        "path": ".github/workflows/merge-group-gate.yml",
+        "state": "active"
+      },
+      {
+        "id": 348617678,
+        "name": "Validate exact PR268 break-glass candidate",
+        "path": ".github/workflows/validate-pr268-f820-browser-proof.yml",
+        "state": "active"
+      },
+      {
+        "id": 349613973,
+        "name": "Candidate maintenance qualification",
+        "path": ".github/workflows/candidate-maintenance-qualification.yml",
+        "state": "active"
+      },
+      {
+        "id": 350064217,
+        "name": "Issue 314 provenance rotation writer",
+        "path": ".github/workflows/issue-314-provenance-rotation-writer.yml",
+        "state": "active"
+      },
+      {
+        "id": 350364177,
+        "name": "TEMP PR328 materialize handoff",
+        "path": ".github/workflows/TEMP-pr328-materialize.yml",
+        "state": "active"
+      },
+      {
+        "id": 351366015,
+        "name": "Admission sandbox diagnostic (non-authoritative)",
+        "path": ".github/workflows/admission-sandbox-diagnostic.yml",
+        "state": "active"
+      }
+    ]
+  }
+}

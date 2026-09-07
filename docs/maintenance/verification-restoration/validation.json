@@ -1,0 +1,50 @@
+{
+  "baseline": "f00815858bb5b031c502ad19fb96a05ff66b4d84",
+  "checks": {
+    "baseline_test_file_census": true,
+    "baseline_verification_contract_census": true,
+    "baseline_playwright_spec_census": true,
+    "unique_deterministic_proposed_owner": true,
+    "only_protected_retirements_staged": true,
+    "capability_inventory_exact_spec_set": true,
+    "capability_assignments_agree_with_inspected_oracles": true
+  },
+  "scope": "Static evidence completeness only; does not prove executable catalog ownership, routing closure, product tests, PR/MQ canaries or restoration acceptance.",
+  "baselineCounts": {
+    "allTestsFiles": 198,
+    "deterministicEntrypoints": 190,
+    "verificationContracts": 137,
+    "classifications": {
+      "retire": 2,
+      "retained": 98,
+      "rewrite": 28,
+      "historical": 9
+    },
+    "contractsReferencingAbsentWorkflow": 56,
+    "verificationSupportingFixtures": 2,
+    "outsideCatalogDirect": 53,
+    "outsideCatalogIncludingTransitive": 42,
+    "absentWorkflowFileContractCandidates": 39,
+    "absentWorkflowFixtureOnlyContracts": 17
+  },
+  "candidateDelta": {
+    "retiredContracts": [
+      "tests/verification/anti-loop-transition-compose-contract.test.mjs",
+      "tests/verification/bootstrap-catalog-workflow-contract.test.mjs"
+    ],
+    "remainingVerificationContracts": 135,
+    "remainingDeterministicEntrypoints": 188
+  },
+  "focusedTests": {
+    "command": "node --test tests/maintenance/maintenance-diff-policy.test.mjs tests/verification/verification-plan.test.mjs tests/verification/bootstrap-impact-policy-contract.test.mjs",
+    "pass": 35,
+    "fail": 0,
+    "skipped": 0
+  },
+  "obsoleteBaselineReproduction": {
+    "pass": 0,
+    "fail": 2,
+    "cause": "ENOENT for intentionally absent active workflows",
+    "purpose": "confirm obsolete topology contract failures; deletion already independently authorized by protected inventory"
+  }
+}

@@ -1,0 +1,118 @@
+{
+  "repository": "Oteryn/Oteryn-Atlas",
+  "baseSha": "f00815858bb5b031c502ad19fb96a05ff66b4d84",
+  "metaPolicy": {
+    "repository": "Oteryn/Oteryn",
+    "commit": "1dedfc0f264fe0e23e5365dbe9280c2d96df50c5",
+    "version": "3.0.0",
+    "verifiedMergedAncestorOfCurrentMain": true
+  },
+  "sources": [
+    {
+      "path": "AGENTS.md",
+      "blob": "8818bf720f85e720bc997cbb95ecf78f2cdef177",
+      "scope": "protected preparation baseline",
+      "consumedBy": [
+        "lead",
+        "contracts_ownership",
+        "browser_ownership",
+        "fullworld_oracle",
+        "authority_topology"
+      ]
+    },
+    {
+      "path": "docs/agents/META_AGENT_POLICY_BINDING.json",
+      "blob": "cef7245d3bb9120126380b027de8efb3785949e7",
+      "scope": "protected preparation baseline",
+      "consumedBy": [
+        "lead"
+      ]
+    },
+    {
+      "path": "docs/agents/operations/VERIFICATION_CAPABILITY.md",
+      "blob": "0c075021edb0b43db64cf1afb7bce43061886d7b",
+      "scope": "protected preparation baseline",
+      "consumedBy": [
+        "lead"
+      ]
+    },
+    {
+      "path": "tools/maintenance/verify-maintenance-diff.mjs",
+      "blob": "329e24ada9492bc0ce424148127463bbb03b6c54",
+      "scope": "protected preparation baseline",
+      "consumedBy": [
+        "lead"
+      ]
+    },
+    {
+      "path": "docs/maintenance/ATLAS_REMEDIATION_ALLOWLIST.json",
+      "blob": "621ac61e5294d9eda101a1a32b46484e37e58ff0",
+      "scope": "protected preparation baseline",
+      "consumedBy": [
+        "lead"
+      ]
+    },
+    {
+      "path": "docs/maintenance/OBSOLETE_VERIFICATION_CONTRACTS.json",
+      "blob": "83503ba7e1ea1e8289714191cc4ef47748299b51",
+      "scope": "protected preparation baseline",
+      "consumedBy": [
+        "lead"
+      ]
+    },
+    {
+      "path": "tools/verification/verification-catalog.json",
+      "blob": "802d85d03669009374df772fe3f16b3e3d59d916",
+      "scope": "protected preparation baseline",
+      "consumedBy": [
+        "lead"
+      ]
+    },
+    {
+      "path": "tools/verification/impact-manifest.json",
+      "blob": "8c83744ce15eb98b13d87152185474e60d5f1cba",
+      "scope": "protected preparation baseline",
+      "consumedBy": [
+        "lead"
+      ]
+    },
+    {
+      "path": "tools/verification/e2e-data-capability-inventory.json",
+      "blob": "17719221e87d83ebcbccabcfd7fec83dc4861802",
+      "scope": "protected preparation baseline",
+      "consumedBy": [
+        "lead"
+      ]
+    }
+  ],
+  "invariants": [
+    "#315 body remains PAUSED_BEFORE_VERIFICATION_RESTORATION; no activation/shadow/restoration canaries/promotion.",
+    "#376 is open follow-up debt, not a restoration authority grant.",
+    "#385 is open at 3f1be95378bbd0e9938edbcdd3550c805ce01487; its audit matches the inspected main baseline.",
+    "Protected admission self-freezes workflow/validator/allowlist/obsolete-inventory changes. Two exact listed test deletions are already admitted.",
+    "Profile does not imply data capability. Candidate metadata may widen protected obligations only.",
+    "No direct protected integration, synthetic statuses, deployment/publication, secret or environment mutations."
+  ],
+  "agents": {
+    "contracts_ownership": {
+      "model": "gpt-6-astra",
+      "effort": "low",
+      "scope": "test ownership and stale contracts"
+    },
+    "browser_ownership": {
+      "model": "gpt-6-astra",
+      "effort": "low",
+      "scope": "all 36 Playwright oracles"
+    },
+    "fullworld_oracle": {
+      "model": "gpt-5.6-sol",
+      "effort": "high",
+      "scope": "bounded FullWorld correctness decision"
+    },
+    "authority_topology": {
+      "model": "gpt-5.6-sol",
+      "effort": "medium",
+      "scope": "independent authority boundary and archived workflow obligations"
+    }
+  }
+}
