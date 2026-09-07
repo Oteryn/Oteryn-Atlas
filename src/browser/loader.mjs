@@ -137,14 +137,15 @@ function throwTyped(errorClass, message) {
 
 export function validateRelativePath(path, label = 'path', { errorClass = LoadError } = {}) {
   if (typeof path !== 'string' || path.length === 0) throwTyped(errorClass, `${label} missing`);
-  if (path.startsWith('/') || path.includes('\\') || path.includes('?') || path.includes('#')) throwTyped(errorClass, `${label} is not a safe relative path`);
+  if (/^[a-z][a-z0-9+.-]*:/i.test(path) || path.startsWith('/') || path.includes('\\') || path.includes('?') || path.includes('#')) throwTyped(errorClass, `${label} is not a safe relative path`);
   const parts = path.split('/');
   if (parts.some((part) => part === '' || part === '.' || part === '..')) throwTyped(errorClass, `${label} is not a safe relative path`);
-  for (const part of parts) {
+  for (let index = 0; index < parts.length; index += 1) {
+    const part = parts[index];
     let decoded;
     try { decoded = decodeURIComponent(part); }
     catch { throwTyped(errorClass, `${label} has invalid percent encoding`); }
-    if (decoded === '' || decoded === '.' || decoded === '..' || decoded.includes('/') || decoded.includes('\\')) throwTyped(errorClass, `${label} is not a safe relative path`);
+    if (decoded === '' || decoded === '.' || decoded === '..' || decoded.includes('/') || decoded.includes('\\') || (index === 0 && /^[a-z][a-z0-9+.-]*:/i.test(decoded))) throwTyped(errorClass, `${label} is not a safe relative path`);
   }
   return path;
 }
