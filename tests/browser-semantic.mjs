@@ -213,7 +213,7 @@ test('portable SHA-256 fallback matches standard known vectors', async () => {
   assert.equal(sha256HexPortable(encoder.encode('abc')), 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
   assert.equal(
     await sha256ContentId(encoder.encode('abc'), null),
-    'sha256:ba7816bf8f01cfea414140de5dae2223b00361f20015ad',
+    'sha256:ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad',
   );
 });
 
