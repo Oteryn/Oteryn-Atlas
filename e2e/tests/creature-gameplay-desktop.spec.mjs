@@ -3,10 +3,10 @@ import { assertNoRuntimeFailures, captureRuntimeFailures, gotoAtlas, waitForAtla
 import { assertUserVisibleSurface, captureUserVisualEvidence } from '../support/user-acceptance.mjs';
 
 const FIXTURES = Object.freeze({
-  sam: Object.freeze({ entityId: 'npc-entity:f8d4f0200616061ffa4ae0b4c38c6d3e', label: 'Sam' }),
-  rat: Object.freeze({ entityId: 'monster-entity:80295e51265b3662bfbea2ea01ee3ccb', label: 'Rat' }),
-  sigurd: Object.freeze({ entityId: 'npc-entity:0e7857888218c9081fabdb469aa9349b', label: 'Sigurd' }),
-  hl: Object.freeze({ entityId: 'npc-entity:0c83ae18a907dc7e8f15c37c03e4f04c', label: 'H.L.' }),
+  guide: Object.freeze({ entityId: `npc-entity:${'1'.repeat(32)}`, label: 'Fixture Guide' }),
+  sentinel: Object.freeze({ entityId: `monster-entity:${'a'.repeat(32)}`, label: 'Fixture Sentinel' }),
+  merchantNorth: Object.freeze({ entityId: `npc-entity:${'4'.repeat(32)}`, label: 'Fixture Merchant North' }),
+  merchantSouth: Object.freeze({ entityId: `npc-entity:${'5'.repeat(32)}`, label: 'Fixture Merchant South' }),
 });
 
 async function creatureState(page) {
@@ -21,7 +21,7 @@ async function discoverByEntity(page, fixture) {
     const product = await response.json();
     return product.records.find((row) => row.entity_id === entityId) ?? null;
   }, fixture.entityId);
-  expect(record, `missing exact fixture ${fixture.label}`).not.toBeNull();
+  expect(record, `missing exact qualification fixture ${fixture.label}`).not.toBeNull();
   expect(record.label).toBe(fixture.label);
   return record;
 }
@@ -33,6 +33,7 @@ function targetEntry(record) {
   });
   return `/web/fullworld.html?${params.toString()}`;
 }
+
 async function clickCommittedTarget(page, record) {
   const state = await creatureState(page);
   expect(state.cardRecordId).toBe(record.record_id);
@@ -54,7 +55,7 @@ async function clickCommittedTarget(page, record) {
 }
 
 async function openFixture(page, fixture, { directClick = true } = {}) {
-  await gotoAtlas(page, '/web/fullworld.html?x=32369&y=32241&floor=-7&zoom=2&mode=map&creatures=npc,monster');
+  await gotoAtlas(page, '/web/fullworld.html?x=32280&y=32155&floor=-7&zoom=2&mode=map&creatures=npc,monster');
   await waitForAtlas(page);
   const record = await discoverByEntity(page, fixture);
   await gotoAtlas(page, targetEntry(record));
@@ -64,26 +65,21 @@ async function openFixture(page, fixture, { directClick = true } = {}) {
   return record;
 }
 
-test('desktop Sam direct activation opens exact Gameplay shop, preserves Semantic, and round-trips URL state', async ({ page }, testInfo) => {
+test('desktop qualification NPC activation opens Gameplay, preserves Semantic, and round-trips URL state', async ({ page }, testInfo) => {
   const runtime = captureRuntimeFailures(page);
-  const record = await openFixture(page, FIXTURES.sam);
-  await expect(page.locator('#creature-card-body')).toContainText('Shop · 71 sells · 67 buys');
+  const record = await openFixture(page, FIXTURES.guide);
+  await expect(page.locator('#creature-card-body')).toContainText('Shop · 2 sells · 1 buys');
   await page.locator('#creature-card-details').click();
   expect(new URL(page.url()).searchParams.get('inspector')).toBe('gameplay');
   await expect(page.locator('#inspector-tab-gameplay')).toHaveAttribute('aria-selected', 'true');
-  await expect(page.locator('#creature-inspector')).toContainText('Sam');
-  await expect(page.locator('#gameplay-section-sells')).toContainText('axe');
-  await expect(page.locator('#gameplay-section-sells')).toContainText('20 gold');
-  await expect(page.locator('#gameplay-section-buys')).toContainText('axe');
-  await expect(page.locator('#gameplay-section-buys')).toContainText('7 gold');
-  await expect(page.locator('#gameplay-section-services')).toContainText(/partially published/i);
-  await page.locator('.creature-gameplay-search').fill('battle axe');
-  await expect(page.locator('#gameplay-section-sells')).toContainText('battle axe');
-  await expect(page.locator('#gameplay-section-sells')).toContainText('235 gold');
-  await expect(page.locator('#gameplay-section-buys')).toContainText('battle axe');
-  await expect(page.locator('#gameplay-section-buys')).toContainText('80 gold');
+  await expect(page.locator('#creature-inspector')).toContainText('Fixture Guide');
+  await expect(page.locator('#gameplay-section-sells')).toContainText('Fixture Rope');
+  await expect(page.locator('#gameplay-section-sells')).toContainText('50 gold');
+  await expect(page.locator('#gameplay-section-buys')).toContainText('Fixture Parcel');
+  await expect(page.locator('#gameplay-section-buys')).toContainText('3 gold');
+  await expect(page.locator('#gameplay-section-services')).toContainText('shop');
   const gameplayMetrics = await assertUserVisibleSurface(page, {
-    label: 'Desktop creature Gameplay inspector',
+    label: 'Desktop qualification creature Gameplay inspector',
     elements: [
       { selector: '#mobile-inspector-panel', label: 'Gameplay inspector' },
       { selector: '#inspector-tab-gameplay', label: 'Gameplay tab', interactive: true },
@@ -93,34 +89,32 @@ test('desktop Sam direct activation opens exact Gameplay shop, preserves Semanti
   });
   await captureUserVisualEvidence(page, testInfo, 'desktop.creature-gameplay', {
     surfaceMetrics: gameplayMetrics,
-    note: 'Desktop verified Sam Gameplay inspector with real Game-owned trade data.',
+    note: 'Desktop Gameplay inspector using Atlas-owned synthetic qualification data; no Game-owned fact is asserted here.',
   });
-  await page.locator('.creature-gameplay-search').fill('');
-  await expect(page.locator('#gameplay-section-sells')).toContainText('20 gold');
 
   await page.locator('#inspector-tab-semantic').click();
   expect(new URL(page.url()).searchParams.get('inspector')).toBe('semantic');
   await expect(page.locator('#creature-inspector')).toContainText(`Record: ${record.record_id}`);
-  await expect(page.locator('#creature-inspector')).toContainText(`Entity: ${FIXTURES.sam.entityId}`);
+  await expect(page.locator('#creature-inspector')).toContainText(`Entity: ${FIXTURES.guide.entityId}`);
   await expect(page.locator('#creature-inspector')).toContainText('Semantic digest:');
 
   await page.locator('#inspector-tab-gameplay').click();
   expect(new URL(page.url()).searchParams.get('inspector')).toBe('gameplay');
-  await expect(page.locator('#gameplay-section-sells')).toContainText('20 gold');
+  await expect(page.locator('#gameplay-section-sells')).toContainText('Fixture Rope');
   await page.reload({ waitUntil: 'domcontentloaded' });
   await waitForAtlas(page);
   await expect(page.locator('#inspector-tab-gameplay')).toHaveAttribute('aria-selected', 'true');
-  await expect(page.locator('#gameplay-section-sells')).toContainText('20 gold');
+  await expect(page.locator('#gameplay-section-sells')).toContainText('Fixture Rope');
   expect(new URL(page.url()).searchParams.get('creature')).toBe(record.record_id);
   assertNoRuntimeFailures(runtime);
 });
 
-test('desktop Rat direct activation renders exact Loot Stats and placement-backed Spawns', async ({ page }) => {
+test('desktop qualification monster renders Loot Stats and placement-backed Spawns', async ({ page }) => {
   const runtime = captureRuntimeFailures(page);
-  const record = await openFixture(page, FIXTURES.rat);
+  const record = await openFixture(page, FIXTURES.sentinel);
   await expect(page.locator('#creature-card-body')).toContainText('Loot · 2 entries');
   await page.locator('#creature-card-details').click();
-  await expect(page.locator('#gameplay-section-loot')).toContainText('gold coin');
+  await expect(page.locator('#gameplay-section-loot')).toContainText('Fixture Coin');
   await expect(page.locator('#gameplay-section-loot')).toContainText('100%');
   await expect(page.locator('#gameplay-section-loot')).toContainText('×1–4');
   await expect(page.locator('#gameplay-section-stats')).toContainText(/Health\s*20/);
@@ -128,33 +122,36 @@ test('desktop Rat direct activation renders exact Loot Stats and placement-backe
   await expect(page.locator('#gameplay-section-spawns')).toContainText(`X ${record.position.x} · Y ${record.position.y} · F ${record.position.floor}`);
   await expect(page.locator('#gameplay-section-spawns')).toContainText(/currently loaded for this exact entity_id/i);
   await page.locator('#inspector-tab-semantic').click();
-  await expect(page.locator('#creature-inspector')).toContainText(`Entity: ${FIXTURES.rat.entityId}`);
+  await expect(page.locator('#creature-inspector')).toContainText(`Entity: ${FIXTURES.sentinel.entityId}`);
   await page.locator('#inspector-tab-gameplay').click();
-  await expect(page.locator('#gameplay-section-loot')).toContainText('gold coin');
+  await expect(page.locator('#gameplay-section-loot')).toContainText('Fixture Coin');
   assertNoRuntimeFailures(runtime);
 });
 
-test('desktop PARTIAL shop never becomes an authoritative empty claim', async ({ page }) => {
+test('desktop qualification PARTIAL shop never becomes an authoritative empty claim', async ({ page }) => {
   const runtime = captureRuntimeFailures(page);
-  await openFixture(page, FIXTURES.sigurd);
+  await openFixture(page, FIXTURES.merchantSouth);
   await page.locator('#creature-card-details').click();
-  await expect(page.locator('#gameplay-section-sells')).toContainText(/Shop data partially published by Game/i);
-  await expect(page.locator('#gameplay-section-buys')).toContainText(/Shop data partially published by Game/i);
+  await expect(page.locator('#gameplay-section-sells')).toContainText(/partially published/i);
+  await expect(page.locator('#gameplay-section-buys')).toContainText(/partially published/i);
   await expect(page.locator('#gameplay-section-sells')).not.toContainText('No items sold.');
   await expect(page.locator('#gameplay-section-buys')).not.toContainText('No items bought.');
   assertNoRuntimeFailures(runtime);
 });
 
-test('desktop real large shop stays bounded at 100 rendered rows', async ({ page }) => {
+test('desktop qualification large shop stays bounded at 100 rendered rows and supports filtering', async ({ page }) => {
   const runtime = captureRuntimeFailures(page);
-  await openFixture(page, FIXTURES.hl, { directClick: false });
+  await openFixture(page, FIXTURES.merchantNorth, { directClick: false });
   await page.locator('#creature-card-details').click();
-  const buys = page.locator('#gameplay-section-buys .creature-gameplay-row');
-  await expect(buys).toHaveCount(50);
-  await expect(page.locator('#gameplay-section-buys')).toContainText('50 of 124');
-  await page.locator('#gameplay-section-buys .creature-gameplay-more').click();
-  await expect(buys).toHaveCount(100);
-  await expect(page.locator('#gameplay-section-buys')).toContainText(/Refine the search or sort/i);
-  await expect(page.locator('#gameplay-section-buys .creature-gameplay-more')).toHaveCount(0);
+  const sells = page.locator('#gameplay-section-sells .creature-gameplay-row');
+  await expect(sells).toHaveCount(50);
+  await expect(page.locator('#gameplay-section-sells')).toContainText('50 of 124');
+  await page.locator('#gameplay-section-sells .creature-gameplay-more').click();
+  await expect(sells).toHaveCount(100);
+  await expect(page.locator('#gameplay-section-sells')).toContainText(/Refine the search or sort/i);
+  await expect(page.locator('#gameplay-section-sells .creature-gameplay-more')).toHaveCount(0);
+  await page.locator('.creature-gameplay-search').fill('Fixture Bulk Item 124');
+  await expect(sells).toHaveCount(1);
+  await expect(page.locator('#gameplay-section-sells')).toContainText('Fixture Bulk Item 124');
   assertNoRuntimeFailures(runtime);
 });
