@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Build stable content-hash-prefix pixel transport buckets from verified G3 pixel publication."""
 from __future__ import annotations
-import argparse, hashlib, json, os, shutil
+import argparse, hashlib, json, os, shutil, time
 from collections import defaultdict
 from pathlib import Path
 from typing import Any
@@ -15,6 +15,45 @@ PIXEL_ID_DOMAIN=b'OTERYN-DYN-ATLAS-PIXEL-RGBA-V0\0'
 RUNTIME_DOMAIN=b'OTERYN-ATLAS-RUNTIME-PIXEL-BUCKETS-V0\0'
 
 class PixelBucketError(RuntimeError): pass
+
+def _paths_overlap(left:Path,right:Path)->bool:
+    return left==right or left in right.parents or right in left.parents
+
+def _require_resolved_disjointness(output:Path,inputs:list[tuple[str,Path|None]])->Path:
+    if output.is_symlink(): raise PixelBucketError('pixel bucket output must not be a symlink')
+    resolved_output=output.resolve(strict=False)
+    for label,source in inputs:
+        if source is None: continue
+        resolved_source=source.resolve(strict=False)
+        if _paths_overlap(resolved_output,resolved_source): raise PixelBucketError(f'unsafe pixel bucket output overlap with {label}')
+    return resolved_output
+
+def _allocate_staging_directory(output:Path,inputs:list[tuple[str,Path|None]])->Path:
+    resolved_output=output.resolve(strict=False); resolved_output.parent.mkdir(parents=True,exist_ok=True)
+    for attempt in range(100):
+        staging=resolved_output.with_name(f'.{resolved_output.name}.staging-{os.getpid()}-{time.time_ns()}-{attempt}')
+        if staging.exists() or staging.is_symlink(): continue
+        _require_resolved_disjointness(staging,[*inputs,('final output',resolved_output)])
+        return staging
+    raise PixelBucketError('unable to allocate safe pixel bucket staging directory')
+
+def _remove_path(path:Path)->None:
+    if path.is_symlink() or path.is_file(): path.unlink(missing_ok=True)
+    elif path.exists(): shutil.rmtree(path)
+
+def _publish_staged_directory(staging:Path,output:Path)->None:
+    if output.is_symlink(): raise PixelBucketError('pixel bucket output must not be a symlink')
+    resolved_output=output.resolve(strict=False); resolved_staging=staging.resolve(strict=False)
+    if resolved_staging==resolved_output or resolved_staging.parent!=resolved_output.parent: raise PixelBucketError('pixel bucket staging directory is not an adjacent isolated sibling')
+    backup=resolved_output.with_name(f'.{resolved_output.name}.backup-{os.getpid()}-{time.time_ns()}')
+    if backup.exists() or backup.is_symlink(): raise PixelBucketError('pixel bucket backup path already exists')
+    had_output=resolved_output.exists()
+    if had_output: os.replace(resolved_output,backup)
+    try: os.replace(resolved_staging,resolved_output)
+    except BaseException:
+        if had_output and backup.exists(): os.replace(backup,resolved_output)
+        raise
+    if had_output: _remove_path(backup)
 
 def canonical(v:Any)->bytes: return (json.dumps(v,ensure_ascii=False,sort_keys=True,separators=(',',':'))+'\n').encode()
 def rooted(domain:bytes,v:dict[str,Any])->str:
@@ -52,7 +91,7 @@ def previous_buckets(root:Path|None, expected_root:str|None, nibbles:int)->dict[
         result[b['bucket']]=(b,p)
     return result
 
-def build(publication_root:Path, output:Path, expected_publication_root:str, expected_pixel_root:str, nibbles:int=2, previous_output:Path|None=None, expected_previous_root:str|None=None)->dict[str,Any]:
+def _build_into(publication_root:Path, output:Path, expected_publication_root:str, expected_pixel_root:str, nibbles:int=2, previous_output:Path|None=None, expected_previous_root:str|None=None)->dict[str,Any]:
     if not 1<=nibbles<=4: raise PixelBucketError('bucket nibbles must be 1..4')
     pub=load(publication_root/'publication.json')
     if pub.get('profile')!=PUBLICATION_PROFILE or pub.get('source',{}).get('authority')!='Oteryn/Oteryn-Game': raise PixelBucketError('publication authority/profile mismatch')
@@ -67,7 +106,6 @@ def build(publication_root:Path, output:Path, expected_publication_root:str, exp
         if not isinstance(cid,str) or not cid.startswith('sha256:'): raise PixelBucketError('invalid blob content id')
         grouped[cid[7:7+nibbles]].append(blob)
     signatures={bucket:[(b['contentId'],int(b['width']),int(b['height']),int(b['bytes'])) for b in sorted(blobs,key=lambda x:x['contentId'])] for bucket,blobs in grouped.items()}
-    if output.exists(): shutil.rmtree(output)
     (output/'buckets').mkdir(parents=True)
     # Load/verify source pack bytes lazily only for dirty buckets.
     packs:dict[int,bytes]={}
@@ -111,6 +149,18 @@ def build(publication_root:Path, output:Path, expected_publication_root:str, exp
     core={'profile':RUNTIME_PROFILE,'bucketNibbles':nibbles,'identityAuthority':False,'source':{'authority':'Oteryn/Oteryn-Game','publicationRoot':pub['rootContentId'],'pixelRoot':pm['rootContentId']},'buckets':bucket_entries,'blobIndex':blob_index,'localMaxBundle':local_max_bundle,'counts':{'buckets':len(bucket_entries),'blobs':len(blob_index),'bytes':sum(b['bytes'] for b in bucket_entries)}}
     manifest=dict(core); manifest['rootContentId']=rooted(RUNTIME_DOMAIN,core); (output/'manifest.json').write_bytes(canonical(manifest))
     result=dict(manifest); result['_buildEvidence']={'reusedBuckets':reused,'rebuiltBuckets':rebuilt,'sourcePacksRead':len(packs)}; return result
+
+def build(publication_root:Path, output:Path, expected_publication_root:str, expected_pixel_root:str, nibbles:int=2, previous_output:Path|None=None, expected_previous_root:str|None=None)->dict[str,Any]:
+    inputs=[('publication source',publication_root),('previous pixel bucket product',previous_output)]
+    _require_resolved_disjointness(output,inputs)
+    staging=_allocate_staging_directory(output,inputs)
+    try:
+        result=_build_into(publication_root,staging,expected_publication_root,expected_pixel_root,nibbles,previous_output,expected_previous_root)
+        _publish_staged_directory(staging,output)
+        return result
+    except BaseException:
+        _remove_path(staging)
+        raise
 
 def main()->int:
     p=argparse.ArgumentParser(); p.add_argument('--publication',type=Path,required=True); p.add_argument('--output',type=Path,required=True); p.add_argument('--expected-publication-root',required=True); p.add_argument('--expected-pixel-root',required=True); p.add_argument('--bucket-nibbles',type=int,default=2); p.add_argument('--previous-output',type=Path); p.add_argument('--expected-previous-root'); a=p.parse_args()

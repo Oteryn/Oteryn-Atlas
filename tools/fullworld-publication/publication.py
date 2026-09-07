@@ -22,6 +22,64 @@ PACK_LIMIT = 64 * 1024 * 1024
 
 class PublicationError(RuntimeError): pass
 
+def _paths_overlap(left: Path, right: Path) -> bool:
+    return left == right or left in right.parents or right in left.parents
+
+def _require_resolved_disjointness(output: Path, inputs: list[tuple[str, Path | None]]) -> Path:
+    if output.is_symlink():
+        raise PublicationError("publication output must not be a symlink")
+    resolved_output = output.resolve(strict=False)
+    for label, source in inputs:
+        if source is None:
+            continue
+        resolved_source = source.resolve(strict=False)
+        if _paths_overlap(resolved_output, resolved_source):
+            raise PublicationError(f"unsafe publication output overlap with {label}")
+    return resolved_output
+
+def _allocate_staging_directory(output: Path, inputs: list[tuple[str, Path | None]]) -> Path:
+    resolved_output = output.resolve(strict=False)
+    resolved_output.parent.mkdir(parents=True, exist_ok=True)
+    for attempt in range(100):
+        staging = resolved_output.with_name(
+            f".{resolved_output.name}.staging-{os.getpid()}-{time.time_ns()}-{attempt}"
+        )
+        if staging.exists() or staging.is_symlink():
+            continue
+        _require_resolved_disjointness(staging, [*inputs, ("final output", resolved_output)])
+        return staging
+    raise PublicationError("unable to allocate safe publication staging directory")
+
+def _remove_path(path: Path) -> None:
+    if path.is_symlink() or path.is_file():
+        path.unlink(missing_ok=True)
+    elif path.exists():
+        shutil.rmtree(path)
+
+def _publish_staged_directory(staging: Path, output: Path) -> None:
+    if output.is_symlink():
+        raise PublicationError("publication output must not be a symlink")
+    resolved_output = output.resolve(strict=False)
+    resolved_staging = staging.resolve(strict=False)
+    if resolved_staging == resolved_output or resolved_staging.parent != resolved_output.parent:
+        raise PublicationError("publication staging directory is not an adjacent isolated sibling")
+    backup = resolved_output.with_name(
+        f".{resolved_output.name}.backup-{os.getpid()}-{time.time_ns()}"
+    )
+    if backup.exists() or backup.is_symlink():
+        raise PublicationError("publication backup path already exists")
+    had_output = resolved_output.exists()
+    if had_output:
+        os.replace(resolved_output, backup)
+    try:
+        os.replace(resolved_staging, resolved_output)
+    except BaseException:
+        if had_output and backup.exists():
+            os.replace(backup, resolved_output)
+        raise
+    if had_output:
+        _remove_path(backup)
+
 def canonical(value: Any) -> bytes:
     return (json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n").encode()
 
@@ -152,14 +210,25 @@ def publish_pixels(repo:Path,asset:Path,sprites:set[int],handoff:dict[str,Any],o
     core={"profile":PIXEL_PROFILE,"assetZipSha256":handoff["source"]["asset_zip_sha256"],"pixelHashDomain":PIXEL_DOMAIN[:-1].decode(),"spriteIndex":index,"blobs":entries,"packs":packs,"counts":{"spriteRefs":len(index),"uniquePixelBlobs":len(entries),"rawBytesBeforeDedupe":raw_before,"rawBytesAfterDedupe":raw_after,"dedupeBytesSaved":raw_before-raw_after},"runtimePlacement":{"identityAuthority":False}}
     manifest=dict(core); manifest["rootContentId"]=rooted(PIXEL_ROOT_DOMAIN,core); (out/"manifest.json").write_bytes(canonical(manifest)); return manifest
 
-def compile_all(repo:Path,fabric:Path,handoff_path:Path,asset:Path,out:Path,expected_sha:str)->dict[str,Any]:
+def _compile_into(repo:Path,fabric:Path,handoff_path:Path,asset:Path,out:Path,expected_sha:str,final_output:Path)->dict[str,Any]:
     started=time.perf_counter(); handoff=load_handoff(handoff_path,expected_sha)
-    if out.exists(): shutil.rmtree(out)
     out.mkdir(parents=True); semantic,sprites=scan_semantic(fabric,handoff,out/"semantic"); pixel=publish_pixels(repo,asset,sprites,handoff,out/"pixels")
     core={"profile":PUBLICATION_PROFILE,"source":{"authority":handoff["source_authority"],"handoffSha256":expected_sha,"fabricRoot":handoff["fabric_root"],"sourceFingerprint":handoff["source_fingerprint"],"gameSha":handoff["source"]["game_sha"],"canonicalWorldId":handoff.get("canonical_world_id"),"canonicalWorldIdState":handoff.get("canonical_world_id_state")},"semantic":{"path":"semantic/world.json","rootContentId":semantic["rootContentId"]},"pixels":{"path":"pixels/manifest.json","rootContentId":pixel["rootContentId"]},"serializerStatus":"PROVISIONAL_NOT_FROZEN"}
     pub=dict(core); pub["rootContentId"]=rooted(PUBLICATION_DOMAIN,core); (out/"publication.json").write_bytes(canonical(pub))
-    evidence={"publicationRoot":pub["rootContentId"],"semanticRoot":semantic["rootContentId"],"pixelRoot":pixel["rootContentId"],"counts":semantic["counts"],"pixelCounts":pixel["counts"],"elapsedSeconds":time.perf_counter()-started,"outputPath":str(out)}
+    evidence={"publicationRoot":pub["rootContentId"],"semanticRoot":semantic["rootContentId"],"pixelRoot":pixel["rootContentId"],"counts":semantic["counts"],"pixelCounts":pixel["counts"],"elapsedSeconds":time.perf_counter()-started,"outputPath":str(final_output)}
     (out/"build-evidence.json").write_bytes(canonical(evidence)); return evidence
+
+def compile_all(repo:Path,fabric:Path,handoff_path:Path,asset:Path,out:Path,expected_sha:str)->dict[str,Any]:
+    inputs=[("repository",repo),("fabric",fabric),("handoff",handoff_path),("asset ZIP",asset)]
+    _require_resolved_disjointness(out,inputs)
+    staging=_allocate_staging_directory(out,inputs)
+    try:
+        result=_compile_into(repo,fabric,handoff_path,asset,staging,expected_sha,out)
+        _publish_staged_directory(staging,out)
+        return result
+    except BaseException:
+        _remove_path(staging)
+        raise
 
 def main()->int:
     ap=argparse.ArgumentParser(description=__doc__); ap.add_argument("--repo-root",type=Path,required=True); ap.add_argument("--fabric-dir",type=Path,required=True); ap.add_argument("--handoff",type=Path,required=True); ap.add_argument("--asset-zip",type=Path,required=True); ap.add_argument("--output",type=Path,required=True); ap.add_argument("--expected-handoff-sha256",required=True); a=ap.parse_args()

@@ -50,6 +50,23 @@ class FabricError(RuntimeError):
     pass
 
 
+def _paths_overlap(left: Path, right: Path) -> bool:
+    return left == right or left in right.parents or right in left.parents
+
+
+def _require_resolved_disjointness(output: Path, inputs: list[tuple[str, Path | None]]) -> Path:
+    if output.is_symlink():
+        raise FabricError("fabric writable root must not be a symlink")
+    resolved_output = output.resolve(strict=False)
+    for label, source in inputs:
+        if source is None:
+            continue
+        resolved_source = source.resolve(strict=False)
+        if _paths_overlap(resolved_output, resolved_source):
+            raise FabricError(f"unsafe fabric writable-root overlap with {label}")
+    return resolved_output
+
+
 def canonical_json_bytes(value: Any) -> bytes:
     return (json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n").encode("utf-8")
 
@@ -1088,6 +1105,16 @@ def run(args: argparse.Namespace) -> int:
     assets_dir = args.assets_dir.resolve()
     work_root = args.workdir.resolve()
     output_root = args.output.resolve()
+    source_roots = [
+        ("Atlas repository", Path(__file__).resolve().parents[2]),
+        ("Game repository", game_root),
+        ("legacy importer repository", legacy_root),
+        ("map input", map_path),
+        ("asset ZIP", asset_zip),
+        ("assets directory", assets_dir),
+    ]
+    _require_resolved_disjointness(work_root, [*source_roots, ("fabric output", output_root)])
+    _require_resolved_disjointness(output_root, [*source_roots, ("fabric workdir", work_root)])
     work_root.mkdir(parents=True, exist_ok=True)
     output_root.mkdir(parents=True, exist_ok=True)
 
