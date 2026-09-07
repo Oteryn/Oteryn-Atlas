@@ -10,9 +10,34 @@ const sourceRoot=fileURLToPath(new URL('../..',import.meta.url));
 const verifier=path.join(sourceRoot,'tools/maintenance/verify-maintenance-diff.mjs');
 const suspended=['ci.yml','codeql.yml'];
 const readSource=name=>fs.readFileSync(path.join(sourceRoot,name),'utf8');
+const verificationModified=[
+  'e2e/tests/creature-gameplay-desktop.spec.mjs',
+  'e2e/tests/creature-gameplay-mobile.spec.mjs',
+  'src/browser/creature-gameplay-profiles.mjs',
+  'tools/dyn-atlas-semantic/benchmark.py',
+  'tools/dyn-atlas-semantic/self_test.py',
+  'tools/fullworld-runtime/qualify_browser.mjs',
+  'tools/verification/e2e-data-capability-inventory.json',
+  'tools/verification/verification-catalog.json',
+];
+const verificationAdded=[
+  'e2e/support/qualification-gameplay.mjs',
+  'e2e/tests/creature-gameplay-source-contract-desktop.spec.mjs',
+  'tests/fullworld-runtime/cdp-session.test.mjs',
+  'tests/verification/qualification-gameplay-contract.test.mjs',
+  'tools/fullworld-runtime/cdp-session.mjs',
+  'tools/verification/qualification-gameplay.mjs',
+];
+const publicationBuilders=[
+  'tools/fullworld-publication/publication.py',
+  'tools/fullworld-runtime/build_pixel_buckets.py',
+  'tools/fullworld-layers/build_overview.py',
+  'tools/fullworld-generation/fabric.py',
+];
 
 function git(root,...args){return execFileSync('git',['-C',root,'-c','core.hooksPath=/dev/null',...args],{encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim();}
 function put(root,name,content,mode=0o644){const target=path.join(root,name);fs.mkdirSync(path.dirname(target),{recursive:true});fs.writeFileSync(target,content,{mode});}
+function change(root,name){put(root,name,`candidate:${name}\n`);}
 
 function fixture(t){
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'atlas-maintenance-policy-'));
@@ -22,7 +47,20 @@ function fixture(t){
   git(trusted,'init','--quiet');
   put(trusted,'AGENTS.md','# Agents\n');
   put(trusted,'docs/agents/current.md','# Current\n');
-  put(trusted,'tests/verification/obsolete.test.mjs','export {};\n');
+  put(trusted,'docs/maintenance/ATLAS_REMEDIATION_ALLOWLIST.json',readSource('docs/maintenance/ATLAS_REMEDIATION_ALLOWLIST.json'));
+  put(trusted,'docs/maintenance/OBSOLETE_VERIFICATION_CONTRACTS.json',readSource('docs/maintenance/OBSOLETE_VERIFICATION_CONTRACTS.json'));
+  put(trusted,'tests/verification/anti-loop-transition-compose-contract.test.mjs','export {};\n');
+  put(trusted,'tests/verification/bootstrap-catalog-workflow-contract.test.mjs','export {};\n');
+  put(trusted,'tests/verification/unrelated.test.mjs','export {};\n');
+  for(const name of [
+    'src/browser/loader.mjs',
+    'src/browser/semantic.mjs',
+    'tests/browser-semantic.mjs',
+    'src/browser/fullworld.mjs',
+    ...publicationBuilders,
+    ...verificationModified,
+  ]) put(trusted,name,`base:${name}\n`);
+  put(trusted,'web/rogue.mjs','export const rogue=1;\n');
   put(trusted,'tools/maintenance/minimal-merge-group-gate.yml','name: Minimal MQ\n');
   put(trusted,'.github/workflows/merge-authority-audit.yml','name: Audit\n');
   put(trusted,'.github/workflows/merge-group-gate.yml','name: Heavy MQ\n');
@@ -67,18 +105,78 @@ function fixture(t){
   return {trusted,candidate,baseSha,commit,invoke,archiveCutover};
 }
 
+function applyVerificationLane(f){
+  for(const name of verificationModified)change(f.candidate,name);
+  for(const name of verificationAdded)put(f.candidate,name,`candidate:${name}\n`);
+}
+
 test('accepts a regular-text governance addition',t=>{
   const f=fixture(t);put(f.candidate,'docs/agents/prompts/example.md','# Prompt\n');f.commit();
-  const result=f.invoke();assert.equal(result.status,0,result.stderr);assert.match(result.stdout,/"result":"PASS"/);
+  const result=f.invoke();assert.equal(result.status,0,result.stderr);assert.match(result.stdout,/"result":"PASS"/);assert.match(result.stdout,/"mode":"maintenance-only"/);
 });
 
-test('accepts removal of an obsolete governance verification test',t=>{
-  const f=fixture(t);fs.rmSync(path.join(f.candidate,'tests/verification/obsolete.test.mjs'));f.commit();
-  assert.equal(f.invoke().status,0);
+test('accepts deletion only for an exact protected obsolete verification contract',t=>{
+  const f=fixture(t);fs.rmSync(path.join(f.candidate,'tests/verification/anti-loop-transition-compose-contract.test.mjs'));f.commit();
+  const result=f.invoke();assert.equal(result.status,0,result.stderr);assert.match(result.stdout,/"mode":"maintenance-only"/);
 });
 
-test('rejects a mixed governance and runtime diff',t=>{
-  const f=fixture(t);put(f.candidate,'docs/agents/prompts/example.md','# Prompt\n');put(f.candidate,'web/fullworld-app.mjs','export const bypass=true;\n');f.commit();
+test('rejects deletion of an unrelated verification test',t=>{
+  const f=fixture(t);fs.rmSync(path.join(f.candidate,'tests/verification/unrelated.test.mjs'));f.commit();
+  const result=f.invoke();assert.equal(result.status,1);assert.match(result.stderr,/maintenance path is frozen/);
+});
+
+test('candidate obsolete inventory cannot authorize its own same-PR deletion',t=>{
+  const f=fixture(t);
+  const inventory=JSON.parse(fs.readFileSync(path.join(f.candidate,'docs/maintenance/OBSOLETE_VERIFICATION_CONTRACTS.json'),'utf8'));
+  inventory.paths.push('tests/verification/unrelated.test.mjs');
+  put(f.candidate,'docs/maintenance/OBSOLETE_VERIFICATION_CONTRACTS.json',`${JSON.stringify(inventory,null,2)}\n`);
+  fs.rmSync(path.join(f.candidate,'tests/verification/unrelated.test.mjs'));
+  f.commit();
+  const result=f.invoke();assert.equal(result.status,1);assert.match(result.stderr,/maintenance authority is immutable/);
+});
+
+test('current F01 two-path candidate resolves exactly to canonical-foundation',t=>{
+  const f=fixture(t);change(f.candidate,'src/browser/loader.mjs');put(f.candidate,'tests/fullworld-publication/canonical-json-parity.test.mjs','export {};\n');f.commit();
+  const result=f.invoke();assert.equal(result.status,0,result.stderr);assert.match(result.stdout,/"remediationLane":"canonical-foundation"/);
+});
+
+test('current F06 two-path candidate resolves exactly to geometry',t=>{
+  const f=fixture(t);change(f.candidate,'src/browser/semantic.mjs');change(f.candidate,'tests/browser-semantic.mjs');f.commit();
+  const result=f.invoke();assert.equal(result.status,0,result.stderr);assert.match(result.stdout,/"remediationLane":"geometry"/);
+});
+
+test('current F02 four-builder candidate resolves exactly to publication-safety',t=>{
+  const f=fixture(t);for(const name of publicationBuilders)change(f.candidate,name);f.commit();
+  const result=f.invoke();assert.equal(result.status,0,result.stderr);assert.match(result.stdout,/"remediationLane":"publication-safety"/);
+});
+
+test('current F11 F12 F13 fourteen-path candidate resolves exactly to verification',t=>{
+  const f=fixture(t);applyVerificationLane(f);f.commit();
+  const result=f.invoke();assert.equal(result.status,0,result.stderr);assert.match(result.stdout,/"remediationLane":"verification"/);
+});
+
+test('rejects a mixed verification and runtime candidate',t=>{
+  const f=fixture(t);applyVerificationLane(f);change(f.candidate,'src/browser/fullworld.mjs');f.commit();
+  const result=f.invoke();assert.equal(result.status,1);assert.match(result.stderr,/spans multiple remediation lanes/);
+});
+
+test('rejects an ambiguous candidate that only touches a shared lane surface',t=>{
+  const f=fixture(t);change(f.candidate,'src/browser/loader.mjs');f.commit();
+  const result=f.invoke();assert.equal(result.status,1);assert.match(result.stderr,/ambiguous across multiple remediation lanes/);
+});
+
+test('candidate remediation allowlist cannot self-authorize an extra runtime path',t=>{
+  const f=fixture(t);
+  const allowlist=JSON.parse(fs.readFileSync(path.join(f.candidate,'docs/maintenance/ATLAS_REMEDIATION_ALLOWLIST.json'),'utf8'));
+  allowlist.lanes['runtime-safety'].rules.push({path:'web/rogue.mjs',operations:['M']});
+  put(f.candidate,'docs/maintenance/ATLAS_REMEDIATION_ALLOWLIST.json',`${JSON.stringify(allowlist,null,2)}\n`);
+  change(f.candidate,'web/rogue.mjs');
+  f.commit();
+  const result=f.invoke();assert.equal(result.status,1);assert.match(result.stderr,/maintenance authority is immutable/);
+});
+
+test('rejects a mixed governance and unrelated runtime diff',t=>{
+  const f=fixture(t);put(f.candidate,'docs/agents/prompts/example.md','# Prompt\n');change(f.candidate,'web/rogue.mjs');f.commit();
   const result=f.invoke();assert.equal(result.status,1);assert.match(result.stderr,/maintenance path is frozen/);
 });
 
