@@ -103,7 +103,7 @@ class AtlasMetaPolicyTests(unittest.TestCase):
                 return {"name": "main", "protected": True, "commit": {"sha": MAIN}}
             if url.endswith(f"/compare/{PIN}...{MAIN}"):
                 return {
-                    "status": "ahead",
+                    "status": "identical",
                     "base_commit": {"sha": PIN},
                     "merge_base_commit": {"sha": PIN},
                 }

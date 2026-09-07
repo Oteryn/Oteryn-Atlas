@@ -6,7 +6,7 @@
 
 **Bound META authority:** `1dedfc0f264fe0e23e5365dbe9280c2d96df50c5`
 
-**Live META main observed by the adoption resolver:** `16a9718e5fe54ab1c153fe78aac789e9bc5da64e`
+**Live META main observed by the corrected adoption resolver:** `1dedfc0f264fe0e23e5365dbe9280c2d96df50c5`
 
 This maintenance-only adoption binds Atlas to `OTERYN_ORGANIZATION_AGENT_POLICY@3.0.0`, reduces the root instructions to an organization-policy bootstrap plus Atlas-owned invariants, and installs a fail-closed consumer for the binding, root overlay, and reusable prompt catalog. It does not change runtime, publication data, rendering, deployment, workflows, branch protection, or the suspended verification stack.
 
