@@ -332,7 +332,7 @@ def _build_overview_into(publication_root: Path, output_root: Path, *, expected_
             raise OverviewError(f"semantic floor source fingerprint mismatch: {floor}")
 
         tasks: list[tuple[str, dict[str, Any], int, str, str]] = []
-        for entry in source_floor.get("floors", []) if False else source_floor.get("chunks", []):
+        for entry in source_floor.get("chunks", []):
             logical = entry.get("logicalAddress", {})
             address = (logical.get("floor"), logical.get("region_x"), logical.get("region_y"))
             if address[0] != floor or not all(isinstance(v, int) for v in address):
