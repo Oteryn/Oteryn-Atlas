@@ -1,8 +1,11 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import { loadChunk, loadManifest, sha256ContentId } from '../../src/browser/loader.mjs';
 import { FullWorldError, SemanticRangeStore, safeRelativePath } from '../../src/browser/fullworld.mjs';
+import { loadVerifiedPixelBucket } from '../../src/browser/fullworld-pixel-buckets.mjs';
+import { loadVerifiedPixelPack } from '../../src/browser/fullworld-pixels.mjs';
 import { VerifiedContentCache } from '../../src/browser/verified-content-cache.mjs';
 
 const sha = (pair) => `sha256:${pair.repeat(32)}`;
@@ -176,6 +179,49 @@ test('F04 corrupt persistent bytes are rejected and replaced by verified network
   assert.equal(store.stats().persistentErrors, 1);
 });
 
+test('F04 pixel-pack cache failure degrades to digest-verified network retrieval', async () => {
+  const bytes = new Uint8Array([9, 8, 7, 6]);
+  const contentId = await sha256ContentId(bytes);
+  let fetches = 0;
+  const catalog = {
+    packs: [{ bytes: bytes.byteLength, path: 'packs/a.bin', sha256: contentId.slice(7) }],
+    pixelBaseUrl: new URL('https://atlas.example/pixels/'),
+  };
+  const loaded = await loadVerifiedPixelPack(catalog, 0, async () => {
+    fetches += 1;
+    return response(bytes, 200, { 'content-length': String(bytes.byteLength) });
+  }, {
+    persistentCache: {
+      async get() { throw new Error('cache read failed'); },
+      async put() { throw new Error('cache write failed'); },
+    },
+  });
+  assert.deepEqual([...loaded], [...bytes]);
+  assert.equal(fetches, 1);
+});
+
+test('F04 pixel-bucket corrupt cache bytes degrade to digest-verified network retrieval', async () => {
+  const bytes = new Uint8Array([4, 3, 2, 1]);
+  const contentId = await sha256ContentId(bytes);
+  let fetches = 0;
+  const catalog = {
+    baseUrl: new URL('https://atlas.example/runtime-pixels/'),
+    buckets: new Map([['a', { bytes: bytes.byteLength, contentId, path: 'buckets/a.bin' }]]),
+  };
+  const loaded = await loadVerifiedPixelBucket(catalog, 'a', async () => {
+    fetches += 1;
+    return response(bytes, 200, { 'content-length': String(bytes.byteLength) });
+  }, {
+    persistentCache: {
+      async get() { return new Uint8Array([4, 3, 2, 0]); },
+      async put() { throw new Error('cache write failed'); },
+    },
+    timeoutMs: 1_000,
+  });
+  assert.deepEqual([...loaded], [...bytes]);
+  assert.equal(fetches, 1);
+});
+
 test('F07 same-key concurrent semantic loads share one in-flight retrieval', async () => {
   const { bytes, chunk, group } = await semanticFixture();
   let fetches = 0;
@@ -217,4 +263,14 @@ test('F08 trusted URL confinement rejects normalized escape even when text looks
   });
   await assert.rejects(() => store.loadGroup(-7, escaped, group), FullWorldError);
   assert.equal(fetches, 0);
+});
+
+test('F05/F08 creature overlay keeps bounded streaming and final URL confinement contracts', () => {
+  const source = readFileSync(new URL('../../web/fullworld-creatures.mjs', import.meta.url), 'utf8');
+  assert.match(source, /readBoundedResponseBytes/);
+  assert.doesNotMatch(source, /response\.arrayBuffer\(\)/);
+  assert.match(source, /trustedCreatureUrl\(entry\.path, ROOT, 'creature chunk path'\)/);
+  assert.match(source, /trustedCreatureUrl\(index\.search_path, ROOT, 'creature search path'\)/);
+  assert.doesNotMatch(source, /new URL\(safeRelativePath\(entry\.path\), ROOT\)/);
+  assert.doesNotMatch(source, /new URL\(safeRelativePath\(index\.search_path\), ROOT\)/);
 });
