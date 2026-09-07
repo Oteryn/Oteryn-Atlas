@@ -41,7 +41,7 @@ export function canonicalJsonBytes(value) {
 const SHA256_K = Object.freeze([
   0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
   0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
-  0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+  0xe49b69c1, 0xefbe4786, 0x0fc19dcf, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
   0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
   0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
   0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
@@ -131,13 +131,83 @@ export async function computeRootContentId(manifest) {
   return sha256ContentId(joined);
 }
 
-async function readBoundedResponse(response, limit, label) {
-  if (!response?.ok) throw new LoadError(`${label} fetch failed: ${response?.status ?? 'unknown'}`);
+function throwTyped(errorClass, message) {
+  throw new errorClass(message);
+}
+
+export function validateRelativePath(path, label = 'path', { errorClass = LoadError } = {}) {
+  if (typeof path !== 'string' || path.length === 0) throwTyped(errorClass, `${label} missing`);
+  if (path.startsWith('/') || path.includes('\\') || path.includes('?') || path.includes('#')) throwTyped(errorClass, `${label} is not a safe relative path`);
+  const parts = path.split('/');
+  if (parts.some((part) => part === '' || part === '.' || part === '..')) throwTyped(errorClass, `${label} is not a safe relative path`);
+  for (const part of parts) {
+    let decoded;
+    try { decoded = decodeURIComponent(part); }
+    catch { throwTyped(errorClass, `${label} has invalid percent encoding`); }
+    if (decoded === '' || decoded === '.' || decoded === '..' || decoded.includes('/') || decoded.includes('\\')) throwTyped(errorClass, `${label} is not a safe relative path`);
+  }
+  return path;
+}
+
+export function resolveTrustedRelativeUrl(path, baseUrl, label = 'path', { errorClass = LoadError } = {}) {
+  const relative = validateRelativePath(path, label, { errorClass });
+  let base;
+  let resolved;
+  try {
+    base = new URL(baseUrl);
+    resolved = new URL(relative, base);
+  } catch {
+    throwTyped(errorClass, `${label} URL resolution failed`);
+  }
+  const baseDirectory = base.pathname.endsWith('/') ? base : new URL('./', base);
+  if (resolved.protocol !== base.protocol || resolved.origin !== base.origin) throwTyped(errorClass, `${label} escapes trusted origin`);
+  if (resolved.search || resolved.hash) throwTyped(errorClass, `${label} must not contain query or fragment state`);
+  if (!resolved.pathname.startsWith(baseDirectory.pathname)) throwTyped(errorClass, `${label} escapes trusted path prefix`);
+  return resolved;
+}
+
+export async function readBoundedResponseBytes(response, limit, label, { errorClass = LoadError, expectedBytes = null } = {}) {
+  if (!Number.isSafeInteger(limit) || limit < 0) throwTyped(errorClass, `${label} byte limit invalid`);
+  if (!response?.ok) throwTyped(errorClass, `${label} fetch failed: ${response?.status ?? 'unknown'}`);
   const declared = response.headers?.get?.('content-length');
-  if (declared !== null && declared !== undefined && Number(declared) > limit) throw new LoadError(`${label} declared bytes exceed proof limit`);
-  const bytes = new Uint8Array(await response.arrayBuffer());
-  if (bytes.byteLength > limit) throw new LoadError(`${label} bytes exceed proof limit`);
+  if (declared !== null && declared !== undefined) {
+    const declaredBytes = Number(declared);
+    if (Number.isFinite(declaredBytes) && declaredBytes > limit) throwTyped(errorClass, `${label} declared bytes exceed proof limit`);
+  }
+  const reader = response.body?.getReader?.();
+  if (!reader) throwTyped(errorClass, `${label} response body is not stream-readable`);
+  const chunks = [];
+  let total = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const chunk = value instanceof Uint8Array ? value : new Uint8Array(value);
+      total += chunk.byteLength;
+      if (total > limit) {
+        try { await reader.cancel(); } catch {}
+        throwTyped(errorClass, `${label} bytes exceed proof limit`);
+      }
+      chunks.push(chunk);
+    }
+  } catch (error) {
+    if (error instanceof errorClass) throw error;
+    throwTyped(errorClass, `${label} body read failed: ${error?.message ?? String(error)}`);
+  } finally {
+    try { reader.releaseLock?.(); } catch {}
+  }
+  if (expectedBytes != null && total !== expectedBytes) throwTyped(errorClass, `${label} byte count mismatch`);
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
   return bytes;
+}
+
+async function readBoundedResponse(response, limit, label) {
+  return readBoundedResponseBytes(response, limit, label);
 }
 
 function decodeJson(bytes, label) {
@@ -160,7 +230,7 @@ export async function loadManifest(url, fetcher = fetch) {
 export async function loadChunk(baseUrl, entry, manifest, fetcher = fetch) {
   if (!entry || typeof entry !== 'object') throw new LoadError('invalid chunk index entry');
   if (!Number.isSafeInteger(entry.bytes) || entry.bytes < 1 || entry.bytes > MAX_CHUNK_BYTES) throw new LoadError('invalid indexed chunk byte size');
-  const url = new URL(entry.path, baseUrl).toString();
+  const url = resolveTrustedRelativeUrl(entry.path, baseUrl, 'chunk path').toString();
   const response = await fetcher(url, { cache: 'no-store' });
   const bytes = await readBoundedResponse(response, MAX_CHUNK_BYTES, 'chunk');
   if (bytes.byteLength !== entry.bytes) throw new LoadError('chunk byte count differs from manifest');
