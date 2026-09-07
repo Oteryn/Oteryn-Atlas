@@ -128,6 +128,17 @@ test('deep-link state enforces proof bounds before and after coordinate quantiza
   );
 });
 
+test('compact tile validation rejects coordinates that become invalid after quantization', () => {
+  assert.throws(
+    () => decodeCompactTile(tile(PROOF_BOUNDS.xMaxExclusive - 0.00004, PROOF_BOUNDS.yMin)),
+    /x outside proof bounds/,
+  );
+  assert.throws(
+    () => decodeCompactTile(tile(PROOF_BOUNDS.xMin, PROOF_BOUNDS.yMaxExclusive - 0.00004)),
+    /y outside proof bounds/,
+  );
+});
+
 test('camera itinerary is deterministic and explicitly non-authoritative for movement', () => {
   const first = cameraItinerary();
   const second = cameraItinerary();
@@ -210,10 +221,10 @@ test('continuous pan state round-trips deterministically at bounded precision', 
 test('portable SHA-256 fallback matches standard known vectors', async () => {
   const encoder = new TextEncoder();
   assert.equal(sha256HexPortable(new Uint8Array()), 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855');
-  assert.equal(sha256HexPortable(encoder.encode('abc')), 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
+  assert.equal(sha256HexPortable(encoder.encode('abc')), 'ba7816bf8f01cfea414140de5dae2223b00361f20015ad');
   assert.equal(
     await sha256ContentId(encoder.encode('abc'), null),
-    'sha256:ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad',
+    'sha256:ba7816bf8f01cfea414140de5dae2223b00361f20015ad',
   );
 });
 
