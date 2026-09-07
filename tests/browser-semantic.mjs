@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   CAMERA_ITINERARY,
+  PROOF_BOUNDS,
   SemanticError,
   cameraItinerary,
   decodeCompactTile,
@@ -90,6 +91,52 @@ test('deep-link state round-trips deterministically', () => {
 test('deep-link state fails closed outside the exported floor/bounds', () => {
   assert.throws(() => parseViewState('?x=1&y=32240&floor=-7&zoom=4'), SemanticError);
   assert.throws(() => parseViewState('?x=32370&y=32240&floor=7&zoom=4'), SemanticError);
+});
+
+test('deep-link state enforces proof bounds before and after coordinate quantization', () => {
+  const base = `y=${PROOF_BOUNDS.yMin}&floor=${PROOF_BOUNDS.floor}&zoom=1`;
+
+  assert.deepEqual(
+    parseViewState(`?x=${PROOF_BOUNDS.xMin}&${base}`),
+    { x: PROOF_BOUNDS.xMin, y: PROOF_BOUNDS.yMin, floor: PROOF_BOUNDS.floor, zoom: 1 },
+  );
+  assert.throws(
+    () => parseViewState(`?x=${PROOF_BOUNDS.xMin - 0.00001}&${base}`),
+    /x outside proof bounds/,
+  );
+  assert.throws(
+    () => parseViewState(`?x=${PROOF_BOUNDS.xMaxExclusive}&${base}`),
+    /x outside proof bounds/,
+  );
+  assert.throws(
+    () => parseViewState(`?x=${PROOF_BOUNDS.xMaxExclusive - 0.00004}&${base}`),
+    /x outside proof bounds/,
+  );
+
+  assert.deepEqual(
+    parseViewState(`?x=${PROOF_BOUNDS.xMaxExclusive - 0.00006}&y=${PROOF_BOUNDS.yMaxExclusive - 0.00006}&floor=${PROOF_BOUNDS.floor}&zoom=1`),
+    {
+      x: PROOF_BOUNDS.xMaxExclusive - 0.0001,
+      y: PROOF_BOUNDS.yMaxExclusive - 0.0001,
+      floor: PROOF_BOUNDS.floor,
+      zoom: 1,
+    },
+  );
+  assert.throws(
+    () => parseViewState(`?x=${PROOF_BOUNDS.xMin}&y=${PROOF_BOUNDS.yMaxExclusive - 0.00004}&floor=${PROOF_BOUNDS.floor}&zoom=1`),
+    /y outside proof bounds/,
+  );
+});
+
+test('compact tile validation rejects coordinates that become invalid after quantization', () => {
+  assert.throws(
+    () => decodeCompactTile(tile(PROOF_BOUNDS.xMaxExclusive - 0.00004, PROOF_BOUNDS.yMin)),
+    /x outside proof bounds/,
+  );
+  assert.throws(
+    () => decodeCompactTile(tile(PROOF_BOUNDS.xMin, PROOF_BOUNDS.yMaxExclusive - 0.00004)),
+    /y outside proof bounds/,
+  );
 });
 
 test('camera itinerary is deterministic and explicitly non-authoritative for movement', () => {

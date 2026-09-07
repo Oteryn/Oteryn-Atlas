@@ -1,126 +1,42 @@
-# Dockerized Atlas E2E
+# Atlas E2E harness
 
-This harness runs the Atlas FullWorld portal in digest-pinned Playwright Chromium without requiring host-installed Node, Playwright or a browser.
+The `e2e/` tree contains the Dockerized Playwright harness used by Atlas verification work. During the temporary maintenance state tracked by Issue #315, the historical product/E2E workflow stack is suspended and this harness is **not** a current required PR gate or an automatically scheduled qualification path.
 
-The full-world publication is intentionally not committed to the Atlas source repository. In checkout-overlay mode, the local unprivileged Nginx container serves the exact `web/` and `src/` checkout while proxying only `/fullworld/**` and `/data/creatures/**` from an explicitly selected publication origin. Browser trust validation still fails closed on product identity mismatches.
+## Current authority
 
-## Requirements
+Do not infer active CI or deployment topology from this directory. Current repository authority is:
 
-- Docker Engine / Docker Desktop with Compose v2.
-- Access from the Docker host to a FullWorld publication origin.
-- No Docker socket, privileged container or source write mount is required.
+1. protected `main`;
+2. root `AGENTS.md`;
+3. Issue #315 for the temporary maintenance lifecycle;
+4. the workflows that actually exist under `.github/workflows/` on protected `main`.
 
-## Test the current checkout
+Suspended workflow definitions are retained under `docs/maintenance/suspended-workflows/` as implementation/history material. Their old trigger, runner, status-publishing and deployment behavior is not current authority while suspended.
 
-Linux / WSL / Git Bash:
+## Harness purpose
+
+The harness runs the Atlas FullWorld portal in digest-pinned Playwright Chromium without requiring host-installed Node, Playwright or a browser. In checkout-overlay mode, an unprivileged Nginx container serves the selected `web/` and `src/` checkout while proxying approved publication paths from an explicitly selected origin. Runtime trust validation remains fail-closed on product-identity mismatches.
+
+The harness is retained so verification groups can be repaired and re-qualified incrementally during the later #315 restoration phase. Reintroduction must follow the current repository policy: restore a bounded group in non-blocking/shadow execution, prove real PR/Merge Queue canaries, and only then make impact-applicable coverage blocking. Do not revive the retired aggregate stack merely because scripts or historical workflow files still exist.
+
+## Manual/local use
+
+Local execution is diagnostic or qualification evidence only when separately authorized by the current task and policy. Typical entry points are:
 
 ```bash
-ATLAS_PUBLICATION_ORIGIN=http://192.168.1.2:8097 ./e2e/run.sh
+ATLAS_PUBLICATION_ORIGIN=http://<publication-origin> ./e2e/run.sh
 ```
 
-Native Windows PowerShell:
-
 ```powershell
-$env:ATLAS_PUBLICATION_ORIGIN = 'http://192.168.1.2:8097'
+$env:ATLAS_PUBLICATION_ORIGIN = 'http://<publication-origin>'
 $env:ATLAS_E2E_WORKERS = '1'
-$env:ATLAS_VERIFICATION_PLAN_PATH = 'C:\\path\\to\\shadow-verification-plan.json'
 .\e2e\run.ps1
 ```
 
-The harness exposes and asserts the exact checkout SHA through `X-Oteryn-Atlas-Code-Revision`. Publication products are accepted only when they match the trust pins embedded in that checkout.
-On native Windows, `run.ps1` starts a bounded user-space TCP forwarder and routes Docker Desktop publication traffic through `host.docker.internal` while preserving the original publication Host identity. This avoids Docker bridge-to-LAN reachability failures without changing the NAS or the Atlas runtime, and the forwarder is stopped during runner cleanup.
+Direct deployed-preview mode uses `ATLAS_BASE_URL` and, for an exact-revision claim, `ATLAS_EXPECTED_REVISION`. Generated reports and visual evidence remain local/CI artifacts unless a current repository procedure explicitly accepts them.
 
-After the exact tested commit has been pushed to the PR branch, publish the verified local result from the generated `summary.json`:
+## Verification characteristics
 
-```powershell
-.\e2e\publish-local-e2e-status.ps1 `
-  -SummaryPath .\artifacts\e2e\<project>\summary.json `
-  -VerificationPlanPath C:\\path\\to\\shadow-verification-plan.json `
-  -RemoteBranch agent/atlas-verify-ci-nightly-01
-```
+The retained suite covers FullWorld loading and range behavior, semantic search, navigation/history, map geometry, floors/modes, creature presentation and interaction, responsive/mobile behavior, failure handling, accessibility and reviewed visual scenarios. The suite is designed for zero-retry deterministic evidence; failures must remain visible rather than being converted to success through retries, broad allowlists or enlarged tolerances.
 
-Trusted local `run.ps1`/`run.sh` invocations enable successful full-frame user evidence. The authoritative required-frame census and primary browser profile are versioned in `e2e/user-visual-scenarios.json`. These frames remain in the local artifact directory and are not source baselines. Before publishing `atlas-local-e2e`, open and review every required full-frame screenshot under `user-visual-evidence/`, then create the exact-revision review manifest:
-
-```powershell
-.\e2e\approve-visual-user-acceptance.ps1 `
-  -SummaryPath .\artifacts\e2e\<project>\summary.json `
-  -Reviewer '<reviewer-or-agent-id>' `
-  -ConfirmReviewedAllScreenshots
-```
-
-`publish-local-e2e-status.ps1` now requires the resulting `visual-review.json` and the exact verification-plan artifact. It verifies the plan hash embedded in the Playwright summary, its exact HEAD/merge-base identity, and the complete stable Playwright test-ID census before re-hashing every reviewed screenshot. The publisher writes only the `atlas-local-e2e` commit status; it does not merge, deploy or modify the publication.
-
-## Test a deployed preview directly
-
-Linux / WSL / Git Bash:
-
-```bash
-ATLAS_BASE_URL=http://192.168.1.2:8097 \
-ATLAS_EXPECTED_REVISION=<exact-preview-sha> \
-./e2e/run.sh
-```
-
-PowerShell uses the same environment variable names with `.\e2e\run.ps1`.
-
-Direct mode exercises deployed code and data together. `ATLAS_EXPECTED_REVISION` is optional for exploratory runs but required for a revision-qualified acceptance claim.
-
-Set `ATLAS_E2E_WORKERS=1` for a low-resource machine. The suite has no retries, so first-run failures remain visible.
-
-## Worker calibration (Molehill-PC only)
-
-Do not change the accepted worker policy from hardware intuition. The measurement-only harness runs the required baseline/candidates (`1`, `2`, `4`, `6`, `8`) in counterbalanced order with at least three repetitions and records Windows performance-counter, Docker, disk, runner, environment, summary and zero-retry evidence. It does not change Playwright configuration, runner slots, branch policy, or status publication.
-
-First validate the harness on Molehill-PC:
-
-```powershell
-.\e2e\benchmark-workers.ps1 -SelfTest
-```
-
-Then run it only when the current checkout is the intended exact revision and no exclusive performance, soak, native-GPU, deployment, or conflicting calibration work is active:
-
-```powershell
-.\e2e\benchmark-workers.ps1 -PublicationOrigin http://192.168.1.2:8097 -Repetitions 3
-```
-
-Review the generated JSON before proposing any worker or concurrency default. A nonzero test exit, nonzero retry, missing summary, browser/container instability, or incomplete telemetry invalidates that measurement set.
-
-## Coverage
-
-The deterministic suite covers:
-
-- FullWorld qualification, WebGL2, verified HTTP 206 range streaming and strict browser/runtime error capture;
-- desktop zoom buttons, wheel zoom, pan, floor controls, AUTO/MINIMAP/MAP transitions and overview state;
-- coordinate navigation, safe invalid/out-of-bounds handling, replace-state/reload behavior and browser back/forward deep links;
-- semantic named search, result selection, deep-link state and inspector consistency;
-- shipped static NPC/monster toggles, search, deep links, inspector state and bounded creature diagnostics;
-- mobile drawers, backdrop/Escape behavior, search/floor controls and 390x844 plus 844x390 responsive transitions;
-- bounded failure injection for required publication failure, malformed semantic search data and unavailable optional creature index;
-- critical accessible names and truthful disabled/hidden states;
-- user-facing visual acceptance across desktop/mobile initial state, search/inspector, layer presentation, animation playback, MINIMAP/CLASSIC/floor transitions, coordinate/zoom/pan navigation, degraded-search and fail-closed presentation, mobile drawers and responsive landscape-like resize, with deterministic clipping/occlusion/hit-target checks plus reviewed exact-revision full-frame evidence.
-
-## Network/error policy
-
-Unexpected page exceptions, console errors, failed requests and HTTP >=400 responses fail the suite. The allowlist is intentionally narrow: a missing favicon and a 404 for the optional `/data/creatures/index.json` entry point may be classified as expected. Once a creature index is present, missing child products are not ignored.
-
-## Artifacts
-
-Each runner invocation uses an isolated Compose project and, by default, an isolated `artifacts/e2e/<project>/` directory. Set `ATLAS_E2E_PROJECT` and `ATLAS_E2E_ARTIFACTS_HOST` only when a stable external name/path is required.
-
-Each run directory contains:
-
-- `summary.json` - compact target/revision/browser/project/scenario/timing/PASS-FAIL census;
-- `failure.json` - bounded machine-readable failing-scenario manifest when the run fails;
-- `results.json` - Playwright JSON report;
-- `html-report/` - browsable report;
-- `test-results/` - retained trace, video, screenshot and error context on failures;
-- `user-visual-evidence/<project>/<scenario>/` - successful exact-revision viewport PNG plus machine-readable manifest for required user-facing states;
-- `visual-review.json` - explicit approved review bound to the exact `summary.json` and reviewed screenshot digests.
-
-Generated reports remain local/CI artifacts and are not intended for source-control commits.
-
-The source checkout is mounted read-only into the web container, no host service port is published by the harness, and the selected publication origin is exercised read-only.
-## CI tiers
-
-Required pull-request qualification is wired into `atlas-gate`: deterministic Node verification and authenticated exact-head local Docker Playwright evidence must both succeed. The heavy Playwright run is executed on Molehill-PC with Docker; GitHub CI only verifies the `atlas-local-e2e=success` status on the exact pull-request SHA. The publisher refuses dirty, stale-SHA, skipped/failed or retried evidence. Fork candidates cannot satisfy this trusted same-repository gate and must be reproduced on an authorized branch. `main` CI does not repeat the heavy PR workload; merged-main/live acceptance remains separately revision-qualified.
-
-Scheduled depth is defined by `.github/workflows/verification-depth.yml` and runs its heavy browser work on the dedicated Molehill-PC runner. It is additive to the 77-scenario exact-head PR gate rather than a second copy of that gate: it runs repeated critical geometry/render probes, fixed replayable stress seeds, extra DPR/tablet projects, and stable worker-delivered performance/visual/accessibility/race/soak depth. Missing optional depth categories are recorded with explicit reasons in `optional-depth-skips.json`. Synology remains the merged-main deployment/live-acceptance target and is not a general-purpose heavy CI runner.
+Before using any specialist/nightly profile, data capability, runner, status publisher or visual-approval flow, read `docs/agents/operations/VERIFICATION_CAPABILITY.md` and current Issue #315 state. Historical commands and artifacts are not authority for reactivating suspended verification.

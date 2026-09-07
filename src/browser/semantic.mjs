@@ -29,7 +29,9 @@ function boundedCoordinate(value, min, maxExclusive, name) {
 
 function boundedViewCoordinate(value, min, maxExclusive, name) {
   if (!Number.isFinite(value) || value < min || value >= maxExclusive) throw new SemanticError(`${name} outside proof bounds`);
-  return Math.round(value * 10000) / 10000;
+  const quantized = Math.round(value * 10000) / 10000;
+  if (quantized < min || quantized >= maxExclusive) throw new SemanticError(`${name} outside proof bounds`);
+  return quantized;
 }
 
 function exactBounds(bounds) {

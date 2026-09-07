@@ -34,16 +34,29 @@ def source_jsonl_chunks(tiles: list[dict[str, Any]], source: Path, span: int) ->
     return {key: b"".join(values) for key, values in grouped.items()}
 
 
+def compact_chunk_key(relative_path: str, data: bytes, span: int) -> tuple[int, int, int]:
+    try:
+        chunk = json.loads(data)
+        address = chunk["address"]
+        floor = address["floor"]
+        cx = address["cx"]
+        cy = address["cy"]
+        chunk_span = address["span"]
+    except (json.JSONDecodeError, KeyError, TypeError) as exc:
+        raise compiler.CompileError(f"invalid compact chunk metadata for {relative_path}") from exc
+    if not all(isinstance(value, int) for value in (floor, cx, cy, chunk_span)):
+        raise compiler.CompileError(f"invalid compact chunk address for {relative_path}")
+    expected_path = f"chunks/f{floor}-x{cx}-y{cy}.json"
+    if relative_path != expected_path or chunk_span != span:
+        raise compiler.CompileError(f"compact chunk path/metadata mismatch for {relative_path}")
+    return floor, cx, cy
+
+
 def compact_chunks(tiles: list[dict[str, Any]], span: int) -> dict[tuple[int, int, int], bytes]:
     compiled, _manifest = compiler.compile_tiles(tiles, span)
     by_key: dict[tuple[int, int, int], bytes] = {}
     for relative_path, data in compiled.items():
-        name = Path(relative_path).stem
-        floor_text, cx_text, cy_text = name.split("-")
-        floor = int(floor_text[1:])
-        cx = int(cx_text[1:])
-        cy = int(cy_text[1:])
-        by_key[(floor, cx, cy)] = data
+        by_key[compact_chunk_key(relative_path, data, span)] = data
     return by_key
 
 
