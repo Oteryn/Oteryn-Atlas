@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "repository": "Oteryn/Oteryn-Atlas",
+  "main_sha": "5ea38a62fe1af8b8068adcb84350e9644905943c",
+  "root_tree_sha": "1024b0a7c32cab87e74655fba2a8cb7463cb3d44",
+  "tracked_leaf_paths": 1140,
+  "counts": {
+    "DIRECT": 131,
+    "GROUPED": 550,
+    "NOT_APPLICABLE": 459,
+    "PARTIAL": 0,
+    "UNVERIFIED": 0,
+    "INACCESSIBLE": 0
+  },
+  "inventory_counts": {
+    "root": 6,
+    ".github": 5,
+    "docs": 151,
+    "e2e": 85,
+    "src": 49,
+    "tests": 192,
+    "tools": 96,
+    "web": 556
+  },
+  "grouped_rules": [
+    {"pattern": "web/creature-gameplay/shards/**", "count": 508, "state": "GROUPED", "basis": "manifest+digest+bounded-schema+consumer+4 edge samples"},
+    {"pattern": "web/proof/**", "count": 33, "state": "GROUPED", "basis": "generated proof products with manifests/content identities and inspected producer/consumer contracts"},
+    {"pattern": "web/semantic-search/*.json", "count": 2, "state": "GROUPED", "basis": "generated search indexes with inspected builder/consumer"},
+    {"pattern": "e2e/tests/*-snapshots/*.png", "count": 7, "state": "GROUPED", "basis": "generated visual reference outputs; no new visual approval inferred"}
+  ],
+  "not_applicable_rules": [
+    {"pattern": "tests/** except tests/maintenance/maintenance-diff-policy.test.mjs", "count": 191, "reason": "suspended product/verification execution under maintenance"},
+    {"pattern": "docs/evidence/**", "count": 33, "reason": "historical evidence on current main"},
+    {"pattern": "docs/superpowers/**", "count": 23, "reason": "dated historical plans/specs"},
+    {"pattern": "docs/maintenance/suspended-workflows/**", "count": 25, "reason": "deliberately inactive workflow copies"},
+    {"pattern": "docs/agents/prompts/** except two active task prompts", "count": 36, "reason": "task-specific prompt contracts not selected as current mutable task authority"},
+    {"pattern": "docs/agents/tasks/archive/**", "count": 1, "reason": "archived task evidence"},
+    {"pattern": "docs/agents/SYNOLOGY_DESKTOP_COMMANDER_ACCESS.md", "count": 1, "reason": "host-specific note not current repository execution authority"},
+    {"pattern": "docs/governance/**", "count": 3, "reason": "historical Merge Queue canary evidence"},
+    {"pattern": "docs/migration/**", "count": 1, "reason": "migration provenance artifact"},
+    {"pattern": "docs/testing/**", "count": 12, "reason": "historical/pre-maintenance verification architecture records"},
+    {"pattern": "tools/verification/** except e2e-data-capability-inventory.json and verification-catalog.json", "count": 61, "reason": "suspended verification/restoration implementation"},
+    {"pattern": "e2e/** authored leaves except six DIRECT files and seven GROUPED snapshots", "count": 72, "reason": "suspended E2E implementation/support under maintenance"}
+  ],
+  "direct_rule": {
+    "state": "DIRECT",
+    "count": 131,
+    "rule": "all remaining current tracked leaves after GROUPED and NOT_APPLICABLE rules",
+    "breakdown": {"root": 6, ".github": 5, "docs": 16, "e2e": 6, "src": 49, "tests": 1, "tools": 35, "web": 13}
+  }
+}

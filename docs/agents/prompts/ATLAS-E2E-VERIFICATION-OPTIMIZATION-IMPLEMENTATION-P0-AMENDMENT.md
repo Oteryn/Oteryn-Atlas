@@ -1,14 +1,16 @@
 # ATLAS-E2E-VERIFICATION-OPTIMIZATION-IMPLEMENTATION — P0 amendment
 
-Lifecycle authority: `Oteryn/Oteryn-Atlas#179`
+> **Lifecycle status: HISTORICAL / SUSPENDED.** Issue #179 is closed. This prompt is retained only as design and safety input for a later restoration phase explicitly authorized by live Issue #315 and current protected repository authority. It does not authorize execution, test or workflow restoration, deployment, or copying these procedures into active instructions.
 
-Status: **normative amendment** to `docs/agents/prompts/ATLAS-E2E-VERIFICATION-OPTIMIZATION-IMPLEMENTATION.md`.
+Historical lifecycle authority: `Oteryn/Oteryn-Atlas#179` (closed)
+
+Status: **historical normative amendment** to `docs/agents/prompts/ATLAS-E2E-VERIFICATION-OPTIMIZATION-IMPLEMENTATION.md`.
 
 Source review evidence: `docs/testing/ATLAS-E2E-VERIFICATION-OPTIMIZATION-PRO-AUDIT-2026-08-27.md` from PR #204.
 
-This amendment incorporates the independent Agent Pro P0 findings into the mandatory implementation contract. The Pro audit itself remains point-in-time review evidence; the requirements below are forward-looking lifecycle constraints and must be validated against fresh protected `main` and exact current PR heads before implementation or cutover.
+This amendment incorporated the independent Agent Pro P0 findings into the then-mandatory #179 implementation contract. The Pro audit itself remains point-in-time review evidence; the requirements below are preserved as design and safety input for any separately authorized restoration.
 
-Where this amendment is stricter than the current implementation prompt, execution audit, readiness contract, active stacked PR descriptions, or older handoff documents, this amendment governs lifecycle #179 until the primary documents are reconciled.
+Where this amendment was stricter than the implementation prompt, execution audit, readiness contract, active stacked PR descriptions, or older handoff documents, it governed lifecycle #179 until that lifecycle closed.
 
 ## P0 cutover rule
 

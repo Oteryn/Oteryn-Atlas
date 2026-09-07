@@ -69,17 +69,9 @@ The integration originated from these worker branches/observed handoff heads:
 
 Re-resolve each branch from GitHub before relying on it. Do not replace already-integrated reviewed code with stale worker content merely because a historical SHA is listed here.
 
-## Mandatory GitHub-first resume gate
+## Task-specific continuation coordinates
 
-Before local execution or mutation:
-1. Resolve current `main` SHA and branch protection from GitHub.
-2. Refresh Issue #115 state and complete body.
-3. Refresh PR #163 state, draft status, exact base/head SHAs, changed-file list, reviews, review threads, checks and workflow runs.
-4. Confirm the exact remote head of `feat/issue-115-creature-label-badge-ux`.
-5. Search for overlapping open PRs/branches that touch creature presentation, animation, geometry, diagnostics, FullWorld mode/LOD or the E2E harness.
-6. Refresh #113 and use its merged canonical interaction/presentation geometry instead of creating a second hit-test or selection authority.
-7. Confirm the parallel-suite/integrator prompts are on current `main`.
-8. Inspect the full PR #163 diff against current `main`; do not trust old summaries.
+Use current repository authority to resolve Issue #115 and PR #163, including its current branch/head, complete diff, review state, checks, and workflow evidence. Reconcile active work touching creature presentation, animation, geometry, diagnostics, FullWorld mode/LOD, or the E2E harness. Preserve #113's merged interaction/presentation geometry instead of creating a second hit-test or selection authority.
 
 If another actor advanced PR #163, continue from the new remote head after reviewing the delta. Never reset the branch backward to the creation-time snapshot.
 

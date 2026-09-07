@@ -27,19 +27,9 @@ Named real creatures are acceptance fixtures only. Reject any worker code that b
 
 Oteryn-Game remains canonical World/Content authority and MUST NOT be mutated.
 
-## Mandatory GitHub-first refresh
+## Task-specific integration coordinates
 
-Before mutation:
-1. resolve exact current `main` from GitHub;
-2. read root `AGENTS.md`, Issue #115, #113, #111 and #85;
-3. confirm the parallel-suite prompts are on `main`;
-4. inspect all four worker branches and their final commit SHAs;
-5. inspect changed-file lists and diffs, not just worker summaries;
-6. recheck active branches/PRs touching `web/fullworld-creatures.mjs`, FullWorld view/LOD, diagnostics or E2E;
-7. revalidate current Game-derived acceptance anchors/fixtures;
-8. create/reuse the single integration branch from refreshed `main`, recommended `feat/issue-115-creature-label-badge-ux`.
-
-If `main` advanced after workers started, do not reset `main` backward. Integrate worker changes onto refreshed current main and resolve drift explicitly.
+Use current repository authority to resolve Issue #115, #113, #111 and #85; all four worker branches and their complete diffs; and active ownership of `web/fullworld-creatures.mjs`, FullWorld view/LOD, diagnostics, and E2E. Revalidate current Game-derived acceptance fixtures. Reuse the single #115 integration branch, historically named `feat/issue-115-creature-label-badge-ux`, after resolving its live state.
 
 ## Worker review gate
 
