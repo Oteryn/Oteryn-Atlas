@@ -18,9 +18,9 @@ The initial #345 binding selected the v3 introduction merge `8673d109d1a364efa79
 - **Adoption and delivery:** root `AGENTS.md` contains the affirmative binding bootstrap, and the provider consumer loads policy and validator bytes from that exact authenticated commit. This proves the repository delivery path used by the validator; it does not claim every external client automatically loads remote META text.
 - **Behavior:** `ATLAS-LEAN-PROMPT-CANARY.md` remains the representative task-delta contract and its deterministic structural test passes. New controlled model trials were **NOT_EVALUATED** in this maintenance lane, so static checks and reduced text volume are not represented as behavioral improvement.
 
-## Source volume
+## Initial-adoption source volume
 
-Counts use UTF-8 tracked source at Atlas admission main and this candidate worktree before commit. Lines use `splitlines()`; words use whitespace splitting.
+These frozen #345 measurements compare UTF-8 tracked source at Atlas admission main with the initial META-adoption candidate before its commit. They do not include the later W4 prompt cleanup recorded below. Lines use `splitlines()`; words use whitespace splitting.
 
 | Surface | Files before → after | Lines before → after | Words before → after | Bytes before → after |
 | --- | ---: | ---: | ---: | ---: |
@@ -33,19 +33,19 @@ The always-loaded root is 66.9% smaller by words and 66.2% smaller by bytes. Tot
 
 ## W4 prompt-cleanup inventory
 
-The authenticated central validator accepts all 38 current reusable prompts. Seven still contain explicit GitHub-first procedure headings that are candidates for later semantic ablation and cleanup:
+The authenticated central validator accepts all 38 current reusable prompts. The W4 scan found seven explicit GitHub-first procedure headings. Live ownership allowed six to be reduced to task-specific locators and dependencies while retaining their Atlas domain and acceptance contracts:
 
-| Prompt | Words | Bytes | Candidate duplicated heading |
+| Prompt | Words before → after | Bytes before → after | W4 result |
 | --- | ---: | ---: | --- |
-| `ATLAS-CREATURE-INTERACTION-CARDS.md` | 1,815 | 14,185 | Mandatory GitHub-first preflight |
-| `ATLAS-CREATURE-LABEL-AND-NPC-BADGE-UX.md` | 2,680 | 19,835 | Mandatory GitHub-first preflight |
-| `ATLAS-CREATURE-PRESENTATION-INTEGRATOR-RESUME.md` | 1,860 | 14,083 | Mandatory GitHub-first resume gate |
-| `ATLAS-CREATURE-PRESENTATION-INTEGRATOR.md` | 1,266 | 9,939 | Mandatory GitHub-first refresh |
-| `ATLAS-CREATURE-WALKING-IN-PLACE-ANIMATION.md` | 3,049 | 22,766 | Mandatory GitHub-first preflight |
-| `ATLAS-E2E-VERIFICATION-OPTIMIZATION-IMPLEMENTATION.md` | 5,610 | 45,564 | GitHub-first preflight |
-| `ATLAS-PRODUCTION-UI-SHELL-V1.md` | 1,200 | 9,974 | Mandatory GitHub-first preflight |
+| `ATLAS-CREATURE-INTERACTION-CARDS.md` | 1,815 → 1,724 | 14,185 → 13,584 | duplicated procedure removed |
+| `ATLAS-CREATURE-LABEL-AND-NPC-BADGE-UX.md` | 2,680 → 2,574 | 19,835 → 19,096 | duplicated procedure removed |
+| `ATLAS-CREATURE-PRESENTATION-INTEGRATOR-RESUME.md` | 1,860 → 1,799 | 14,083 → 13,690 | duplicated procedure removed |
+| `ATLAS-CREATURE-PRESENTATION-INTEGRATOR.md` | 1,266 → 1,217 | 9,939 → 9,599 | duplicated procedure removed |
+| `ATLAS-CREATURE-WALKING-IN-PLACE-ANIMATION.md` | 3,049 → 2,993 | 22,766 → 22,428 | duplicated procedure removed |
+| `ATLAS-E2E-VERIFICATION-OPTIMIZATION-IMPLEMENTATION.md` | 5,610 → 5,610 | 45,564 → 45,564 | deferred: open PR #346 owns this path |
+| `ATLAS-PRODUCTION-UI-SHELL-V1.md` | 1,200 → 1,147 | 9,974 → 9,550 | duplicated procedure removed |
 
-This is a point-in-time cleanup inventory, not a dispatch or lifecycle registry. W4 must refresh each prompt's live Issue/ownership and preserve task-specific domain and acceptance content before editing or retiring it. The remaining 31 prompts have no heading match from this bounded scan; that is not a semantic-ablation verdict.
+Across the six edited prompts, this removes 416 words and 2,835 bytes. The open-PR overlap is a concrete ownership deferral, not a validator or freeze bypass. The remaining 31 prompts had no heading match in this bounded scan; that is not a semantic-ablation verdict. This table remains point-in-time cleanup evidence, not a dispatch or lifecycle registry.
 
 ## Deferred execution configuration and W6
 
