@@ -28,7 +28,7 @@ The group needs a real non-browser specialist obligation in the protected plan, 
 
 ## Exact impact boundary
 
-Every listed product-semantic file should select the existing focused/unit proof, fixture browser coverage where its output is consumed, and `fullworld.complete-integrity`. The real group is additive; its presence does not turn `e2e.full` into a real-data group.
+As a temporary conservative boundary, a changed mixed product-semantic file below needs focused/unit proof, fixture browser coverage where its output is consumed, and an explicit unresolved complete-product obligation. The table is not an optimized accepted route: generic CLI, error handling, serialization, or helper changes must be separated into modules with independent fixture oracles before claiming selectivity. Do not introduce a diff-hunk semantic classifier. The proposed complete-integrity aggregate is broad qualification; split its generator, publication, runtime-index, pixel, overview and minimap proofs by producer/consumer dependencies before making it routine. A change to one downstream builder must not automatically rebuild every upstream product. Required real proof remains additive and does not turn `e2e.full` into a real-data group.
 
 | File | Minimum real-product reason | Fast proof that still runs |
 |---|---|---|
@@ -57,28 +57,29 @@ No reviewed file has a bounded-real requirement by itself. `bounded_real_world` 
 
 ## Manifest design and unknown fallback
 
-Introduce an exact-path rule type (for example `pathExact`) that suppresses broader `pathPrefix` matches for that one path. Preserve current prefix union behavior when no exact rule exists. Then:
+Use exact-path ownership in addition to semantic impact rules, with any precedence limited to a **named default/unknown catchall**. An exact rule must not suppress unrelated matching prefixes, domains, dependencies, review obligations, or cross-domain escalation. For example the gameplay profile must retain the existing common-smoke floor from its creature/browser rules while adding the bounded source contract. Classify protected and candidate manifests independently, then union their complete results; a candidate exact rule can never override a protected prefix requirement.
 
-* add exact rules for every known file above, selecting either `fullworld.complete-integrity` or the bounded/fixture owner shown in the tables;
-* keep each `tools/fullworld-*` directory prefix only as an **unknown-new-file guard** with domain `unknown-complete-product-impact` and group `fullworld.complete-integrity`;
-* cover renames by classifying both old and new paths, as the planner already does;
-* fail closed to the real group when a changed hunk crosses extracted product/generic module boundaries or an exact rule is absent;
-* use the ordinary global fallback (`profile=full`, fixture groups) outside these complete-product namespaces unless another rule establishes material complete-product uncertainty.
+* classify each known file in the tables with explicit semantic owners;
+* treat an unowned new file in a complete-product namespace as `unknown-complete-product-impact`, retaining an explicit unresolved-oracle obligation; select an existing specialist proof only if it truthfully covers that uncertainty;
+* classify both rename source and destination, preserving the strongest obligations;
+* keep applicable known fixture checks as useful partial proof, but make every unknown/unclassified path yield **BLOCKED unresolved ownership/oracle** until a protected complete mapping or an independently justified conservative proof exists;
+* do not endorse the current global fixture-only fallback as complete qualification, either inside or outside FullWorld directories, and do not replace uncertainty with an unconditional all-product build;
+* the final executor must conserve every selected group: each maps exactly once to a deterministic, hosted, or specialist execution obligation; review is an additive evidence obligation. Reject missing, duplicated, skipped, or unsupported execution/evidence partitions, including non-browser hosted and specialist groups.
 
-This makes the conservative case explicit without claiming that `cdp-session.mjs`, the local range server, or the authority-registry checker needs ~19 GB of bytes. The protected and candidate manifests must still be unioned so a candidate cannot downgrade the protected exact rule.
+This preserves the byte-independent routes without claiming ~19 GB is necessary, and prevents unknown scope from passing with missing specialist, native, artifact, or other proof. Security and publication remain independently authorized lanes; a product planner must not silently claim their obligations satisfied.
 
 The current `deterministic.core` catalog entry names only `tests/verification/*.test.mjs` (`verification-catalog.json:4-10`); it does not own the actual `tests/fullworld-*` unit suites. Add a separately executable hosted group such as `unit.fullworld-tools` (or expand execution ownership with explicit commands) before relying on “deterministic.core” as proof of these tools. Python and Node commands must be first-class plan obligations, not inert strings that the hosted browser runner ignores.
 
 ## Issue #376 minimal routing
 
-The functional gameplay E2E is already fixture-owned by `e2e.creatures`, and the isolated Game-fact test is already `bounded_real_world` in `integration.source-contract` (`verification-catalog.json:20-32,84-93`). The missing pieces are exact impact ownership:
+The functional gameplay E2E is already fixture-owned by `e2e.creatures`, and the isolated Game-fact test is already `bounded_real_world` in `integration.source-contract` (`verification-catalog.json:20-32,84-93`). The missing pieces are exact impact ownership plus additive semantic floors. The JSON below illustrates desired group floors only; `pathExact` is not implemented or an accepted schema extension:
 
 ```json
 {
   "pathExact": "src/browser/creature-gameplay-profiles.mjs",
   "domains": ["creatures", "source-contract"],
   "minimumProfile": "targeted",
-  "requiredGroups": ["deterministic.core", "e2e.creatures", "integration.source-contract", "visual.creatures"]
+  "requiredGroups": ["deterministic.core", "e2e.common-smoke", "e2e.creatures", "integration.source-contract", "visual.creatures"]
 }
 ```
 
@@ -91,9 +92,9 @@ The functional gameplay E2E is already fixture-owned by `e2e.creatures`, and the
 }
 ```
 
-Expected plans for either isolated path: `requiresRealFullWorld=false`; data capabilities exactly `bounded_real_world` and `qualification_fixture`; functional owner `e2e.creatures`; source owner `integration.source-contract`; no `e2e.full`, `fullworld.animation-census`, or `fullworld.complete-integrity`. Preserve `visual.creatures` for the runtime module because gameplay validation changes can alter user-visible creature detail; editing the source-contract test itself does not create a visual obligation.
+Expected plans for either isolated path: `requiresRealFullWorld=false`; data capabilities exactly `bounded_real_world` and `qualification_fixture`; functional owner `e2e.creatures`; source owner `integration.source-contract`; no real-FullWorld groups. Avoid `e2e.full` only after an independently reviewed catchall-only migration: current protected broad floors remain until that migration is integrated; a candidate exact entry cannot remove them. Preserve `visual.creatures` for the runtime module because gameplay validation changes can alter user-visible creature detail; editing the source-contract test itself does not create a visual obligation.
 
-The existing regression contract already demands both missing explicit rules and the runtime plan's two capabilities (`tests/verification/qualification-gameplay-contract.test.mjs:67-100`). Add the same isolated-plan assertions for the source-contract spec and explicit absence of FullWorld groups. With the current prefix-only union, merely adding the two existing-schema entries is insufficient: the spec still matches generic `e2e/` and acquires profile/full-suite ownership. The exact-path override is therefore part of the minimal correctness fix, unless the generic `e2e/` catchall is replaced by an exhaustive specific inventory with an equivalent unknown fallback.
+The existing regression contract already demands both missing explicit rules and the runtime plan's two capabilities (`tests/verification/qualification-gameplay-contract.test.mjs:67-100`). Add the same isolated-plan assertions for the source-contract spec and explicit absence of FullWorld groups. With the current prefix-only union, merely adding the two existing-schema entries is insufficient: the spec still matches generic `e2e/` and acquires profile/full-suite ownership. An additive source-contract entry can repair the false negative while retaining broad execution. Removing that over-execution is a separate catchall/ownership migration, not authority to globally suppress overlapping rules.
 
 ## Explicit unresolved oracles
 
@@ -106,9 +107,9 @@ The following remain **BLOCKED/UNKNOWN**, rather than implicitly satisfied by th
 * whether complete artifact generation can run safely and repeatably on the approved specialist capacity, within measured disk/time limits, has not been demonstrated;
 * `build_minimap.py` consumes publication/pixel/semantic JSON and pack offsets directly without the independent root/digest validation visible in the overview/publication verifiers; the complete-integrity runner must not treat the builder's output root as an independent source-integrity oracle;
 * the product-independent and release/full-product responsibilities inside `qualify_browser.mjs` are not separated, so its narrowest durable route is unresolved;
-* the planner has no exact-path override or equivalent closed ownership model, so the proposed FullWorld boundaries and #376 no-escalation result are not implementable by JSON edits alone;
+* the planner has no catchall-only precedence or equivalent closed ownership model, so the proposed selective FullWorld boundaries and removal of #376 broad-suite over-execution are not implementable by JSON additions alone;
 * exact reviewed full-product census values and expected output roots for the future candidate/input tuple are unavailable in this review. They must be generated and independently bound under separate authority, never copied from stale evidence.
 
 ## Activation gate
 
-This design must remain inert while #315 is paused. Before any future shadow activation, require: schema/planner/merge tests for exact override and protected/candidate union; specialist placement tests for non-browser `real_fullworld`; executable unit-group ownership; exact product identity/evidence schema; then the separately authorized shadow/canary sequence. No stale product or existing animation census evidence can satisfy `fullworld.complete-integrity`.
+This design must remain inert while #315 is paused. Before any future shadow activation, require: schema/planner/merge tests for named-catchall precedence, retained additive semantic floors and independent protected/candidate union; selected-group execution/evidence conservation for all hosted and specialist groups; explicit blocked unknown-oracle behavior; executable unit-group ownership; exact product identity/evidence schema; then the separately authorized shadow/canary sequence. No stale product or existing animation census evidence can satisfy `fullworld.complete-integrity`.
