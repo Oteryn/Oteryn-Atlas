@@ -65,7 +65,7 @@ real browser execution, visual approval, or complete-product qualification.
 
 - Changed leaf regression GREEN: real Node process observes candidate marker;
   intentionally throwing candidate bytes still fail. No fixture policy repin.
-- Full verification/maintenance: 1062 PASS, zero fail/skip/retry/todo.
+- Full verification/maintenance: 1065 PASS, zero fail/skip/retry/todo.
 - Current declared graph: 202 entries, 183 roots, 202 unique coverage claims;
   53 product + 149 verification. Hidden new candidate edges get no coverage
   credit; exact physical runtime census remains a later R4 evidence obligation.
@@ -81,3 +81,15 @@ real browser execution, visual approval, or complete-product qualification.
   dispatch, execution-window controller. No active consumer exists for them.
 - Deployment keeps candidate product digest equality as qualification evidence;
   removes resource naming, cleanup/finalize orchestration and unrelated helpers.
+
+## Admission composition correction
+
+Independent Sol review rejected the previous corrected tree because admission
+changes the maintenance regression bytes while the implementation catalog still
+pinned the old source. Both candidates now use identical maintenance test bytes,
+SHA-256 `936e96801dc94c2aae1ce331dcc9f37cf23971588533eaf7dea6679086181235`,
+and the implementation catalog pins that exact baseline. After admission first,
+this shared test has no implementation diff. No candidate self-admission is used.
+The focused composition suite passes 58/58; full verification/maintenance passes
+1065/1065 with zero skips/retries. The final admission must retain these exact test
+bytes and the composed tree must be checked before requesting an owner decision.

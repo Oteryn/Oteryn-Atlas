@@ -92,10 +92,22 @@ The owner transition must name the exact reviewed activation candidate and permi
 
 ## Final local qualification
 
-The corrected combined verification and maintenance run passed **1062/1062**, with zero failures, skips, retries or todos. Actual candidate-byte regression failed before the fix (`source proof changed: tests/example.mjs`) and passes after it, including a failing candidate body. The first combined correction run exposed three stale references to the removed producer module and one test demanding duplicate impact metadata; those were corrected, focused regressions passed, then the full suite passed.
+The corrected combined verification and maintenance run passed **1065/1065**, with zero failures, skips, retries or todos. Actual candidate-byte regression failed before the fix (`source proof changed: tests/example.mjs`) and passes after it, including a failing candidate body. The first combined correction run exposed three stale references to the removed producer module and one test demanding duplicate impact metadata; those were corrected, focused regressions passed, then the full suite passed.
 
 Exact current deterministic resolution covers **202/202** entries through **183** roots: 53 product entrypoints and 149 verification contracts. Removing the unused candidate-new producer test reduced the prior census by one; no protected-main test was deleted. Coverage is the protected declared graph; arbitrary new hidden test imports inside changed leaf bytes are not independently attested by R1–R3. R4 must reject unexpected runtime test identities before accepting exact once-only execution. Actual Playwright listing remains **79 cases / 36 files**, with **30** canonical visual frames; no browser or visual acceptance run is claimed.
 
 All original 37 historical topology contracts and 20 additional stale contracts were rewritten without adding retired workflows or deleting contracts. The two deployment contracts exercise local inactive staging/rollback and isolation semantics. Previous deployment state remains retained after success; speculative resource naming, generic finalize/cleanup, and unrelated gameplay helpers were removed. Candidate product digest equality remains a distinct qualification invariant; actual deployment remains separately unqualified. The current protected capture projection contains all 30 canonical frames, and its generated equality is regression-tested.
 
 Security scanning remains an explicit external UNKNOWN: the repository CodeQL workflow is archived; the prior authorized inspection could not establish GitHub default or organization-enforced scanning. No new scanning claim is made here. Observed product CI savings and product PR/MQ canaries remain unavailable under the activation pause.
+
+## Admission composition correction
+
+Independent Sol review rejected the previous corrected tree because admission
+changes the maintenance regression bytes while the implementation catalog still
+pinned the old source. Both candidates now use identical maintenance test bytes,
+SHA-256 `936e96801dc94c2aae1ce331dcc9f37cf23971588533eaf7dea6679086181235`,
+and the implementation catalog pins that exact baseline. After admission first,
+this shared test has no implementation diff. No candidate self-admission is used.
+The focused composition suite passes 58/58; full verification/maintenance passes
+1065/1065 with zero skips/retries. The final admission must retain these exact test
+bytes and the composed tree must be checked before requesting an owner decision.

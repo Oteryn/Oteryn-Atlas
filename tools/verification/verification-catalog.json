@@ -2537,7 +2537,7 @@
             "--test",
             "tests/maintenance/maintenance-diff-policy.test.mjs"
           ],
-          "sourceSha256": "e6764aef28cad475823fa96787dc4f7b24e600ba0eb5eeddd16c04f2fdb7d9a6",
+          "sourceSha256": "936e96801dc94c2aae1ce331dcc9f37cf23971588533eaf7dea6679086181235",
           "imports": [],
           "subprocessTests": [],
           "qualification": "unqualified"

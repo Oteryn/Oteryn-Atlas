@@ -117,8 +117,8 @@
     "predecessorHead": "46da2f861a770897eb516f88ab994d9bbb2a46d5",
     "qualification": {
       "command": "node --test tests/verification/*.test.mjs tests/maintenance/maintenance-diff-policy.test.mjs",
-      "tests": 1062,
-      "pass": 1062,
+      "tests": 1065,
+      "pass": 1065,
       "fail": 0,
       "skipped": 0,
       "retries": 0,
@@ -162,7 +162,18 @@
       {
         "name": "playwright-list.log",
         "sha256": "df1a327c5949032aa53a58d868eb70dfdeed7255f10c5f45d34010d960fd8920"
+      },
+      {
+        "name": "full-verification-composition.log",
+        "sha256": "0e010b92940b800e2d21a2fb947f4019aea5b39c70a3c8f67afd3caf9e8ff54e"
       }
-    ]
+    ],
+    "admissionComposition": {
+      "sharedMaintenanceTestSha256": "936e96801dc94c2aae1ce331dcc9f37cf23971588533eaf7dea6679086181235",
+      "focusedPass": 58,
+      "fail": 0,
+      "skipped": 0,
+      "rule": "admission first; identical shared test absent effective implementation diff"
+    }
   }
 }

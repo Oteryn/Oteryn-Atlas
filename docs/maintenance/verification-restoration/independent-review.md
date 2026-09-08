@@ -6,6 +6,13 @@ and removal of unconsumed R4 transport. A separate Sol High reviewer must review
 exact final #390 head; its verdict is recorded on that PR and in the programme
 closeout, before regenerating or requesting admission of #389.
 
+The independent review of `038e2dd0843c12bb4e3d5648ab83f2227cfc382e`
+(tree `82166fcf1dcc94dc9e8629f8524773a20b4426ce`) returned CHANGES_REQUIRED:
+the prerequisite admission changed the maintenance test without matching the
+implementation's source pin. The correction now shares the exact maintenance
+test bytes across both candidates and pins them in the catalog. All other
+acceptance questions passed that review; fresh exact-tree review is required.
+
 Current evidence and limits: [correction ledger](correction-ledger.md) and
 [execution readiness](execution-readiness.md). No protected admission, R4, browser
 acceptance or FullWorld qualification follows from local tests.
