@@ -102,3 +102,20 @@ for(const field of ['head','base'])test(`actual CLI rejects wrong ${field} befor
  assert.equal(fs.existsSync(path.join(f.dir,'outputs')),false);
  assert.doesNotMatch(fs.readFileSync(path.join(f.dir,'requests'),'utf8'),/artifacts\/45\/zip/);
 });
+
+
+test('temporary executable Node shims are available to the real CLI fixture',t=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'atlas-cli-executable-'));
+ t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+ if(process.platform==='linux') {
+  const rows=fs.readFileSync('/proc/self/mountinfo','utf8').split('\n').filter(row=>row.split(' ')[4]==='/tmp');
+  for(const row of rows)t.diagnostic('effective /tmp mount: '+row);
+ }
+ const executable=path.join(dir,'node-shim');
+ fs.writeFileSync(executable,`#!${process.execPath}\nprocess.stdout.write('ATLAS_CLI_EXECUTABLE_OK');\n`,{mode:0o755});
+ assert.equal(fs.statSync(executable).mode&0o777,0o755,'temporary shim must have executable file mode');
+ const result=spawnSync(executable,[],{encoding:'utf8'});
+ assert.equal(result.error,undefined,`absolute temporary shim failed: ${result.error?.code??'unknown'}; stderr=${result.stderr??''}`);
+ assert.equal(result.status,0,result.stderr);
+ assert.equal(result.stdout,'ATLAS_CLI_EXECUTABLE_OK');
+});
