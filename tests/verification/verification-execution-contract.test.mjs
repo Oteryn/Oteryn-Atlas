@@ -133,6 +133,8 @@ test('added candidate test executes as an unprivileged subject while candidate-o
  t.after(()=>fs.rmSync(target,{force:true}));
  fs.writeFileSync(target,"import test from 'node:test'; test('ADD_CANDIDATE_EXECUTED',()=>{});\n");
  const input=executionInput(spec);
+ // Repository bytes are the known protected fixture; only the new subject differs.
+ input.protectedRoot=root;
  input.candidate.changedFiles=[{path:spec,status:'added'}];
  input.planInput.changedFiles=input.candidate.changedFiles;
  input.planInput.candidateVerificationCatalog=structuredClone(input.protectedCatalog);

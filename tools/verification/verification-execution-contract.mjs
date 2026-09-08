@@ -77,7 +77,7 @@ export function sealExecutionContract(value) {
 // Only a protected-base caller may supply policy, census and source authority.
 // Candidate metadata is not current execution authority; authenticated candidate
 // test paths may only widen execution as unprivileged test subjects.
-export function resolveExecutionContract({root, candidate, planInput, claimedPlan,
+export function resolveExecutionContract({root, protectedRoot, candidate, planInput, claimedPlan,
   protectedCatalog, protectedImpactManifest, protectedStableTestIds,
   environmentDigest, publicationProofs, protectedExpectedAuthorities}) {
   const snapshot=normalizedSnapshot(candidate);
@@ -102,7 +102,7 @@ export function resolveExecutionContract({root, candidate, planInput, claimedPla
   const commands=[],reviews=[],groups=[];
   const deterministic=plan.groups.filter(group=>group.executionEngine==='deterministic').map(group=>group.id);
   if(deterministic.length) {
-    const resolved=resolveDeterministicCommands({root,catalog:metadata.deterministic.proposedCatalog,ownership:metadata.deterministic,groupIds:deterministic,changedFiles:snapshot.changedFiles});
+    const resolved=resolveDeterministicCommands({root,protectedRoot,catalog:metadata.deterministic.proposedCatalog,ownership:metadata.deterministic,groupIds:deterministic,changedFiles:snapshot.changedFiles});
     for(const command of resolved) {
       const entry={argv:[command.interpreter,...command.argv],cwd:'.',engine:'deterministic',groupIds:command.groupIds,
         expectedTestIds:command.coveredSpecs,resourceClass:'cpu-light',dataCapability:'qualification_fixture',timeoutSeconds:900};

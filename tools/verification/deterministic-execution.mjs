@@ -13,7 +13,7 @@ function runtimeFor(spec){
 // Protected ownership/catalog metadata defines obligations and command policy.
 // Authenticated candidate test paths are subjects only: they may execute, but
 // they never create ownership, interpreter/argv or transitive coverage authority.
-export function resolveDeterministicCommands({root,catalog,groupIds,ownership,requiredSpecs=[],changedFiles=[]}){
+export function resolveDeterministicCommands({root,protectedRoot,catalog,groupIds,ownership,requiredSpecs=[],changedFiles=[]}){
   if(!Array.isArray(groupIds)||groupIds.length===0)throw new Error('empty selection');
   if(ownership?.schemaVersion!==1||!Array.isArray(ownership.entries)||(ownership.importAggregators!==undefined&&!Array.isArray(ownership.importAggregators)))throw new Error('unsupported ownership schema');
   if(!Array.isArray(changedFiles))throw new Error('changed test census required');
@@ -47,14 +47,16 @@ export function resolveDeterministicCommands({root,catalog,groupIds,ownership,re
     }
   }
   const realRoot=fs.realpathSync(root);
+  // Only the protected caller may supply this authenticated base checkout.
+  // Catalog hashes prove historical edges; they are not a moving source lock.
+  const realProtectedRoot=protectedRoot===undefined?null:fs.realpathSync(protectedRoot);
   function executionPath(spec){return renamed.get(spec)??spec;}
-  function checkedFile(spec){
-    const physical=executionPath(spec);
+  function checkedFile(spec,base=realRoot,physical=executionPath(spec)){
     if(!safeTestPath(physical))throw new Error(`exact safe test path required: ${physical}`);
-    const target=path.join(realRoot,physical);
+    const target=path.join(base,physical);
     if(!fs.existsSync(target))throw new Error(`missing file: ${physical}`);
     const real=fs.realpathSync(target);
-    if(real!==target||!real.startsWith(`${realRoot}${path.sep}`))throw new Error(`symlink or path escape: ${physical}`);
+    if(real!==target||!real.startsWith(`${base}${path.sep}`))throw new Error(`symlink or path escape: ${physical}`);
     if(!fs.statSync(real).isFile())throw new Error(`missing file: ${physical}`);
     return fs.readFileSync(real);
   }
@@ -68,7 +70,11 @@ export function resolveDeterministicCommands({root,catalog,groupIds,ownership,re
     if(!/^[a-f0-9]{64}$/.test(row.sourceSha256??''))throw new Error(`missing source proof: ${spec}`);
     const bytes=checkedFile(spec);
     const sourceMatches=crypto.createHash('sha256').update(bytes).digest('hex')===row.sourceSha256;
-    if(!sourceMatches&&!changed.has(spec))throw new Error(`source proof changed: ${spec}`);
+    if(!changed.has(spec)){
+      if(realProtectedRoot!==null){
+        if(!bytes.equals(checkedFile(spec,realProtectedRoot,spec)))throw new Error(`protected base source mismatch: ${spec}`);
+      }else if(!sourceMatches)throw new Error(`source proof changed: ${spec}`);
+    }
     return {row,sourceMatches};
   }
   const obligationClosures=new Map();
