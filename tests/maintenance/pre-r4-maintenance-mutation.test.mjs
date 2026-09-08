@@ -22,7 +22,7 @@ function fixture(t){
   put(trusted,restoration,readSource(restoration));put(trusted,remediation,readSource(remediation));put(trusted,obsolete,readSource(obsolete));
   put(trusted,'tools/verification/verification-execution-contract.mjs');
   put(trusted,'tools/verification/build-verification-plan.mjs');
-  put(trusted,'src/verification.mjs');
+  put(trusted,'src/browser/semantic.mjs');
   put(trusted,'tests/existing.mjs',"import test from 'node:test';test('existing',()=>{});\n");
   put(trusted,'tests/old.mjs',"import test from 'node:test';test('old',()=>{});\n");
   put(trusted,'tools/maintenance/helper.mjs');put(trusted,'web/rogue.mjs');
@@ -64,7 +64,7 @@ test('candidate restoration authority cannot self-admit unrelated code',t=>{
 
 test('test-subject authority does not open unrelated runtime or mixed remediation lanes',t=>{
   const unrelated=fixture(t);put(unrelated.candidate,'web/rogue.mjs','// changed\n');unrelated.commit();let r=unrelated.invoke();assert.equal(r.status,1);assert.match(r.stderr,/maintenance path is frozen/);
-  const mixed=fixture(t);put(mixed.candidate,'tests/new-subject.py','assert True\n');put(mixed.candidate,'src/verification.mjs','// remediation\n');mixed.commit();r=mixed.invoke();assert.equal(r.status,1);assert.match(r.stderr,/spans multiple authority lanes/);
+  const mixed=fixture(t);put(mixed.candidate,'tests/new-subject.py','assert True\n');put(mixed.candidate,'src/browser/semantic.mjs','// remediation\n');mixed.commit();r=mixed.invoke();assert.equal(r.status,1);assert.match(r.stderr,/spans multiple authority lanes/);
 });
 
 test('PR and merge-group identities produce equivalent restoration result for a safe rename',t=>{
