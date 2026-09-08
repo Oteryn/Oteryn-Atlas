@@ -10,7 +10,7 @@ const equal = (left,right,label) => { if(canonicalJson(left)!==canonicalJson(rig
 const hash = value => `sha256:${createHash('sha256').update(canonicalJson(value)).digest('hex')}`;
 const sha = value => /^[a-f0-9]{40}$/.test(value ?? '');
 const digest = value => /^sha256:[a-f0-9]{64}$/.test(value ?? '');
-const deterministicTest = value => typeof value==='string'&&/^tests\/[A-Za-z0-9_./-]+\.(mjs|py)$/.test(value);
+const deterministicTest = value => typeof value==='string'&&/^tests\/[A-Za-z0-9_./-]+\.(mjs|py)$/.test(value)&&!value.split('/').some(part=>!part||part==='.'||part==='..');
 const freeze = value => {if(value && typeof value==='object' && !Object.isFrozen(value)){Object.values(value).forEach(freeze);Object.freeze(value);}return value;};
 
 function normalizedSnapshot(value) {
@@ -49,19 +49,27 @@ export function assertCandidateReadback({planned,current,sourceRepository,source
 }
 
 export function sealExecutionContract(value) {
-  if(!value || value.schemaVersion!==1 || !value.identity || !Array.isArray(value.commands)||!Array.isArray(value.reviews)||!Array.isArray(value.groups)) fail('contract shape');
+  if(!value || value.schemaVersion!==1 || !value.identity || !Array.isArray(value.commands)||!Array.isArray(value.reviews)||!Array.isArray(value.groups)||!Array.isArray(value.candidateTestSubjects)) fail('contract shape');
   if(Object.keys(value.identity).sort().join(',')!==['repository','headSha','protectedBaseSha','treeSha','candidateDigest','planDigest','policyDigest','environmentDigest'].sort().join(',')||value.identity.repository!=='Oteryn/Oteryn-Atlas'||!sha(value.identity.headSha)||!sha(value.identity.protectedBaseSha)||!sha(value.identity.treeSha)||!digest(value.identity.candidateDigest)||!digest(value.identity.planDigest)||!digest(value.identity.policyDigest)||!/^[a-f0-9]{64}$/.test(value.identity.environmentDigest??'')) fail('contract identity');
-  if(Object.keys(value).some(key=>!['schemaVersion','identity','commands','groups','reviews','contractDigest'].includes(key))) fail('contract shape');
+  if(Object.keys(value).some(key=>!['schemaVersion','identity','commands','groups','reviews','candidateTestSubjects','contractDigest'].includes(key))) fail('contract shape');
 
   if(new Set(value.commands.map(c=>c.id)).size!==value.commands.length || new Set(value.groups.map(g=>g.id)).size!==value.groups.length) fail('contract duplicate command/group');
   for(const command of value.commands) {
+    if(command.executionScope!==undefined&&command.executionScope!=='candidate-self-only')fail('contract execution scope');
     if(!digest(command.id)||!Array.isArray(command.expectedTestIds)||!command.expectedTestIds.length||new Set(command.expectedTestIds).size!==command.expectedTestIds.length) fail('contract exact test census');
     if(!Array.isArray(command.argv)||!command.argv.length||!Number.isSafeInteger(command.timeoutSeconds)||command.timeoutSeconds<1) fail('contract executable command');
   }
   for(const group of value.groups) {
     if(typeof group.id!=='string'||!group.id||!Array.isArray(group.commandIds)||!group.commandIds.length||new Set(group.commandIds).size!==group.commandIds.length||group.commandIds.some(id=>!value.commands.some(c=>c.id===id))) fail('contract group command conservation');
   }
-  if(value.commands.some(command=>!value.groups.some(group=>group.commandIds.includes(command.id)))) fail('contract group command conservation');
+  const subjects=value.candidateTestSubjects;
+  if(new Set(subjects.map(row=>row.spec)).size!==subjects.length||new Set(subjects.map(row=>row.commandId)).size!==subjects.length)fail('contract subject census');
+  for(const subject of subjects){
+    if(Object.keys(subject).sort().join(',')!=='commandId,spec'||!deterministicTest(subject.spec))fail('contract subject shape');
+    const command=value.commands.find(row=>row.id===subject.commandId);
+    if(!command||command.engine!=='deterministic'||command.executionScope!=='candidate-self-only'||command.groupIds.length||canonicalJson(command.expectedTestIds)!==canonicalJson([subject.spec])||canonicalJson(command.argv)!==canonicalJson(subject.spec.endsWith('.py')?['python3',subject.spec]:['node','--test',subject.spec]))fail('contract subject execution conservation');
+  }
+  if(value.commands.some(command=>command.executionScope==='candidate-self-only'?value.groups.some(group=>group.commandIds.includes(command.id))||!subjects.some(row=>row.commandId===command.id):!value.groups.some(group=>group.commandIds.includes(command.id)))) fail('contract group command conservation');
   if(new Set(value.reviews.map(review=>review.groupId)).size!==value.reviews.length) fail('contract duplicate review group');
   for(const review of value.reviews) {
     const group=value.groups.find(group=>group.id===review.groupId);
@@ -99,16 +107,18 @@ export function resolveExecutionContract({root, protectedRoot, candidate, planIn
   }
   const identity={repository:snapshot.repository,headSha:snapshot.headSha,protectedBaseSha:snapshot.baseSha,
     treeSha:snapshot.treeSha,candidateDigest:hash(snapshot),planDigest:hash(plan),policyDigest:hash({protectedCatalog,protectedImpactManifest,protectedStableTestIds:protectedStableTestIds??[]}),environmentDigest};
-  const commands=[],reviews=[],groups=[];
+  const commands=[],reviews=[],groups=[],candidateTestSubjects=[];
   const deterministic=plan.groups.filter(group=>group.executionEngine==='deterministic').map(group=>group.id);
-  if(deterministic.length) {
+  if(deterministic.length||plan.candidateTestSubjects.length) {
     const resolved=resolveDeterministicCommands({root,protectedRoot,catalog:metadata.deterministic.proposedCatalog,ownership:metadata.deterministic,groupIds:deterministic,changedFiles:snapshot.changedFiles});
     for(const command of resolved) {
-      const entry={argv:[command.interpreter,...command.argv],cwd:'.',engine:'deterministic',groupIds:command.groupIds,
+      const entry={...(command.executionScope?{executionScope:command.executionScope}:{}),argv:[command.interpreter,...command.argv],cwd:'.',engine:'deterministic',groupIds:command.groupIds,
         expectedTestIds:command.coveredSpecs,resourceClass:'cpu-light',dataCapability:'qualification_fixture',timeoutSeconds:900};
-      commands.push({...entry,id:hash({identity,...entry})});
+      const id=hash({identity,...entry});commands.push({...entry,id});
+      if(command.executionScope==='candidate-self-only')candidateTestSubjects.push({spec:command.executionPath,commandId:id});
     }
   }
+  equal(candidateTestSubjects.map(row=>row.spec).sort(),plan.candidateTestSubjects,'recomputed candidate subject scope');
   const browserIds=plan.groups.filter(group=>group.executionEngine==='playwright').map(group=>group.id);
   if(browserIds.length) {
     if(!Array.isArray(protectedStableTestIds)||!protectedStableTestIds.length) fail('missing protected test census for Playwright execution');
@@ -134,5 +144,5 @@ export function resolveExecutionContract({root, protectedRoot, candidate, planIn
     if(!commandIds?.length) fail(`unresolved execution engine: ${group.id}`);
     groups.push({id:group.id,commandIds});
   }
-  return sealExecutionContract({schemaVersion:1,identity,commands,groups,reviews});
+  return sealExecutionContract({schemaVersion:1,identity,commands,groups,reviews,candidateTestSubjects});
 }

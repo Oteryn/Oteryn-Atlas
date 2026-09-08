@@ -146,12 +146,16 @@ test('added candidate test executes as an unprivileged subject while candidate-o
  const command=contract.commands.find(row=>row.expectedTestIds.includes(spec));
  assert.ok(command);
  assert.deepEqual(command.argv,['node','--test',spec]);
- assert.deepEqual(command.groupIds,['deterministic.core']);
+ assert.deepEqual(command.groupIds,[]);
+ assert.equal(contract.commands.length,1);
+ assert.deepEqual(contract.groups,[]);
+ assert.deepEqual(contract.candidateTestSubjects,[{spec,commandId:command.id}]);
  assert.deepEqual(command.expectedTestIds,[spec]);
  let result=spawnSync(command.argv[0],command.argv.slice(1),{cwd:subjectRoot,encoding:'utf8',env:{...process.env,NODE_TEST_CONTEXT:undefined}});
  assert.equal(result.status,0,result.stderr);assert.match(result.stdout,/ADD_CANDIDATE_EXECUTED/);
  fs.writeFileSync(target,"throw new Error('ADD_CANDIDATE_FAILURE_VISIBLE');\n");
  const failed=resolveExecutionContract(input);
+ assert.equal(failed.commands.length,1);
  const failedCommand=failed.commands.find(row=>row.expectedTestIds.includes(spec));
  result=spawnSync(failedCommand.argv[0],failedCommand.argv.slice(1),{cwd:subjectRoot,encoding:'utf8',env:{...process.env,NODE_TEST_CONTEXT:undefined}});
  assert.notEqual(result.status,0);assert.match(result.stdout+result.stderr,/ADD_CANDIDATE_FAILURE_VISIBLE/);
@@ -304,4 +308,78 @@ test('Docker startup failures expose bounded diagnostics and never attest execut
   assert.throws(()=>assertContainerStarted(container,{status:125,stderr:'x'.repeat(10000)+' DIAGNOSTIC_TAIL'}),error=>error.message.includes('no specs executed')&&error.message.includes('DIAGNOSTIC_TAIL')&&error.message.length<5000);
  }
  assert.throws(()=>assertContainerStarted(started,{status:125}),/never started/);
+});
+
+import {buildVerificationPlan} from '../../tools/verification/build-verification-plan.mjs';
+test('authenticated self-only subjects compose with docs, another subject and HTTP without claiming core',t=>{
+ const directory=fs.mkdtempSync(path.join(os.tmpdir(),'atlas-subject-composition-'));t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
+ fs.cpSync(path.join(root,'tests'),path.join(directory,'tests'),{recursive:true});
+ const first='tests/new-subject.mjs',second='tests/second-subject.py';
+ fs.writeFileSync(path.join(directory,first),"import test from 'node:test';test('subject',()=>{});\n");fs.writeFileSync(path.join(directory,second),'assert True\n');
+ const base=executionInput(first);base.root=directory;base.protectedRoot=root;
+ base.protectedStableTestIds=JSON.parse(fs.readFileSync(path.join(root,'tools/verification/protected-scenario-inventory.json'))).stableTestIds;
+ Object.assign(base,createPublicationProofFixtures());
+ function input(extra=[]){const value={...base,candidate:{...base.candidate,changedFiles:[{path:first,status:'added'},...extra].sort((a,b)=>a.path.localeCompare(b.path))}};value.planInput={...base.planInput,changedFiles:value.candidate.changedFiles};return value;}
+ for(const [extra,count] of [[[],1],[[{path:'docs/example.md',status:'added'}],1],[[{path:second,status:'added'}],2],[[{path:'e2e/tests/creature-gameplay-source-contract-desktop.spec.mjs',status:'modified'}],2]]) {
+  const value=input(extra),contract=resolveExecutionContract(value);
+  assert.equal(contract.commands.length,count);
+  assert.ok(!contract.groups.some(group=>group.id==='deterministic.core'));
+  assert.equal(contract.candidateTestSubjects.length,extra.some(row=>row.path===second)?2:1);
+  for(const subject of contract.candidateTestSubjects)assert.deepEqual(contract.commands.find(command=>command.id===subject.commandId).expectedTestIds,[subject.spec]);
+ }
+ const actualCore=resolveExecutionContract(input([{path:'tests/verification/artifacts.test.mjs',status:'modified'}]));
+ assert.equal(actualCore.commands.filter(command=>command.groupIds.includes('deterministic.core')).length,149);
+ assert.equal(actualCore.commands.length,150);
+ assert.equal(actualCore.candidateTestSubjects.length,1);
+ const subjectOnly=resolveExecutionContract(input());
+ const forged=structuredClone(subjectOnly);forged.candidateTestSubjects[0].spec='tests/../outside.mjs';assert.throws(()=>sealExecutionContract(forged),/subject/);
+ const traversal=structuredClone(subjectOnly);traversal.candidateTestSubjects[0].spec='tests/../outside.mjs';traversal.commands[0].expectedTestIds=['tests/../outside.mjs'];traversal.commands[0].argv=['node','--test','tests/../outside.mjs'];assert.throws(()=>sealExecutionContract(traversal),/subject shape/);
+ const unknownScope=structuredClone(subjectOnly);unknownScope.commands[0].executionScope='candidate-approved';assert.throws(()=>sealExecutionContract(unknownScope),/execution scope/);
+ const hidden=structuredClone(subjectOnly);hidden.candidateTestSubjects=[];assert.throws(()=>sealExecutionContract(hidden),/conservation/);
+ const grouped=structuredClone(subjectOnly);grouped.commands[0].groupIds=['deterministic.core'];assert.throws(()=>sealExecutionContract(grouped),/subject/);
+ const claimed=planShadow({candidate:input().candidate,root:directory,protectedRoot:root}).plan;
+ assert.deepEqual(claimed.groups,[]);assert.deepEqual(claimed.candidateTestSubjects,[first]);
+ const malicious=structuredClone(claimed);malicious.candidateTestSubjects=[];assert.throws(()=>resolveExecutionContract({...input(),claimedPlan:malicious}),/recomputed plan/);
+ const ignored=input();ignored.planInput.candidateTestSubjects=[];assert.equal(resolveExecutionContract(ignored).commands.length,1);
+ const planInput={...base.planInput,changedFiles:[{path:first,status:'added'}],trustedVerificationCatalog:base.protectedCatalog,candidateVerificationCatalog:base.protectedCatalog,trustedImpactManifest:base.protectedImpactManifest,candidateImpactManifest:base.protectedImpactManifest,unprivilegedDeterministicSubjects:[first],protectedStableTestIds:base.protectedStableTestIds};
+ const floor=buildVerificationPlan({...planInput,requiredGroupFloor:['deterministic.core']});assert.ok(floor.requiredGroupIds.includes('deterministic.core'));assert.deepEqual(floor.candidateTestSubjects,[first]);
+ const samePathManifest=structuredClone(base.protectedImpactManifest);
+ samePathManifest.entries.push({pathPrefix:first,exactMatch:true,domains:['subject-semantic'],minimumProfile:'focused',requiredGroups:['deterministic.core']});
+ const samePath=buildVerificationPlan({...planInput,trustedImpactManifest:samePathManifest,candidateImpactManifest:base.protectedImpactManifest});
+ assert.ok(samePath.requiredGroupIds.includes('deterministic.core'));assert.deepEqual(samePath.candidateTestSubjects,[first]);
+ assert.equal(resolveExecutionContract({...input(),protectedImpactManifest:samePathManifest}).commands.length,150);
+ const escalatedManifest=structuredClone(base.protectedImpactManifest);
+ escalatedManifest.entries.push({pathPrefix:first,exactMatch:true,domains:['subject-semantic'],minimumProfile:'focused',requiredGroups:[]});
+ escalatedManifest.crossDomainEscalations.push({id:'subject-core-proof',whenDomains:['subject-semantic','documentation'],minimumProfile:'focused',requiredGroups:['deterministic.core']});
+ const escalated=buildVerificationPlan({...planInput,changedFiles:[{path:first,status:'added'},{path:'docs/example.md',status:'added'}],trustedImpactManifest:escalatedManifest,candidateImpactManifest:escalatedManifest});
+ assert.ok(escalated.requiredGroupIds.includes('deterministic.core'));assert.deepEqual(escalated.candidateTestSubjects,[first]);
+ assert.equal(resolveExecutionContract({...input([{path:'docs/example.md',status:'added'}]),protectedImpactManifest:escalatedManifest}).commands.length,150);
+ const renamed=input();renamed.candidate.changedFiles=[{path:first,previousPath:'tests/old-unowned.mjs',status:'renamed'}];renamed.planInput.changedFiles=renamed.candidate.changedFiles;assert.equal(resolveExecutionContract(renamed).commands.length,1);
+});
+
+test('real protected shadow plan CLI schedules subject-only work and keeps docs-only S0 empty',t=>{
+ const temporary=fs.mkdtempSync(path.join(os.tmpdir(),'atlas-shadow-plan-cli-'));t.after(()=>fs.rmSync(temporary,{recursive:true,force:true}));
+ const control=path.join(temporary,'control'),candidateRoot=path.join(temporary,'candidate');
+ const git=(directory,...args)=>{const result=spawnSync('git',['-C',directory,'-c','core.hooksPath=/dev/null',...args],{encoding:'utf8'});assert.equal(result.status,0,result.stderr);return result.stdout.trim();};
+ git(root,'clone','--quiet','--shared',root,control);
+ for(const file of ['build-verification-plan.mjs','deterministic-execution.mjs','verification-execution-contract.mjs','run-verification-shadow.mjs'])fs.copyFileSync(path.join(root,'tools/verification',file),path.join(control,'tools/verification',file));
+ const commit=directory=>{git(directory,'add','.');git(directory,'-c','user.name=Fixture','-c','user.email=fixture@example.invalid','-c','commit.gpgsign=false','commit','--quiet','--allow-empty','-m','Fixture');return git(directory,'rev-parse','HEAD');};
+ const base=commit(control);git(control,'clone','--quiet','--shared',control,candidateRoot);
+ // Only the external GitHub transport is replaced; real CLI parsing, checkout,
+ // diff authentication, planner, output routing and Git checks execute unchanged.
+ const preload=path.join(temporary,'github-fixture.mjs');
+ fs.writeFileSync(preload,"import cp from 'node:child_process';import fs from 'node:fs';import {syncBuiltinESMExports} from 'node:module';const original=cp.execFileSync;cp.execFileSync=function(file,args,options){if(file!=='gh')return original(file,args,options);const rows=JSON.parse(fs.readFileSync(process.env.ATLAS_TEST_GITHUB_RESPONSES));if(args[0]!=='api'||!Object.hasOwn(rows,args[1]))throw Error('unexpected GitHub fixture endpoint');return JSON.stringify(rows[args[1]]);};syncBuiltinESMExports();\n");
+ for(const [subject,expected] of [['tests/cli-added-subject.mjs',true],['docs/cli-docs-only.md',false]]){
+  git(candidateRoot,'reset','--hard',base);fs.writeFileSync(path.join(candidateRoot,subject),'// fixture\n');const head=commit(candidateRoot),tree=git(candidateRoot,'rev-parse','HEAD^{tree}');
+  const repository={full_name:'Oteryn/Oteryn-Atlas',default_branch:'main'};
+  const pr={number:7,state:'open',merged:false,changed_files:1,base:{sha:base,ref:'main',repo:repository},head:{sha:head,repo:repository}};
+  const prefix='/repos/Oteryn/Oteryn-Atlas';
+  const responses={ [prefix]:repository,[`${prefix}/git/ref/heads/main`]:{object:{sha:base}},[`${prefix}/pulls/7`]:pr,[`${prefix}/pulls/7/files?per_page=100&page=1`]:[{filename:subject,status:'added'}],[`${prefix}/git/commits/${head}`]:{sha:head,tree:{sha:tree}},[`${prefix}/actions/runs/19`]:{id:19,repository,path:'.github/workflows/verification-shadow.yml',event:'pull_request_target',run_attempt:1,status:'in_progress',head_sha:head}};
+  const responseFile=path.join(temporary,'responses.json'),eventFile=path.join(temporary,'event.json'),output=path.join(temporary,expected?'subject-output':'docs-output');
+  fs.writeFileSync(responseFile,JSON.stringify(responses));fs.writeFileSync(eventFile,JSON.stringify({repository,action:'synchronize',pull_request:pr}));
+  const result=spawnSync(process.execPath,['--import',preload,path.join(control,'tools/verification/run-verification-shadow.mjs'),'plan',candidateRoot],{encoding:'utf8',env:{PATH:process.env.PATH,HOME:os.tmpdir(),GITHUB_RUN_ATTEMPT:'1',GITHUB_EVENT_NAME:'pull_request_target',GITHUB_EVENT_PATH:eventFile,GITHUB_SHA:base,GITHUB_RUN_ID:'19',GITHUB_OUTPUT:output,ATLAS_TEST_GITHUB_RESPONSES:responseFile}});
+  assert.equal(result.status,0,result.stderr);assert.equal(fs.readFileSync(output,'utf8'),`has_commands=${expected}\n`);
+  const summary=JSON.parse(result.stdout);assert.deepEqual(summary.groups,[]);assert.deepEqual(summary.candidateTestSubjects,expected?[subject]:[]);
+  assert.equal(summary.status,expected?'UNRESOLVED':'NO_PRODUCT_WORK');if(!expected)assert.deepEqual(summary.commands,[]);
+ }
 });

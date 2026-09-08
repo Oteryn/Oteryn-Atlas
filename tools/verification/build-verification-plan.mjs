@@ -73,14 +73,14 @@ function normalizeUnprivilegedDeterministicSubjects(value, changedFiles, trusted
     if (!row || typeof row !== 'object') continue;
     if (['added', 'modified'].includes(row.status) && deterministicTestPath(row.path)) {
       const owners = protectedOwners(row.path);
-      authenticated.set(row.path, owners.length ? owners : ['deterministic.core']);
+      authenticated.set(row.path, owners);
     }
     if (row.status === 'renamed' && deterministicTestPath(row.path) && deterministicTestPath(row.previousPath)) {
       const left = row.path.slice(row.path.lastIndexOf('.'));
       const right = row.previousPath.slice(row.previousPath.lastIndexOf('.'));
       if (left === right) {
         const owners = protectedOwners(row.previousPath);
-        const transitionGroups = owners.length ? owners : ['deterministic.core'];
+        const transitionGroups = owners;
         authenticated.set(row.previousPath, transitionGroups);
         authenticated.set(row.path, transitionGroups);
       }
@@ -339,6 +339,9 @@ export function buildVerificationPlan(input) {
   const candidateImpactManifest = validateImpactManifest(input.candidateImpactManifest, candidateVerificationCatalog);
   const changedPaths = allEvidencePaths(input.changedFiles);
   const unprivilegedSubjects = normalizeUnprivilegedDeterministicSubjects(input.unprivilegedDeterministicSubjects, input.changedFiles, trustedVerificationCatalog);
+  const candidateTestSubjects = [...new Set((Array.isArray(input.changedFiles) ? input.changedFiles : []).filter(row =>
+    ['added', 'modified', 'renamed'].includes(row?.status) && unprivilegedSubjects.has(row.path)
+    && unprivilegedSubjects.get(row.path).length === 0).map(row => row.path))].sort();
   const trusted = classify(changedPaths, trustedImpactManifest, trustedVerificationCatalog, unprivilegedSubjects);
   const candidate = classify(changedPaths, candidateImpactManifest, candidateVerificationCatalog, unprivilegedSubjects);
   const executionBlockers = [];
@@ -384,8 +387,8 @@ export function buildVerificationPlan(input) {
     }
   }
   const visualGroupIds = groups.filter((group) => group.evidence === 'restricted-visual-review').map((group) => group.id);
-  const resourceClasses = [...new Set(groups.map((group) => group.resourceClass))].sort();
-  const requiredDataCapabilities = [...new Set(groups.map((group) => group.capabilities.dataCapability))].sort();
+  const resourceClasses = [...new Set([...groups.map((group) => group.resourceClass), ...(candidateTestSubjects.length ? ['cpu-light'] : [])])].sort();
+  const requiredDataCapabilities = [...new Set([...groups.map((group) => group.capabilities.dataCapability), ...(candidateTestSubjects.length ? ['qualification_fixture'] : [])])].sort();
   const stableTestIds = exactStableTestIds(groups, input.protectedStableTestIds ?? input.stableTestIds);
   const headSha = sha(input.headSha, 'headSha');
   const integrationBaseSha = sha(input.integrationBaseSha, 'integrationBaseSha');
@@ -407,6 +410,7 @@ export function buildVerificationPlan(input) {
     impactDomains: result.domains,
     appliedCrossDomainEscalations: result.applied,
     requiredGroupIds: result.groups,
+    candidateTestSubjects,
     groups,
     stableTestIds,
     expectedStableTestIdsDigest: digest(stableTestIds),
@@ -418,7 +422,7 @@ export function buildVerificationPlan(input) {
     workerPolicyId: SHADOW_WORKER_POLICY.id,
     workerPolicyDigest: digest(SHADOW_WORKER_POLICY),
     retryPolicy: { retries: 0 },
-    requiredEvidence: [...new Set(groups.map((group) => group.evidence))].sort(),
+    requiredEvidence: [...new Set([...groups.map((group) => group.evidence), ...(candidateTestSubjects.length ? ['machine-summary'] : [])])].sort(),
     requiresNativeHardware: resourceClasses.includes('native-gpu'),
     exclusive: resourceClasses.some((resource) => ['native-gpu', 'performance', 'soak'].includes(resource)),
     shadowOnly: true,

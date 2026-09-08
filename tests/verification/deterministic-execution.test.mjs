@@ -191,7 +191,7 @@ test('candidate changes cannot attest new test edges or replace protected comman
  assert.throws(()=>resolveDeterministicCommands({...value,ownership:malformed,changedFiles}),/missing source proof/);
 });
 
-test('added deterministic test executes as an unowned self-only subject under protected core command policy', t => {
+test('added deterministic test executes self-only without becoming core coverage', t => {
  const value=fixture(t);
  fs.writeFileSync(path.join(value.root,'tests/new-subject.mjs'),"import test from 'node:test'; test('candidate add',()=>{});\n");
  value.catalog.groups['deterministic.core']={...value.catalog.groups['deterministic.node'],specs:['tests/a.mjs','tests/leaf.mjs']};
@@ -199,8 +199,16 @@ test('added deterministic test executes as an unowned self-only subject under pr
  const subject=commands.find(row=>row.spec==='tests/new-subject.mjs');
  assert.ok(subject);
  assert.deepEqual(subject.argv,['--test','tests/new-subject.mjs']);
- assert.deepEqual(subject.groupIds,['deterministic.core']);
+ assert.deepEqual(subject.groupIds,[]);
+ assert.equal(subject.executionScope,'candidate-self-only');
+ const narrow=resolveDeterministicCommands({...value,groupIds:[],changedFiles:[{path:'tests/new-subject.mjs',status:'added'}]});
+ assert.equal(narrow.length,1);assert.deepEqual(narrow[0].coveredSpecs,['tests/new-subject.mjs']);
  assert.deepEqual(subject.coveredSpecs,['tests/new-subject.mjs']);
+});
+
+test('unowned rename cannot overwrite a protected deterministic identity', t => {
+ const value=fixture(t);
+ for(const groupIds of [[],['deterministic.node']])assert.throws(()=>resolveDeterministicCommands({...value,groupIds,changedFiles:[{path:'tests/leaf.mjs',previousPath:'tests/unowned.mjs',status:'renamed'}]}),/rename target is protected/);
 });
 
 test('renamed protected deterministic identity executes the new path without stale parent coverage credit', t => {

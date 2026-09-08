@@ -178,11 +178,13 @@ function executeDeterministic(command,root,image,dependencyRoot,shimRoot) {
     assertContainerStarted(container,result);
     assertDeterministicContainer(container,{command,candidateRoot:root,dependencyRoot,shimRoot,image});
     return {commandId:command.id,argv:command.argv,cwd:command.cwd,groupIds:command.groupIds,
-      expectedTestIds:command.expectedTestIds,censusKind:'external-command-and-spec',retry:0,
+      expectedTestIds:command.expectedTestIds,...(command.executionScope?{executionScope:command.executionScope}:{}),censusKind:'external-command-and-spec',retry:0,
       containerId:container.Id,imageId:container.Image,image,executedArgv:[container.Path,...container.Args],
       isolationDigest:digest({config:container.Config,host:container.HostConfig,mounts:container.Mounts}),startedAt,finishedAt:new Date().toISOString(),
       exitCode:result.status,signal:result.signal,timeout:result.error?.code==='ETIMEDOUT',
       outputDigest:bytesDigest((result.stdout??'')+(result.stderr??'')),
+      failureOutput:result.error||result.status!==0||result.signal||container.State.ExitCode!==0
+        ? {stdoutTail:String(result.stdout??'').slice(-12288),stderrTail:String(result.stderr??'').slice(-4096)} : null,
       passed:!result.error&&result.status===0&&!result.signal&&container.State.ExitCode===0};
   } finally {spawnSync('docker',['rm','-f',name],{stdio:'ignore'});}
 }
@@ -274,12 +276,14 @@ export async function runShadow(mode,root) {
     runId:currentRunId,runAttempt:1,workflowSourceRevision:process.env.GITHUB_SHA,apiRunHeadSha:currentRun.head_sha,planDigest:digest(plan),groups:plan.groups.map(g=>g.id),
     parentWorkflowDigest:event.parentRunId?bytesDigest(fs.readFileSync(path.join(controlRoot,'.github/workflows/merge-group-gate.yml'))):null,
     workflowDigest:bytesDigest(fs.readFileSync(path.join(controlRoot,TEMPLATE))),results:[],status:'UNRESOLVED'};
-  if(!plan.groups.length) {summary.status='NO_PRODUCT_WORK';summary.commands=[];}
+  const hasWork=plan.groups.length>0||plan.candidateTestSubjects.length>0;
+  summary.candidateTestSubjects=plan.candidateTestSubjects;
+  if(!hasWork) {summary.status='NO_PRODUCT_WORK';summary.commands=[];}
   if(mode==='plan') {
-    if(process.env.GITHUB_OUTPUT) fs.appendFileSync(process.env.GITHUB_OUTPUT,`has_commands=${plan.groups.length>0}\n`);
+    if(process.env.GITHUB_OUTPUT) fs.appendFileSync(process.env.GITHUB_OUTPUT,`has_commands=${hasWork}\n`);
     return summary;
   }
-  if(!plan.groups.length) fail('S0 must not start product job');
+  if(!hasWork) fail('S0 must not start product job');
   const directory=fs.mkdtempSync(path.join(os.tmpdir(),'atlas-r4-'));
   try {
     const config=readJson(path.join(controlRoot,'tools/verification/protected-execution-environment.json'));

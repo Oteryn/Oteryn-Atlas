@@ -166,3 +166,19 @@ test('artifact writes and sandbox ownership are mandatory qualification evidence
     assert.equal(calls, 1, 'failed ownership must not trigger a retry');
   }
 });
+
+test('tmpfs accepts only the exact protected option set with order-stable identity', () => {
+  const expected = config.container.tmpfs[0].options;
+  const withOptions = options => ({ ...config, container: { ...config.container,
+    tmpfs: [{ path: '/tmp', options }] } });
+  const identity = buildProtectedExecutionEnvironmentIdentity(config);
+  assert.deepEqual(buildProtectedExecutionEnvironmentIdentity(withOptions([...expected].reverse())), identity);
+  for (const options of [
+    ...expected.map(option => expected.filter(value => value !== option)),
+    ...['exec', 'noexec', 'suid', 'dev', 'unknown', 'ro', 'size=128m', 'rw'].map(option => [...expected, option]),
+    expected.map(option => option === 'size=256m' ? 'size=128m' : option),
+    expected.map(option => option === 'rw' ? 'ro' : option),
+  ]) {
+    assert.throws(() => buildProtectedExecutionEnvironmentIdentity(withOptions(options)), /tmp/, JSON.stringify(options));
+  }
+});
