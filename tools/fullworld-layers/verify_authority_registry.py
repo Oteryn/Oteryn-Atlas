@@ -35,6 +35,7 @@ def _cid(value: Any, field: str) -> None:
 
 def load_registry(path: Path) -> dict[str, Any]:
     try: value = json.loads(path.read_text(encoding="utf-8"))
+    except UnicodeDecodeError as exc: raise RegistryError("registry must be UTF-8 JSON") from exc
     except (OSError, json.JSONDecodeError) as exc: raise RegistryError(f"unable to read registry: {exc}") from exc
     _require(isinstance(value, dict), "registry root must be an object")
     return value
