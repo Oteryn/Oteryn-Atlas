@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import fs from 'node:fs';
 import {fileURLToPath} from 'node:url';
-import {resolveDirectMergeGroup} from '../../tools/verification/protected-candidate-snapshot.mjs';
+import {readCandidateSnapshot,resolveDirectMergeGroup} from '../../tools/verification/protected-candidate-snapshot.mjs';
 
 const repository='Oteryn/Oteryn-Atlas',defaultBranch='main';
 const sha=value=>value.repeat(40);
@@ -11,6 +11,7 @@ const headRef='refs/heads/gh-readonly-queue/main/pr-7-deadbeef';
 function fixture(){
   const event={repository:{full_name:repository,default_branch:defaultBranch},action:'checks_requested',merge_group:{base_ref:'refs/heads/main',base_sha:base,head_ref:headRef,head_sha:head}};
   const responses={
+    [`/repos/${repository}`]:{full_name:repository,default_branch:defaultBranch},
     [`/repos/${repository}/git/ref/heads/main`]:{object:{sha:base}},
     [`/repos/${repository}/git/commits/${head}`]:{sha:head,tree:{sha:tree},parents:[{sha:base},{sha:other}]},
   };
@@ -19,13 +20,23 @@ function fixture(){
 
 test('direct merge_group binds protected base, queue ref, exact head and candidate tree',async()=>{
   const f=fixture();
-  assert.deepEqual(await resolveDirectMergeGroup(f.input),{repository,baseSha:base,headSha:head,treeSha:tree,headRef,allowJustIntegratedHead:false});
+  assert.deepEqual(await resolveDirectMergeGroup(f.input),{repository,baseSha:base,headSha:head,treeSha:tree,headRef});
 });
 
 test('direct merge_group accepts only the exact just-integrated head after event creation',async()=>{
   const f=fixture();
   f.responses[`/repos/${repository}/git/ref/heads/main`].object.sha=head;
-  assert.deepEqual(await resolveDirectMergeGroup(f.input),{repository,baseSha:base,headSha:head,treeSha:tree,headRef,allowJustIntegratedHead:true});
+  assert.deepEqual(await resolveDirectMergeGroup(f.input),{repository,baseSha:base,headSha:head,treeSha:tree,headRef});
+});
+
+test('direct queue snapshot readback accepts exact integrated head but rejects unrelated main drift',async()=>{
+  const f=fixture(),changedFiles=[{path:'docs/canary.md',status:'added'}];
+  f.responses[`/repos/${repository}/git/ref/heads/main`].object.sha=head;
+  const request=f.input.request;
+  assert.deepEqual(await readCandidateSnapshot({request,repository,baseSha:base,headSha:head,prNumber:null,headRef,changedFiles}),
+    {repository,prNumber:null,baseSha:base,headSha:head,treeSha:tree,changedFiles});
+  f.responses[`/repos/${repository}/git/ref/heads/main`].object.sha=other;
+  await assert.rejects(readCandidateSnapshot({request,repository,baseSha:base,headSha:head,prNumber:null,headRef,changedFiles}),/protected base moved/);
 });
 
 test('direct merge_group rejects stale base, wrong branch/action/head and synthetic topology',async()=>{
