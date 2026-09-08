@@ -235,10 +235,17 @@ function runFixture(command,{candidate,contract,fixture,directory,root}) {
   try {
     for(const setup of [['build','e2e'],['up','-d','--wait','--wait-timeout','180','atlas-web']]) {
       const result=spawnSync('docker',[...args,...setup],{env,encoding:'utf8',timeout:300000,maxBuffer:16*1024*1024});
-      if(result.error||result.status!==0||result.signal) fail('fixture protected service setup failed');
+      if(result.error||result.status!==0||result.signal) {
+        console.error(JSON.stringify({phase:'fixture-setup',operation:setup,exitCode:result.status,signal:result.signal,error:result.error?.message??null,stdout:String(result.stdout??'').slice(-12288),stderr:String(result.stderr??'').slice(-4096)}));
+        if(setup[0]==='up') {
+          const logs=spawnSync('docker',[...args,'logs','--no-color','--tail','40'],{env,encoding:'utf8',timeout:10000,maxBuffer:1024*1024});
+          console.error(JSON.stringify({phase:'fixture-service-logs',exitCode:logs.status,stdout:String(logs.stdout??'').slice(-16384),stderr:String(logs.stderr??'').slice(-4096)}));
+        }
+        fail('fixture protected service setup failed');
+      }
     }
     const result=spawnSync('docker',[...args,'run','--rm','--no-deps','e2e'],{env,encoding:'utf8',timeout:command.timeoutSeconds*1000,maxBuffer:16*1024*1024});
-    if(result.error||result.status!==0||result.signal) fail('fixture browser execution failed');
+    if(result.error||result.status!==0||result.signal) {console.error(JSON.stringify({phase:'fixture-browser',exitCode:result.status,signal:result.signal,error:result.error?.message??null,stdout:String(result.stdout??'').slice(-12288),stderr:String(result.stderr??'').slice(-4096)}));fail('fixture browser execution failed');}
     const report=readJson(path.join(artifacts,'results.json'));
     const observed=[];
     const walk=suites=>{for(const suite of suites??[]){for(const spec of suite.specs??[]){for(const test of spec.tests??[]){if(test.status!=='expected'||test.results?.length!==1||test.results[0].status!=='passed'||test.results[0].retry!==0)fail('fixture nonpass/retry');observed.push(`${test.projectName}::e2e/tests/${spec.file.replace(/^.*\/tests\//,'')}::${spec.title}`);}}walk(suite.suites);}};
