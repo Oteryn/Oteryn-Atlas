@@ -8,7 +8,7 @@ export function gitChangedFiles(root,base,head) {
   return files.sort((a,b)=>a.path.localeCompare(b.path));
 }
 export async function resolveDirectMergeGroup({request=githubRequest,repository,defaultBranch,event,githubSha,githubRef}) {
-  if(!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository??'')||!/[A-Za-z0-9._/-]+/.test(defaultBranch??''))fail('merge-group authority');
+  if(!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository??'')||!/^[A-Za-z0-9._/-]+$/.test(defaultBranch??''))fail('merge-group authority');
   if(event?.repository?.full_name!==repository||event.repository.default_branch!==defaultBranch||event.action!=='checks_requested')fail('merge-group event identity');
   const group=event.merge_group,baseRef=`refs/heads/${defaultBranch}`,queuePrefix=`refs/heads/gh-readonly-queue/${defaultBranch}/`;
   if(group?.base_ref!==baseRef||!SHA.test(group.base_sha??'')||!SHA.test(group.head_sha??'')||group.base_sha===group.head_sha
