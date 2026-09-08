@@ -43,11 +43,12 @@ test('docs-only plan produces no command or runner and needs no publication',()=
  assert.deepEqual(contract.commands,[]);assert.deepEqual(contract.groups,[]);
 });
 
-test('unknown paths, candidate command widening and stale claimed plans fail closed',()=>{
+test('unknown paths and stale claimed plans fail closed while candidate group widening has no execution authority',()=>{
  assert.throws(()=>resolveExecutionContract(executionInput('unknown/product.mjs')),/unresolved obligations/);
+ const baseline=resolveExecutionContract(executionInput());
  const input=executionInput();input.planInput.candidateVerificationCatalog=structuredClone(input.protectedCatalog);
  input.planInput.candidateVerificationCatalog.groups['deterministic.search'].specs.push('tests/creature-gameplay-model.mjs');
- assert.throws(()=>resolveExecutionContract(input),/protected execution group/);
+ assert.deepEqual(resolveExecutionContract(input),baseline);
  assert.throws(()=>resolveExecutionContract({...executionInput(),claimedPlan:{}}),/recomputed plan/);
  const changed=executionInput();changed.candidate.treeSha='bad';assert.throws(()=>resolveExecutionContract(changed),/readback identity/);
 });
@@ -126,11 +127,76 @@ test('equivalent PR and MQ content resolves identical semantic obligations',()=>
  const semantic=contract=>({groups:contract.groups.map(g=>g.id),commands:contract.commands.map(({id,...row})=>row),reviews:contract.reviews});
  assert.deepEqual(semantic(left),semantic(right));
 });
-test('candidate-only owner cannot become protected execution authority',()=>{
- const input=executionInput('tests/new-candidate.mjs');
+test('added candidate test executes as an unprivileged subject while candidate-only owner metadata stays inert',t=>{
+ const spec=`tests/pre-r4-add-${process.pid}-${Date.now()}.mjs`;
+ const target=path.join(root,spec);
+ t.after(()=>fs.rmSync(target,{force:true}));
+ fs.writeFileSync(target,"import test from 'node:test'; test('ADD_CANDIDATE_EXECUTED',()=>{});\n");
+ const input=executionInput(spec);
+ input.candidate.changedFiles=[{path:spec,status:'added'}];
+ input.planInput.changedFiles=input.candidate.changedFiles;
  input.planInput.candidateVerificationCatalog=structuredClone(input.protectedCatalog);
- input.planInput.candidateVerificationCatalog.groups['deterministic.search'].specs.push('tests/new-candidate.mjs');
- assert.throws(()=>resolveExecutionContract(input),/unresolved obligations/);
+ input.planInput.candidateVerificationCatalog.groups['deterministic.search'].specs.push(spec);
+ const contract=resolveExecutionContract(input);
+ const command=contract.commands.find(row=>row.expectedTestIds.includes(spec));
+ assert.ok(command);
+ assert.deepEqual(command.argv,['node','--test',spec]);
+ assert.deepEqual(command.groupIds,['deterministic.core']);
+ assert.deepEqual(command.expectedTestIds,[spec]);
+ let result=spawnSync(command.argv[0],command.argv.slice(1),{cwd:root,encoding:'utf8',env:{...process.env,NODE_TEST_CONTEXT:undefined}});
+ assert.equal(result.status,0,result.stderr);assert.match(result.stdout,/ADD_CANDIDATE_EXECUTED/);
+ fs.writeFileSync(target,"throw new Error('ADD_CANDIDATE_FAILURE_VISIBLE');\n");
+ const failed=resolveExecutionContract(input);
+ const failedCommand=failed.commands.find(row=>row.expectedTestIds.includes(spec));
+ result=spawnSync(failedCommand.argv[0],failedCommand.argv.slice(1),{cwd:root,encoding:'utf8',env:{...process.env,NODE_TEST_CONTEXT:undefined}});
+ assert.notEqual(result.status,0);assert.match(result.stdout+result.stderr,/ADD_CANDIDATE_FAILURE_VISIBLE/);
+});
+
+test('renamed deterministic test executes candidate bytes at the new path under the old protected identity',t=>{
+ const directory=fs.mkdtempSync(path.join(os.tmpdir(),'atlas-candidate-rename-'));
+ t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));fs.mkdirSync(path.join(directory,'tests'));
+ const oldPath='tests/example.mjs',newPath='tests/renamed-example.mjs';
+ const baseline="import test from 'node:test'; test('baseline rename',()=>{});\n";
+ const candidateBytes="import test from 'node:test'; test('RENAME_CANDIDATE_EXECUTED',()=>{});\n";
+ fs.writeFileSync(path.join(directory,newPath),candidateBytes);
+ const input=executionInput(newPath);
+ const oldSpecs=input.protectedCatalog.groups['deterministic.search'].specs;
+ input.protectedCatalog.groups['deterministic.search'].specs=[oldPath];
+ input.protectedCatalog.executionPolicy.deterministic.entries=input.protectedCatalog.executionPolicy.deterministic.entries.filter(row=>!oldSpecs.includes(row.spec));
+ input.protectedCatalog.executionPolicy.deterministic.entries.push({spec:oldPath,interpreter:'node',argv:['--test',oldPath],sourceSha256:createHash('sha256').update(baseline).digest('hex'),imports:[],subprocessTests:[]});
+ input.root=directory;input.candidate.changedFiles=[{path:newPath,status:'renamed',previousPath:oldPath}];input.planInput.changedFiles=input.candidate.changedFiles;
+ const contract=resolveExecutionContract(input);
+ assert.deepEqual(contract.groups.map(row=>row.id),['deterministic.search']);
+ const command=contract.commands.find(row=>row.expectedTestIds.includes(oldPath));
+ assert.ok(command);assert.deepEqual(command.argv,['node','--test',newPath]);assert.deepEqual(command.expectedTestIds,[oldPath]);
+ const result=spawnSync(command.argv[0],command.argv.slice(1),{cwd:directory,encoding:'utf8',env:{...process.env,NODE_TEST_CONTEXT:undefined}});
+ assert.equal(result.status,0,result.stderr);assert.match(result.stdout,/RENAME_CANDIDATE_EXECUTED/);
+});
+
+test('modified protected aggregator executes itself but loses stale child coverage credit',t=>{
+ const directory=fs.mkdtempSync(path.join(os.tmpdir(),'atlas-candidate-parent-'));
+ t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));fs.mkdirSync(path.join(directory,'tests'));
+ const parent='tests/example-parent.mjs',child='tests/example-child.mjs';
+ const childBytes="import test from 'node:test'; test('PROTECTED_CHILD_EXECUTED',()=>{});\n";
+ const baseline="import './example-child.mjs';\nimport test from 'node:test'; test('baseline parent',()=>{});\n";
+ const candidateParent="import test from 'node:test'; test('MODIFIED_PARENT_EXECUTED',()=>{});\n";
+ fs.writeFileSync(path.join(directory,parent),candidateParent);fs.writeFileSync(path.join(directory,child),childBytes);
+ const input=executionInput(parent);const oldSpecs=input.protectedCatalog.groups['deterministic.search'].specs;
+ input.protectedCatalog.groups['deterministic.search'].specs=[parent,child];
+ input.protectedCatalog.executionPolicy.deterministic.entries=input.protectedCatalog.executionPolicy.deterministic.entries.filter(row=>!oldSpecs.includes(row.spec));
+ input.protectedCatalog.executionPolicy.deterministic.entries.push(
+  {spec:parent,interpreter:'node',argv:['--test',parent],sourceSha256:createHash('sha256').update(baseline).digest('hex'),imports:[child],subprocessTests:[]},
+  {spec:child,interpreter:'node',argv:['--test',child],sourceSha256:createHash('sha256').update(childBytes).digest('hex'),imports:[],subprocessTests:[]},
+ );
+ input.root=directory;
+ const contract=resolveExecutionContract(input);
+ const parentCommand=contract.commands.find(row=>row.expectedTestIds.includes(parent));
+ const childCommand=contract.commands.find(row=>row.expectedTestIds.includes(child));
+ assert.ok(parentCommand&&childCommand);assert.deepEqual(parentCommand.expectedTestIds,[parent]);assert.deepEqual(childCommand.expectedTestIds,[child]);
+ let result=spawnSync(parentCommand.argv[0],parentCommand.argv.slice(1),{cwd:directory,encoding:'utf8',env:{...process.env,NODE_TEST_CONTEXT:undefined}});
+ assert.equal(result.status,0,result.stderr);assert.match(result.stdout,/MODIFIED_PARENT_EXECUTED/);
+ result=spawnSync(childCommand.argv[0],childCommand.argv.slice(1),{cwd:directory,encoding:'utf8',env:{...process.env,NODE_TEST_CONTEXT:undefined}});
+ assert.equal(result.status,0,result.stderr);assert.match(result.stdout,/PROTECTED_CHILD_EXECUTED/);
 });
 test('candidate execution metadata cannot replace protected interpreter or hashes',()=>{
  const input=executionInput();

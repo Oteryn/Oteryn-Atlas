@@ -10,6 +10,7 @@ const equal = (left,right,label) => { if(canonicalJson(left)!==canonicalJson(rig
 const hash = value => `sha256:${createHash('sha256').update(canonicalJson(value)).digest('hex')}`;
 const sha = value => /^[a-f0-9]{40}$/.test(value ?? '');
 const digest = value => /^sha256:[a-f0-9]{64}$/.test(value ?? '');
+const deterministicTest = value => typeof value==='string'&&/^tests\/[A-Za-z0-9_./-]+\.(mjs|py)$/.test(value);
 const freeze = value => {if(value && typeof value==='object' && !Object.isFrozen(value)){Object.values(value).forEach(freeze);Object.freeze(value);}return value;};
 
 function normalizedSnapshot(value) {
@@ -25,6 +26,20 @@ function normalizedSnapshot(value) {
     return {path:row.path,status:row.status,...(row.previousPath?{previousPath:row.previousPath}:{})};
   }).sort((a,b)=>a.path.localeCompare(b.path));
   return {repository:value.repository,prNumber:value.prNumber,headSha:value.headSha,baseSha:value.baseSha,treeSha:value.treeSha,changedFiles};
+}
+
+function unprivilegedDeterministicSubjects(changedFiles) {
+  const result=new Set();
+  for(const row of changedFiles) {
+    if(['added','modified'].includes(row.status)&&deterministicTest(row.path)) result.add(row.path);
+    if(row.status==='renamed') {
+      const touches=deterministicTest(row.path)||deterministicTest(row.previousPath);
+      if(!touches) continue;
+      if(!deterministicTest(row.path)||!deterministicTest(row.previousPath)||row.path.slice(row.path.lastIndexOf('.'))!==row.previousPath.slice(row.previousPath.lastIndexOf('.'))) fail(`unsafe deterministic rename: ${row.previousPath} -> ${row.path}`);
+      result.add(row.previousPath);result.add(row.path);
+    }
+  }
+  return [...result].sort();
 }
 
 export function assertCandidateReadback({planned,current,sourceRepository,sourceRef,sourceRevision}) {
@@ -60,7 +75,8 @@ export function sealExecutionContract(value) {
 }
 
 // Only a protected-base caller may supply policy, census and source authority.
-// Candidate metadata can widen the plan, but cannot supply executable commands.
+// Candidate metadata is not current execution authority; authenticated candidate
+// test paths may only widen execution as unprivileged test subjects.
 export function resolveExecutionContract({root, candidate, planInput, claimedPlan,
   protectedCatalog, protectedImpactManifest, protectedStableTestIds,
   environmentDigest, publicationProofs, protectedExpectedAuthorities}) {
@@ -68,8 +84,10 @@ export function resolveExecutionContract({root, candidate, planInput, claimedPla
   if(!/^[a-f0-9]{64}$/.test(environmentDigest??'')) fail('environment digest');
   if(planInput?.repository!==snapshot.repository || planInput.headSha!==snapshot.headSha || planInput.integrationBaseSha!==snapshot.baseSha) fail('plan candidate identity');
   equal(planInput.changedFiles,snapshot.changedFiles,'plan candidate changed files');
-  const plan=buildVerificationPlan({...planInput,trustedVerificationCatalog:protectedCatalog,
-    trustedImpactManifest:protectedImpactManifest,protectedStableTestIds,stableTestIds:undefined});
+  const subjects=unprivilegedDeterministicSubjects(snapshot.changedFiles);
+  const plan=buildVerificationPlan({...planInput,trustedVerificationCatalog:protectedCatalog,candidateVerificationCatalog:protectedCatalog,
+    trustedImpactManifest:protectedImpactManifest,candidateImpactManifest:protectedImpactManifest,
+    unprivilegedDeterministicSubjects:subjects,protectedStableTestIds,stableTestIds:undefined});
   if(claimedPlan) equal(claimedPlan,plan,'recomputed plan');
   assertPlanExecutable(plan);
   const metadata=deriveVerificationMetadata(protectedCatalog);
@@ -84,10 +102,9 @@ export function resolveExecutionContract({root, candidate, planInput, claimedPla
   const commands=[],reviews=[],groups=[];
   const deterministic=plan.groups.filter(group=>group.executionEngine==='deterministic').map(group=>group.id);
   if(deterministic.length) {
-    const resolved=resolveDeterministicCommands({root,catalog:metadata.deterministic.proposedCatalog,ownership:metadata.deterministic,groupIds:deterministic,changedSpecs:snapshot.changedFiles.filter(row=>row.status==='modified').map(row=>row.path)});
+    const resolved=resolveDeterministicCommands({root,catalog:metadata.deterministic.proposedCatalog,ownership:metadata.deterministic,groupIds:deterministic,changedFiles:snapshot.changedFiles});
     for(const command of resolved) {
-      const groupIds=deterministic.filter(id=>protectedGroups[id].specs.some(spec=>command.coveredSpecs.includes(spec)));
-      const entry={argv:[command.interpreter,...command.argv],cwd:'.',engine:'deterministic',groupIds,
+      const entry={argv:[command.interpreter,...command.argv],cwd:'.',engine:'deterministic',groupIds:command.groupIds,
         expectedTestIds:command.coveredSpecs,resourceClass:'cpu-light',dataCapability:'qualification_fixture',timeoutSeconds:900};
       commands.push({...entry,id:hash({identity,...entry})});
     }
