@@ -5,6 +5,7 @@ import path from 'node:path';
 import test from 'node:test';
 
 import { publishReadyPublication, validateReadyPublication } from '../../tools/verification/publication-readiness.mjs';
+import { fixtureReadinessEnvironment } from '../../tools/verification/run-verification-shadow.mjs';
 
 function identity() {
   return {
@@ -18,6 +19,23 @@ function identity() {
     harnessDigest: `sha256:${'f'.repeat(64)}`,
   };
 }
+
+test('R4 fixture contract digests cross the strict publication readiness boundary', t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-fixture-readiness-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const source = path.join(root, 'source'), destination = path.join(root, 'published');
+  fs.mkdirSync(source);
+  fs.writeFileSync(path.join(source, 'product.json'), '{}');
+  const contract = { identity: { planDigest: identity().planSemanticDigest, environmentDigest: 'e'.repeat(64) }, contractDigest: identity().planInstanceDigest };
+  const env = fixtureReadinessEnvironment(contract);
+  const publicationIdentity = { ...identity(), planSemanticDigest: env.ATLAS_PLAN_SEMANTIC_DIGEST,
+    planInstanceDigest: env.ATLAS_PLAN_INSTANCE_DIGEST, environmentDigest: env.ATLAS_ENVIRONMENT_DIGEST };
+  const manifest = publishReadyPublication({ sourceDir: source, destinationDir: destination, ...publicationIdentity });
+  assert.deepEqual(validateReadyPublication({ publicationDir: destination, manifest, ...publicationIdentity }), manifest);
+  assert.equal(contract.identity.environmentDigest, 'e'.repeat(64));
+  assert.throws(() => validateReadyPublication({ publicationDir: destination, manifest, ...publicationIdentity, environmentDigest: contract.identity.environmentDigest }), /identity is invalid/);
+  assert.throws(() => validateReadyPublication({ publicationDir: destination, manifest, ...publicationIdentity, environmentDigest: `sha256:${'0'.repeat(64)}` }), /identity|stale/);
+});
 
 test('publication readiness validates bytes then atomically publishes an exact complete semantic manifest', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-publication-'));
