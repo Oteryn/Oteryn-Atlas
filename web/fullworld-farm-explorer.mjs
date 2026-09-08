@@ -6,6 +6,7 @@ import { ancillarySourceExpectations, FULLWORLD_TRUST } from '../src/browser/ful
 const CREATURE_SEARCH_URL = new URL('./semantic-search/creatures.json', import.meta.url);
 const MAX_CATALOG_BYTES = 2 * 1024 * 1024;
 const MAX_RESULTS = 10;
+const MONSTER_ENTITY_PREFIX = 'monster-entity:';
 const TIME_BASES = new Set(['active_hunt', 'hunt_wall', 'trip_wall']);
 const SOURCE_EXPECTATIONS = ancillarySourceExpectations(FULLWORLD_TRUST);
 
@@ -49,7 +50,7 @@ export function searchFarmMonsterTargets(records, query, { limit = MAX_RESULTS }
   const needle = String(query ?? '').trim().toLocaleLowerCase('en-US');
   if (!needle) return Object.freeze([]);
   const matches = records
-    .filter((record) => record.kind === 'monster' && record.resolution_state === 'RESOLVED' && typeof record.entity_id === 'string' && record.entity_id.startsWith('monster-entity:'))
+    .filter((record) => record.kind === 'monster' && record.resolution_state === 'RESOLVED' && typeof record.entity_id === 'string' && record.entity_id.startsWith(MONSTER_ENTITY_PREFIX))
     .filter((record) => record.label.toLocaleLowerCase('en-US').includes(needle) || record.entity_id === query)
     .sort((a, b) => a.label.localeCompare(b.label) || a.entity_id.localeCompare(b.entity_id))
     .slice(0, limit);
@@ -106,7 +107,7 @@ function selectedFromUrl() {
   return findSelectedMapMonster(runtime.records, params);
 }
 function usableMonster(record) {
-  return record?.kind === 'monster' && (record.resolution_state ?? record.provenance?.resolution_state) === 'RESOLVED' && typeof record.entity_id === 'string' && record.entity_id.startsWith('monster-entity:');
+  return record?.kind === 'monster' && (record.resolution_state ?? record.provenance?.resolution_state) === 'RESOLVED' && typeof record.entity_id === 'string' && record.entity_id.startsWith(MONSTER_ENTITY_PREFIX);
 }
 
 function pushCreatureState(record) {
