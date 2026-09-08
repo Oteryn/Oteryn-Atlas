@@ -121,7 +121,6 @@
       "minimumProfile": "targeted",
       "requiredGroups": [
         "deterministic.search",
-        "e2e.search-navigation",
         "integration.source-contract-browser"
       ]
     },

@@ -53,6 +53,6 @@ test('reviewed complete-product source selects genuine specialist proof and pres
 
 test('semantic search source build does not request unrelated real gameplay bytes',()=>{
  const p=plan(['tools/build-semantic-search-index.py']);
- assert(p.requiredGroupIds.includes('integration.source-contract-browser'));assert(p.requiredGroupIds.includes('e2e.search-navigation'));
+ assert.deepEqual(p.requiredGroupIds,['deterministic.search','integration.source-contract-browser']);
  assert(!p.requiredGroupIds.includes('integration.source-contract-http'));
 });
