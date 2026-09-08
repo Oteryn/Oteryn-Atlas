@@ -80,12 +80,12 @@ def validate_source(source: dict[str, Any]) -> list[dict[str, Any]]:
         if not isinstance(capabilities, list) or len(capabilities) > MAX_CAPABILITIES or not all(isinstance(value, str) and len(value) <= 64 for value in capabilities):
             raise ValueError("invalid semantic capabilities")
         position = record.get("position")
-        if not isinstance(position, dict) or set(position) != {"x", "y", "floor"} or not all(type(position[key]) is int for key in position):
+        if not isinstance(position, dict) or set(position) != {"x", "y", "floor"} or not all(type(position[key]) is int and abs(position[key]) <= MAX_SAFE_INTEGER for key in position):
             raise ValueError("invalid semantic position")
         bounds = record.get("bounds")
         if bounds is not None:
             keys = {"x_min", "y_min", "x_max_exclusive", "y_max_exclusive", "floor"}
-            if not isinstance(bounds, dict) or set(bounds) != keys or not all(type(bounds[key]) is int for key in keys):
+            if not isinstance(bounds, dict) or set(bounds) != keys or not all(type(bounds[key]) is int and abs(bounds[key]) <= MAX_SAFE_INTEGER for key in keys):
                 raise ValueError("invalid semantic bounds")
             if bounds["x_min"] >= bounds["x_max_exclusive"] or bounds["y_min"] >= bounds["y_max_exclusive"]:
                 raise ValueError("empty semantic bounds")
