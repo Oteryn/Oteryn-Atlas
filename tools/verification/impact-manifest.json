@@ -1016,7 +1016,8 @@
       "minimumProfile": "targeted",
       "requiredGroups": [
         "e2e.search-navigation",
-        "e2e.visual-presentation"
+        "e2e.visual-presentation",
+        "integration.source-contract-browser"
       ]
     },
     {
