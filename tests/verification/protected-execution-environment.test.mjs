@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
@@ -156,17 +155,14 @@ test('repository environment config is the canonical pinned protected environmen
 });
 
 
-test('environment artifact bind ownership is handed to sandbox uid and restored', () => {
-  const workflow = fs.readFileSync(new URL('../../.github/workflows/protected-hosted-executor.yml', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
-  const start = workflow.indexOf('      - name: Qualify exact protected environment once');
-  const end = workflow.indexOf('      - name: Bind environment qualification into dependency evidence', start);
-  assert.notEqual(start, -1);
-  assert.notEqual(end, -1);
-  const probe = workflow.slice(start, end);
-  assert.match(probe, /host_uid="\$\(id -u\)"/);
-  assert.match(probe, /host_gid="\$\(id -g\)"/);
-  assert.match(probe, /sudo chown 1000:1000 artifacts\/environment/);
-  assert.match(probe, /trap restore_artifact_ownership EXIT/);
-  assert.match(probe, /restore_artifact_ownership\n\s+trap - EXIT/);
-  assert.ok(probe.indexOf('sudo chown 1000:1000 artifacts/environment') < probe.indexOf('docker run --rm'));
+test('artifact writes and sandbox ownership are mandatory qualification evidence', async () => {
+  for (const field of ['artifactWrite', 'uidGid']) {
+    let calls = 0;
+    await assert.rejects(qualifyProtectedExecutionEnvironment(config, async identity => {
+      calls += 1;
+      return { schemaVersion: 1, status: 'QUALIFIED', environmentDigest: identity.environmentDigest,
+        checks: { ...checks, [field]: false }, probeDigest: `sha256:${'d'.repeat(64)}` };
+    }), new RegExp(field));
+    assert.equal(calls, 1, 'failed ownership must not trigger a retry');
+  }
 });

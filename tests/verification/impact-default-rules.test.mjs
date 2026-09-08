@@ -20,11 +20,11 @@ test('explicitly designated defaults yield to known ownership without erasing ad
 test('candidate default designation cannot narrow protected broad semantic rule',()=>{
   const protectedBroad={...broad};delete protectedBroad.defaultRule;
   const p=plan(manifest([protectedBroad,semantic,narrow]),manifest([broad,semantic,narrow]));
-  assert(p.requiredGroupIds.includes('e2e.full'));
+  for(const id of catalog.groups['e2e.full'].dependsOnGroups)assert(p.requiredGroupIds.includes(id),id);
 });
 test('unowned path still receives designated default obligations',()=>{
   const p=plan(manifest([broad,semantic,narrow]),undefined,'tests/new-family.test.mjs');
-  assert(p.requiredGroupIds.includes('e2e.full'));
+  for(const id of catalog.groups['e2e.full'].dependsOnGroups)assert(p.requiredGroupIds.includes(id),id);
 });
 test('default metadata is typed and survives schema normalization',()=>{
   assert.equal(validateImpactManifest(manifest([broad]),catalog).entries[0].defaultRule,true);
@@ -32,7 +32,7 @@ test('default metadata is typed and survives schema normalization',()=>{
 });
 
 test('semantic prefixes cannot be downgraded into default catchalls',()=>{
- for(const row of [{...broad,pathPrefix:'src/browser/'},{...broad,domains:['creatures']},{...broad,requiredGroups:['visual.creatures']}]) {
+ for(const row of [{...broad,pathPrefix:'src/browser/'},{...broad,domains:['creatures']},{...broad,requiredGroups:['review.visual-desktop']}]) {
   assert.throws(()=>validateImpactManifest(manifest([row]),catalog),/reserved/);
  }
  assert.throws(()=>validateImpactManifest(manifest([{...broad,exactMatch:true}]),catalog),/exact entries/);

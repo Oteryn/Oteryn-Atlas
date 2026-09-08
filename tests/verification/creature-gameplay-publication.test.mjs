@@ -45,21 +45,11 @@ test('committed creature gameplay publication is exact merged Game output', () =
   assert.equal(Math.max(...manifest.shards.map((entry) => entry.records)), 15);
 });
 
-test('exact-source workflow rebuilds the same merged Game product and CI runs consumers', () => {
-  const workflow = readFileSync(join(ROOT, '.github', 'workflows', 'creature-gameplay-profiles.yml'), 'utf8');
-  assert.match(workflow, new RegExp(`GAME_REVISION: ${GAME_SHA}`));
-  assert.match(workflow, new RegExp(`LEGACY_REVISION: ${LEGACY_SHA}`));
-  assert.match(workflow, /game-atlas-creature-gameplay\/export\.py/);
-  assert.match(workflow, /diff -qr web\/creature-gameplay \/tmp\/creature-gameplay/);
-  assert.match(workflow, /tests\/creature-gameplay-profiles\.mjs/);
-  assert.match(workflow, /tests\/creature-inspector-state\.mjs/);
-  assert.match(workflow, /tests\/creature-gameplay-model\.mjs/);
-  assert.match(workflow, new RegExp(DIGEST.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
-
-  const ci = readFileSync(join(ROOT, '.github', 'workflows', 'ci.yml'), 'utf8');
-  for (const path of ['tests/creature-gameplay-profiles.mjs', 'tests/creature-inspector-state.mjs', 'tests/creature-gameplay-model.mjs', 'tests/creature-gameplay-runtime-contract.mjs']) {
-    assert.match(ci, new RegExp(path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
-  }
+test('current deterministic gameplay ownership executes every published-product consumer', () => {
+  const catalog = JSON.parse(readFileSync(join(ROOT, 'tools/verification/verification-catalog.json')));
+  const group = catalog.groups['deterministic.gameplay'];
+  for (const spec of ['tests/creature-gameplay-profiles.mjs', 'tests/creature-inspector-state.mjs', 'tests/creature-gameplay-model.mjs', 'tests/creature-gameplay-runtime-contract.mjs']) assert.equal(Object.values(catalog.groups).filter(owner => owner.specs.includes(spec)).length, 1, spec);
+  assert.equal(group.capabilities.browser, false);
 });
 
 test('Rat loot row count stays separate from per-drop max count', () => {
@@ -75,9 +65,10 @@ test('Rat loot row count stays separate from per-drop max count', () => {
   assert.equal(gold.max_count, 4);
 });
 
-test('large-shop browser fixture stays on the map-reachable H.L. profile', () => {
+test('large-shop qualification oracle preserves the published 124-row boundary', () => {
   const browser = readFileSync(join(ROOT, 'e2e', 'tests', 'creature-gameplay-desktop.spec.mjs'), 'utf8');
-  assert.match(browser, /npc-entity:0c83ae18a907dc7e8f15c37c03e4f04c/);
+  assert.match(browser, /FIXTURES\.merchantNorth/);
+  assert.match(browser, /Fixture Bulk Item 124/);
   assert.doesNotMatch(browser, /npc-entity:b486d5d7292f7acca539899a96e66016|FIXTURES\.yasir/);
   assert.match(browser, /50 of 124/);
   const shard = JSON.parse(readFileSync(join(PRODUCT, 'shards', 'npc-0c.json')));

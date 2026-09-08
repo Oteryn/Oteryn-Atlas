@@ -1,3 +1,4 @@
+import { deriveVerificationMetadata } from '../../tools/verification/verification-metadata.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { test } from 'node:test';
@@ -6,7 +7,7 @@ import { validateVerificationCatalog } from '../../tools/verification/verificati
 const root = new URL('../../', import.meta.url);
 const read = (path) => readFileSync(new URL(path, root), 'utf8');
 const sorted = (values) => [...values].sort();
-const load = () => JSON.parse(read('tools/verification/browser-semantic-ownership.json'));
+const load = () => deriveVerificationMetadata(JSON.parse(read('tools/verification/verification-catalog.json'))).browser;
 const inventory = () => readdirSync(new URL('e2e/tests/', root)).filter((p) => p.endsWith('.spec.mjs')).map((p) => `e2e/tests/${p}`);
 function sourceFrames(spec) {
   const source = read(spec);
@@ -80,7 +81,7 @@ test('bounded workload resources preserve separate performance/stress and soak c
   for (const name of ['performance', 'stress', 'scale']) assert.equal(rows.find((r) => r.spec.endsWith(`${name}-desktop.spec.mjs`)).resourceClass, 'performance');
   assert.equal(rows.find((r) => r.spec.endsWith('soak-desktop.spec.mjs')).resourceClass, 'soak');
 });
-test('all 30 frames are additive review, including the 13 absent from protected legacy inventory', () => {
+test('all 30 additive review frames exactly match the generated protected capture projection', () => {
   const data = load();
   const rows = data.specs.filter((r) => r.requiredFrames.length);
   assert.equal(rows.length, 9);
@@ -97,7 +98,7 @@ test('all 30 frames are additive review, including the 13 absent from protected 
   }
   assert.equal(data.legacyFrameMigration.stableTestIdRemaps.length, 2);
   assert.equal(data.legacyFrameMigration.addedFrameIds.length, 13);
-  assert.equal(frames.filter((r) => !legacy.some((old) => old.frameId === r.frameId)).length, 13);
+  assert.deepEqual([...frames].sort((a,b)=>a.frameId.localeCompare(b.frameId)),[...legacy].sort((a,b)=>a.frameId.localeCompare(b.frameId)));
   assert.equal(data.executionContract.deduplicateBy, 'exact-revision+spec+project+data-capability+environment-digest');
   assert.equal(data.executionContract.reviewDischargedByMachinePass, false);
   assert.equal(data.fallback.groupId, 'e2e.full');

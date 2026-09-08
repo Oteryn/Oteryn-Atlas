@@ -7,7 +7,7 @@ const manifest=JSON.parse(fs.readFileSync(new URL('../../tools/verification/impa
 const plan=path=>planner.buildVerificationPlan({repository:'Oteryn/Oteryn-Atlas',headSha:'a'.repeat(40),integrationBaseSha:'b'.repeat(40),mergeBaseSha:'c'.repeat(40),changedFiles:[{path}],verificationCatalog:catalog,trustedImpactManifest:manifest,candidateImpactManifest:manifest});
 test('unknown source preserves broad partial proof but cannot qualify as complete execution',()=>{
  const p=plan('new-product/compiler.py');
- assert(p.requiredGroupIds.includes('e2e.full'));
+ for (const group of catalog.groups['e2e.full'].dependsOnGroups) assert(p.requiredGroupIds.includes(group));
  assert(p.executionBlockers.some(x=>x.path==='new-product/compiler.py'&&x.reason==='unknown-impact'));
  assert.throws(()=>planner.assertPlanExecutable(p),/unresolved/);
 });
@@ -21,10 +21,12 @@ test('new verification contracts cannot hide inside historical wildcard ownershi
  assert(p.executionBlockers.some(x=>x.reason==='unowned-test'));
  assert.throws(()=>planner.assertPlanExecutable(p),/unresolved/);
 });
-test('retained wildcard core blocks execution while its exact qualification remains unresolved',()=>{
+test('current core owns exact test files and never inherits wildcard execution',()=>{
  const p=plan('src/browser/creature-gameplay-profiles.mjs');
- assert(p.executionBlockers.some(x=>x.reason==='unexpanded-test-ownership'&&x.group==='deterministic.core'));
- assert.throws(()=>planner.assertPlanExecutable(p),/unresolved/);
+ assert(catalog.groups['deterministic.core'].specs.every(spec=>!/[?*]/.test(spec)));
+ assert.equal(new Set(catalog.groups['deterministic.core'].specs).size,catalog.groups['deterministic.core'].specs.length);
+ for(const spec of catalog.groups['deterministic.core'].specs)assert(fs.statSync(new URL('../../'+spec,import.meta.url)).isFile());
+ assert(!p.executionBlockers.some(x=>x.reason==='unexpanded-test-ownership'&&x.group==='deterministic.core'));
  const docs=plan('docs/guide.md');
  assert.deepEqual(docs.executionBlockers,[]);
  assert.equal(planner.assertPlanExecutable(docs),docs);
@@ -32,11 +34,25 @@ test('retained wildcard core blocks execution while its exact qualification rema
 test('execution guard rejects pre-migration plans lacking explicit uncertainty metadata',()=>{
  assert.throws(()=>planner.assertPlanExecutable({groups:[]}),/blocker metadata/);
 });
-test('complete-product helpers retain explicit oracle blockers without blind FullWorld escalation',()=>{
- for(const path of ['tools/fullworld-publication/publication.py','tools/fullworld-runtime/build_runtime_index.py','tools/fullworld-minimap/build_minimap.py']) {
+test('reviewed complete-product sources require specialist integrity proof and retain explicit oracle blockers',()=>{
+ for(const path of [
+  'tools/fullworld-generation/fabric.py',
+  'tools/fullworld-generation/verify_handoff.py',
+  'tools/fullworld-publication/publication.py',
+  'tools/fullworld-publication/verify_publication.py',
+  'tools/fullworld-publication/negative_tests.py',
+  'tools/fullworld-runtime/build_runtime_index.py',
+  'tools/fullworld-runtime/build_pixel_buckets.py',
+  'tools/fullworld-layers/build_overview.py',
+  'tools/fullworld-layers/verify_overview.py',
+  'tools/fullworld-minimap/build_minimap.py',
+ ]) {
   const p=plan(path);
   assert(p.executionBlockers.some(x=>x.reason==='unqualified-complete-product-oracle'&&x.path===path));
-  assert.equal(p.requiresRealFullWorld,false);
+  assert.equal(p.requiresRealFullWorld,true);
+  assert(p.requiredGroupIds.includes('fullworld.complete-integrity'));
+  assert(p.requiredDataCapabilities.includes('real_fullworld'));
+  assert.throws(()=>planner.assertPlanExecutable(p),/unresolved/);
  }
 });
 test('independently reviewed fixture helpers do not inherit complete-product escalation',()=>{

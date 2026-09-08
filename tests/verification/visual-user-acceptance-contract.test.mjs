@@ -11,7 +11,8 @@ const read = (relative) => readFile(path.join(root, relative), 'utf8');
 test('user-facing visual acceptance is a required repository contract', async () => {
   const agents = await read('AGENTS.md');
   const platform = await read('docs/testing/ATLAS-VERIFICATION-PLATFORM.md');
-  assert.match(agents, /user-facing visual acceptance/i);
+  assert.match(agents, /User-visible changes require real-browser journeys and reviewed full-frame evidence/);
+  assert.match(agents, /reviewer, exact Atlas revision, exact Playwright result, and screenshot digests/);
   assert.match(platform, /user-facing visual acceptance/i);
   assert.match(platform, /full-frame evidence/i);
   assert.match(platform, /occlusion|clipping/i);
@@ -102,13 +103,13 @@ test('visual user acceptance contract enumerates complete primary user-facing st
   assert.match(resilience, /desktop\.fail-closed/);
   assert.match(gameplayDesktop, /desktop\.creature-gameplay/);
   assert.match(gameplayMobile, /mobile\.creature-gameplay/);
-  assert.ok(gameplayDesktop.includes(".fill('battle axe')"));
-  assert.match(gameplayDesktop, /captureUserVisualEvidence[\s\S]*?\.fill\(''\)[\s\S]*?#inspector-tab-semantic/);
-  assert.ok(gameplayMobile.includes(".fill('battle axe')"));
-  assert.match(gameplayDesktop, /235 gold/);
-  assert.match(gameplayDesktop, /80 gold/);
-  assert.match(gameplayMobile, /235 gold/);
-  assert.match(gameplayMobile, /80 gold/);
+  assert.match(gameplayDesktop, /Fixture Bulk Item 124/);
+  assert.match(gameplayDesktop, /captureUserVisualEvidence[\s\S]*?#inspector-tab-semantic/);
+  assert.match(gameplayMobile, /semanticTab\.tap\(\)/);
+  assert.match(gameplayDesktop, /50 gold/);
+  assert.match(gameplayDesktop, /3 gold/);
+  assert.match(gameplayMobile, /50 gold/);
+  assert.match(gameplayMobile, /3 gold/);
 });
 
 test('coordinate-pan evidence waits for the current detail scene rather than a stale render', async () => {

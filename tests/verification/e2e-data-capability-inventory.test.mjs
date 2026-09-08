@@ -50,7 +50,8 @@ test('every current Playwright spec has one reviewed minimum data capability', (
 
 test('ordinary full-safety census contains exactly qualification-fixture browser specs', () => {
   const inventory = readJson(INVENTORY_PATH);
-  const census = readJson(CENSUS_PATH);
+  const catalog = readJson(path.join(ROOT, 'tools/verification/verification-catalog.json'));
+  const census = { stableTestIds: catalog.groups['e2e.full'].dependsOnGroups.flatMap(id => catalog.groups[id].specs.map(spec => `desktop-chromium::${spec}::inventory`)) };
   const fixtureSpecs = inventory.specs
     .filter((entry) => entry.dataCapability === 'qualification_fixture')
     .map((entry) => entry.spec)
@@ -66,14 +67,10 @@ test('bounded source contracts and complete FullWorld census are isolated during
 
   assert.deepEqual(bounded.map((entry) => entry.spec), [
     'e2e/tests/api-contract-desktop.spec.mjs',
-    'e2e/tests/creature-gameplay-desktop.spec.mjs',
-    'e2e/tests/creature-gameplay-mobile.spec.mjs',
+    'e2e/tests/creature-gameplay-source-contract-desktop.spec.mjs',
   ]);
   assert.match(bounded[0].rationale, /source authority|contract_id/i);
   assert.deepEqual(full.map((entry) => entry.spec), ['e2e/tests/fullworld-animation-census-desktop.spec.mjs']);
   assert.match(full[0].rationale, /complete published animation|production-wide coverage/i);
-  assert.deepEqual(inventory.specs.filter((entry) => entry.splitRequired).map((entry) => entry.spec), [
-    'e2e/tests/creature-gameplay-desktop.spec.mjs',
-    'e2e/tests/creature-gameplay-mobile.spec.mjs',
-  ], 'policy staging must expose the two mixed gameplay specs until final Phase D splits them');
+  assert.deepEqual(inventory.specs.filter((entry) => entry.splitRequired).map((entry) => entry.spec), [], 'functional fixture specs and source-contract specs must remain separated');
 });

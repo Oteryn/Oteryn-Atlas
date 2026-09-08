@@ -2,35 +2,59 @@
   "schemaVersion": 1,
   "requiredFrames": [
     {
-      "frameId": "desktop.initial",
-      "stableTestId": "desktop-chromium::e2e/tests/visual-desktop.spec.mjs::desktop Atlas-owned chrome and user journey retain reviewed visual contracts"
+      "frameId": "creature-presentation.classic-sparse",
+      "stableTestId": "desktop-chromium::e2e/tests/creature-presentation-desktop.spec.mjs::desktop mode-aware LOD is sparse in minimap/classic/overview and follows canonical auto representation"
     },
     {
-      "frameId": "desktop.search-inspector",
-      "stableTestId": "desktop-chromium::e2e/tests/visual-desktop.spec.mjs::desktop Atlas-owned chrome and user journey retain reviewed visual contracts"
+      "frameId": "creature-presentation.dense-monsters",
+      "stableTestId": "desktop-chromium::e2e/tests/creature-presentation-desktop.spec.mjs::desktop dense occupancy is deterministic and long factual names stay bounded at edges"
     },
     {
-      "frameId": "desktop.creature-gameplay",
-      "stableTestId": "desktop-chromium::e2e/tests/creature-gameplay-desktop.spec.mjs::desktop Sam direct activation opens exact Gameplay shop, preserves Semantic, and round-trips URL state"
+      "frameId": "creature-presentation.long-name-edge",
+      "stableTestId": "desktop-chromium::e2e/tests/creature-presentation-desktop.spec.mjs::desktop dense occupancy is deterministic and long factual names stay bounded at edges"
     },
     {
-      "frameId": "desktop.layers",
-      "stableTestId": "desktop-chromium::e2e/tests/visual-desktop.spec.mjs::desktop Atlas-owned chrome and user journey retain reviewed visual contracts"
+      "frameId": "creature-presentation.map-detail",
+      "stableTestId": "desktop-chromium::e2e/tests/creature-presentation-desktop.spec.mjs::desktop mode-aware LOD is sparse in minimap/classic/overview and follows canonical auto representation"
     },
     {
-      "frameId": "desktop.playback",
-      "stableTestId": "desktop-chromium::e2e/tests/visual-desktop.spec.mjs::playback changes only verified animated presentation regions and restores static pixels"
+      "frameId": "creature-presentation.minimap-sparse",
+      "stableTestId": "desktop-chromium::e2e/tests/creature-presentation-desktop.spec.mjs::desktop mode-aware LOD is sparse in minimap/classic/overview and follows canonical auto representation"
     },
     {
-      "frameId": "desktop.minimap",
-      "stableTestId": "desktop-chromium::e2e/tests/audit-desktop.spec.mjs::audit desktop controls and LOD modes"
+      "frameId": "creature-presentation.mixed-card",
+      "stableTestId": "desktop-chromium::e2e/tests/creature-presentation-desktop.spec.mjs::desktop mixed scene exposes #115 diagnostics and coexists with #113 card geometry"
+    },
+    {
+      "frameId": "creature-presentation.mobile-auto-detail",
+      "stableTestId": "mobile-chromium::e2e/tests/creature-presentation-mobile.spec.mjs::mobile AUTO follows minimap/detail representation without DPR-specific label inflation"
+    },
+    {
+      "frameId": "creature-presentation.mobile-eremo-card",
+      "stableTestId": "mobile-chromium::e2e/tests/creature-presentation-mobile.spec.mjs::mobile DPR2 keeps truthful Eremo badges in CSS pixels beside the canonical card"
+    },
+    {
+      "frameId": "creature-presentation.nearby-npcs",
+      "stableTestId": "desktop-chromium::e2e/tests/creature-presentation-desktop.spec.mjs::desktop dense occupancy is deterministic and long factual names stay bounded at edges"
+    },
+    {
+      "frameId": "creature-presentation.overflow-eremo",
+      "stableTestId": "desktop-chromium::e2e/tests/creature-presentation-desktop.spec.mjs::desktop factual role rows preserve canonical roles, overflow count and active filtered role"
+    },
+    {
+      "frameId": "creature-presentation.overflow-filter-trainer",
+      "stableTestId": "desktop-chromium::e2e/tests/creature-presentation-desktop.spec.mjs::desktop factual role rows preserve canonical roles, overflow count and active filtered role"
+    },
+    {
+      "frameId": "creature-presentation.overview-sparse",
+      "stableTestId": "desktop-chromium::e2e/tests/creature-presentation-desktop.spec.mjs::desktop mode-aware LOD is sparse in minimap/classic/overview and follows canonical auto representation"
+    },
+    {
+      "frameId": "creature-presentation.selected-card",
+      "stableTestId": "desktop-chromium::e2e/tests/creature-presentation-desktop.spec.mjs::desktop selection, camera/floor changes and animation preserve layout-lifetime contract"
     },
     {
       "frameId": "desktop.classic",
-      "stableTestId": "desktop-chromium::e2e/tests/audit-desktop.spec.mjs::audit desktop controls and LOD modes"
-    },
-    {
-      "frameId": "desktop.floor-mode",
       "stableTestId": "desktop-chromium::e2e/tests/audit-desktop.spec.mjs::audit desktop controls and LOD modes"
     },
     {
@@ -38,23 +62,51 @@
       "stableTestId": "desktop-chromium::e2e/tests/audit-desktop.spec.mjs::audit coordinate Go, wheel zoom and drag pan"
     },
     {
-      "frameId": "desktop.search-degraded",
-      "stableTestId": "desktop-chromium::e2e/tests/degraded-search-desktop.spec.mjs::semantic search HTTP outage degrades search without invalidating map qualification"
+      "frameId": "desktop.creature-gameplay",
+      "stableTestId": "desktop-chromium::e2e/tests/creature-gameplay-desktop.spec.mjs::desktop qualification NPC activation opens Gameplay, preserves Semantic, and round-trips URL state"
     },
     {
       "frameId": "desktop.fail-closed",
       "stableTestId": "desktop-chromium::e2e/tests/resilience-desktop.spec.mjs::required FullWorld publication failure is deterministic and fail-closed"
     },
     {
-      "frameId": "mobile.initial",
-      "stableTestId": "mobile-chromium::e2e/tests/visual-mobile.spec.mjs::mobile Atlas-owned chrome and drawers retain reviewed user-facing visual contracts"
+      "frameId": "desktop.floor-mode",
+      "stableTestId": "desktop-chromium::e2e/tests/audit-desktop.spec.mjs::audit desktop controls and LOD modes"
+    },
+    {
+      "frameId": "desktop.initial",
+      "stableTestId": "desktop-chromium::e2e/tests/visual-desktop.spec.mjs::desktop Atlas-owned chrome and user journey retain reviewed visual contracts"
+    },
+    {
+      "frameId": "desktop.layers",
+      "stableTestId": "desktop-chromium::e2e/tests/visual-desktop.spec.mjs::desktop Atlas-owned chrome and user journey retain reviewed visual contracts"
+    },
+    {
+      "frameId": "desktop.minimap",
+      "stableTestId": "desktop-chromium::e2e/tests/audit-desktop.spec.mjs::audit desktop controls and LOD modes"
+    },
+    {
+      "frameId": "desktop.playback",
+      "stableTestId": "desktop-chromium::e2e/tests/visual-desktop.spec.mjs::playback changes only verified animated presentation regions and restores static pixels"
+    },
+    {
+      "frameId": "desktop.search-degraded",
+      "stableTestId": "desktop-chromium::e2e/tests/degraded-search-desktop.spec.mjs::semantic search HTTP outage degrades search without invalidating map qualification"
+    },
+    {
+      "frameId": "desktop.search-inspector",
+      "stableTestId": "desktop-chromium::e2e/tests/visual-desktop.spec.mjs::desktop Atlas-owned chrome and user journey retain reviewed visual contracts"
     },
     {
       "frameId": "mobile.controls",
       "stableTestId": "mobile-chromium::e2e/tests/visual-mobile.spec.mjs::mobile Atlas-owned chrome and drawers retain reviewed user-facing visual contracts"
     },
     {
-      "frameId": "mobile.search",
+      "frameId": "mobile.creature-gameplay",
+      "stableTestId": "mobile-chromium::e2e/tests/creature-gameplay-mobile.spec.mjs::mobile qualification NPC tap reaches readable Gameplay data and touch-sized tabs"
+    },
+    {
+      "frameId": "mobile.initial",
       "stableTestId": "mobile-chromium::e2e/tests/visual-mobile.spec.mjs::mobile Atlas-owned chrome and drawers retain reviewed user-facing visual contracts"
     },
     {
@@ -62,11 +114,11 @@
       "stableTestId": "mobile-chromium::e2e/tests/visual-mobile.spec.mjs::mobile Atlas-owned chrome and drawers retain reviewed user-facing visual contracts"
     },
     {
-      "frameId": "mobile.creature-gameplay",
-      "stableTestId": "mobile-chromium::e2e/tests/creature-gameplay-mobile.spec.mjs::mobile Sam direct tap reaches readable Gameplay trade data and tabs"
+      "frameId": "mobile.landscape",
+      "stableTestId": "mobile-chromium::e2e/tests/visual-mobile.spec.mjs::mobile Atlas-owned chrome and drawers retain reviewed user-facing visual contracts"
     },
     {
-      "frameId": "mobile.landscape",
+      "frameId": "mobile.search",
       "stableTestId": "mobile-chromium::e2e/tests/visual-mobile.spec.mjs::mobile Atlas-owned chrome and drawers retain reviewed user-facing visual contracts"
     }
   ]

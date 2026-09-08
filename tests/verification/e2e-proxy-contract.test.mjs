@@ -7,7 +7,7 @@ const nginx = fs.readFileSync('e2e/nginx/default.conf.template', 'utf8');
 const compose = fs.readFileSync('e2e/compose.yml', 'utf8');
 const runSh = fs.readFileSync('e2e/run.sh', 'utf8');
 const runPs = fs.readFileSync('e2e/run.ps1', 'utf8');
-const nightly = fs.readFileSync('.github/workflows/verification-depth.yml', 'utf8');
+const selfhosted = fs.readFileSync('e2e/compose.selfhosted.yml', 'utf8');
 const forwarderPath = 'e2e/local-publication-forwarder.py';
 
 test('checkout overlay reuses publication upstream connections without masking failures', () => {
@@ -24,7 +24,7 @@ test('all checkout-overlay launch paths provide normalized publication upstream 
     assert.match(compose, new RegExp(`${key}:`));
     assert.match(runSh, new RegExp(key));
     assert.match(runPs, new RegExp(key));
-    assert.match(nightly, new RegExp(key));
+    assert.match(selfhosted, new RegExp(key));
   }
 });
 

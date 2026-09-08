@@ -18,7 +18,7 @@ const PYTHON_FILES = [
   'tests/farm-bundle.py',
 ];
 function runPython(args) {
-  const result = spawnSync('python', args, { cwd: ROOT, encoding: 'utf8' });
+  const result = spawnSync('python3', args, { cwd: ROOT, encoding: 'utf8' });
   assert.equal(result.status, 0, `${args.join(' ')} failed:\n${result.stdout}\n${result.stderr}`);
   return result.stdout;
 }

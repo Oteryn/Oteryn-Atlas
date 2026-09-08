@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { authenticatePublicationProofs } from './proof-provenance.mjs';
 import { canonicalJson, validateVerificationCatalog } from './verification-plan-schema.mjs';
 
 const SPEC = /^e2e\/tests\/[a-z0-9-]+\.spec\.mjs$/;
@@ -14,12 +15,11 @@ function unique(values, label) {
 const digest = (value) => `sha256:${createHash('sha256').update(canonicalJson(value)).digest('hex')}`;
 const same = (left, right) => JSON.stringify(left) === JSON.stringify(right);
 
-// The caller must load this registry from authenticated protected-base code. This
-// pure resolver does not authenticate a repository revision and accepts no
-// candidate catalog, candidate command or candidate ownership overrides.
+// The caller must load this registry and the expected publication authorities
+// from authenticated protected-base code. This pure resolver does not authenticate
+// a repository revision and accepts no candidate catalog, command or ownership overrides.
 // It resolves obligations only: it neither executes tests nor activates routing.
-export function resolveBrowserExecution({ protectedRegistry, requiredGroups, atlasRevision, environmentDigest, policyResolved, protectedBaseSha, publicationIdentities } = {}) {
-  requireValue(policyResolved === true, 'protected policy has not been resolved');
+export function resolveBrowserExecution({ protectedRegistry, requiredGroups, atlasRevision, environmentDigest, protectedBaseSha, publicationProofs, protectedExpectedAuthorities } = {}) {
   requireValue(/^[0-9a-f]{40}$/.test(atlasRevision ?? ''), 'exact Atlas revision required');
   requireValue(/^[0-9a-f]{40}$/.test(protectedBaseSha ?? ''), 'exact protected base revision required');
   requireValue(/^[0-9a-f]{64}$/.test(environmentDigest ?? ''), 'environment digest required');
@@ -41,11 +41,11 @@ export function resolveBrowserExecution({ protectedRegistry, requiredGroups, atl
     const owner = catalog[row.machineGroups[0]];
     requireValue(owner?.evidence === 'machine-summary' && !owner.capabilities.visualReview && owner.specs.includes(row.spec), `machine owner for ${row.spec}`);
     const execution = row.execution;
-    const project = row.spec.endsWith('mobile.spec.mjs') ? 'mobile-chromium' : 'desktop-chromium';
-    requireValue(execution?.runtime === 'playwright' && execution.cwd === 'e2e' && execution.project === project, `runtime/cwd/project for ${row.spec}`);
+    const project = execution?.project;
+    requireValue(execution?.runtime === 'playwright' && execution.cwd === 'e2e' && ['desktop-chromium', 'mobile-chromium'].includes(project), `runtime/cwd/project for ${row.spec}`);
     requireValue(same(execution.argv, ['npx', '--no-install', 'playwright', 'test', row.spec, `--project=${project}`]), `exact argv for ${row.spec}`);
     requireValue(typeof execution.browser === 'boolean' && execution.browser === owner.capabilities.browser, `browser requirement for ${row.spec}`);
-    requireValue(execution.browser ? owner.projects.includes(project) : owner.projects.length === 0, `project placement for ${row.spec}`);
+    requireValue(owner.executionEngine === 'playwright' ? owner.projects.includes(project) : (execution.browser ? owner.projects.includes(project) : owner.projects.length === 0), `project placement for ${row.spec}`);
     requireValue(owner.resourceClass === row.resourceClass && owner.capabilities.dataCapability === row.minimumDataCapability, `resource/capability for ${row.spec}`);
     requireValue(owner.capabilities.hosted || owner.capabilities.specialistReason !== null, `executor placement for ${row.spec}`);
     requireValue(Array.isArray(row.requiredFrames), `frame inventory for ${row.spec}`);
@@ -66,10 +66,14 @@ export function resolveBrowserExecution({ protectedRegistry, requiredGroups, atl
   }
   for (const [id, group] of Object.entries(catalog)) {
     requireValue(group.specs.length > 0, `empty group ${id}`);
-    requireValue(group.dependsOnGroups.length === 0, `unsupported catalog dependency ${id}`);
     for (const spec of group.specs) {
       const row = rows.get(spec);
       requireValue(row && [...row.machineGroups, ...row.reviewGroups].includes(id), `missing spec ownership ${id}:${spec}`);
+    }
+    for (const dependencyId of group.dependsOnGroups) {
+      const dependency = catalog[dependencyId];
+      requireValue(group.evidence === 'machine-summary' && dependency?.evidence === 'restricted-visual-review', `unsafe catalog dependency ${id}:${dependencyId}`);
+      requireValue(group.specs.some((spec) => rows.get(spec)?.reviewGroups.includes(dependencyId)), `dependency is not an actual row review owner ${id}:${dependencyId}`);
     }
   }
   requireValue(same(Object.keys(registry.reviewGroups ?? {}).sort(), Object.keys(catalog).filter((id) => catalog[id].evidence === 'restricted-visual-review').sort()), 'review group inventory');
@@ -80,21 +84,32 @@ export function resolveBrowserExecution({ protectedRegistry, requiredGroups, atl
   for (const id of new Set(requiredGroups)) {
     for (const spec of catalog[id].specs) {
       const row = rows.get(spec);
-      for (const dependency of row.machineGroups) selected.add(dependency);
-      if (catalog[id].evidence === 'machine-summary') for (const review of row.reviewGroups) selected.add(review);
+      if (catalog[id].evidence === 'restricted-visual-review') {
+        requireValue(row.reviewGroups.includes(id), `review dependency owner ${id}:${spec}`);
+        for (const dependency of row.machineGroups) selected.add(dependency);
+      } else {
+        requireValue(row.machineGroups.includes(id), `machine dependency owner ${id}:${spec}`);
+        for (const review of row.reviewGroups) selected.add(review);
+      }
     }
   }
   const machineGroups = [...selected].filter((id) => catalog[id].evidence === 'machine-summary').sort();
-  const boundPublications = {};
-  for (const capability of new Set(machineGroups.map((id) => catalog[id].capabilities.dataCapability))) {
-    const publication = publicationIdentities?.[capability];
-    requireValue(publication && typeof publication === 'object' && !Array.isArray(publication), `publication identity for ${capability}`);
-    requireValue(same(Object.keys(publication).sort(), ['productRootDigest', 'publicationManifestDigest', 'sourceRepository', 'sourceRevision']), `publication identity fields for ${capability}`);
-    for (const field of ['publicationManifestDigest', 'productRootDigest']) requireValue(/^sha256:[0-9a-f]{64}$/.test(publication[field] ?? ''), `${field} for ${capability}`);
-    const absentFixtureSource = capability === 'qualification_fixture' && publication.sourceRepository === null && publication.sourceRevision === null;
-    requireValue(absentFixtureSource || (typeof publication.sourceRepository === 'string' && /^[A-Za-z0-9][A-Za-z0-9_.-]*\/[A-Za-z0-9][A-Za-z0-9_.-]*$/.test(publication.sourceRepository) && /^[0-9a-f]{40}$/.test(publication.sourceRevision ?? '')), `immutable source identity for ${capability}`);
-    boundPublications[capability] = structuredClone(publication);
+  const capabilities = [...new Set(machineGroups.map((id) => catalog[id].capabilities.dataCapability))].sort();
+  const selectedProofs = {};
+  const selectedAuthorities = {};
+  for (const capability of capabilities) {
+    requireValue(publicationProofs?.[capability] != null, `raw publication proof for ${capability}`);
+    requireValue(protectedExpectedAuthorities?.[capability] != null, `protected expected authority for ${capability}`);
+    selectedProofs[capability] = publicationProofs[capability];
+    selectedAuthorities[capability] = protectedExpectedAuthorities[capability];
   }
+  let authentication;
+  try {
+    authentication = authenticatePublicationProofs({ publicationProofs: selectedProofs, protectedExpectedAuthorities: selectedAuthorities, protectedBaseSha });
+  } catch (error) {
+    throw new TypeError(`browser execution unresolved: publication authentication failed: ${error.message}`);
+  }
+  const boundPublications = authentication.authenticatedPublicationIdentities;
   const identityFor = (capability) => ({ atlasRevision, environmentDigest, protectedBaseSha, protectedRegistryDigest, dataCapability: capability, publication: structuredClone(boundPublications[capability]) });
   const commands = [];
   const partitions = { hostedPlaywright: [], specialistPlaywright: [] };
@@ -115,5 +130,5 @@ export function resolveBrowserExecution({ protectedRegistry, requiredGroups, atl
   requireValue(new Set(commands.map((c) => c.executionKey)).size === commands.length, 'duplicate machine execution');
   requireValue(machineGroups.every((id) => commands.some((c) => c.groupId === id)), 'machine group disappeared');
   requireValue(reviews.every((review) => review.requiredFrames.length && review.machineExecutionKeys.length), 'review evidence disappeared');
-  return { schemaVersion: 1, atlasRevision, environmentDigest, protectedBaseSha, protectedRegistryDigest, publicationIdentities: boundPublications, requestedGroups: [...new Set(requiredGroups)].sort(), machineGroups, commands, partitions, reviews };
+  return { schemaVersion: 1, atlasRevision, environmentDigest, protectedBaseSha, protectedRegistryDigest, publicationTrustReceiptDigest: authentication.trustReceiptDigest, authenticatedPublicationIdentities: boundPublications, requestedGroups: [...new Set(requiredGroups)].sort(), machineGroups, commands, partitions, reviews };
 }

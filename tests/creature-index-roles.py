@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 import importlib.util
+import hashlib
 import json
 from pathlib import Path
 import tempfile
@@ -31,12 +32,21 @@ def main() -> int:
         out=Path(tmp)
         index=module.build(source(),out)
         assert index["source"]["npc_role_schema_version"]==1
+        assert index["counts"]=={"records":2,"chunks":1,"search_records":2}
+        assert index["chunks"][0]["records"]==2
         search=json.loads((out/"search.json").read_text(encoding="utf-8"))
+        search_bytes=(out/"search.json").read_bytes()
+        assert index["search_bytes"]==len(search_bytes)
+        assert index["search_digest"]=="sha256:"+hashlib.sha256(search_bytes).hexdigest()
         npc=next(record for record in search["records"] if record["kind"]=="npc")
         assert npc["roles"]==["bank","quest"]
         assert npc["role_resolution_state"]=="RESOLVED"
         chunk_path=out/index["chunks"][0]["path"]
-        chunk=json.loads(chunk_path.read_text(encoding="utf-8"))
+        chunk_bytes=chunk_path.read_bytes()
+        assert index["chunks"][0]["bytes"]==len(chunk_bytes)
+        assert index["chunks"][0]["digest"]=="sha256:"+hashlib.sha256(chunk_bytes).hexdigest()
+        chunk=json.loads(chunk_bytes)
+        assert [(record["position"]["y"],record["position"]["x"]) for record in chunk["records"]]==[(200,100),(200,101)]
         npc_chunk=next(record for record in chunk["records"] if record["kind"]=="npc")
         assert npc_chunk["roles"]==["bank","quest"]
         assert npc_chunk["role_resolution_state"]=="RESOLVED"
@@ -48,6 +58,14 @@ def main() -> int:
     try: module.validate(bad)
     except ValueError as error: assert "ambiguous" in str(error).lower()
     else: raise AssertionError("ambiguous role metadata must not carry roles")
+    bad=source(); bad["monster_spawns"][0]["roles"]=["quest"]
+    try: module.validate(bad)
+    except ValueError as error: assert "monster" in str(error).lower()
+    else: raise AssertionError("monster role metadata must fail closed")
+    bad=source(); bad["coordinate_profile"]="legacy-z"
+    try: module.validate(bad)
+    except ValueError as error: assert "coordinate" in str(error).lower()
+    else: raise AssertionError("non-canonical coordinates must fail closed")
     print("creature index NPC roles: PASS")
     return 0
 

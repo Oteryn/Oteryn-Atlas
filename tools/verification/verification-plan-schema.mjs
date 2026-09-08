@@ -116,16 +116,22 @@ export function validateVerificationCatalog(candidate) {
       || !(value.capabilities.specialistReason === null || SPECIALIST_REASONS.has(value.capabilities.specialistReason))) {
       invalid(kind, `${id}.capabilities is not explicit semantic metadata`);
     }
-    if (value.capabilities.browser !== (projects.length > 0)) invalid(kind, `${id}.capabilities.browser conflicts with projects`);
+    if (value.capabilities.browser !== (projects.length > 0) && !(value.executionEngine === 'playwright' && !value.capabilities.browser && projects.length > 0)) invalid(kind, `${id}.capabilities.browser conflicts with projects`);
     if (value.capabilities.specialistReason !== null && value.capabilities.hosted) invalid(kind, `${id}.capabilities cannot be hosted and specialist-only`);
     if (value.capabilities.dataCapability === 'real_fullworld'
       && (value.capabilities.hosted || value.capabilities.specialistReason === null)) {
       invalid(kind, `${id}.real_fullworld must be specialist-only`);
     }
-    const stableTestIds = uniqueStrings(value.stableTestIds ?? [], kind, `${id}.stableTestIds`);
+    const projectedFrames = value.executionRole === 'canonical-review' && Array.isArray(candidate.executionPolicy?.browser?.specs)
+      ? candidate.executionPolicy.browser.specs.filter(row => specs.includes(row.spec)).flatMap(row => row.requiredFrames.map(frame => frame.stableTestId)) : null;
+    const stableTestIds = uniqueStrings(projectedFrames ? [...new Set(projectedFrames)] : value.stableTestIds ?? [], kind, `${id}.stableTestIds`);
     const dependsOnGroups = uniqueStrings(value.dependsOnGroups ?? [], kind, `${id}.dependsOnGroups`);
     if (dependsOnGroups.includes(id)) invalid(kind, `${id}.dependsOnGroups cannot include itself`);
+    if (value.executionRole !== undefined && !['canonical-machine', 'canonical-review', 'aggregate', 'legacy-fallback'].includes(value.executionRole)) invalid(kind, `${id}.executionRole is invalid`);
+    if (value.executionEngine !== undefined && !['deterministic', 'playwright', 'aggregate', 'complete-product'].includes(value.executionEngine)) invalid(kind, `${id}.executionEngine is invalid`);
     groups[id] = {
+      ...(value.executionRole ? { executionRole: value.executionRole } : {}),
+      ...(value.executionEngine ? { executionEngine: value.executionEngine } : {}),
       specs,
       projects,
       stableTestIds,

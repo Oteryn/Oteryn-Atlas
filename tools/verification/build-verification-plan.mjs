@@ -198,7 +198,7 @@ function matchesSpecPattern(pattern, spec) {
 }
 
 function stableIdMatchesGroup(id, group) {
-  if (!group.capabilities.browser) return false;
+  if (!group.capabilities.browser && group.executionEngine !== 'playwright') return false;
   const { project, spec } = stableTestCoordinates(id);
   return group.projects.includes(project) && group.specs.some((pattern) => matchesSpecPattern(pattern, spec));
 }
@@ -207,7 +207,7 @@ function exactStableTestIds(groups, protectedStableTestIds) {
   const required = new Set(groups.flatMap((group) => group.stableTestIds));
   const supplied = suppliedStableTestIds(protectedStableTestIds);
   if (!supplied) return [...required].sort();
-  const browserGroups = groups.filter((group) => group.capabilities.browser);
+  const browserGroups = groups.filter((group) => group.capabilities.browser || group.executionEngine === 'playwright');
   for (const id of supplied) {
     if (browserGroups.some((group) => stableIdMatchesGroup(id, group))) required.add(id);
   }
@@ -224,6 +224,8 @@ function mergeCatalogs(trusted, candidate) {
     const resourceClass = RESOURCE_RANK[left.resourceClass] >= RESOURCE_RANK[right.resourceClass]
       ? left.resourceClass : right.resourceClass;
     groups[id] = {
+      ...(left.executionRole && left.executionRole === right.executionRole ? { executionRole: left.executionRole } : {}),
+      ...(left.executionEngine && left.executionEngine === right.executionEngine ? { executionEngine: left.executionEngine } : {}),
       specs: unionStrings(left.specs, right.specs),
       projects: unionStrings(left.projects, right.projects),
       stableTestIds: unionStrings(left.stableTestIds, right.stableTestIds),
@@ -263,7 +265,7 @@ function selectedGroups(groupIds, catalog) {
     resolved.add(id);
   };
   for (const id of groupIds) visit(id);
-  return [...resolved].sort().map((id) => ({ id, ...catalog.groups[id] }));
+  return [...resolved].sort().filter(id => catalog.groups[id].executionRole !== 'aggregate').map((id) => ({ id, ...catalog.groups[id] }));
 }
 
 // Planning can expose useful partial proof while retaining unresolved obligations.

@@ -13,7 +13,15 @@ test('classic palette maps representative visual colors without inventing tile s
 
 test('classic palette transform preserves alpha and pixel count', () => {
   const input = new Uint8ClampedArray([40, 90, 170, 255, 55, 125, 45, 180]);
+  const original = input.slice();
   const output = transformClassicPalette(input);
   assert.deepEqual([...output], [57, 103, 159, 255, 0, 200, 0, 180]);
+  assert.deepEqual(input, original, 'presentation transform must not mutate authenticated source pixels');
+  assert.notEqual(output.buffer, input.buffer);
   assert.equal(output.length, input.length);
+});
+
+test('classic palette transform rejects ambiguous byte containers and partial pixels', () => {
+  assert.throws(() => transformClassicPalette(new Uint8Array(4)), /expects Uint8ClampedArray/);
+  assert.throws(() => transformClassicPalette(new Uint8ClampedArray(3)), /divisible by four/);
 });

@@ -1,17 +1,21 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import path from 'node:path';
 import test from 'node:test';
-import { fileURLToPath } from 'node:url';
+import {buildVerificationPlan} from '../../tools/verification/build-verification-plan.mjs';
+const read=p=>JSON.parse(fs.readFileSync(new URL(`../../tools/verification/${p}`,import.meta.url),'utf8'));
+const catalog=read('verification-catalog.json'),impact=read('impact-manifest.json');
+const input=()=>({repository:'Oteryn/Oteryn-Atlas',headSha:'a'.repeat(40),integrationBaseSha:'b'.repeat(40),mergeBaseSha:'c'.repeat(40),changedFiles:[{path:'tests/verification/example.test.mjs'}],trustedImpactManifest:impact,candidateImpactManifest:impact,trustedVerificationCatalog:catalog,candidateVerificationCatalog:catalog});
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const workflow = fs.readFileSync(path.join(ROOT, '.github/workflows/protected-verification-controller.yml'), 'utf8').replace(/\r\n/g, '\n');
-
-test('base-advance controller safely inherits protected planning policy when a long-lived candidate predates policy files', () => {
-  assert.match(workflow, /git cat-file -e "\$ATLAS_CANDIDATE_HEAD_SHA:\$path"/);
-  assert.match(workflow, /artifacts\/protected-controller\/changed-files\.json "\$path"/);
-  assert.match(workflow, /Candidate changed or removed protected planning policy/);
-  assert.match(workflow, /cp "\$trusted" "\$target"/);
-  assert.match(workflow, /snapshot_candidate_policy tools\/verification\/impact-manifest\.json/);
-  assert.match(workflow, /snapshot_candidate_policy tools\/verification\/verification-catalog\.json/);
+test('base-advance planning rejects absent candidate policy instead of guessing inherited bytes',()=>{
+ assert.equal(buildVerificationPlan(input()).profile,'focused');
+ for(const field of ['trustedImpactManifest','candidateImpactManifest','trustedVerificationCatalog','candidateVerificationCatalog']){
+  const missing=input();delete missing[field];assert.throws(()=>buildVerificationPlan(missing),field);
+ }
+});
+test('candidate narrowing cannot erase the protected plan required groups',()=>{
+ const trusted=buildVerificationPlan(input());
+ const narrowed=structuredClone(impact);
+ for(const entry of narrowed.entries){entry.requiredGroups=[];entry.minimumProfile='none';}
+ const candidate=buildVerificationPlan({...input(),candidateImpactManifest:narrowed});
+ for(const id of trusted.requiredGroupIds)assert.ok(candidate.requiredGroupIds.includes(id),id);
 });
