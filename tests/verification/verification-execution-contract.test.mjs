@@ -276,6 +276,36 @@ test('actual container evidence rejects extra writable mounts, capabilities, cre
 });
 }
 
+import {prepareExecutionView,verifyExecutionView,assertContainerStarted} from '../../tools/verification/run-verification-shadow.mjs';
+test('execution view preserves tracked bytes/modes and Git identity while isolating the dependency mountpoint',t=>{
+ const temporary=fs.mkdtempSync(path.join(os.tmpdir(),'atlas-execution-view-test-'));t.after(()=>fs.rmSync(temporary,{recursive:true,force:true}));
+ const sourceRoot=path.join(temporary,'source'),destination=path.join(temporary,'view');fs.mkdirSync(sourceRoot);
+ const git=(...args)=>{const r=spawnSync('git',['-C',sourceRoot,...args],{encoding:'utf8'});assert.equal(r.status,0,r.stderr);return r.stdout.trim();};
+ git('init');git('config','user.name','Fixture');git('config','user.email','fixture@example.invalid');
+ fs.mkdirSync(path.join(sourceRoot,'e2e'));fs.writeFileSync(path.join(sourceRoot,'e2e/package.json'),'{}\n');fs.writeFileSync(path.join(sourceRoot,'run.sh'),'#!/bin/sh\nexit 0\n',{mode:0o755});
+ git('add','.');git('commit','-m','fixture');const revision=git('rev-parse','HEAD');
+ prepareExecutionView({sourceRoot,revision,destination});
+ const input={viewRoot:destination,sourceRoot,revision};assert.equal(verifyExecutionView(input),true);
+ assert.equal(fs.existsSync(path.join(sourceRoot,'e2e/node_modules')),false);assert.equal(git('status','--porcelain'),'');
+ const copyGit=spawnSync('git',['-C',destination,'rev-parse','HEAD'],{encoding:'utf8'});assert.equal(copyGit.stdout.trim(),revision);
+ const target=path.join(destination,'run.sh'),original=fs.readFileSync(target);
+ fs.writeFileSync(target,'mutated');assert.throws(()=>verifyExecutionView(input),/bytes or mode/);fs.writeFileSync(target,original);
+ fs.chmodSync(target,0o644);assert.throws(()=>verifyExecutionView(input),/bytes or mode/);fs.chmodSync(target,0o755);
+ fs.writeFileSync(path.join(destination,'extra'),'extra');assert.throws(()=>verifyExecutionView(input),/unexpected execution view/);fs.unlinkSync(path.join(destination,'extra'));
+ fs.symlinkSync('/etc/passwd',path.join(destination,'link'));assert.throws(()=>verifyExecutionView(input),/symlink/);fs.unlinkSync(path.join(destination,'link'));
+ fs.writeFileSync(path.join(destination,'e2e/node_modules/extra'),'extra');assert.throws(()=>verifyExecutionView(input),/unexpected execution view/);fs.unlinkSync(path.join(destination,'e2e/node_modules/extra'));
+ fs.unlinkSync(target);assert.throws(()=>verifyExecutionView(input),/census/);
+ fs.writeFileSync(path.join(sourceRoot,'run.sh'),'source mutation');assert.throws(()=>prepareExecutionView({sourceRoot,revision,destination:path.join(temporary,'other')}),/cleanliness/);
+});
+test('Docker startup failures expose bounded diagnostics and never attest executed specs',()=>{
+ const started={State:{StartedAt:'2026-09-08T00:00:00.000Z',Error:'',ExitCode:1}};
+ assert.equal(assertContainerStarted(started,{status:1}),true);
+ for(const container of [null,{State:{StartedAt:'0001-01-01T00:00:00Z',Error:'mount destination missing',ExitCode:125}},{State:{...started.State,Error:'mount failed'}}]) {
+  assert.throws(()=>assertContainerStarted(container,{status:125,stderr:'x'.repeat(10000)+' DIAGNOSTIC_TAIL'}),error=>error.message.includes('no specs executed')&&error.message.includes('DIAGNOSTIC_TAIL')&&error.message.length<5000);
+ }
+ assert.throws(()=>assertContainerStarted(started,{status:125}),/never started/);
+});
+
 test('candidate path traversal cannot enter an execution contract',()=>{
  const input=executionInput('tests/../outside.mjs');
  // R4 negative qualification: the next exact head restores the fail-closed assertion.
