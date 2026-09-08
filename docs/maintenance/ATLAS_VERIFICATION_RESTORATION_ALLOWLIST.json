@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "programme": "atlas-verification-restoration",
-  "phase": "r1-r4",
+  "phase": "r1-r5",
   "rules": [
     {
       "path": "tests/creature-gameplay-profiles.mjs",
@@ -629,6 +629,24 @@
     },
     {
       "path": "e2e/tests/layer-audit-desktop.spec.mjs",
+      "operations": [
+        "M"
+      ]
+    },
+    {
+      "path": "tools/fullworld-layers/verify_authority_registry.py",
+      "operations": [
+        "M"
+      ]
+    },
+    {
+      "path": "web/fullworld-farm-explorer.mjs",
+      "operations": [
+        "M"
+      ]
+    },
+    {
+      "path": "tools/build-semantic-search-index.py",
       "operations": [
         "M"
       ]

@@ -11,6 +11,11 @@ const verifier=path.join(sourceRoot,'tools/maintenance/verify-maintenance-diff.m
 const restoration='docs/maintenance/ATLAS_VERIFICATION_RESTORATION_ALLOWLIST.json';
 const remediation='docs/maintenance/ATLAS_REMEDIATION_ALLOWLIST.json';
 const obsolete='docs/maintenance/OBSOLETE_VERIFICATION_CONTRACTS.json';
+const r5CanaryPaths=[
+  'tools/fullworld-layers/verify_authority_registry.py',
+  'web/fullworld-farm-explorer.mjs',
+  'tools/build-semantic-search-index.py',
+];
 const readSource=name=>fs.readFileSync(path.join(sourceRoot,name),'utf8');
 function git(root,...args){return execFileSync('git',['-C',root,'-c','core.hooksPath=/dev/null',...args],{encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim();}
 function put(root,name,content='export {};\n'){const target=path.join(root,name);fs.mkdirSync(path.dirname(target),{recursive:true});fs.writeFileSync(target,content);}
@@ -22,6 +27,7 @@ function fixture(t){
   put(trusted,restoration,readSource(restoration));put(trusted,remediation,readSource(remediation));put(trusted,obsolete,readSource(obsolete));
   put(trusted,'tools/verification/verification-execution-contract.mjs');
   put(trusted,'tools/verification/build-verification-plan.mjs');
+  for(const name of r5CanaryPaths)put(trusted,name);
   put(trusted,'src/browser/semantic.mjs');
   put(trusted,'tests/browser-semantic.mjs');
   put(trusted,'tests/existing.mjs',"import test from 'node:test';test('existing',()=>{});\n");
@@ -66,6 +72,29 @@ test('test delete, runtime-changing rename and control-plane rename fail closed'
 
 test('candidate restoration authority cannot self-admit unrelated code',t=>{
   const f=fixture(t);const manifest=JSON.parse(fs.readFileSync(path.join(f.candidate,restoration),'utf8'));manifest.rules.push({path:'web/rogue.mjs',operations:['M']});put(f.candidate,restoration,`${JSON.stringify(manifest)}\n`);put(f.candidate,'web/rogue.mjs','// candidate\n');f.commit();const r=f.invoke();assert.equal(r.status,1);assert.match(r.stderr,/maintenance authority is immutable/);
+});
+
+test('protected R5 authority admits only the three exact canary paths equivalently for PR and MQ',t=>{
+  for(const name of r5CanaryPaths){
+    const f=fixture(t);put(f.candidate,name,'// realistic R5 canary\n');f.commit();
+    const pr=f.invoke();pass(pr);
+    const head=git(f.candidate,'rev-parse','HEAD');
+    const mq=f.invoke({GITHUB_EVENT_NAME:'merge_group',ATLAS_BASE_REF:'refs/heads/main',ATLAS_EVENT_ACTION:'checks_requested',ATLAS_PR_NUMBER:'',GITHUB_SHA:head});
+    pass(mq);assert.equal(pr.stdout,mq.stdout);
+  }
+  for(const name of [
+    'tools/fullworld-layers/verify_authority_registry-extra.py',
+    'web/fullworld-farm-explorer-extra.mjs',
+    'tools/build-semantic-search-index-extra.py',
+  ]){
+    const f=fixture(t);put(f.candidate,name,'// near-neighbor\n');f.commit();
+    const result=f.invoke();assert.equal(result.status,1);assert.match(result.stderr,/maintenance path is frozen/);
+  }
+  const self=fixture(t);
+  const manifest=JSON.parse(fs.readFileSync(path.join(self.candidate,restoration),'utf8'));
+  manifest.rules.push({path:'web/r5-self-admitted.mjs',operations:['M']});
+  put(self.candidate,restoration,`${JSON.stringify(manifest)}\n`);put(self.candidate,'web/r5-self-admitted.mjs');self.commit();
+  const rejected=self.invoke();assert.equal(rejected.status,1);assert.match(rejected.stderr,/maintenance authority is immutable/);
 });
 
 test('test-subject authority does not open unrelated runtime or mixed remediation lanes',t=>{
