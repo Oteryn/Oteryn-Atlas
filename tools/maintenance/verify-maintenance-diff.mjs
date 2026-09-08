@@ -101,7 +101,7 @@ function loadVerificationRestorationAuthority(base){
   if(mode(trustedRoot,base,VERIFICATION_RESTORATION_ALLOWLIST)===null)return [];
   const raw=protectedJson(base,VERIFICATION_RESTORATION_ALLOWLIST);
   exactKeys(raw,['schemaVersion','programme','phase','rules'],'restoration allowlist');
-  if(raw.schemaVersion!==1||raw.programme!=='atlas-verification-restoration'||!['r1-r3','r1-r4'].includes(raw.phase)||!Array.isArray(raw.rules)||!raw.rules.length||raw.rules.length>104)fail('restoration allowlist identity is invalid');
+  if(raw.schemaVersion!==1||raw.programme!=='atlas-verification-restoration'||!['r1-r3','r1-r4'].includes(raw.phase)||!Array.isArray(raw.rules)||!raw.rules.length||raw.rules.length>105)fail('restoration allowlist identity is invalid');
   const paths=new Set(),rules=[];
   for(const rule of raw.rules){
     exactKeys(rule,['operations','path'],'restoration rule');

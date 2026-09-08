@@ -626,6 +626,12 @@
       "operations": [
         "M"
       ]
+    },
+    {
+      "path": "e2e/tests/layer-audit-desktop.spec.mjs",
+      "operations": [
+        "M"
+      ]
     }
   ]
 }
