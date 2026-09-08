@@ -265,11 +265,10 @@ test('R5 C2 selects the minimal fixture browser and deterministic farm obligatio
   assert.deepEqual(result.requiredVisualGroupIds, []);
 });
 
-test('R5 C3 replaces broad core with exact search, fixture navigation and bounded source obligations', () => {
+test('R5 C3 selects exact search and bounded-source obligations without unrelated fixture navigation', () => {
   const result = r5Plan('tools/build-semantic-search-index.py');
   assert.deepEqual(result.requiredGroupIds, [
     'deterministic.search',
-    'e2e.search-navigation',
     'integration.source-contract-browser',
   ]);
   assert.deepEqual(result.requiredDataCapabilities, ['bounded_real_world', 'qualification_fixture']);
@@ -278,7 +277,10 @@ test('R5 C3 replaces broad core with exact search, fixture navigation and bounde
     'tests/semantic-search-creatures.mjs',
     'tests/semantic-search.mjs',
   ]);
-  assert.equal(result.stableTestIds.length, 5);
+  assert.deepEqual(result.stableTestIds, [
+    'desktop-chromium::e2e/tests/api-contract-desktop.spec.mjs::browser search diagnostics match published semantic API contracts',
+    'desktop-chromium::e2e/tests/api-contract-desktop.spec.mjs::published API records render unchanged through browser search',
+  ]);
   assert.deepEqual(result.requiredVisualGroupIds, []);
 });
 
@@ -316,15 +318,13 @@ test('R5 bounded semantic publication derives from one exact authenticated Game 
     protectedExpectedAuthorities: { qualification_fixture: fixture.protectedExpectedAuthorities.qualification_fixture },
     selectedSemanticFiles: publication.selectedFiles,
   });
-  assert.equal(contract.commands.length, 7);
+  assert.equal(contract.commands.length, 5);
   assert.deepEqual(contract.commands.map(({ engine, dataCapability }) => `${engine}:${dataCapability}`).sort(), [
     'deterministic:qualification_fixture',
     'deterministic:qualification_fixture',
     'deterministic:qualification_fixture',
     'deterministic:qualification_fixture',
     'playwright:bounded_real_world',
-    'playwright:qualification_fixture',
-    'playwright:qualification_fixture',
   ]);
   const oracle = contract.commands.find(({ executionScope }) => executionScope === 'protected-harness');
   assert.deepEqual(oracle.groupIds, ['deterministic.search']);
