@@ -213,6 +213,12 @@ async function selectedSource() {
   return buildSelectedGameplaySource(inputs);
 }
 
+export function fixtureReadinessEnvironment(contract) {
+  return {ATLAS_PLAN_SEMANTIC_DIGEST:contract.identity.planDigest,
+    ATLAS_PLAN_INSTANCE_DIGEST:contract.contractDigest,
+    ATLAS_ENVIRONMENT_DIGEST:`sha256:${contract.identity.environmentDigest}`};
+}
+
 function runFixture(command,{candidate,contract,fixture,directory,root}) {
   const context=path.join(directory,'fixture-context');fs.mkdirSync(context);
   for(const relative of ['web','src']) fs.cpSync(path.join(root,relative),path.join(context,relative),{recursive:true});
@@ -229,9 +235,9 @@ function runFixture(command,{candidate,contract,fixture,directory,root}) {
   const env={PATH:process.env.PATH,HOME:process.env.HOME,ATLAS_EXECUTION_CONTEXT:context,ATLAS_CODE_REVISION:candidate.headSha,
     ATLAS_QUALIFICATION_PUBLICATION_HOST:path.join(directory,'fixture'),ATLAS_QUALIFICATION_TRUST_JSON:JSON.stringify(qualificationTrustDescriptor(fixture.manifest)),
     ATLAS_PROTECTED_TEST_LIST:list,ATLAS_E2E_ARTIFACTS_HOST:artifacts,ATLAS_E2E_SHARD:'1/1',ATLAS_E2E_WORKERS:'1',
-    ATLAS_E2E_DATA_CAPABILITY:'qualification_fixture',ATLAS_PLAN_SEMANTIC_DIGEST:contract.identity.planDigest,
-    ATLAS_PLAN_INSTANCE_DIGEST:contract.contractDigest,ATLAS_AUTHORITY_DIGEST:fixture.authority.authorityDigest,
-    ATLAS_ENVIRONMENT_DIGEST:contract.identity.environmentDigest,GITHUB_RUN_ID:process.env.GITHUB_RUN_ID,GITHUB_REPOSITORY:REPOSITORY};
+    ATLAS_E2E_DATA_CAPABILITY:'qualification_fixture',...fixtureReadinessEnvironment(contract),
+    ATLAS_AUTHORITY_DIGEST:fixture.authority.authorityDigest,
+    GITHUB_RUN_ID:process.env.GITHUB_RUN_ID,GITHUB_REPOSITORY:REPOSITORY};
   try {
     for(const setup of [['build','e2e'],['up','-d','--wait','--wait-timeout','180','atlas-web']]) {
       const result=spawnSync('docker',[...args,...setup],{env,encoding:'utf8',timeout:300000,maxBuffer:16*1024*1024});
