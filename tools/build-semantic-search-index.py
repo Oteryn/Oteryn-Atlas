@@ -15,6 +15,7 @@ EXPECTED_PROFILE = "oteryn-game-atlas-semantic-search-v1"
 MAX_RECORDS = 250_000
 MAX_ALIASES = 32
 MAX_CAPABILITIES = 32
+MAX_SAFE_INTEGER = 2**53 - 1
 SHA = re.compile(r"^[0-9a-f]{40}$")
 ALLOWED_KINDS = {"npc", "monster", "town", "waypoint", "poi", "teleport", "house", "quest_area", "mechanic"}
 RANKING = {
@@ -57,7 +58,7 @@ def validate_source(source: dict[str, Any]) -> list[dict[str, Any]]:
     if not isinstance(aliases, dict) or len(aliases) > 64:
         raise ValueError("invalid input floor aliases")
     for key, value in aliases.items():
-        if not re.fullmatch(r"-?\d+", str(key)) or str(int(key)) != key or type(value) is not int:
+        if not re.fullmatch(r"-?\d+", str(key)) or str(int(key)) != key or abs(int(key)) > MAX_SAFE_INTEGER or type(value) is not int or abs(value) > MAX_SAFE_INTEGER:
             raise ValueError("invalid input floor alias")
     records = source.get("records")
     if not isinstance(records, list) or len(records) > MAX_RECORDS:
