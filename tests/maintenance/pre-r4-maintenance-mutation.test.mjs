@@ -23,6 +23,7 @@ function fixture(t){
   put(trusted,'tools/verification/verification-execution-contract.mjs');
   put(trusted,'tools/verification/build-verification-plan.mjs');
   put(trusted,'src/browser/semantic.mjs');
+  put(trusted,'tests/browser-semantic.mjs');
   put(trusted,'tests/existing.mjs',"import test from 'node:test';test('existing',()=>{});\n");
   put(trusted,'tests/old.mjs',"import test from 'node:test';test('old',()=>{});\n");
   put(trusted,'tools/maintenance/helper.mjs');put(trusted,'web/rogue.mjs');
@@ -46,6 +47,11 @@ test('existing exact restoration path admitted historically as A may evolve thro
 test('safe deterministic test subjects admit A and M without becoming restoration authority paths',t=>{
   const added=fixture(t);put(added.candidate,'tests/new-subject.mjs');added.commit();pass(added.invoke());
   const modified=fixture(t);put(modified.candidate,'tests/existing.mjs','// candidate subject bytes\n');modified.commit();pass(modified.invoke());
+});
+
+test('existing remediation-owned deterministic tests keep their protected remediation lane',t=>{
+  const f=fixture(t);put(f.candidate,'src/browser/semantic.mjs','// changed source\n');put(f.candidate,'tests/browser-semantic.mjs','// changed test\n');f.commit();
+  const result=f.invoke();assert.equal(result.status,0,result.stderr);assert.match(result.stdout,/"mode":"bounded-remediation"/);assert.match(result.stdout,/"remediationLane":"geometry"/);
 });
 
 test('safe same-runtime deterministic test rename is admitted',t=>{
