@@ -311,6 +311,5 @@ test('Docker startup failures expose bounded diagnostics and never attest execut
 
 test('candidate path traversal cannot enter an execution contract',()=>{
  const input=executionInput('tests/../outside.mjs');
- // R4 negative qualification: the next exact head restores the fail-closed assertion.
- assert.doesNotThrow(()=>resolveExecutionContract(input));
+ assert.throws(()=>resolveExecutionContract(input),/candidate readback path/);
 });
