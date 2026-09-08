@@ -6,7 +6,7 @@ import {createHash, randomUUID} from 'node:crypto';
 import {execFileSync, spawnSync} from 'node:child_process';
 import {buildVerificationPlan, assertPlanExecutable} from './build-verification-plan.mjs';
 import {R5_SEMANTIC_BUILDER_ORACLE, R5_SEMANTIC_BUILDER_ORACLE_DIGEST, R5_SEMANTIC_SOURCE, resolveExecutionContract, assertCandidateReadback, verifyR5SemanticProduct} from './verification-execution-contract.mjs';
-import {readCandidateSnapshot, gitChangedFiles, githubRequest} from './protected-candidate-snapshot.mjs';
+import {readCandidateSnapshot, gitChangedFiles, githubRequest, resolveDirectMergeGroup} from './protected-candidate-snapshot.mjs';
 import {buildProtectedExecutionEnvironmentIdentity} from './protected-execution-environment.mjs';
 import {canonicalJson} from './verification-plan-schema.mjs';
 import {buildQualificationWorld, verifyQualificationWorld, qualificationTrustDescriptor} from './qualification-world.mjs';
@@ -27,13 +27,13 @@ const git=(root,...args)=>execFileSync('git',['--no-replace-objects','-C',root,'
 const gitBlob=(root,revision,name)=>execFileSync('git',['--no-replace-objects','-C',root,'-c','core.hooksPath=/dev/null','show',`${revision}:${name}`],{maxBuffer:2*1024*1024});
 const controlRoot=path.resolve(fileURLToPath(new URL('../../',import.meta.url)));
 
-// workflow_run loads this workflow from protected main, after the existing MQ
-// gate. A merge-group candidate never supplies executable workflow or control.
-export async function resolveShadowEvent({eventName,event,githubSha,request=githubRequest}) {
+// pull_request_target and merge_group both load protected workflow authority.
+// Candidate content is inert input and never supplies executable control metadata.
+export async function resolveShadowEvent({eventName,event,githubSha,githubRef,request=githubRequest}) {
   if(event?.repository?.full_name!==REPOSITORY||event.repository.default_branch!=='main') fail('event repository');
-  const base=(await request(`/repos/${REPOSITORY}/git/ref/heads/main`)).object?.sha;
-  if(!sha(base)) fail('protected main revision');
   if(eventName==='pull_request_target') {
+    const base=(await request(`/repos/${REPOSITORY}/git/ref/heads/main`)).object?.sha;
+    if(!sha(base)) fail('protected main revision');
     const pr=event.pull_request;
     if(!['opened','reopened','synchronize','edited','ready_for_review'].includes(event.action)
       ||pr?.base?.ref!=='main'||pr.base.sha!==base||pr.base.repo?.full_name!==REPOSITORY
@@ -41,18 +41,9 @@ export async function resolveShadowEvent({eventName,event,githubSha,request=gith
       ||!Number.isSafeInteger(pr.number)||pr.number<1) fail('PR event identity');
     return {repository:REPOSITORY,baseSha:base,headSha:pr.head.sha,prNumber:pr.number,parentRunId:null,event:'pull_request_target'};
   }
-  if(eventName!=='workflow_run'||event.action!=='completed'||!sha(githubSha)) fail('protected workflow event');
-  const supplied=event.workflow_run;
-  if(!Number.isSafeInteger(supplied?.id)||supplied.id<1) fail('parent run id');
-  const run=await request(`/repos/${REPOSITORY}/actions/runs/${supplied.id}`);
-  if(run.id!==supplied.id||run.repository?.full_name!==REPOSITORY||run.event!=='merge_group'
-    ||run.path!=='.github/workflows/merge-group-gate.yml'||run.conclusion!=='success'
-    ||run.status!=='completed'||run.run_attempt!==1||!sha(run.head_sha)
-    ||!run.head_branch?.startsWith('gh-readonly-queue/main/')||run.head_sha!==supplied.head_sha) fail('successful exact MQ parent');
-  const commit=await request(`/repos/${REPOSITORY}/git/commits/${run.head_sha}`);
-  const mqBase=commit.parents?.[0]?.sha;
-  if(commit.sha!==run.head_sha||!sha(mqBase)||![mqBase,run.head_sha].includes(base)||![mqBase,run.head_sha].includes(githubSha)||(base===mqBase&&githubSha===run.head_sha)) fail('MQ base moved');
-  return {repository:REPOSITORY,baseSha:mqBase,headSha:run.head_sha,prNumber:null,parentRunId:run.id,event:'workflow_run'};
+  if(eventName!=='merge_group') fail('protected workflow event');
+  const group=await resolveDirectMergeGroup({request,repository:REPOSITORY,defaultBranch:'main',event,githubSha,githubRef});
+  return {repository:REPOSITORY,baseSha:group.baseSha,headSha:group.headSha,prNumber:null,parentRunId:null,event:'merge_group',treeSha:group.treeSha,headRef:group.headRef};
 }
 
 function assertCheckout(root,revision) {
@@ -95,8 +86,6 @@ export function verifyExecutionView({viewRoot,sourceRoot,revision}) {
 export function prepareExecutionView({sourceRoot,revision,destination}) {
   assertCheckout(sourceRoot,revision);executionEntries(sourceRoot,revision);
   if(fs.existsSync(destination)||path.resolve(destination).startsWith(path.resolve(sourceRoot)+path.sep))fail('execution view destination');
-  // A fresh local clone preserves exact Git history for tests without copying
-  // checkout credentials/configuration or sharing writable object hardlinks.
   const env={PATH:process.env.PATH,GIT_CONFIG_GLOBAL:'/dev/null',GIT_CONFIG_NOSYSTEM:'1',GIT_TERMINAL_PROMPT:'0'};
   execFileSync('git',['-c','core.hooksPath=/dev/null','clone','--quiet','--no-hardlinks','--no-checkout','--',sourceRoot,destination],{stdio:'pipe',env});
   const viewGit=(...args)=>execFileSync('git',['--no-replace-objects','-C',destination,'-c','core.hooksPath=/dev/null',...args],{stdio:'pipe',env});
@@ -132,8 +121,6 @@ export function planShadow({candidate,root,protectedRoot}) {
   return {plan,input:{root,protectedRoot,candidate,planInput,protectedCatalog,protectedImpactManifest,protectedStableTestIds}};
 }
 
-// No language-owned reporter is accepted as evidence that a candidate assertion
-// ran. This census attests exact processes/spec files and their external exits.
 export function deterministicDockerArgs({command,candidateRoot,dependencyRoot,shimRoot,protectedHarnessFile,protectedInputFile,image,containerName}) {
   if(command.engine!=='deterministic'||command.cwd!=='.'||!['node','python','python3'].includes(command.argv?.[0])
     ||!command.argv.slice(1).every(value=>typeof value==='string')||!/^sha256:[a-f0-9]{64}$/.test(command.id)) fail('deterministic command');
@@ -182,7 +169,6 @@ function executeDeterministic(command,root,image,dependencyRoot,shimRoot,protect
   let result,container;
   try {
     result=spawnSync('docker',argv,{encoding:'utf8',timeout:command.timeoutSeconds*1000,maxBuffer:16*1024*1024,env:{PATH:process.env.PATH,HOME:process.env.HOME}});
-    // Inspect the actual container, even for timeout/nonzero/daemon failures.
     try {container=JSON.parse(execFileSync('docker',['inspect',name],{encoding:'utf8'}))[0];} catch {assertContainerStarted(null,result);}
     assertContainerStarted(container,result);
     assertDeterministicContainer(container,{command,candidateRoot:root,dependencyRoot,shimRoot,protectedHarnessFile,protectedInputFile,image});
@@ -288,8 +274,6 @@ function runPublicationBrowser(command,{candidate,contract,publication,directory
   const suffix=command.id.slice('sha256:'.length,'sha256:'.length+12);
   const context=path.join(directory,`browser-context-${suffix}`);fs.mkdirSync(context);
   for(const relative of ['web','src']) fs.cpSync(path.join(root,relative),path.join(context,relative),{recursive:true});
-  // Candidate web/source bytes are inert inputs. Every executable harness byte
-  // comes from the authenticated protected checkout.
   fs.cpSync(path.join(controlRoot,'e2e'),path.join(context,'e2e'),{recursive:true,filter:p=>!p.split(path.sep).includes('node_modules')});
   fs.mkdirSync(path.join(context,'tools','verification'),{recursive:true});
   fs.copyFileSync(path.join(controlRoot,'tools/verification/stable-id.mjs'),path.join(context,'tools/verification/stable-id.mjs'));
@@ -331,30 +315,24 @@ export async function runShadow(mode,root) {
   if(!['plan','execute'].includes(mode)) fail('mode');
   root=path.resolve(root);
   if(process.env.GITHUB_RUN_ATTEMPT!=='1') fail('reruns are not shadow evidence');
-  const event=await resolveShadowEvent({eventName:process.env.GITHUB_EVENT_NAME,event:readJson(process.env.GITHUB_EVENT_PATH),githubSha:process.env.GITHUB_SHA});
+  const event=await resolveShadowEvent({eventName:process.env.GITHUB_EVENT_NAME,event:readJson(process.env.GITHUB_EVENT_PATH),githubSha:process.env.GITHUB_SHA,githubRef:process.env.GITHUB_REF});
   assertCheckout(controlRoot,event.baseSha);assertCheckout(root,event.headSha);
   if(git(root,'merge-base',event.baseSha,event.headSha)!==event.baseSha) fail('candidate base ancestry');
-  if(!git(controlRoot,'ls-tree',process.env.GITHUB_SHA,'--',ACTIVE).startsWith('100644 blob ')
-    ||!gitBlob(controlRoot,process.env.GITHUB_SHA,ACTIVE).equals(fs.readFileSync(path.join(controlRoot,TEMPLATE)))) fail('protected workflow/template bytes');
-  if(event.event==='workflow_run') {
-    const gate='.github/workflows/merge-group-gate.yml';
-    if(!git(controlRoot,'ls-tree',event.baseSha,'--',gate).startsWith('100644 blob ')
-      ||!git(root,'ls-tree',event.headSha,'--',gate).startsWith('100644 blob ')
-      ||!gitBlob(root,event.headSha,gate).equals(gitBlob(controlRoot,event.baseSha,gate))) fail('parent MQ gate workflow differs from protected source');
-  }
-  const candidate=await readCandidateSnapshot({...event,allowJustIntegratedHead:event.event==='workflow_run',changedFiles:gitChangedFiles(root,event.baseSha,event.headSha)});
+  if(!git(controlRoot,'ls-tree',event.baseSha,'--',ACTIVE).startsWith('100644 blob ')
+    ||!gitBlob(controlRoot,event.baseSha,ACTIVE).equals(fs.readFileSync(path.join(controlRoot,TEMPLATE)))) fail('protected workflow/template bytes');
+  const candidate=await readCandidateSnapshot({...event,changedFiles:gitChangedFiles(root,event.baseSha,event.headSha)});
+  if(event.treeSha&&candidate.treeSha!==event.treeSha) fail('event candidate tree differs from API tree');
   if(git(root,'rev-parse','HEAD^{tree}')!==candidate.treeSha) fail('API tree differs from checkout');
   const currentRunId=Number(process.env.GITHUB_RUN_ID);
   if(!Number.isSafeInteger(currentRunId)||currentRunId<1) fail('current run id');
   const currentRun=await githubRequest(`/repos/${REPOSITORY}/actions/runs/${currentRunId}`);
   if(currentRun.id!==currentRunId||currentRun.repository?.full_name!==REPOSITORY||currentRun.path!==ACTIVE
     ||currentRun.event!==event.event||currentRun.run_attempt!==1||currentRun.status!=='in_progress'
-    ||currentRun.head_sha!==(event.event==='pull_request_target'?event.headSha:process.env.GITHUB_SHA)) fail('current run API identity');
+    ||currentRun.head_sha!==event.headSha) fail('current run API identity');
   const {plan,input}=planShadow({candidate,root,protectedRoot:controlRoot});
-  const summary={schemaVersion:1,mode:'nonblocking-shadow',candidate,event: event.event,parentRunId:event.parentRunId,
-    runId:currentRunId,runAttempt:1,workflowSourceRevision:process.env.GITHUB_SHA,apiRunHeadSha:currentRun.head_sha,planDigest:digest(plan),groups:plan.groups.map(g=>g.id),
-    parentWorkflowDigest:event.parentRunId?bytesDigest(fs.readFileSync(path.join(controlRoot,'.github/workflows/merge-group-gate.yml'))):null,
-    workflowDigest:bytesDigest(fs.readFileSync(path.join(controlRoot,TEMPLATE))),results:[],status:'UNRESOLVED'};
+  const summary={schemaVersion:1,mode:'nonblocking-shadow',candidate,event:event.event,parentRunId:null,
+    runId:currentRunId,runAttempt:1,workflowSourceRevision:event.baseSha,apiRunHeadSha:currentRun.head_sha,planDigest:digest(plan),groups:plan.groups.map(g=>g.id),
+    parentWorkflowDigest:null,workflowDigest:bytesDigest(fs.readFileSync(path.join(controlRoot,TEMPLATE))),results:[],status:'UNRESOLVED'};
   const hasWork=plan.groups.length>0||plan.candidateTestSubjects.length>0;
   summary.candidateTestSubjects=plan.candidateTestSubjects;
   if(!hasWork) {summary.status='NO_PRODUCT_WORK';summary.commands=[];}
@@ -398,7 +376,7 @@ export async function runShadow(mode,root) {
         summary.results.push(runPublicationBrowser(command,{candidate,contract,publication:{...product,root:command.dataCapability==='qualification_fixture'?path.join(directory,'fixture'):path.join(directory,'bounded'),trustDescriptor:command.dataCapability==='qualification_fixture'?qualificationTrustDescriptor(product.manifest):boundedRealTrustDescriptor(product.manifest)},directory,root}));
       } else fail('unsupported command');
     }
-    const current=await readCandidateSnapshot({...event,allowJustIntegratedHead:event.event==='workflow_run',changedFiles:gitChangedFiles(root,event.baseSha,event.headSha)});
+    const current=await readCandidateSnapshot({...event,changedFiles:gitChangedFiles(root,event.baseSha,event.headSha)});
     assertCandidateReadback({planned:candidate,current,sourceRepository:REPOSITORY,sourceRef:'refs/heads/main',sourceRevision:event.baseSha});
     assertCheckout(root,event.headSha);
     summary.status=summary.results.length===contract.commands.length&&summary.results.every(row=>row.passed)?'PASS':'FAIL';
