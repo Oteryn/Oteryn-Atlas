@@ -1,4 +1,3 @@
-// R4 hosted qualification: exercise this exact protected machine owner.
 import { expect, test } from '@playwright/test';
 import { gotoAtlas, waitForAtlas } from './runtime.mjs';
 
