@@ -219,6 +219,11 @@ export function fixtureReadinessEnvironment(contract) {
     ATLAS_ENVIRONMENT_DIGEST:`sha256:${contract.identity.environmentDigest}`};
 }
 
+export function fixtureBrowserArgs(composeArgs,{uid=process.getuid(),gid=process.getgid()}={}) {
+  if(!Number.isSafeInteger(uid)||uid<0||!Number.isSafeInteger(gid)||gid<0) fail('fixture host identity');
+  return [...composeArgs,'run','--user',`${uid}:${gid}`,'--rm','--no-deps','e2e'];
+}
+
 function runFixture(command,{candidate,contract,fixture,directory,root}) {
   const context=path.join(directory,'fixture-context');fs.mkdirSync(context);
   for(const relative of ['web','src']) fs.cpSync(path.join(root,relative),path.join(context,relative),{recursive:true});
@@ -250,7 +255,7 @@ function runFixture(command,{candidate,contract,fixture,directory,root}) {
         fail('fixture protected service setup failed');
       }
     }
-    const result=spawnSync('docker',[...args,'run','--rm','--no-deps','e2e'],{env,encoding:'utf8',timeout:command.timeoutSeconds*1000,maxBuffer:16*1024*1024});
+    const result=spawnSync('docker',fixtureBrowserArgs(args),{env,encoding:'utf8',timeout:command.timeoutSeconds*1000,maxBuffer:16*1024*1024});
     if(result.error||result.status!==0||result.signal) {console.error(JSON.stringify({phase:'fixture-browser',exitCode:result.status,signal:result.signal,error:result.error?.message??null,stdout:String(result.stdout??'').slice(-12288),stderr:String(result.stderr??'').slice(-4096)}));fail('fixture browser execution failed');}
     const report=readJson(path.join(artifacts,'results.json'));
     const observed=[];
