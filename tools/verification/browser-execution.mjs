@@ -15,12 +15,40 @@ function unique(values, label) {
 }
 const digest = (value) => `sha256:${createHash('sha256').update(canonicalJson(value)).digest('hex')}`;
 const same = (left, right) => JSON.stringify(left) === JSON.stringify(right);
+const freeze = (value) => { if (value && typeof value === 'object' && !Object.isFrozen(value)) { Object.values(value).forEach(freeze); Object.freeze(value); } return value; };
+const raw = (value, label) => { if (!(Buffer.isBuffer(value) || value instanceof Uint8Array)) throw new TypeError(`selected semantic source invalid: ${label} requires raw bytes`); return Buffer.from(value); };
+const bytesDigest = (value) => `sha256:${createHash('sha256').update(value).digest('hex')}`;
+export const R5_SEMANTIC_SOURCE = freeze({
+  id: 'semanticSearchSource', repository: 'Oteryn/Oteryn-Game', revision: '54f19765c07e3b33ce2d9c10ad57df4818434a52',
+  path: 'tools/game-atlas-semantic-search/fixtures/acceptance-source.json', blob: '5df1e399398635f64cc3afcab29ad5afa648ba25',
+  digest: 'sha256:a101cfaf07b83affd2896e480a51898d609a445216190621b54b002667e83a88', bytes: 2577,
+});
+const R5_SEMANTIC_OUTPUTS = freeze([
+  { path: 'web/semantic-search/index.json', digest: 'sha256:080518a6ef859b1e277f2305178faee8a76e22e247266f8950c1feb66d02a3e6', bytes: 3405 },
+  { path: 'web/semantic-search/creatures.json', digest: 'sha256:668a6c85065beea9dd103dd47729e07f6afd4952b66fe9ea20557e62c104c4a6', bytes: 478872 },
+]);
+
+export function verifyR5SemanticProduct(value) {
+  const keys = ['sourceBytes', ...R5_SEMANTIC_OUTPUTS.map(({ path }) => path)];
+  if (!value || typeof value !== 'object' || Array.isArray(value) || JSON.stringify(Object.keys(value).sort()) !== JSON.stringify(keys.sort())) throw new TypeError('selected semantic source invalid: byte census mismatch');
+  const sourceBytes = raw(value.sourceBytes, 'source');
+  const sourceBlob = createHash('sha1').update(`blob ${sourceBytes.length}\0`).update(sourceBytes).digest('hex');
+  if (sourceBytes.length !== R5_SEMANTIC_SOURCE.bytes || bytesDigest(sourceBytes) !== R5_SEMANTIC_SOURCE.digest || sourceBlob !== R5_SEMANTIC_SOURCE.blob) throw new TypeError('selected semantic source invalid: source bytes do not match protected Game pin');
+  const outputs = R5_SEMANTIC_OUTPUTS.map((pin) => {
+    const bytes = raw(value[pin.path], pin.path);
+    if (bytes.length !== pin.bytes || bytesDigest(bytes) !== pin.digest) throw new TypeError(`selected semantic source invalid: ${pin.path} output digest mismatch`);
+    return pin;
+  });
+  return freeze({ schemaVersion: 1, contract: 'selected-semantic-search-v1', mapAuthority: false, completeWorld: false,
+    dataCapability: 'bounded_real_world', scope: 'selected-semantic-browser', source: R5_SEMANTIC_SOURCE, outputs,
+    authorityDigest: digest({ source: R5_SEMANTIC_SOURCE, outputs }) });
+}
 
 // The caller must load this registry and the expected publication authorities
 // from authenticated protected-base code. This pure resolver does not authenticate
 // a repository revision and accepts no candidate catalog, command or ownership overrides.
 // It resolves obligations only: it neither executes tests nor activates routing.
-export function resolveBrowserExecution({ protectedRegistry, requiredGroups, atlasRevision, environmentDigest, protectedBaseSha, publicationProofs, protectedExpectedAuthorities, selectedGameplayFiles } = {}) {
+export function resolveBrowserExecution({ protectedRegistry, requiredGroups, atlasRevision, environmentDigest, protectedBaseSha, publicationProofs, protectedExpectedAuthorities, selectedGameplayFiles, selectedSemanticFiles } = {}) {
   requireValue(/^[0-9a-f]{40}$/.test(atlasRevision ?? ''), 'exact Atlas revision required');
   requireValue(/^[0-9a-f]{40}$/.test(protectedBaseSha ?? ''), 'exact protected base revision required');
   requireValue(/^[0-9a-f]{64}$/.test(environmentDigest ?? ''), 'environment digest required');
@@ -109,10 +137,22 @@ export function resolveBrowserExecution({ protectedRegistry, requiredGroups, atl
       'selected gameplay exact HTTP route');
     selectedGameplay = verifySelectedGameplayProduct(selectedGameplayFiles);
   }
+  let selectedSemantic;
+  if (selectedSemanticFiles !== undefined) {
+    requireValue(machineGroups.includes('integration.source-contract-browser'), 'selected semantic source requires its browser owner');
+    requireValue(machineGroups.filter(id => catalog[id].capabilities.dataCapability === 'bounded_real_world')
+      .every(id => id === 'integration.source-contract-browser'), 'selected semantic source cannot authorize another bounded group');
+    const row = rows.get('e2e/tests/api-contract-desktop.spec.mjs');
+    requireValue(row?.execution.browser === true && row.execution.project === 'desktop-chromium'
+      && same(row.machineGroups, ['integration.source-contract-browser']) && row.reviewGroups.length === 0,
+      'selected semantic exact browser route');
+    selectedSemantic = verifyR5SemanticProduct(selectedSemanticFiles);
+  }
+  requireValue(!(selectedGameplay && selectedSemantic), 'bounded selected source proofs cannot overlap');
   const selectedProofs = {};
   const selectedAuthorities = {};
   for (const capability of capabilities) {
-    if (capability === 'bounded_real_world' && selectedGameplay) continue;
+    if (capability === 'bounded_real_world' && (selectedGameplay || selectedSemantic)) continue;
     requireValue(publicationProofs?.[capability] != null, `raw publication proof for ${capability}`);
     requireValue(protectedExpectedAuthorities?.[capability] != null, `protected expected authority for ${capability}`);
     selectedProofs[capability] = publicationProofs[capability];
@@ -130,6 +170,12 @@ export function resolveBrowserExecution({ protectedRegistry, requiredGroups, atl
       ...selectedGameplay, protectedBaseSha, trustReceiptDigest: digest({ protectedBaseSha, selectedGameplay }) };
     authentication = { ...authentication, trustReceiptDigest: digest({ publication: authentication.trustReceiptDigest,
       selectedGameplay: boundPublications.bounded_real_world.trustReceiptDigest }) };
+  }
+  if (selectedSemantic) {
+    boundPublications.bounded_real_world = { kind: 'game-source-derived-selected-semantic-search',
+      ...selectedSemantic, protectedBaseSha, trustReceiptDigest: digest({ protectedBaseSha, selectedSemantic }) };
+    authentication = { ...authentication, trustReceiptDigest: digest({ publication: authentication.trustReceiptDigest,
+      selectedSemantic: boundPublications.bounded_real_world.trustReceiptDigest }) };
   }
   const identityFor = (capability) => ({ atlasRevision, environmentDigest, protectedBaseSha, protectedRegistryDigest, dataCapability: capability, publication: structuredClone(boundPublications[capability]) });
   const commands = [];

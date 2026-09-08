@@ -6,7 +6,7 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
-import {assertCandidateReadback, resolveExecutionContract, sealExecutionContract} from '../../tools/verification/verification-execution-contract.mjs';
+import {R5_SEMANTIC_BUILDER_ORACLE, R5_SEMANTIC_BUILDER_ORACLE_DIGEST, R5_SEMANTIC_SOURCE, assertCandidateReadback, resolveExecutionContract, sealExecutionContract, verifyR5SemanticProduct} from '../../tools/verification/verification-execution-contract.mjs';
 import {createPublicationProofFixtures} from './helpers/publication-proof-fixture.mjs';
 const sha = c => c.repeat(40);
 const snapshot = () => ({repository:'Oteryn/Oteryn-Atlas',prNumber:7,headSha:sha('a'),baseSha:sha('b'),treeSha:sha('c'),changedFiles:[{path:'src/browser/loader.mjs',status:'modified'}]});
@@ -217,7 +217,7 @@ test('candidate execution metadata cannot replace protected interpreter or hashe
  assert(!JSON.stringify(contract).includes('candidate-policy'));
 });
 
-import {resolveShadowEvent,planShadow,deterministicDockerArgs,fixtureBrowserArgs} from '../../tools/verification/run-verification-shadow.mjs';
+import {authenticateR5SemanticSource,buildR5SemanticPublication,resolveShadowEvent,planShadow,deterministicDockerArgs,fixtureBrowserArgs} from '../../tools/verification/run-verification-shadow.mjs';
 test('fixture browser preserves runner ownership of report artifacts',()=>{
  const compose=['compose','-p','protected-fixture','-f','/protected/compose.yml'];
  assert.deepEqual(fixtureBrowserArgs(compose,{uid:1001,gid:1002}),[...compose,'run','--user','1001:1002','--rm','--no-deps','e2e']);
@@ -227,6 +227,166 @@ test('fixture browser preserves runner ownership of report artifacts',()=>{
   assert.throws(()=>fixtureBrowserArgs(compose,{uid:1001,gid:bad}),/fixture host identity/);
  }
 });
+
+const r5Read = (name) => JSON.parse(fs.readFileSync(path.join(root, 'tools/verification', `${name}.json`), 'utf8'));
+const r5Catalog = r5Read('verification-catalog');
+const r5Impact = r5Read('impact-manifest');
+const r5Inventory = r5Read('protected-scenario-inventory');
+const r5SemanticSourceBytes = () => Buffer.from('ewogICJjYXBhYmlsaXR5IjogInNlbWFudGljLXNlYXJjaC1zb3VyY2UtdjEiLAogICJjb250cmFjdF9pZCI6ICJvdGVyeW4tZ2FtZS1hdGxhcy1leHBvcnQtdjEiLAogICJjb29yZGluYXRlX3Byb2ZpbGUiOiAib3RlcnluLXdvcmxkLXNwYXRpYWwtdjEiLAogICJjb3VudHMiOiB7CiAgICAia2luZHMiOiB7CiAgICAgICJucGMiOiAxLAogICAgICAidG93biI6IDEKICAgIH0sCiAgICAicmVjb3JkcyI6IDIKICB9LAogICJpbnB1dF9mbG9vcl9hbGlhc2VzIjogewogICAgIjAiOiAwLAogICAgIjEiOiAtMSwKICAgICIxMCI6IC0xMCwKICAgICIxMSI6IC0xMSwKICAgICIxMiI6IC0xMiwKICAgICIxMyI6IC0xMywKICAgICIxNCI6IC0xNCwKICAgICIxNSI6IC0xNSwKICAgICIyIjogLTIsCiAgICAiMyI6IC0zLAogICAgIjQiOiAtNCwKICAgICI1IjogLTUsCiAgICAiNiI6IC02LAogICAgIjciOiAtNywKICAgICI4IjogLTgsCiAgICAiOSI6IC05CiAgfSwKICAibGVnYWN5X2ltcG9ydF9wcm9maWxlIjogIm90ZXJ5bi1jcnlzdGFsc2VydmVyLWxlZ2FjeS1zcGF0aWFsLWltcG9ydC12MSIsCiAgInByb2ZpbGVfaWQiOiAib3RlcnluLWdhbWUtYXRsYXMtc2VtYW50aWMtc2VhcmNoLXYxIiwKICAicmVjb3JkcyI6IFsKICAgIHsKICAgICAgImFsaWFzZXMiOiBbXSwKICAgICAgImJvdW5kcyI6IG51bGwsCiAgICAgICJjYXBhYmlsaXRpZXMiOiBbCiAgICAgICAgInNob3AiLAogICAgICAgICJzdGF0aWMtcGxhY2VtZW50IgogICAgICBdLAogICAgICAiaWQiOiAibnBjOjcyNjQ4NzQzOGM4MzA4YWJmMjkxNjIyYTUyZDkxYjI0IiwKICAgICAgImtpbmQiOiAibnBjIiwKICAgICAgImxhYmVsIjogIlNhbSIsCiAgICAgICJwb3NpdGlvbiI6IHsKICAgICAgICAiZmxvb3IiOiAtNywKICAgICAgICAieCI6IDMyMzYxLAogICAgICAgICJ5IjogMzIxOTgKICAgICAgfSwKICAgICAgInByb3ZlbmFuY2UiOiB7CiAgICAgICAgImF1dGhvcml0eSI6ICJPdGVyeW4vT3RlcnluLUdhbWUiLAogICAgICAgICJsZWdhY3lfcmVwb3NpdG9yeSI6ICJibGFraW5pby9PdGhlcnluIiwKICAgICAgICAibGVnYWN5X3JlcG9zaXRvcnlfc2hhIjogImU0MTdjNWU3YzIyOTg2YmY0YWNlZjA0OTVlYjQ3ZjdiNzJjOTdjY2UiLAogICAgICAgICJvcmlnaW4iOiAiYmFzZS1tYXAiLAogICAgICAgICJyZXNvbHV0aW9uX3N0YXRlIjogIlJFU09MVkVEIiwKICAgICAgICAic2VydmljZV9yZXNvbHV0aW9uX3N0YXRlIjogIlJFU09MVkVEIiwKICAgICAgICAic291cmNlX2NhcGFiaWxpdHkiOiAic3RhdGljLWNyZWF0dXJlcy12MSIsCiAgICAgICAgInNvdXJjZV9zZW1hbnRpY19kaWdlc3QiOiAic2hhMjU2OjAxOTIxOTY4YTZjYjRmNmVjZWEyMzc4MjBhMDUzZmM1MDUyYWFhMWRhNTU2ODUxZjJjMmE2MGQ5OTg5MGI1ZTEiCiAgICAgIH0KICAgIH0sCiAgICB7CiAgICAgICJhbGlhc2VzIjogW10sCiAgICAgICJib3VuZHMiOiBudWxsLAogICAgICAiY2FwYWJpbGl0aWVzIjogWwogICAgICAgICJuYXZpZ2F0aW9uIiwKICAgICAgICAib3ZlcmxheS1wb2ludCIKICAgICAgXSwKICAgICAgImlkIjogInNlbWFudGljLXJlY29yZDoyMzcxNmEzNTA5OWEwNDE3OWY3YjllM2U2YzkxOThlZSIsCiAgICAgICJraW5kIjogInRvd24iLAogICAgICAibGFiZWwiOiAiVGhhaXMiLAogICAgICAicG9zaXRpb24iOiB7CiAgICAgICAgImZsb29yIjogLTcsCiAgICAgICAgIngiOiAzMjM2OSwKICAgICAgICAieSI6IDMyMjQxCiAgICAgIH0sCiAgICAgICJwcm92ZW5hbmNlIjogewogICAgICAgICJhdXRob3JpdHkiOiAiT3RlcnluL090ZXJ5bi1HYW1lIiwKICAgICAgICAiaWRlbnRpdHlfc3RhdGUiOiAiVU5SRVNPTFZFRCIsCiAgICAgICAgImxlZ2FjeV9wYXJzZXJfYmxvYnMiOiB7CiAgICAgICAgICAidG9vbHMvb3RibV9hdGxhcy9hc3NldHMucHkiOiAiMjVlZDI0MDA4MTNiYjNjY2RjNTQ0ODI5NjdlZDA1MTk3ZWIxYTg1MCIsCiAgICAgICAgICAidG9vbHMvb3RibV9hdGxhcy9ub2RlZmlsZS5weSI6ICJiZWQ2ZjdhODAzZDlkZTQ4NWMxZjAzY2JkY2E0YmUwY2IxNTIxZDMwIiwKICAgICAgICAgICJ0b29scy9vdGJtX2F0bGFzL3NlbWFudGljLnB5IjogImExMTM0M2E0NzIxNDVhZWU0ZDljZjY1YzZjZTI4YjNlNGE3MWEyYjMiCiAgICAgICAgfSwKICAgICAgICAibGVnYWN5X3JlcG9zaXRvcnkiOiAiYmxha2luaW8vT3RoZXJ5biIsCiAgICAgICAgImxlZ2FjeV9yZXBvc2l0b3J5X3NoYSI6ICJlNDE3YzVlN2MyMjk4NmJmNGFjZWYwNDk1ZWI0N2Y3YjcyYzk3Y2NlIiwKICAgICAgICAic291cmNlX2ZhbWlseSI6ICJ0b3duIiwKICAgICAgICAid29ybGRfb3RibV9zaGEyNTYiOiAiM2JkNDBkMTRmZWZlYzQxZjI0YzRiM2FlODc5ZTQyMGJlMWE4MzFlZjU1Yjk1ZGNiZWM3MjFlNTg3YTA5YjAzNCIKICAgICAgfQogICAgfQogIF0sCiAgInNjaGVtYV92ZXJzaW9uIjogMSwKICAic2VtYW50aWNfZGlnZXN0IjogInNoYTI1NjphNGE0NzAzOTYyYmQ2OTg0ZDMxZWYxZGFmY2QyN2JhZDQ3NWQ2YjYxZjU3MGQwMTM1NjBjMTZhNzA0OTg5YmY4IiwKICAic2VtYW50aWNfcmV2aXNpb24iOiAxCn0K', 'base64');
+const r5Candidate = (changedPath) => ({
+  repository: 'Oteryn/Oteryn-Atlas', prNumber: 315, headSha: sha('a'), baseSha: sha('b'), treeSha: sha('c'),
+  changedFiles: [{ path: changedPath, status: 'modified' }],
+});
+const r5Plan = (changedPath) => buildVerificationPlan({
+  repository: 'Oteryn/Oteryn-Atlas', headSha: sha('a'), integrationBaseSha: sha('b'), mergeBaseSha: sha('b'),
+  changedFiles: [{ path: changedPath, status: 'modified' }], trustedImpactManifest: r5Impact,
+  candidateImpactManifest: r5Impact, verificationCatalog: r5Catalog, protectedStableTestIds: r5Inventory.stableTestIds,
+});
+
+test('R5 C1 selects only the exact deterministic authority-registry proof', () => {
+  const result = r5Plan('tools/fullworld-layers/verify_authority_registry.py');
+  assert.deepEqual(result.requiredGroupIds, ['deterministic.fullworld-layers']);
+  assert.deepEqual(result.requiredDataCapabilities, ['qualification_fixture']);
+  assert.deepEqual(result.groups[0].specs, [
+    'tests/fullworld-layers/overview-browser.test.mjs',
+    'tests/fullworld-layers/test_authority_registry.py',
+    'tests/fullworld-layers/test_overview.py',
+  ]);
+});
+
+test('R5 C2 selects the minimal fixture browser and deterministic farm obligations', () => {
+  const result = r5Plan('web/fullworld-farm-explorer.mjs');
+  assert.deepEqual(result.requiredGroupIds, ['deterministic.farm-ui', 'e2e.farm-explorer']);
+  assert.deepEqual(result.requiredDataCapabilities, ['qualification_fixture']);
+  assert.deepEqual(result.stableTestIds, [
+    'desktop-chromium::e2e/tests/farm-explorer-desktop.spec.mjs::desktop Farm Explorer fails closed for upstream facts and keeps custom kill estimator usable',
+    'mobile-chromium::e2e/tests/farm-explorer-mobile.spec.mjs::mobile Farm Explorer remains reachable and truthful in the existing controls drawer',
+  ]);
+  assert.deepEqual(result.requiredVisualGroupIds, []);
+});
+
+test('R5 C3 replaces broad core with exact search, fixture navigation and bounded source obligations', () => {
+  const result = r5Plan('tools/build-semantic-search-index.py');
+  assert.deepEqual(result.requiredGroupIds, [
+    'deterministic.search',
+    'e2e.search-navigation',
+    'integration.source-contract-browser',
+  ]);
+  assert.deepEqual(result.requiredDataCapabilities, ['bounded_real_world', 'qualification_fixture']);
+  assert.deepEqual(result.groups.find(({ id }) => id === 'deterministic.search').specs, [
+    'tests/browser-semantic.mjs',
+    'tests/semantic-search-creatures.mjs',
+    'tests/semantic-search.mjs',
+  ]);
+  assert.equal(result.stableTestIds.length, 5);
+  assert.deepEqual(result.requiredVisualGroupIds, []);
+});
+
+test('R5 protected shadow planner accepts exactly the three bounded canary routes', () => {
+  for (const changedPath of [
+    'tools/fullworld-layers/verify_authority_registry.py',
+    'web/fullworld-farm-explorer.mjs',
+    'tools/build-semantic-search-index.py',
+  ]) {
+    assert.doesNotThrow(() => planShadow({ candidate: r5Candidate(changedPath), root, protectedRoot: root }), changedPath);
+  }
+});
+
+test('R5 bounded semantic publication derives from one exact authenticated Game source byte', async (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-r5-semantic-'));
+  fs.rmSync(directory, { recursive: true, force: true });
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const sourceBytes = r5SemanticSourceBytes();
+  const publication = await buildR5SemanticPublication(directory, sourceBytes);
+  const manifest = publication.manifest;
+  assert.equal(manifest.sourceDigests[R5_SEMANTIC_SOURCE.id], R5_SEMANTIC_SOURCE.digest);
+  assert.equal(publication.selected.source.repository, 'Oteryn/Oteryn-Game');
+  assert.equal(publication.selected.source.revision, R5_SEMANTIC_SOURCE.revision);
+  const index = JSON.parse(fs.readFileSync(path.join(directory, 'web/semantic-search/index.json'), 'utf8'));
+  assert.equal(index.source.game_revision, R5_SEMANTIC_SOURCE.revision);
+  assert.equal(index.records.length, 2);
+  assert.doesNotThrow(() => verifyR5SemanticProduct(publication.selectedFiles));
+  const tampered = { ...publication.selectedFiles, sourceBytes: Buffer.from('{}\n') };
+  assert.throws(() => verifyR5SemanticProduct(tampered), /source bytes do not match/);
+
+  const planned = planShadow({ candidate: r5Candidate('tools/build-semantic-search-index.py'), root, protectedRoot: root });
+  const fixture = createPublicationProofFixtures(['qualification_fixture']);
+  const contract = resolveExecutionContract({ ...planned.input, environmentDigest: 'd'.repeat(64),
+    publicationProofs: { qualification_fixture: fixture.publicationProofs.qualification_fixture },
+    protectedExpectedAuthorities: { qualification_fixture: fixture.protectedExpectedAuthorities.qualification_fixture },
+    selectedSemanticFiles: publication.selectedFiles,
+  });
+  assert.equal(contract.commands.length, 7);
+  assert.deepEqual(contract.commands.map(({ engine, dataCapability }) => `${engine}:${dataCapability}`).sort(), [
+    'deterministic:qualification_fixture',
+    'deterministic:qualification_fixture',
+    'deterministic:qualification_fixture',
+    'deterministic:qualification_fixture',
+    'playwright:bounded_real_world',
+    'playwright:qualification_fixture',
+    'playwright:qualification_fixture',
+  ]);
+  const oracle = contract.commands.find(({ executionScope }) => executionScope === 'protected-harness');
+  assert.deepEqual(oracle.groupIds, ['deterministic.search']);
+  assert.deepEqual(oracle.argv, ['node', '/protected-harness/r5-semantic-builder-oracle.mjs']);
+  assert.deepEqual(oracle.expectedTestIds, ['protected-oracle::tools/build-semantic-search-index.py::selected semantic product']);
+  assert.match(oracle.protectedHarnessDigest, /^sha256:[a-f0-9]{64}$/);
+  assert.equal(oracle.protectedInputDigest, 'sha256:3075f42ee1b5502a10d23ec2df9171f9ef829158d82c9bba8ab9bb91abc654bc');
+  const harnessFile = path.join(directory, 'oracle.mjs');
+  fs.writeFileSync(harnessFile, R5_SEMANTIC_BUILDER_ORACLE);
+  const inputFile = path.join(root, 'tests/fixtures/game-semantic-search-source.json');
+  const dockerArgs = deterministicDockerArgs({ command: oracle, candidateRoot: root,
+    dependencyRoot: path.join(root, 'e2e/node_modules'), shimRoot: directory, protectedHarnessFile: harnessFile, protectedInputFile: inputFile,
+    image: `example.invalid/atlas@sha256:${'a'.repeat(64)}`, containerName: 'atlas-r5-oracle-test' });
+  assert.ok(dockerArgs.includes(`type=bind,src=${harnessFile},dst=/protected-harness/r5-semantic-builder-oracle.mjs,readonly`));
+  assert.ok(dockerArgs.includes(`type=bind,src=${inputFile},dst=/protected-input/game-semantic-search-source.json,readonly`));
+  fs.appendFileSync(harnessFile, '// drift\n');
+  assert.throws(() => deterministicDockerArgs({ command: oracle, candidateRoot: root,
+    dependencyRoot: path.join(root, 'e2e/node_modules'), shimRoot: directory, protectedHarnessFile: harnessFile, protectedInputFile: inputFile,
+    image: `example.invalid/atlas@sha256:${'a'.repeat(64)}`, containerName: 'atlas-r5-oracle-test' }), /protected harness inputs/);
+});
+
+test('bounded builder rejects a claimed source digest without the exact source bytes', async (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-r5-semantic-bad-'));
+  fs.rmSync(directory, { recursive: true, force: true });
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  await assert.rejects(buildR5SemanticPublication(directory, Buffer.from('{}\n')), /R5 semantic source bytes/);
+});
+
+test('R5 selected source authenticates the exact commit and revision:path blob binding', () => {
+  const bytes = r5SemanticSourceBytes();
+  const commit = { sha: R5_SEMANTIC_SOURCE.revision, tree: { sha: sha('d') } };
+  const file = {
+    type: 'file', path: R5_SEMANTIC_SOURCE.path, name: path.posix.basename(R5_SEMANTIC_SOURCE.path),
+    sha: R5_SEMANTIC_SOURCE.blob, size: bytes.length, encoding: 'base64', content: bytes.toString('base64'),
+  };
+  assert.deepEqual(authenticateR5SemanticSource({ commit, file }), bytes);
+  for (const [label, mutate] of [
+    ['revision', ({ commit: value }) => { value.sha = sha('e'); }],
+    ['path', ({ file: value }) => { value.path = `other/${value.name}`; }],
+    ['blob', ({ file: value }) => { value.sha = sha('f'); }],
+    ['bytes', ({ file: value }) => { value.content = Buffer.from('{}\n').toString('base64'); }],
+  ]) {
+    const value = { commit: structuredClone(commit), file: structuredClone(file) };
+    mutate(value);
+    assert.throws(() => authenticateR5SemanticSource(value), /R5 semantic/, label);
+  }
+});
+
+test('R5 protected harness executes only the candidate builder and enforces exact product bytes', () => {
+  assert.equal(`sha256:${createHash('sha256').update(R5_SEMANTIC_BUILDER_ORACLE).digest('hex')}`, R5_SEMANTIC_BUILDER_ORACLE_DIGEST);
+  const localHarness = R5_SEMANTIC_BUILDER_ORACLE
+    .replaceAll('/candidate', root.replace(/\/$/, ''))
+    .replace('/protected-input/game-semantic-search-source.json', path.join(root, 'tests/fixtures/game-semantic-search-source.json'));
+  const result = spawnSync(process.execPath, ['--input-type=module', '--eval', localHarness], {
+    cwd: root, env: { LANG: 'C.UTF-8', LC_ALL: 'C.UTF-8', HOME: os.tmpdir() }, encoding: 'utf8', shell: false, timeout: 30_000,
+  });
+  assert.equal(result.error, undefined);
+  assert.equal(result.signal, null);
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /"oracle":"r5-semantic-candidate-builder","passed":true/);
+});
+
 import {assertDeterministicContainer} from '../../tools/verification/run-verification-shadow.mjs';
 {
 const repository='Oteryn/Oteryn-Atlas',base='a'.repeat(40),head='b'.repeat(40),tree='c'.repeat(40);
@@ -371,7 +531,7 @@ test('real protected shadow plan CLI schedules subject-only work and keeps docs-
  const control=path.join(temporary,'control'),candidateRoot=path.join(temporary,'candidate');
  const git=(directory,...args)=>{const result=spawnSync('git',['-C',directory,'-c','core.hooksPath=/dev/null',...args],{encoding:'utf8'});assert.equal(result.status,0,result.stderr);return result.stdout.trim();};
  git(root,'clone','--quiet','--shared',root,control);
- for(const file of ['build-verification-plan.mjs','deterministic-execution.mjs','verification-execution-contract.mjs','run-verification-shadow.mjs'])fs.copyFileSync(path.join(root,'tools/verification',file),path.join(control,'tools/verification',file));
+ for(const file of ['browser-execution.mjs','build-verification-plan.mjs','deterministic-execution.mjs','verification-execution-contract.mjs','run-verification-shadow.mjs'])fs.copyFileSync(path.join(root,'tools/verification',file),path.join(control,'tools/verification',file));
  const commit=directory=>{git(directory,'add','.');git(directory,'-c','user.name=Fixture','-c','user.email=fixture@example.invalid','-c','commit.gpgsign=false','commit','--quiet','--allow-empty','-m','Fixture');return git(directory,'rev-parse','HEAD');};
  const base=commit(control);git(control,'clone','--quiet','--shared',control,candidateRoot);
  // Only the external GitHub transport is replaced; real CLI parsing, checkout,

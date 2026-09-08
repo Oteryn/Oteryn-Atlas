@@ -5,11 +5,12 @@ import {fileURLToPath} from 'node:url';
 import {createHash, randomUUID} from 'node:crypto';
 import {execFileSync, spawnSync} from 'node:child_process';
 import {buildVerificationPlan, assertPlanExecutable} from './build-verification-plan.mjs';
-import {resolveExecutionContract, assertCandidateReadback} from './verification-execution-contract.mjs';
+import {R5_SEMANTIC_BUILDER_ORACLE, R5_SEMANTIC_BUILDER_ORACLE_DIGEST, R5_SEMANTIC_SOURCE, resolveExecutionContract, assertCandidateReadback, verifyR5SemanticProduct} from './verification-execution-contract.mjs';
 import {readCandidateSnapshot, gitChangedFiles, githubRequest} from './protected-candidate-snapshot.mjs';
 import {buildProtectedExecutionEnvironmentIdentity} from './protected-execution-environment.mjs';
 import {canonicalJson} from './verification-plan-schema.mjs';
 import {buildQualificationWorld, verifyQualificationWorld, qualificationTrustDescriptor} from './qualification-world.mjs';
+import {buildBoundedRealWorld, verifyBoundedRealWorld, boundedRealTrustDescriptor} from './bounded-real-world.mjs';
 import {buildProtectedExpectedAuthority, PUBLICATION_AUTHORITY_ID} from './proof-provenance.mjs';
 import {SELECTED_GAMEPLAY_INPUTS, buildSelectedGameplaySource} from './shadow-gameplay-source.mjs';
 import {runSelectedGameplayHttp} from './shadow-gameplay-http.mjs';
@@ -126,27 +127,33 @@ export function planShadow({candidate,root,protectedRoot}) {
     trustedImpactManifest:protectedImpactManifest,candidateImpactManifest:protectedImpactManifest,
     protectedStableTestIds,unprivilegedDeterministicSubjects});
   assertPlanExecutable(plan);
-  const supported=new Set(['e2e.layer-availability','integration.source-contract-http']);
-  for(const group of plan.groups) if(group.executionEngine!=='deterministic'&&!supported.has(group.id)) fail(`R4 bounded executor unavailable for ${group.id}`);
+  const supported=new Set(['e2e.layer-availability','e2e.farm-explorer','e2e.search-navigation','integration.source-contract-browser','integration.source-contract-http']);
+  for(const group of plan.groups) if(group.executionEngine!=='deterministic'&&!supported.has(group.id)) fail(`R5 bounded executor unavailable for ${group.id}`);
   return {plan,input:{root,protectedRoot,candidate,planInput,protectedCatalog,protectedImpactManifest,protectedStableTestIds}};
 }
 
 // No language-owned reporter is accepted as evidence that a candidate assertion
 // ran. This census attests exact processes/spec files and their external exits.
-export function deterministicDockerArgs({command,candidateRoot,dependencyRoot,shimRoot,image,containerName}) {
+export function deterministicDockerArgs({command,candidateRoot,dependencyRoot,shimRoot,protectedHarnessFile,protectedInputFile,image,containerName}) {
   if(command.engine!=='deterministic'||command.cwd!=='.'||!['node','python','python3'].includes(command.argv?.[0])
     ||!command.argv.slice(1).every(value=>typeof value==='string')||!/^sha256:[a-f0-9]{64}$/.test(command.id)) fail('deterministic command');
   if(!/^[a-z0-9-]+$/.test(containerName)||!/@sha256:[a-f0-9]{64}$/.test(image)) fail('container identity');
+  const protectedHarness=command.executionScope==='protected-harness';
+  if(protectedHarness&&(!path.isAbsolute(protectedHarnessFile??'')||!path.isAbsolute(protectedInputFile??'')
+    ||bytesDigest(fs.readFileSync(protectedHarnessFile))!==command.protectedHarnessDigest
+    ||bytesDigest(fs.readFileSync(protectedInputFile))!==command.protectedInputDigest)) fail('protected harness inputs');
   return ['run','--name',containerName,'--network=none','--read-only','--user=1000:1000','--cap-drop=ALL',
     '--security-opt=no-new-privileges','--pids-limit=192','--memory=1610612736','--cpus=2',
     '--tmpfs=/tmp:rw,nodev,nosuid,size=256m','--mount',`type=bind,src=${candidateRoot},dst=/candidate,readonly`,
     '--mount',`type=bind,src=${dependencyRoot},dst=/candidate/e2e/node_modules,readonly`,
     '--mount',`type=bind,src=${shimRoot},dst=/tmp/atlas-python-bin,readonly`,
+    ...(protectedHarness?['--mount',`type=bind,src=${protectedHarnessFile},dst=/protected-harness/r5-semantic-builder-oracle.mjs,readonly`,
+      '--mount',`type=bind,src=${protectedInputFile},dst=/protected-input/game-semantic-search-source.json,readonly`]:[]),
     '--workdir=/candidate','--env=PATH=/tmp/atlas-python-bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin','--env=HOME=/tmp','--env=PYTHONPYCACHEPREFIX=/tmp/atlas-python-pycache',image,
     command.argv[0]==='python'?'/usr/bin/python3':command.argv[0],...command.argv.slice(1)];
 }
 
-export function assertDeterministicContainer(container,{command,candidateRoot,dependencyRoot,shimRoot,image}) {
+export function assertDeterministicContainer(container,{command,candidateRoot,dependencyRoot,shimRoot,protectedHarnessFile,protectedInputFile,image}) {
   const host=container?.HostConfig,config=container?.Config,state=container?.State;
   if(!host||!config||!state||config.Image!==image||host.NetworkMode!=='none'||!host.ReadonlyRootfs
     ||config.User!=='1000:1000'||config.WorkingDir!=='/candidate'||state.Running||state.OOMKilled
@@ -156,7 +163,9 @@ export function assertDeterministicContainer(container,{command,candidateRoot,de
     ||host.Tmpfs?.['/tmp']!=='rw,nodev,nosuid,size=256m') fail('actual container isolation/completion');
   const expected=[{Source:candidateRoot,Destination:'/candidate'},
     {Source:dependencyRoot,Destination:'/candidate/e2e/node_modules'},
-    {Source:shimRoot,Destination:'/tmp/atlas-python-bin'}].sort((a,b)=>a.Destination.localeCompare(b.Destination));
+    {Source:shimRoot,Destination:'/tmp/atlas-python-bin'},
+    ...(command.executionScope==='protected-harness'?[{Source:protectedHarnessFile,Destination:'/protected-harness/r5-semantic-builder-oracle.mjs'},
+      {Source:protectedInputFile,Destination:'/protected-input/game-semantic-search-source.json'}]:[])].sort((a,b)=>a.Destination.localeCompare(b.Destination));
   const mounts=(container.Mounts??[]).filter(x=>x.Type!=='tmpfs');
   if(mounts.some(x=>x.Type!=='bind'||x.RW!==false)
     ||canonicalJson(mounts.map(({Source,Destination})=>({Source,Destination})).sort((a,b)=>a.Destination.localeCompare(b.Destination)))!==canonicalJson(expected)) fail('actual readonly mount census');
@@ -166,9 +175,9 @@ export function assertDeterministicContainer(container,{command,candidateRoot,de
   return true;
 }
 
-function executeDeterministic(command,root,image,dependencyRoot,shimRoot) {
+function executeDeterministic(command,root,image,dependencyRoot,shimRoot,protectedHarnessFile,protectedInputFile) {
   const name=`atlas-r4-${randomUUID()}`;
-  const argv=deterministicDockerArgs({command,candidateRoot:root,dependencyRoot,shimRoot,image,containerName:name});
+  const argv=deterministicDockerArgs({command,candidateRoot:root,dependencyRoot,shimRoot,protectedHarnessFile,protectedInputFile,image,containerName:name});
   const startedAt=new Date().toISOString();
   let result,container;
   try {
@@ -176,9 +185,10 @@ function executeDeterministic(command,root,image,dependencyRoot,shimRoot) {
     // Inspect the actual container, even for timeout/nonzero/daemon failures.
     try {container=JSON.parse(execFileSync('docker',['inspect',name],{encoding:'utf8'}))[0];} catch {assertContainerStarted(null,result);}
     assertContainerStarted(container,result);
-    assertDeterministicContainer(container,{command,candidateRoot:root,dependencyRoot,shimRoot,image});
+    assertDeterministicContainer(container,{command,candidateRoot:root,dependencyRoot,shimRoot,protectedHarnessFile,protectedInputFile,image});
     return {commandId:command.id,argv:command.argv,cwd:command.cwd,groupIds:command.groupIds,
-      expectedTestIds:command.expectedTestIds,...(command.executionScope?{executionScope:command.executionScope}:{}),censusKind:'external-command-and-spec',retry:0,
+      expectedTestIds:command.expectedTestIds,...(command.executionScope?{executionScope:command.executionScope}:{}),
+      censusKind:command.executionScope==='protected-harness'?'protected-harness-and-candidate-subprocess':'external-command-and-spec',retry:0,
       containerId:container.Id,imageId:container.Image,image,executedArgv:[container.Path,...container.Args],
       isolationDigest:digest({config:container.Config,host:container.HostConfig,mounts:container.Mounts}),startedAt,finishedAt:new Date().toISOString(),
       exitCode:result.status,signal:result.signal,timeout:result.error?.code==='ETIMEDOUT',
@@ -203,6 +213,56 @@ async function fixtureProof(destination) {
     publicationManifestBytes,productFiles,source:null,completeProduct:null}};
 }
 
+export async function buildR5SemanticPublication(destination, sourceBytes) {
+  if (!(Buffer.isBuffer(sourceBytes)||sourceBytes instanceof Uint8Array)||bytesDigest(sourceBytes)!==R5_SEMANTIC_SOURCE.digest) fail('R5 semantic source bytes');
+  await buildBoundedRealWorld(destination,{sourceRoot:controlRoot});
+  await verifyBoundedRealWorld(destination);
+  const scratch=fs.mkdtempSync(path.join(os.tmpdir(),'atlas-r5-semantic-build-'));
+  try {
+    const source=path.join(scratch,'source.json'),output=path.join(destination,'web/semantic-search/index.json');
+    fs.writeFileSync(source,Buffer.from(sourceBytes),{flag:'wx',mode:0o400});
+    const execution=spawnSync('/usr/bin/python3',['-I','-B',path.join(controlRoot,'tools/build-semantic-search-index.py'),source,output,'--game-revision',R5_SEMANTIC_SOURCE.revision],
+      {cwd:controlRoot,env:{LANG:'C.UTF-8',LC_ALL:'C.UTF-8',HOME:scratch},encoding:'utf8',shell:false,timeout:30000,maxBuffer:1024*1024});
+    if(execution.error||execution.status!==0||execution.signal)fail(`R5 semantic protected build failed: ${String(execution.stderr??'').slice(-1024)}`);
+  } finally {fs.rmSync(scratch,{recursive:true,force:true});}
+  const selectedFiles={sourceBytes:Buffer.from(sourceBytes),
+    'web/semantic-search/index.json':fs.readFileSync(path.join(destination,'web/semantic-search/index.json')),
+    'web/semantic-search/creatures.json':fs.readFileSync(path.join(destination,'web/semantic-search/creatures.json'))};
+  const selected=verifyR5SemanticProduct(selectedFiles);
+  const entries=[];
+  const walk=(directory)=>{for(const entry of fs.readdirSync(directory,{withFileTypes:true})) {const absolute=path.join(directory,entry.name),relative=path.relative(destination,absolute).replaceAll(path.sep,'/');if(entry.isDirectory())walk(absolute);else if(relative!=='bounded-real-manifest.json'){const bytes=fs.readFileSync(absolute);entries.push({path:relative,bytes:bytes.length,digest:bytesDigest(bytes)});}}};
+  walk(destination);entries.sort((a,b)=>a.path.localeCompare(b.path));
+  const manifest={...readJson(path.join(destination,'bounded-real-manifest.json')),sourceDigests:{...readJson(path.join(destination,'bounded-real-manifest.json')).sourceDigests,
+    semanticSearch:bytesDigest(selectedFiles['web/semantic-search/index.json']),semanticSearchSource:R5_SEMANTIC_SOURCE.digest},files:entries,productDigest:bytesDigest(Buffer.from(canonicalJson(entries)+'\n'))};
+  fs.writeFileSync(path.join(destination,'bounded-real-manifest.json'),canonicalJson(manifest)+'\n');
+  await verifyBoundedRealWorld(destination);
+  return {manifest,selectedFiles,selected,authority:{authorityDigest:selected.authorityDigest}};
+}
+
+export function authenticateR5SemanticSource({commit,file}={}) {
+  if(commit?.sha!==R5_SEMANTIC_SOURCE.revision||!sha(commit.tree?.sha)) fail('R5 semantic source commit identity');
+  if(file?.type!=='file'||file.path!==R5_SEMANTIC_SOURCE.path||file.name!==path.posix.basename(R5_SEMANTIC_SOURCE.path)
+    ||file.sha!==R5_SEMANTIC_SOURCE.blob||file.size!==R5_SEMANTIC_SOURCE.bytes||file.encoding!=='base64'
+    ||typeof file.content!=='string') fail('R5 semantic revision:path identity');
+  const encoded=file.content.replaceAll('\n','');
+  if(!/^[A-Za-z0-9+/]+={0,2}$/.test(encoded)||encoded.length%4!==0) fail('R5 semantic source API encoding');
+  const bytes=Buffer.from(encoded,'base64');
+  const blob=createHash('sha1').update(`blob ${bytes.length}\0`).update(bytes).digest('hex');
+  if(bytes.toString('base64')!==encoded||bytes.length!==R5_SEMANTIC_SOURCE.bytes
+    ||blob!==R5_SEMANTIC_SOURCE.blob||bytesDigest(bytes)!==R5_SEMANTIC_SOURCE.digest) fail('R5 semantic source API bytes');
+  return bytes;
+}
+
+async function r5SemanticPublication(destination) {
+  const revision=R5_SEMANTIC_SOURCE.revision;
+  const sourcePath=R5_SEMANTIC_SOURCE.path.split('/').map(encodeURIComponent).join('/');
+  const [commit,file]=await Promise.all([
+    githubRequest(`/repos/${R5_SEMANTIC_SOURCE.repository}/git/commits/${revision}`),
+    githubRequest(`/repos/${R5_SEMANTIC_SOURCE.repository}/contents/${sourcePath}?ref=${revision}`),
+  ]);
+  return buildR5SemanticPublication(destination,authenticateR5SemanticSource({commit,file}));
+}
+
 async function selectedSource() {
   const inputs={};
   for(const pin of SELECTED_GAMEPLAY_INPUTS) {
@@ -224,39 +284,40 @@ export function fixtureBrowserArgs(composeArgs,{uid=process.getuid(),gid=process
   return [...composeArgs,'run','--user',`${uid}:${gid}`,'--rm','--no-deps','e2e'];
 }
 
-function runFixture(command,{candidate,contract,fixture,directory,root}) {
-  const context=path.join(directory,'fixture-context');fs.mkdirSync(context);
+function runPublicationBrowser(command,{candidate,contract,publication,directory,root}) {
+  const suffix=command.id.slice('sha256:'.length,'sha256:'.length+12);
+  const context=path.join(directory,`browser-context-${suffix}`);fs.mkdirSync(context);
   for(const relative of ['web','src']) fs.cpSync(path.join(root,relative),path.join(context,relative),{recursive:true});
   // Candidate web/source bytes are inert inputs. Every executable harness byte
   // comes from the authenticated protected checkout.
   fs.cpSync(path.join(controlRoot,'e2e'),path.join(context,'e2e'),{recursive:true,filter:p=>!p.split(path.sep).includes('node_modules')});
   fs.mkdirSync(path.join(context,'tools','verification'),{recursive:true});
   fs.copyFileSync(path.join(controlRoot,'tools/verification/stable-id.mjs'),path.join(context,'tools/verification/stable-id.mjs'));
-  const list=path.join(directory,'test-list.txt');
+  const list=path.join(directory,`test-list-${suffix}.txt`);
   fs.writeFileSync(list,command.expectedTestIds.map(id=>{const [project,spec,...title]=id.split('::');return `[${project}] › ${spec.replace('e2e/tests/','')} › ${title.join('::')}`;}).join('\n')+'\n');
-  const artifacts=path.join(directory,'artifacts');fs.mkdirSync(artifacts);fs.chmodSync(artifacts,0o777);
-  const project=`atlas-r4-${randomUUID()}`;
+  const artifacts=path.join(directory,`artifacts-${suffix}`);fs.mkdirSync(artifacts);fs.chmodSync(artifacts,0o777);
+  const project=`atlas-r5-${randomUUID()}`;
   const args=['compose','-p',project,'-f',path.join(controlRoot,'e2e/compose.protected-hosted-executor.yml'),'-f',path.join(controlRoot,'e2e/compose.github-hosted.yml')];
   const env={PATH:process.env.PATH,HOME:process.env.HOME,ATLAS_EXECUTION_CONTEXT:context,ATLAS_CODE_REVISION:candidate.headSha,
-    ATLAS_QUALIFICATION_PUBLICATION_HOST:path.join(directory,'fixture'),ATLAS_QUALIFICATION_TRUST_JSON:JSON.stringify(qualificationTrustDescriptor(fixture.manifest)),
+    ATLAS_QUALIFICATION_PUBLICATION_HOST:publication.root,ATLAS_QUALIFICATION_TRUST_JSON:JSON.stringify(publication.trustDescriptor),
     ATLAS_PROTECTED_TEST_LIST:list,ATLAS_E2E_ARTIFACTS_HOST:artifacts,ATLAS_E2E_SHARD:'1/1',ATLAS_E2E_WORKERS:'1',
-    ATLAS_E2E_DATA_CAPABILITY:'qualification_fixture',...fixtureReadinessEnvironment(contract),
-    ATLAS_AUTHORITY_DIGEST:fixture.authority.authorityDigest,
+    ATLAS_E2E_DATA_CAPABILITY:command.dataCapability,...fixtureReadinessEnvironment(contract),
+    ATLAS_AUTHORITY_DIGEST:publication.authority.authorityDigest,
     GITHUB_RUN_ID:process.env.GITHUB_RUN_ID,GITHUB_REPOSITORY:REPOSITORY};
   try {
     for(const setup of [['build','e2e'],['up','-d','--wait','--wait-timeout','180','atlas-web']]) {
       const result=spawnSync('docker',[...args,...setup],{env,encoding:'utf8',timeout:300000,maxBuffer:16*1024*1024});
       if(result.error||result.status!==0||result.signal) {
-        console.error(JSON.stringify({phase:'fixture-setup',operation:setup,exitCode:result.status,signal:result.signal,error:result.error?.message??null,stdout:String(result.stdout??'').slice(-12288),stderr:String(result.stderr??'').slice(-4096)}));
+        console.error(JSON.stringify({phase:'browser-setup',dataCapability:command.dataCapability,operation:setup,exitCode:result.status,signal:result.signal,error:result.error?.message??null,stdout:String(result.stdout??'').slice(-12288),stderr:String(result.stderr??'').slice(-4096)}));
         if(setup[0]==='up') {
           const logs=spawnSync('docker',[...args,'logs','--no-color','--tail','40'],{env,encoding:'utf8',timeout:10000,maxBuffer:1024*1024});
-          console.error(JSON.stringify({phase:'fixture-service-logs',exitCode:logs.status,stdout:String(logs.stdout??'').slice(-16384),stderr:String(logs.stderr??'').slice(-4096)}));
+          console.error(JSON.stringify({phase:'browser-service-logs',dataCapability:command.dataCapability,exitCode:logs.status,stdout:String(logs.stdout??'').slice(-16384),stderr:String(logs.stderr??'').slice(-4096)}));
         }
-        fail('fixture protected service setup failed');
+        fail('protected browser service setup failed');
       }
     }
     const result=spawnSync('docker',fixtureBrowserArgs(args),{env,encoding:'utf8',timeout:command.timeoutSeconds*1000,maxBuffer:16*1024*1024});
-    if(result.error||result.status!==0||result.signal) {console.error(JSON.stringify({phase:'fixture-browser',exitCode:result.status,signal:result.signal,error:result.error?.message??null,stdout:String(result.stdout??'').slice(-12288),stderr:String(result.stderr??'').slice(-4096)}));fail('fixture browser execution failed');}
+    if(result.error||result.status!==0||result.signal) {console.error(JSON.stringify({phase:'browser-execution',dataCapability:command.dataCapability,exitCode:result.status,signal:result.signal,error:result.error?.message??null,stdout:String(result.stdout??'').slice(-12288),stderr:String(result.stderr??'').slice(-4096)}));fail('protected browser execution failed');}
     const report=readJson(path.join(artifacts,'results.json'));
     const observed=[];
     const walk=suites=>{for(const suite of suites??[]){for(const spec of suite.specs??[]){for(const test of spec.tests??[]){if(test.status!=='expected'||test.results?.length!==1||test.results[0].status!=='passed'||test.results[0].retry!==0)fail('fixture nonpass/retry');observed.push(`${test.projectName}::e2e/tests/${spec.file.replace(/^.*\/tests\//,'')}::${spec.title}`);}}walk(suite.suites);}};
@@ -302,27 +363,39 @@ export async function runShadow(mode,root) {
     return summary;
   }
   if(!hasWork) fail('S0 must not start product job');
-  const directory=fs.mkdtempSync(path.join(os.tmpdir(),'atlas-r4-'));
+  const directory=fs.mkdtempSync(path.join(os.tmpdir(),'atlas-r5-'));
   try {
     const config=readJson(path.join(controlRoot,'tools/verification/protected-execution-environment.json'));
     const shimRoot=path.join(directory,'python-bin');fs.mkdirSync(shimRoot);fs.symlinkSync('/usr/bin/python3',path.join(shimRoot,'python'));
     const environmentDigest=buildProtectedExecutionEnvironmentIdentity(config).environmentDigest.slice('sha256:'.length);
-    const fixture=plan.groups.some(g=>g.id==='e2e.layer-availability')?await fixtureProof(path.join(directory,'fixture')):null;
+    const fixture=plan.groups.some(g=>g.executionEngine==='playwright'&&g.capabilities.dataCapability==='qualification_fixture')?await fixtureProof(path.join(directory,'fixture')):null;
+    const bounded=plan.groups.some(g=>g.executionEngine==='playwright'&&g.id==='integration.source-contract-browser')?await r5SemanticPublication(path.join(directory,'bounded')):null;
     const selected=plan.groups.some(g=>g.id==='integration.source-contract-http')?await selectedSource():null;
+    const publications=[fixture&&['qualification_fixture',fixture]].filter(Boolean);
     const contract=resolveExecutionContract({...input,environmentDigest,
-      publicationProofs:fixture?{qualification_fixture:fixture.proof}:undefined,
-      protectedExpectedAuthorities:fixture?{qualification_fixture:fixture.authority}:undefined,
-      selectedGameplayFiles:selected?.productFiles});
+      publicationProofs:publications.length?Object.fromEntries(publications.map(([id,value])=>[id,value.proof])):undefined,
+      protectedExpectedAuthorities:publications.length?Object.fromEntries(publications.map(([id,value])=>[id,value.authority])):undefined,
+      selectedGameplayFiles:selected?.productFiles,selectedSemanticFiles:bounded?.selectedFiles});
     summary.contractDigest=contract.contractDigest;summary.environmentDigest=environmentDigest;summary.commands=contract.commands;
     const executionRoot=contract.commands.some(command=>command.engine==='deterministic')?prepareExecutionView({sourceRoot:root,revision:candidate.headSha,destination:path.join(directory,'candidate-view')}):null;
+    const hasSemanticOracle=contract.commands.some(command=>command.executionScope==='protected-harness');
+    const protectedHarnessFile=hasSemanticOracle?path.join(directory,'r5-semantic-builder-oracle.mjs'):null;
+    const protectedInputFile=hasSemanticOracle?path.join(controlRoot,'tests/fixtures/game-semantic-search-source.json'):null;
+    if(hasSemanticOracle) {
+      fs.writeFileSync(protectedHarnessFile,R5_SEMANTIC_BUILDER_ORACLE,{flag:'wx',mode:0o444});
+      if(bytesDigest(fs.readFileSync(protectedHarnessFile))!==R5_SEMANTIC_BUILDER_ORACLE_DIGEST) fail('protected semantic harness materialization');
+    }
     for(const command of contract.commands) {
-      if(command.engine==='deterministic') {verifyExecutionView({viewRoot:executionRoot,sourceRoot:root,revision:candidate.headSha});summary.results.push(executeDeterministic(command,executionRoot,config.container.image,path.join(controlRoot,'e2e/node_modules'),shimRoot));}
-      else if(command.groupIds[0]==='e2e.layer-availability') summary.results.push(runFixture(command,{candidate,contract,fixture,directory,root}));
+      if(command.engine==='deterministic') {verifyExecutionView({viewRoot:executionRoot,sourceRoot:root,revision:candidate.headSha});summary.results.push(executeDeterministic(command,executionRoot,config.container.image,path.join(controlRoot,'e2e/node_modules'),shimRoot,protectedHarnessFile,protectedInputFile));}
       else if(command.groupIds[0]==='integration.source-contract-http') {
         const result=await runSelectedGameplayHttp(selected.productFiles);
         if(canonicalJson([...result.observedStableIds].sort())!==canonicalJson([...command.expectedTestIds].sort())) fail('selected HTTP actual test census');
         summary.results.push({commandId:command.id,passed:true,retry:0,workers:1,observedTestIds:result.observedStableIds,
           sourceProof:selected.proof,candidateProductEvidence:false,requests:result.observedRequests,reportDigest:bytesDigest(result.resultsBytes)});
+      } else if(command.engine==='playwright') {
+        const product=command.dataCapability==='qualification_fixture'?fixture:command.dataCapability==='bounded_real_world'?bounded:null;
+        if(!product)fail(`missing ${command.dataCapability} browser publication`);
+        summary.results.push(runPublicationBrowser(command,{candidate,contract,publication:{...product,root:command.dataCapability==='qualification_fixture'?path.join(directory,'fixture'):path.join(directory,'bounded'),trustDescriptor:command.dataCapability==='qualification_fixture'?qualificationTrustDescriptor(product.manifest):boundedRealTrustDescriptor(product.manifest)},directory,root}));
       } else fail('unsupported command');
     }
     const current=await readCandidateSnapshot({...event,allowJustIntegratedHead:event.event==='workflow_run',changedFiles:gitChangedFiles(root,event.baseSha,event.headSha)});
