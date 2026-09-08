@@ -8,5 +8,5 @@ test('candidate readback rejects path traversal before execution authority is co
     headSha: 'a'.repeat(40), baseSha: 'b'.repeat(40), treeSha: 'c'.repeat(40),
     changedFiles: [{ path: 'tests/../outside.mjs', status: 'added' }],
   };
-  assert.doesNotThrow(() => resolveExecutionContract({ candidate }), /candidate readback path/);
+  assert.throws(() => resolveExecutionContract({ candidate }), /candidate readback path/);
 });
