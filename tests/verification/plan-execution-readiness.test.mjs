@@ -69,3 +69,43 @@ test('candidate exclusions cannot erase protected complete-product blockers',()=
  const p=planner.buildVerificationPlan({repository:'Oteryn/Oteryn-Atlas',headSha:'a'.repeat(40),integrationBaseSha:'b'.repeat(40),mergeBaseSha:'c'.repeat(40),changedFiles:[{path:'tools/fullworld-publication/publication.py'}],verificationCatalog:catalog,trustedImpactManifest:manifest,candidateImpactManifest:candidate});
  assert(p.executionBlockers.some(x=>x.reason==='unqualified-complete-product-oracle'));
 });
+
+test('protected authenticated handoff can execute an added deterministic subject without making it a canonical owner',()=>{
+ const changedFiles=[{path:'tests/new-feature.py',status:'added'}];
+ const p=planner.buildVerificationPlan({repository:'Oteryn/Oteryn-Atlas',headSha:'a'.repeat(40),integrationBaseSha:'b'.repeat(40),mergeBaseSha:'c'.repeat(40),changedFiles,
+  trustedVerificationCatalog:catalog,candidateVerificationCatalog:catalog,trustedImpactManifest:manifest,candidateImpactManifest:manifest,
+  unprivilegedDeterministicSubjects:['tests/new-feature.py']});
+ assert.deepEqual(p.executionBlockers,[]);
+ assert.equal(p.profile,'focused');
+ assert.deepEqual(p.requiredGroupIds,['deterministic.core']);
+ assert.equal(planner.assertPlanExecutable(p),p);
+});
+
+test('protected rename transition preserves the old canonical owner while executing the authenticated new path',()=>{
+ const oldPath='tests/semantic-search.mjs',newPath='tests/semantic-search-renamed.mjs';
+ const changedFiles=[{path:newPath,status:'renamed',previousPath:oldPath}];
+ const p=planner.buildVerificationPlan({repository:'Oteryn/Oteryn-Atlas',headSha:'a'.repeat(40),integrationBaseSha:'b'.repeat(40),mergeBaseSha:'c'.repeat(40),changedFiles,
+  trustedVerificationCatalog:catalog,candidateVerificationCatalog:catalog,trustedImpactManifest:manifest,candidateImpactManifest:manifest,
+  unprivilegedDeterministicSubjects:[oldPath,newPath]});
+ assert.deepEqual(p.executionBlockers,[]);
+ assert.equal(p.profile,'focused');
+ assert.deepEqual(p.requiredGroupIds,['deterministic.search']);
+ assert.equal(planner.assertPlanExecutable(p),p);
+});
+
+test('candidate subject classification never erases independent protected semantic obligations',()=>{
+ const runtimePath='src/browser/creature-gameplay-profiles.mjs';
+ const runtime=plan(runtimePath);
+ const changedFiles=[{path:'tests/new-feature.py',status:'added'},{path:runtimePath,status:'modified'}];
+ const mixed=planner.buildVerificationPlan({repository:'Oteryn/Oteryn-Atlas',headSha:'a'.repeat(40),integrationBaseSha:'b'.repeat(40),mergeBaseSha:'c'.repeat(40),changedFiles,
+  trustedVerificationCatalog:catalog,candidateVerificationCatalog:catalog,trustedImpactManifest:manifest,candidateImpactManifest:manifest,
+  unprivilegedDeterministicSubjects:['tests/new-feature.py']});
+ for(const id of runtime.requiredGroupIds)assert(mixed.requiredGroupIds.includes(id),id);
+ assert(mixed.requiredGroupIds.includes('deterministic.core'));
+});
+
+test('planner rejects an unprivileged deterministic subject not authenticated by the changed-file census',()=>{
+ assert.throws(()=>planner.buildVerificationPlan({repository:'Oteryn/Oteryn-Atlas',headSha:'a'.repeat(40),integrationBaseSha:'b'.repeat(40),mergeBaseSha:'c'.repeat(40),changedFiles:[{path:'docs/guide.md',status:'modified'}],
+  trustedVerificationCatalog:catalog,candidateVerificationCatalog:catalog,trustedImpactManifest:manifest,candidateImpactManifest:manifest,
+  unprivilegedDeterministicSubjects:['tests/new-feature.py']}),/not authenticated/);
+});

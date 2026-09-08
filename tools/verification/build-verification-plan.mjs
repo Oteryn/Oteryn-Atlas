@@ -28,6 +28,7 @@ const RESOURCE_RANK = Object.freeze({
   soak: 6,
   'artifact-build': 2,
 });
+const DETERMINISTIC_TEST_PATH = /^tests\/[A-Za-z0-9_./-]+\.(mjs|py)$/;
 
 function freeze(value) {
   if (value && typeof value === 'object' && !Object.isFrozen(value)) {
@@ -56,6 +57,43 @@ function safeChangedPath(value) {
     && !value.split('/').includes('.');
 }
 
+function deterministicTestPath(value) {
+  return safeChangedPath(value) && DETERMINISTIC_TEST_PATH.test(value);
+}
+
+function normalizeUnprivilegedDeterministicSubjects(value, changedFiles, trustedCatalog) {
+  if (value == null) return new Map();
+  if (!Array.isArray(value) || value.some((spec) => !deterministicTestPath(spec)) || new Set(value).size !== value.length) {
+    throw new TypeError('unprivilegedDeterministicSubjects must be unique safe deterministic test paths');
+  }
+  const protectedOwners = (spec) => Object.entries(trustedCatalog.groups)
+    .filter(([, group]) => group.executionRole === 'canonical-machine' && group.specs.includes(spec)).map(([id]) => id).sort();
+  const authenticated = new Map();
+  for (const row of changedFiles ?? []) {
+    if (!row || typeof row !== 'object') continue;
+    if (['added', 'modified'].includes(row.status) && deterministicTestPath(row.path)) {
+      const owners = protectedOwners(row.path);
+      authenticated.set(row.path, owners.length ? owners : ['deterministic.core']);
+    }
+    if (row.status === 'renamed' && deterministicTestPath(row.path) && deterministicTestPath(row.previousPath)) {
+      const left = row.path.slice(row.path.lastIndexOf('.'));
+      const right = row.previousPath.slice(row.previousPath.lastIndexOf('.'));
+      if (left === right) {
+        const owners = protectedOwners(row.previousPath);
+        const transitionGroups = owners.length ? owners : ['deterministic.core'];
+        authenticated.set(row.previousPath, transitionGroups);
+        authenticated.set(row.path, transitionGroups);
+      }
+    }
+  }
+  const result = new Map();
+  for (const spec of value) {
+    if (!authenticated.has(spec)) throw new TypeError(`unprivileged deterministic subject is not authenticated by changed files: ${spec}`);
+    result.set(spec, authenticated.get(spec));
+  }
+  return result;
+}
+
 function allEvidencePaths(changedFiles) {
   if (!Array.isArray(changedFiles) || changedFiles.length === 0) return null;
   const paths = [];
@@ -68,7 +106,7 @@ function allEvidencePaths(changedFiles) {
   return [...new Set(paths)].sort();
 }
 
-function matchesForPath(path, manifest, catalog) {
+function matchesForPath(path, manifest, catalog, unprivilegedSubjects = new Map()) {
   if (path === 'AGENTS.md') {
     return [{
       pathPrefix: 'AGENTS.md',
@@ -86,20 +124,26 @@ function matchesForPath(path, manifest, catalog) {
   }] : [];
   const matches = manifest.entries.filter((entry) => (entry.exactMatch ? path === entry.pathPrefix : path.startsWith(entry.pathPrefix))
     && !(entry.excludedPaths ?? []).includes(path));
+  const subject = !owners.length && unprivilegedSubjects.has(path) ? [{
+    pathPrefix: path,
+    domains: ['candidate-deterministic-test-subject'],
+    minimumProfile: 'focused',
+    requiredGroups: unprivilegedSubjects.get(path),
+  }] : [];
   // Only explicitly designated catchalls yield. Every semantic match remains
   // additive; protected and candidate manifests are classified independently.
-  const semantic = [...ownership, ...matches.filter((entry) => !entry.defaultRule)];
+  const semantic = [...ownership, ...subject, ...matches.filter((entry) => !entry.defaultRule)];
   return semantic.length ? semantic : matches;
 }
 
-function classify(paths, manifest, catalog) {
+function classify(paths, manifest, catalog, unprivilegedSubjects = new Map()) {
   if (!paths) return { profile: 'full', groups: FALLBACK_GROUPS, domains: ['invalid-change-evidence'], fallback: true };
   const groups = new Set();
   const domains = new Set();
   let profile = 'none';
   let fallback = false;
   for (const path of paths) {
-    const matches = matchesForPath(path, manifest, catalog);
+    const matches = matchesForPath(path, manifest, catalog, unprivilegedSubjects);
     if (matches.length === 0) {
       fallback = true;
       profile = 'full';
@@ -294,8 +338,9 @@ export function buildVerificationPlan(input) {
   const trustedImpactManifest = validateImpactManifest(input.trustedImpactManifest, trustedVerificationCatalog);
   const candidateImpactManifest = validateImpactManifest(input.candidateImpactManifest, candidateVerificationCatalog);
   const changedPaths = allEvidencePaths(input.changedFiles);
-  const trusted = classify(changedPaths, trustedImpactManifest, trustedVerificationCatalog);
-  const candidate = classify(changedPaths, candidateImpactManifest, candidateVerificationCatalog);
+  const unprivilegedSubjects = normalizeUnprivilegedDeterministicSubjects(input.unprivilegedDeterministicSubjects, input.changedFiles, trustedVerificationCatalog);
+  const trusted = classify(changedPaths, trustedImpactManifest, trustedVerificationCatalog, unprivilegedSubjects);
+  const candidate = classify(changedPaths, candidateImpactManifest, candidateVerificationCatalog, unprivilegedSubjects);
   const executionBlockers = [];
   if (!changedPaths) executionBlockers.push({ reason: 'invalid-change-evidence', path: null });
   for (const path of changedPaths ?? []) {
@@ -306,12 +351,15 @@ export function buildVerificationPlan(input) {
         executionBlockers.push({ reason: 'ambiguous-test-owner', path });
       }
     }
-    const blockers = new Set([...matchesForPath(path, trustedImpactManifest, trustedVerificationCatalog), ...matchesForPath(path, candidateImpactManifest, candidateVerificationCatalog)].map(entry => entry.executionBlocker).filter(Boolean));
+    const blockers = new Set([...matchesForPath(path, trustedImpactManifest, trustedVerificationCatalog, unprivilegedSubjects), ...matchesForPath(path, candidateImpactManifest, candidateVerificationCatalog, unprivilegedSubjects)].map(entry => entry.executionBlocker).filter(Boolean));
     for (const reason of blockers) executionBlockers.push({ reason, path });
-    if (!matchesForPath(path, trustedImpactManifest, trustedVerificationCatalog).some(entry => !entry.defaultRule) || !matchesForPath(path, candidateImpactManifest, candidateVerificationCatalog).some(entry => !entry.defaultRule)) {
+    if (!unprivilegedSubjects.has(path)
+      && (!matchesForPath(path, trustedImpactManifest, trustedVerificationCatalog, unprivilegedSubjects).some(entry => !entry.defaultRule)
+        || !matchesForPath(path, candidateImpactManifest, candidateVerificationCatalog, unprivilegedSubjects).some(entry => !entry.defaultRule))) {
       executionBlockers.push({ reason: 'unknown-impact', path });
     }
     if ((path.startsWith('tests/') || path.startsWith('e2e/tests/')) && /\.(?:mjs|py)$/.test(path)
+      && !unprivilegedSubjects.has(path)
       && !Object.values(verificationCatalog.groups).some(group => group.specs.some(pattern => !pattern.includes('*') && pattern === path))) {
       executionBlockers.push({ reason: 'unowned-test', path });
     }

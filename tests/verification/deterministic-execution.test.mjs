@@ -167,19 +167,51 @@ test('authenticated changed leaf bytes preserve protected parent coverage once',
  fs.appendFileSync(path.join(value.root,'tests/leaf.mjs'),'// candidate leaf bytes\n');
  fs.appendFileSync(path.join(value.root,'tests/b.py'),'# candidate Python bytes\n');
  assert.throws(()=>resolveDeterministicCommands(value),/source proof changed/);
- const commands=resolveDeterministicCommands({...value,changedSpecs:['tests/leaf.mjs','tests/b.py']});
+ const changedFiles=[{path:'tests/b.py',status:'modified'},{path:'tests/leaf.mjs',status:'modified'}];
+ const commands=resolveDeterministicCommands({...value,changedFiles});
  assert.equal(commands.length,1);
  assert.deepEqual(commands[0].coveredSpecs,['tests/a.mjs','tests/b.py','tests/leaf.mjs']);
  fs.appendFileSync(path.join(value.root,'tests/a.mjs'),'// candidate parent bytes\n');
- assert.throws(()=>resolveDeterministicCommands({...value,changedSpecs:['tests/a.mjs','tests/leaf.mjs','tests/b.py']}),/source proof changed/);
+ const split=resolveDeterministicCommands({...value,changedFiles:[{path:'tests/a.mjs',status:'modified'},...changedFiles]});
+ assert.deepEqual(split.map(row=>[row.spec,row.coveredSpecs]),[
+  ['tests/a.mjs',['tests/a.mjs']],
+  ['tests/b.py',['tests/b.py']],
+  ['tests/leaf.mjs',['tests/leaf.mjs']],
+ ]);
 });
 test('candidate changes cannot attest new test edges or replace protected command shape', t => {
  const value=fixture(t);
  fs.writeFileSync(path.join(value.root,'tests/leaf.mjs'),"import './b.py';\n");
  // The bytes can be tested, but cannot claim another test's coverage or command.
- const commands=resolveDeterministicCommands({...value,groupIds:['deterministic.node'],changedSpecs:['tests/leaf.mjs']});
+ const changedFiles=[{path:'tests/leaf.mjs',status:'modified'}];
+ const commands=resolveDeterministicCommands({...value,groupIds:['deterministic.node'],changedFiles});
  assert.deepEqual(commands[0].coveredSpecs,['tests/a.mjs','tests/leaf.mjs']);
  assert.deepEqual(commands[0].argv,['--test','tests/a.mjs']);
  const malformed=structuredClone(value.ownership);delete malformed.entries[1].sourceSha256;
- assert.throws(()=>resolveDeterministicCommands({...value,ownership:malformed,changedSpecs:['tests/leaf.mjs']}),/missing source proof/);
+ assert.throws(()=>resolveDeterministicCommands({...value,ownership:malformed,changedFiles}),/missing source proof/);
+});
+
+test('added deterministic test executes as an unowned self-only subject under protected core command policy', t => {
+ const value=fixture(t);
+ fs.writeFileSync(path.join(value.root,'tests/new-subject.mjs'),"import test from 'node:test'; test('candidate add',()=>{});\n");
+ value.catalog.groups['deterministic.core']={...value.catalog.groups['deterministic.node'],specs:['tests/a.mjs','tests/leaf.mjs']};
+ const commands=resolveDeterministicCommands({...value,groupIds:['deterministic.core'],changedFiles:[{path:'tests/new-subject.mjs',status:'added'}]});
+ const subject=commands.find(row=>row.spec==='tests/new-subject.mjs');
+ assert.ok(subject);
+ assert.deepEqual(subject.argv,['--test','tests/new-subject.mjs']);
+ assert.deepEqual(subject.groupIds,['deterministic.core']);
+ assert.deepEqual(subject.coveredSpecs,['tests/new-subject.mjs']);
+});
+
+test('renamed protected deterministic identity executes the new path without stale parent coverage credit', t => {
+ const value=fixture(t);
+ fs.renameSync(path.join(value.root,'tests/leaf.mjs'),path.join(value.root,'tests/renamed-leaf.mjs'));
+ const commands=resolveDeterministicCommands({...value,groupIds:['deterministic.node'],changedFiles:[{path:'tests/renamed-leaf.mjs',previousPath:'tests/leaf.mjs',status:'renamed'}]});
+ const parent=commands.find(row=>row.spec==='tests/a.mjs');
+ const renamed=commands.find(row=>row.spec==='tests/leaf.mjs');
+ assert.deepEqual(parent.coveredSpecs,['tests/a.mjs']);
+ assert.deepEqual(renamed.argv,['--test','tests/renamed-leaf.mjs']);
+ assert.equal(renamed.executionPath,'tests/renamed-leaf.mjs');
+ assert.deepEqual(renamed.coveredSpecs,['tests/leaf.mjs']);
+ assert.throws(()=>resolveDeterministicCommands({...value,groupIds:['deterministic.node'],changedFiles:[{path:'tests/renamed-leaf.py',previousPath:'tests/leaf.mjs',status:'renamed'}]}),/unsafe deterministic test rename/);
 });
