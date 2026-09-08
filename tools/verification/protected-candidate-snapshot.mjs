@@ -14,11 +14,12 @@ export async function resolveDirectMergeGroup({request=githubRequest,repository,
   if(group?.base_ref!==baseRef||!SHA.test(group.base_sha??'')||!SHA.test(group.head_sha??'')||group.base_sha===group.head_sha
     ||typeof group.head_ref!=='string'||!group.head_ref.startsWith(queuePrefix)||githubSha!==group.head_sha||githubRef!==group.head_ref)fail('merge-group candidate identity');
   const protectedRef=await request(`/repos/${repository}/git/ref/heads/${encodeURIComponent(defaultBranch)}`);
-  if(protectedRef.object?.sha!==group.base_sha)fail('merge-group protected base moved');
+  const liveBase=protectedRef.object?.sha;
+  if(liveBase!==group.base_sha&&liveBase!==group.head_sha)fail('merge-group protected base moved');
   const commit=await request(`/repos/${repository}/git/commits/${group.head_sha}`);
   if(commit.sha!==group.head_sha||!SHA.test(commit.tree?.sha??'')||!Array.isArray(commit.parents)||!commit.parents.length
-    ||commit.parents.some(parent=>!SHA.test(parent?.sha??'')))fail('merge-group candidate commit');
-  return {repository,baseSha:group.base_sha,headSha:group.head_sha,treeSha:commit.tree.sha,headRef:group.head_ref};
+    ||commit.parents[0]?.sha!==group.base_sha||commit.parents.some(parent=>!SHA.test(parent?.sha??'')))fail('merge-group candidate commit');
+  return {repository,baseSha:group.base_sha,headSha:group.head_sha,treeSha:commit.tree.sha,headRef:group.head_ref,allowJustIntegratedHead:liveBase===group.head_sha};
 }
 export async function readCandidateSnapshot({request=githubRequest,repository,baseSha,headSha,prNumber=null,changedFiles,allowJustIntegratedHead=false}) {
   if(!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository))fail('repository');
