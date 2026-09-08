@@ -22,7 +22,7 @@ const config = {
     pidsLimit: 192,
     memoryBytes: 1610612736,
     cpus: 2,
-    tmpfs: [{ path: '/tmp', options: ['exec', 'nodev', 'nosuid', 'rw', 'size=256m'] }],
+    tmpfs: [{ path: '/tmp', options: ['nodev', 'nosuid', 'rw', 'size=256m'] }],
   },
   mounts: {
     candidate: { source: 'exact-candidate-checkout', target: '/candidate', readOnly: true },
@@ -167,20 +167,18 @@ test('artifact writes and sandbox ownership are mandatory qualification evidence
   }
 });
 
-
-test('temporary execution options are exact and contradictory or unknown permissions fail closed', () => {
-  const expected = ['exec', 'nodev', 'nosuid', 'rw', 'size=256m'];
+test('tmpfs accepts only the exact protected option set with order-stable identity', () => {
+  const expected = config.container.tmpfs[0].options;
+  const withOptions = options => ({ ...config, container: { ...config.container,
+    tmpfs: [{ path: '/tmp', options }] } });
   const identity = buildProtectedExecutionEnvironmentIdentity(config);
-  assert.deepEqual(identity.config.container.tmpfs[0].options, expected);
-  const reordered = structuredClone(config);
-  reordered.container.tmpfs[0].options.reverse();
-  assert.equal(buildProtectedExecutionEnvironmentIdentity(reordered).environmentDigest, identity.environmentDigest);
+  assert.deepEqual(buildProtectedExecutionEnvironmentIdentity(withOptions([...expected].reverse())), identity);
   for (const options of [
-    expected.filter(option => option !== 'exec'),
-    ...['noexec', 'suid', 'dev', 'exec', 'unknown', 'size=512m'].map(option => [...expected, option]),
-    ['exec', 'nodev', 'nosuid', 'ro', 'size=256m'],
+    ...expected.map(option => expected.filter(value => value !== option)),
+    ...['exec', 'noexec', 'suid', 'dev', 'unknown', 'ro', 'size=128m', 'rw'].map(option => [...expected, option]),
+    expected.map(option => option === 'size=256m' ? 'size=128m' : option),
+    expected.map(option => option === 'rw' ? 'ro' : option),
   ]) {
-    const changed = structuredClone(config); changed.container.tmpfs[0].options = options;
-    assert.throws(() => buildProtectedExecutionEnvironmentIdentity(changed), /tmp.*options/);
+    assert.throws(() => buildProtectedExecutionEnvironmentIdentity(withOptions(options)), /tmp/, JSON.stringify(options));
   }
 });

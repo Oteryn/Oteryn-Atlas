@@ -17,7 +17,7 @@
     "tmpfs": [
       {
         "path": "/tmp",
-        "options": ["exec", "nodev", "nosuid", "rw", "size=256m"]
+        "options": ["nodev", "nosuid", "rw", "size=256m"]
       }
     ]
   },

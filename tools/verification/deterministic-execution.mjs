@@ -14,7 +14,7 @@ function runtimeFor(spec){
 // Authenticated candidate test paths are subjects only: they may execute, but
 // they never create ownership, interpreter/argv or transitive coverage authority.
 export function resolveDeterministicCommands({root,protectedRoot,catalog,groupIds,ownership,requiredSpecs=[],changedFiles=[]}){
-  if(!Array.isArray(groupIds)||groupIds.length===0)throw new Error('empty selection');
+  if(!Array.isArray(groupIds))throw new Error('empty selection');
   if(ownership?.schemaVersion!==1||!Array.isArray(ownership.entries)||(ownership.importAggregators!==undefined&&!Array.isArray(ownership.importAggregators)))throw new Error('unsupported ownership schema');
   if(!Array.isArray(changedFiles))throw new Error('changed test census required');
   const entries=new Map();
@@ -37,7 +37,7 @@ export function resolveDeterministicCommands({root,protectedRoot,catalog,groupId
       if(renamed.has(item.previousPath))throw new Error(`duplicate deterministic test rename: ${item.previousPath}`);
       if([...renamed.values()].includes(item.path))throw new Error(`duplicate deterministic test rename target: ${item.path}`);
       if(entries.has(item.previousPath)){renamed.set(item.previousPath,item.path);changed.add(item.previousPath);}
-      else directSubjects.add(item.path);
+      else {if(entries.has(item.path))throw new Error(`deterministic rename target is protected: ${item.path}`);directSubjects.add(item.path);}
       continue;
     }
     if(!safeTestPath(item.path))continue;
@@ -114,9 +114,9 @@ export function resolveDeterministicCommands({root,protectedRoot,catalog,groupId
     }
   }
   if(directSubjects.size){
-    if(!groupIds.includes('deterministic.core'))throw new Error('candidate deterministic test subject requires deterministic.core');
-    for(const spec of directSubjects){checkedFile(spec);attribute(spec,'deterministic.core');}
+    for(const spec of directSubjects){checkedFile(spec);obligationGroups.set(spec,new Set());}
   }
+  if(groupIds.length===0&&directSubjects.size===0)throw new Error('empty selection');
   const obligations=new Set(obligationGroups.keys());
   for(const spec of requiredSpecs)if(!obligations.has(spec))throw new Error(`required test is not selected: ${spec}`);
   const trustedClosures=new Map();
@@ -158,7 +158,7 @@ export function resolveDeterministicCommands({root,protectedRoot,catalog,groupId
   return roots.map(spec=>{
     const physical=executionPath(spec),shape=runtimeFor(physical),groups=new Set();
     for(const covered of trustedClosures.get(spec))for(const id of obligationGroups.get(covered)??[])groups.add(id);
-    if(!groups.size)throw new Error(`deterministic command lost group ownership: ${spec}`);
-    return {interpreter:shape.interpreter,argv:shape.argv,cwd:realRoot,spec,executionPath:physical,groupIds:[...groups].sort(),coveredSpecs:[...trustedClosures.get(spec)].filter(item=>obligations.has(item)).sort()};
+    if(!groups.size&&!directSubjects.has(spec))throw new Error(`deterministic command lost group ownership: ${spec}`);
+    return {...(directSubjects.has(spec)?{executionScope:'candidate-self-only'}:{}),interpreter:shape.interpreter,argv:shape.argv,cwd:realRoot,spec,executionPath:physical,groupIds:[...groups].sort(),coveredSpecs:[...trustedClosures.get(spec)].filter(item=>obligations.has(item)).sort()};
   });
 }

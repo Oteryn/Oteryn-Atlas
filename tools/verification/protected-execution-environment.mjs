@@ -59,10 +59,10 @@ function normalizeConfig(candidate) {
     throw new TypeError('protected execution writable /tmp tmpfs is invalid');
   }
   const tmpOptions = [...container.tmpfs[0].options].sort();
-  // Real CLI fixtures execute temporary shims. Pin this capability explicitly;
-  // Docker otherwise adds noexec even when it is absent from supplied options.
-  if (JSON.stringify(tmpOptions) !== JSON.stringify(['exec', 'nodev', 'nosuid', 'rw', 'size=256m'])) {
-    throw new TypeError('protected execution /tmp options must be exactly exec,nodev,nosuid,rw,size=256m');
+  const requiredTmpOptions = ['nodev', 'nosuid', 'rw', 'size=256m'];
+  if (tmpOptions.length !== requiredTmpOptions.length
+    || tmpOptions.some((option, index) => option !== requiredTmpOptions[index])) {
+    throw new TypeError('protected execution /tmp options must exactly match the protected option set');
   }
 
   const mounts = candidate.mounts;
