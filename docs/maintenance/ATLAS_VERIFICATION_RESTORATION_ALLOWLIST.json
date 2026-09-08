@@ -650,6 +650,24 @@
       "operations": [
         "M"
       ]
+    },
+    {
+      "path": "e2e/tests/farm-explorer-desktop.spec.mjs",
+      "operations": [
+        "M"
+      ]
+    },
+    {
+      "path": "e2e/tests/farm-explorer-mobile.spec.mjs",
+      "operations": [
+        "M"
+      ]
+    },
+    {
+      "path": "web/fullworld-search.mjs",
+      "operations": [
+        "M"
+      ]
     }
   ]
 }
