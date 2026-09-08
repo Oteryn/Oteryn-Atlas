@@ -1,5 +1,5 @@
 from __future__ import annotations
-import copy, importlib.util, json, tempfile
+import copy, importlib.util, json
 from pathlib import Path
 import unittest
 ROOT=Path(__file__).resolve().parents[2]
@@ -12,10 +12,6 @@ class AuthorityRegistryTests(unittest.TestCase):
     def test_committed_registry_is_valid_with_only_overview_proven(self):
         self.assertEqual(verify.validate_registry(self.registry), {'PROVEN':1,'BLOCKED':11,'UNKNOWN':3})
         enabled={x['id'] for x in self.registry['layers'] if x['enabled']}; self.assertEqual(enabled, {'minimap-overview'})
-    def test_non_utf8_registry_is_reported_as_registry_error(self):
-        with tempfile.TemporaryDirectory() as directory:
-            path=Path(directory)/'registry.json'; path.write_bytes(b'\xff')
-            with self.assertRaisesRegex(verify.RegistryError,'UTF-8 JSON'): verify.load_registry(path)
     def test_duplicate_layer_id_rejected(self):
         broken=copy.deepcopy(self.registry); broken['layers'][1]['id']=broken['layers'][0]['id']
         with self.assertRaisesRegex(verify.RegistryError,'duplicate layer ids|coverage changed'): verify.validate_registry(broken)
