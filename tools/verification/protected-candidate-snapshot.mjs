@@ -19,9 +19,9 @@ export async function resolveDirectMergeGroup({request=githubRequest,repository,
   const commit=await request(`/repos/${repository}/git/commits/${group.head_sha}`);
   if(commit.sha!==group.head_sha||!SHA.test(commit.tree?.sha??'')||!Array.isArray(commit.parents)||!commit.parents.length
     ||commit.parents[0]?.sha!==group.base_sha||commit.parents.some(parent=>!SHA.test(parent?.sha??'')))fail('merge-group candidate commit');
-  return {repository,baseSha:group.base_sha,headSha:group.head_sha,treeSha:commit.tree.sha,headRef:group.head_ref,allowJustIntegratedHead:liveBase===group.head_sha};
+  return {repository,baseSha:group.base_sha,headSha:group.head_sha,treeSha:commit.tree.sha,headRef:group.head_ref};
 }
-export async function readCandidateSnapshot({request=githubRequest,repository,baseSha,headSha,prNumber=null,changedFiles,allowJustIntegratedHead=false}) {
+export async function readCandidateSnapshot({request=githubRequest,repository,baseSha,headSha,prNumber=null,changedFiles,allowJustIntegratedHead=false,headRef=null}) {
   if(!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository))fail('repository');
   for(const sha of [baseSha,headSha])if(!/^[a-f0-9]{40}$/.test(sha??''))fail('revision');
   if(prNumber!==null&&(!Number.isSafeInteger(prNumber)||prNumber<1))fail('PR');
@@ -29,7 +29,8 @@ export async function readCandidateSnapshot({request=githubRequest,repository,ba
   if(repo.full_name!==repository||typeof repo.default_branch!=='string')fail('repository association');
   const base=await request(`${prefix}/git/ref/heads/${encodeURIComponent(repo.default_branch)}`);
   if(typeof allowJustIntegratedHead!=='boolean'||(allowJustIntegratedHead&&prNumber!==null))fail('integrated MQ readback scope');
-  if(base.object?.sha!==baseSha&&!(allowJustIntegratedHead&&base.object?.sha===headSha))fail('protected base moved');
+  const directQueueReadback=prNumber===null&&typeof headRef==='string'&&headRef.startsWith(`refs/heads/gh-readonly-queue/${repo.default_branch}/`)&&base.object?.sha===headSha;
+  if(base.object?.sha!==baseSha&&!(allowJustIntegratedHead&&base.object?.sha===headSha)&&!directQueueReadback)fail('protected base moved');
   if(prNumber!==null){
     const pr=await request(`${prefix}/pulls/${prNumber}`);
     if(pr.number!==prNumber||pr.state!=='open'||pr.merged||pr.head?.sha!==headSha||pr.base?.sha!==baseSha||pr.head?.repo?.full_name!==repository||pr.base?.repo?.full_name!==repository||pr.base?.ref!==repo.default_branch)fail('PR identity drift');
