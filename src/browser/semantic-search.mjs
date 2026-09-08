@@ -124,7 +124,7 @@ function scoreRecord(record, query, type, ranking) {
 }
 
 export function searchSemanticIndex(index, rawQuery, options = {}) {
-  validateSemanticSearchIndex(index);
+  validateSemanticSearchIndex(index, options.expectedSource ?? PRODUCTION_SEMANTIC_SEARCH_SOURCE);
   const limit = Math.min(MAX_RESULTS, Math.max(1, Number(options.limit ?? 12)));
   const split = splitPrefix(rawQuery);
   if (split.type == null) {

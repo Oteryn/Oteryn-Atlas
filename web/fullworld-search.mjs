@@ -91,7 +91,7 @@ function resultIdentity(record) {
 }
 
 function queryAll(raw) {
-  const primary = searchSemanticIndex(state.index, raw, { limit: MAX_RESULTS, currentFloor: currentFloor() });
+  const primary = searchSemanticIndex(state.index, raw, { limit: MAX_RESULTS, currentFloor: currentFloor(), expectedSource: SOURCE_EXPECTATIONS.semanticSearch });
   if (primary.mode === 'coordinate') return primary.results;
   const existing = new Set(primary.results.map(resultIdentity));
   const supplement = searchCreatureRecords(state.creatureSearch, raw, { limit: MAX_RESULTS })
@@ -190,7 +190,7 @@ function wireForm(formId, inputId, suffix) {
     const query = input.value;
     if (state.index) {
       try {
-        const primary = searchSemanticIndex(state.index, query, { limit: MAX_RESULTS, currentFloor: currentFloor() });
+        const primary = searchSemanticIndex(state.index, query, { limit: MAX_RESULTS, currentFloor: currentFloor(), expectedSource: SOURCE_EXPECTATIONS.semanticSearch });
         if (primary.mode === 'coordinate') {
           hideResults(host);
           return;
