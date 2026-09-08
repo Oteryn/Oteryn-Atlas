@@ -68,20 +68,25 @@ test('gameplay impact routing executes both functional fixture and bounded sourc
   const catalog = JSON.parse(readFileSync(new URL('../../tools/verification/verification-catalog.json', import.meta.url), 'utf8'));
   const impact = JSON.parse(readFileSync(new URL('../../tools/verification/impact-manifest.json', import.meta.url), 'utf8'));
 
-  const creatureSpecs = catalog.groups['e2e.creatures'].specs;
+  const creatureSpecs = catalog.groups['e2e.creature-gameplay'].specs;
   assert.ok(creatureSpecs.includes('e2e/tests/creature-gameplay-desktop.spec.mjs'));
   assert.ok(creatureSpecs.includes('e2e/tests/creature-gameplay-mobile.spec.mjs'));
-  assert.equal(catalog.groups['e2e.creatures'].capabilities.dataCapability, 'qualification_fixture');
+  assert.equal(catalog.groups['e2e.creature-gameplay'].capabilities.dataCapability, 'qualification_fixture');
 
   const gameplayRule = impact.entries.find((entry) => entry.pathPrefix === 'src/browser/creature-gameplay-profiles.mjs');
   assert.ok(gameplayRule, 'gameplay runtime requires a dedicated impact rule');
-  assert.ok(gameplayRule.requiredGroups.includes('integration.source-contract'));
-  assert.equal(catalog.groups['integration.source-contract'].capabilities.dataCapability, 'bounded_real_world');
-  assert.ok(catalog.groups['integration.source-contract'].specs.includes('e2e/tests/creature-gameplay-source-contract-desktop.spec.mjs'));
+  assert.ok(gameplayRule.requiredGroups.includes('integration.source-contract-http'));
+  assert.equal(catalog.groups['integration.source-contract-http'].capabilities.dataCapability, 'bounded_real_world');
+  assert.ok(catalog.groups['integration.source-contract-http'].specs.includes('e2e/tests/creature-gameplay-source-contract-desktop.spec.mjs'));
 
-  const sourceSpecRule = impact.entries.find((entry) => entry.pathPrefix === 'e2e/tests/creature-gameplay-source-contract-desktop.spec.mjs');
-  assert.ok(sourceSpecRule, 'source-contract spec requires an explicit impact rule');
-  assert.ok(sourceSpecRule.requiredGroups.includes('integration.source-contract'));
+  const sourceSpecPlan = buildVerificationPlan({
+    repository: 'Oteryn/Oteryn-Atlas', headSha: 'a'.repeat(40),
+    integrationBaseSha: 'b'.repeat(40), mergeBaseSha: 'c'.repeat(40),
+    changedFiles: [{path: 'e2e/tests/creature-gameplay-source-contract-desktop.spec.mjs'}],
+    trustedImpactManifest: impact, candidateImpactManifest: impact, verificationCatalog: catalog,
+  });
+  assert.deepEqual(sourceSpecPlan.requiredGroupIds, ['integration.source-contract-http']);
+  assert.deepEqual(sourceSpecPlan.executionBlockers, []);
 
   const plan = buildVerificationPlan({
     repository: 'Oteryn/Oteryn-Atlas',
@@ -95,6 +100,6 @@ test('gameplay impact routing executes both functional fixture and bounded sourc
   });
   assert.equal(plan.requiresRealFullWorld, false);
   assert.deepEqual(plan.requiredDataCapabilities, ['bounded_real_world', 'qualification_fixture']);
-  assert.ok(plan.requiredGroupIds.includes('e2e.creatures'));
-  assert.ok(plan.requiredGroupIds.includes('integration.source-contract'));
+  assert.ok(plan.requiredGroupIds.includes('e2e.creature-gameplay'));
+  assert.ok(plan.requiredGroupIds.includes('integration.source-contract-http'));
 });

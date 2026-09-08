@@ -62,7 +62,7 @@ test('A: root instruction-only governance does not recursively require browser q
 
   const unknownMarkdown = planFor('README.md');
   assert.equal(unknownMarkdown.profile, 'full', 'arbitrary Markdown must remain fail-closed');
-  assert.deepEqual(unknownMarkdown.requiredGroupIds, ['deterministic.core', 'e2e.full']);
+  assert.deepEqual(unknownMarkdown.requiredGroupIds, Object.entries(verificationCatalog.groups).filter(([,group]) => group.executionRole !== 'aggregate' && (group.fullSafetyNet || group.executionRole === 'canonical-review')).map(([id]) => id).sort());
 });
 
 test('B: pure verification regressions stay deterministic while executable authority stays broad and fail-closed', () => {
@@ -76,16 +76,16 @@ test('B: pure verification regressions stay deterministic while executable autho
   ]) {
     const plan = planFor(pathname);
     assert.equal(plan.profile, 'full', pathname);
-    assert.deepEqual(plan.requiredGroupIds, ['deterministic.core', 'e2e.full'], pathname);
+    assert.deepEqual(plan.requiredGroupIds, Object.entries(verificationCatalog.groups).filter(([,group]) => group.executionRole !== 'aggregate' && (group.fullSafetyNet || group.executionRole === 'canonical-review')).map(([id]) => id).sort(), pathname);
   }
 });
 
 test('C: verification profile remains independent from product data capability', () => {
   assert.equal(verificationCatalog.groups['e2e.full'].capabilities.dataCapability, 'qualification_fixture');
   assert.equal(verificationCatalog.groups['e2e.common-smoke'].capabilities.dataCapability, 'qualification_fixture');
-  assert.equal(verificationCatalog.groups['integration.source-contract'].capabilities.dataCapability, 'bounded_real_world');
+  assert.equal(verificationCatalog.groups['integration.source-contract-http'].capabilities.dataCapability, 'bounded_real_world');
   assert.equal(verificationCatalog.groups['fullworld.animation-census'].capabilities.dataCapability, 'real_fullworld');
-  assert.equal(planFor('web/fullworld-creatures.mjs').profile, 'broad');
+  assert.equal(planFor('web/fullworld-creatures.mjs').profile, 'targeted');
 });
 
 test('D/E: qualification repair admission is branch-agnostic, exact-scope and monotonic without recursively executing e2e.full', async () => {
@@ -162,30 +162,15 @@ test('D/E: generic qualification repair admits regression companions and all tru
   assert(accepted.changedPaths.includes('web/fullworld-farm-explorer.mjs'));
 });
 
-test('D/E: protected qualification repair resolves one exact protected browser oracle instead of the complete matrix', () => {
-  const workflowPath = path.join(ROOT, '.github/workflows/protected-qualification-repair.yml');
-  assert.equal(fs.existsSync(workflowPath), true, 'generic protected qualification repair workflow must exist');
-  const workflow = fs.readFileSync(workflowPath, 'utf8');
-  const job = workflow.split('  qualification-repair:')[1] ?? '';
-  const gateSource = fs.readFileSync(path.join(ROOT, 'tools/verification/protected-hosted-gate.mjs'), 'utf8');
-
-  assert.match(workflow, /workflow_dispatch:/);
-  assert.doesNotMatch(workflow, /pull_request_target:/);
-  assert.match(job, /validateQualificationRepairTransition/);
-  assert.match(job, /requiredGroupFloor:\s*\['deterministic\.core', 'e2e\.full'\]/);
-  assert.match(job, /QUALIFICATION_REPAIR_BROWSER_PROOF/);
-  assert.match(job, /selected\.length !== 1/);
-  assert.doesNotMatch(job, /catalog\.groups\?\.\['e2e\.full'\]\?\.specs/);
-  assert.match(job, /runs-on:\s*ubuntu-24\.04/);
-  assert.match(job, /--network none/);
-  assert.match(job, /--read-only/);
-  assert.match(job, /--workers=1/);
-  assert.match(job, /--retries=0/);
-  assert.match(job, /context='atlas-protected-product-qualification'/);
-  assert.doesNotMatch(job, /ATLAS_HEAD_REF|head\.ref|fix\/issue-|pull_request\.number\s*==/);
-
-  assert.match(gateSource, /\.github\/workflows\/protected-qualification-repair\.yml/);
-  assert.doesNotMatch(gateSource, /resolveProtectedPromotionQualification|resolveProtectedAuthorityRepinQualification/);
+test('D/E: qualification repair selects its exact protected oracle and rejects a missing census entry', async () => {
+  const { QUALIFICATION_REPAIR_BROWSER_PROOF: proof } = await import('../../tools/verification/qualification-repair-policy.mjs');
+  const { selectProtectedBrowserCensus } = await import('../../tools/verification/run-protected-admission.mjs');
+  const id = `${proof.project}::${proof.spec}::${proof.title}`;
+  const census = { scenarioIds: [id, 'other::e2e/tests/other.spec.mjs::other'], testList: 'exact protected oracle\nother oracle\n' };
+  assert.deepEqual(selectProtectedBrowserCensus(census, [id]), {scenarioIds:[id], testList:'exact protected oracle\n'});
+  assert.throws(() => selectProtectedBrowserCensus({scenarioIds:[],testList:''}, [id]), /selection/);
+  assert.equal(proof.workers, 1);
+  assert.equal(proof.retries, 0);
 });
 
 test('F: FullWorld ancillary browser consumers derive exact source authority from active trust', () => {
@@ -244,12 +229,13 @@ test('F2: implicit and explicit production animation authority share one singlet
   }), /identity changed/i);
 });
 
-test('G: genuine runtime-impacting browser changes retain full plan floor while generic repair proof stays fixture-bound', async () => {
+test('G: genuine runtime-impacting browser changes retain canonical creature obligations while generic repair proof stays fixture-bound', async () => {
   const plan = planFor('web/fullworld-creatures.mjs');
-  assert.equal(plan.profile, 'broad');
-  assert(plan.requiredGroupIds.includes('e2e.full'));
+  assert.equal(plan.profile, 'targeted');
+  for(const id of ['e2e.creature-gameplay','e2e.creature-interaction','e2e.creature-presentation'])assert(plan.requiredGroupIds.includes(id),id);
   const group = verificationCatalog.groups['e2e.full'];
-  assert.equal(group.capabilities.browser, true);
+  assert.equal(group.executionRole, 'aggregate');
+  assert.ok(group.dependsOnGroups.length > 0);
   assert.equal(group.capabilities.hosted, true);
   assert.equal(group.capabilities.dataCapability, 'qualification_fixture');
 

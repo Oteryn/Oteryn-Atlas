@@ -23,15 +23,17 @@ test('full verification governance remains qualification-fixture capable after p
   assert.equal(result.profile, 'full');
   assert.equal(result.requiresRealFullWorld, false);
   assert.deepEqual(result.requiredDataCapabilities, ['qualification_fixture']);
-  assert(result.requiredGroupIds.includes('e2e.full'));
+  for(const id of catalog.groups['e2e.full'].dependsOnGroups)assert(result.requiredGroupIds.includes(id),id);
   assert(!result.requiredGroupIds.includes('fullworld.animation-census'));
 });
 
-test('complete FullWorld tooling does not request real bytes without a complete-product oracle', () => {
+test('reviewed complete FullWorld tooling requires specialist bytes and retains the oracle blocker', () => {
   const result = plan('tools/fullworld-runtime/build_runtime_index.py');
-  assert.equal(result.profile, 'broad');
-  assert.equal(result.requiresRealFullWorld, false);
-  assert.deepEqual(result.requiredDataCapabilities, ['qualification_fixture']);
+  assert.equal(result.profile, 'targeted');
+  assert.equal(result.requiresRealFullWorld, true);
+  assert.deepEqual(result.requiredDataCapabilities, ['qualification_fixture', 'real_fullworld']);
+  assert(result.requiredGroupIds.includes('fullworld.complete-integrity'));
+  assert(result.executionBlockers.some(blocker => blocker.path === 'tools/fullworld-runtime/build_runtime_index.py' && blocker.reason === 'unqualified-complete-product-oracle'));
 });
 
 test('animation product changes explicitly request the real FullWorld census', () => {
@@ -45,5 +47,5 @@ test('real source compatibility stays bounded and independent from full verifica
   const result = plan('web/semantic-search/index.json');
   assert.equal(result.requiresRealFullWorld, false);
   assert.deepEqual(result.requiredDataCapabilities, ['bounded_real_world', 'qualification_fixture']);
-  assert(result.requiredGroupIds.includes('integration.source-contract'));
+  assert(result.requiredGroupIds.includes('integration.source-contract-browser'));
 });

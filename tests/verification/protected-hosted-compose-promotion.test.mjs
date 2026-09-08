@@ -103,11 +103,21 @@ test('protected readiness init is re-entry safe only by exact validation, never 
   assert.doesNotMatch(publicationReadyBlock, /force:\s*true|overwrite|rmSync\(publicationDir/);
 });
 
-test('protected hosted executor materializes dedicated exact browser trust for qualification fixture', () => {
-  const workflow = readRequired('.github/workflows/protected-hosted-executor.yml', 'protected hosted executor workflow');
-  assert.match(workflow, /qualificationTrustDescriptor/);
-  assert.match(workflow, /product-trust/);
-  assert.match(workflow, /qualification_fixture\.json/);
-  assert.match(workflow, /JSON\.stringify\(qualificationTrustDescriptor\(manifest\)\)/);
-  assert.doesNotMatch(workflow, /trustPath:\s*path\.join\(destination,\s*'fixture-manifest\.json'\)/);
+test('verified qualification product materializes dedicated exact browser trust', async t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-compose-trust-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const world = path.join(root, 'world');
+  await buildQualificationWorld(world);
+  const manifest = await verifyQualificationWorld(world);
+  const descriptor = qualificationTrustDescriptor(manifest);
+  const trust = resolveFullWorldTrust({ __OTERYN_ATLAS_QUALIFICATION_TRUST__: descriptor });
+  assert.equal(trust.qualificationProductDigest, manifest.productDigest);
+  assert.equal(trust.qualificationFixtureId, manifest.fixtureId);
+  assert.equal(Object.isFrozen(descriptor), true);
+  assert.throws(() => resolveFullWorldTrust({ __OTERYN_ATLAS_QUALIFICATION_TRUST__: manifest }));
 });
+
+import os from 'node:os';
+import path from 'node:path';
+import { buildQualificationWorld, verifyQualificationWorld, qualificationTrustDescriptor } from '../../tools/verification/qualification-world.mjs';
+import { resolveFullWorldTrust } from '../../src/browser/fullworld-trust.mjs';

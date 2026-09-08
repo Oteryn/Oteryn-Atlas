@@ -4,7 +4,7 @@ import test from 'node:test';
 
 const run = fs.readFileSync('e2e/run.ps1', 'utf8');
 const helperPath = 'e2e/heavy-slot-pool.ps1';
-const helper = fs.existsSync(helperPath) ? fs.readFileSync(helperPath, 'utf8') : '';
+const helper = fs.readFileSync(helperPath, 'utf8');
 const source = `${run}\n${helper}`;
 
 test('Molehill heavy E2E uses a bounded machine-wide slot pool', () => {
@@ -30,17 +30,15 @@ test('parallel slots fail closed on duplicate Compose and artifact namespaces', 
   assert.match(source, /Dispose\(\)/);
 });
 
-test('repository policy permits only bounded isolated concurrent full gates', () => {
-  const agents = fs.readFileSync('AGENTS.md', 'utf8');
-  assert.match(agents, /bounded.*concurrent|concurrent.*bounded/i);
-  assert.match(agents, /isolat/i);
-  assert.doesNotMatch(agents, /never launch concurrent 64-scenario local gates/i);
+test('concurrent slot admission retains an explicit upper bound and exclusive project lock', () => {
+  assert.match(helper, /slotCount.*1.*3|1.*3.*slotCount/s);
+  assert.match(helper, /FileShare\]::None/);
+  assert.match(helper, /Dispose\(\)/);
 });
 
 test('parallel slot benchmark is reproducible and keeps each full gate single-worker', () => {
   const path = 'e2e/benchmark-heavy-slots.ps1';
   assert.equal(fs.existsSync(path), true, `${path} is missing`);
-  if (!fs.existsSync(path)) return;
   const benchmark = fs.readFileSync(path, 'utf8');
   assert.match(benchmark, /ATLAS_E2E_SLOT_COUNT/);
   assert.match(benchmark, /ATLAS_E2E_SLOT/);

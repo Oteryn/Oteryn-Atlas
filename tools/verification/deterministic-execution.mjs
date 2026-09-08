@@ -4,9 +4,11 @@ import crypto from 'node:crypto';
 
 // The caller must supply protected ownership/catalog policy. This module resolves
 // commands, never executes them or treats candidate metadata as admission authority.
-export function resolveDeterministicCommands({ root, catalog, groupIds, ownership, requiredSpecs = [] }) {
+export function resolveDeterministicCommands({ root, catalog, groupIds, ownership, requiredSpecs = [], changedSpecs = [] }) {
   if (!Array.isArray(groupIds) || groupIds.length === 0) throw new Error('empty selection');
-  if (ownership?.schemaVersion !== 1 || !Array.isArray(ownership.entries)) throw new Error('unsupported ownership schema');
+  if (ownership?.schemaVersion !== 1 || !Array.isArray(ownership.entries) || (ownership.importAggregators !== undefined && !Array.isArray(ownership.importAggregators))) throw new Error('unsupported ownership schema');
+  if (!Array.isArray(changedSpecs) || changedSpecs.some(spec => typeof spec !== 'string')) throw new Error('changed test census required');
+  const changed = new Set(changedSpecs);
   const realRoot = fs.realpathSync(root);
   function checkedFile(spec) {
     if (typeof spec !== 'string' || !/^tests\/[A-Za-z0-9_./-]+\.(mjs|py)$/.test(spec) || spec.split('/').some(part => !part || part === '.' || part === '..')) throw new Error(`exact safe test path required: ${spec}`);
@@ -19,6 +21,7 @@ export function resolveDeterministicCommands({ root, catalog, groupIds, ownershi
   }
   const entries = new Map();
   for (const row of [...ownership.entries, ...(ownership.importAggregators ?? [])]) {
+    if (!row || typeof row !== 'object' || typeof row.spec !== 'string') throw new Error('malformed ownership row');
     if (entries.has(row.spec)) throw new Error(`duplicate ownership: ${row.spec}`);
     entries.set(row.spec, row);
   }
@@ -38,16 +41,49 @@ export function resolveDeterministicCommands({ root, catalog, groupIds, ownershi
     const bytes = checkedFile(spec);
     const row = entries.get(spec);
     if (!row) throw new Error(`missing explicit interpreter/import ownership: ${spec}`);
-    if (row.qualification?.startsWith('blocked-')) throw new Error(`known qualification blocker: ${spec}: ${row.qualification}`);
+    if ((row.qualification === 'blocked' || row.qualification?.startsWith('blocked-'))) throw new Error(`known qualification blocker: ${spec}: ${row.qualification}`);
     const expected = spec.endsWith('.py') ? { interpreter: 'python3', argv: [spec] } : { interpreter: 'node', argv: ['--test', spec] };
     if (row.interpreter !== expected.interpreter || JSON.stringify(row.argv) !== JSON.stringify(expected.argv)) throw new Error(`unsupported interpreter or argv: ${spec}`);
-    if (typeof row.sourceSha256 !== 'string' || crypto.createHash('sha256').update(bytes).digest('hex') !== row.sourceSha256) throw new Error(`source proof changed: ${spec}`);
     if (!Array.isArray(row.imports) || !Array.isArray(row.subprocessTests)) throw new Error(`missing import proof: ${spec}`);
+    if (!/^[a-f0-9]{64}$/.test(row.sourceSha256 ?? '')) throw new Error(`missing source proof: ${spec}`);
+    const sourceMatches = crypto.createHash('sha256').update(bytes).digest('hex') === row.sourceSha256;
+    // The authenticated diff permits candidate leaf bytes to be test subjects.
+    // Only unchanged protected parent bytes may attest test-to-test execution
+    // edges and deduplication. Candidate bytes never add coverage authority.
+    if (!sourceMatches && (!changed.has(spec) || row.imports.length || row.subprocessTests.length)) {
+      throw new Error(`source proof changed: ${spec}`);
+    }
     visiting.add(spec);
     const covered = new Set([spec]);
+    const direct = new Set();
+    function addChild(child) {
+      if (direct.has(child)) throw new Error(`duplicate execution edge: ${spec}: ${child}`);
+      direct.add(child);
+      for (const leaf of closure(child, visiting)) {
+        if (covered.has(leaf)) throw new Error(`unresolved overlapping import roots: ${leaf}`);
+        covered.add(leaf);
+      }
+    }
     for (const child of row.imports) {
-      if (row.interpreter !== 'node' || !child.endsWith('.mjs')) throw new Error(`unsupported import interpreter: ${spec}`);
-      for (const leaf of closure(child, visiting)) covered.add(leaf);
+      if (row.interpreter !== 'node' || typeof child !== 'string' || !child.endsWith('.mjs')) throw new Error(`unsupported import interpreter: ${spec}`);
+      addChild(child);
+    }
+    // This is protected, reviewed source attestation, not candidate-discovered
+    // execution. The parent digest above binds unconditional execution and
+    // failure propagation; each child additionally needs its own source proof.
+    for (const edge of row.subprocessTests) {
+      if (!edge || typeof edge !== 'object' || Array.isArray(edge)
+        || Object.keys(edge).sort().join(',') !== 'argv,cwd,execution,interpreter,spec'
+        || row.interpreter !== 'node' || edge.execution !== 'unconditional-test'
+        || edge.cwd !== '.' || typeof edge.spec !== 'string') {
+        throw new Error(`unproven subprocess execution: ${spec}`);
+      }
+      const child = entries.get(edge.spec);
+      if (!child) throw new Error(`missing explicit interpreter/import ownership: ${edge.spec}`);
+      if (edge.interpreter !== child.interpreter || JSON.stringify(edge.argv) !== JSON.stringify(child.argv)) {
+        throw new Error(`unsupported subprocess interpreter or argv: ${spec}: ${edge.spec}`);
+      }
+      addChild(edge.spec);
     }
     visiting.delete(spec);
     closures.set(spec, covered);
@@ -60,11 +96,6 @@ export function resolveDeterministicCommands({ root, catalog, groupIds, ownershi
     for (const covered of closures.get(spec)) {
       if (coveredOnce.has(covered)) throw new Error(`unresolved overlapping import roots: ${covered}`);
       coveredOnce.add(covered);
-    }
-  }
-  for (const covered of coveredOnce) {
-    if (entries.get(covered).subprocessTests.length) {
-      throw new Error(`unproven subprocess execution: ${covered}; explicit child execution ownership is required`);
     }
   }
   for (const spec of selected) if (!coveredOnce.has(spec)) throw new Error(`selected test lost coverage: ${spec}`);

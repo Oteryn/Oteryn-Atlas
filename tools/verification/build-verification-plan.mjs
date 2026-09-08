@@ -68,7 +68,7 @@ function allEvidencePaths(changedFiles) {
   return [...new Set(paths)].sort();
 }
 
-function matchesForPath(path, manifest) {
+function matchesForPath(path, manifest, catalog) {
   if (path === 'AGENTS.md') {
     return [{
       pathPrefix: 'AGENTS.md',
@@ -77,22 +77,29 @@ function matchesForPath(path, manifest) {
       requiredGroups: [],
     }];
   }
+  const owners = Object.entries(catalog.groups).filter(([, group]) =>
+    group.executionRole === 'canonical-machine' && group.specs.includes(path));
+  const ownership = owners.length ? [{
+    domains: [path.startsWith('e2e/tests/') ? 'semantic-browser-test' : 'test-contract'],
+    minimumProfile: path.startsWith('e2e/tests/') ? 'targeted' : 'focused',
+    requiredGroups: owners.map(([id]) => id),
+  }] : [];
   const matches = manifest.entries.filter((entry) => (entry.exactMatch ? path === entry.pathPrefix : path.startsWith(entry.pathPrefix))
     && !(entry.excludedPaths ?? []).includes(path));
   // Only explicitly designated catchalls yield. Every semantic match remains
   // additive; protected and candidate manifests are classified independently.
-  const semantic = matches.filter((entry) => !entry.defaultRule);
+  const semantic = [...ownership, ...matches.filter((entry) => !entry.defaultRule)];
   return semantic.length ? semantic : matches;
 }
 
-function classify(paths, manifest) {
+function classify(paths, manifest, catalog) {
   if (!paths) return { profile: 'full', groups: FALLBACK_GROUPS, domains: ['invalid-change-evidence'], fallback: true };
   const groups = new Set();
   const domains = new Set();
   let profile = 'none';
   let fallback = false;
   for (const path of paths) {
-    const matches = matchesForPath(path, manifest);
+    const matches = matchesForPath(path, manifest, catalog);
     if (matches.length === 0) {
       fallback = true;
       profile = 'full';
@@ -198,7 +205,7 @@ function matchesSpecPattern(pattern, spec) {
 }
 
 function stableIdMatchesGroup(id, group) {
-  if (!group.capabilities.browser) return false;
+  if (!group.capabilities.browser && group.executionEngine !== 'playwright') return false;
   const { project, spec } = stableTestCoordinates(id);
   return group.projects.includes(project) && group.specs.some((pattern) => matchesSpecPattern(pattern, spec));
 }
@@ -207,7 +214,7 @@ function exactStableTestIds(groups, protectedStableTestIds) {
   const required = new Set(groups.flatMap((group) => group.stableTestIds));
   const supplied = suppliedStableTestIds(protectedStableTestIds);
   if (!supplied) return [...required].sort();
-  const browserGroups = groups.filter((group) => group.capabilities.browser);
+  const browserGroups = groups.filter((group) => group.capabilities.browser || group.executionEngine === 'playwright');
   for (const id of supplied) {
     if (browserGroups.some((group) => stableIdMatchesGroup(id, group))) required.add(id);
   }
@@ -224,6 +231,8 @@ function mergeCatalogs(trusted, candidate) {
     const resourceClass = RESOURCE_RANK[left.resourceClass] >= RESOURCE_RANK[right.resourceClass]
       ? left.resourceClass : right.resourceClass;
     groups[id] = {
+      ...(left.executionRole && left.executionRole === right.executionRole ? { executionRole: left.executionRole } : {}),
+      ...(left.executionEngine && left.executionEngine === right.executionEngine ? { executionEngine: left.executionEngine } : {}),
       specs: unionStrings(left.specs, right.specs),
       projects: unionStrings(left.projects, right.projects),
       stableTestIds: unionStrings(left.stableTestIds, right.stableTestIds),
@@ -263,7 +272,7 @@ function selectedGroups(groupIds, catalog) {
     resolved.add(id);
   };
   for (const id of groupIds) visit(id);
-  return [...resolved].sort().map((id) => ({ id, ...catalog.groups[id] }));
+  return [...resolved].sort().filter(id => catalog.groups[id].executionRole !== 'aggregate').map((id) => ({ id, ...catalog.groups[id] }));
 }
 
 // Planning can expose useful partial proof while retaining unresolved obligations.
@@ -285,14 +294,21 @@ export function buildVerificationPlan(input) {
   const trustedImpactManifest = validateImpactManifest(input.trustedImpactManifest, trustedVerificationCatalog);
   const candidateImpactManifest = validateImpactManifest(input.candidateImpactManifest, candidateVerificationCatalog);
   const changedPaths = allEvidencePaths(input.changedFiles);
-  const trusted = classify(changedPaths, trustedImpactManifest);
-  const candidate = classify(changedPaths, candidateImpactManifest);
+  const trusted = classify(changedPaths, trustedImpactManifest, trustedVerificationCatalog);
+  const candidate = classify(changedPaths, candidateImpactManifest, candidateVerificationCatalog);
   const executionBlockers = [];
   if (!changedPaths) executionBlockers.push({ reason: 'invalid-change-evidence', path: null });
   for (const path of changedPaths ?? []) {
-    const blockers = new Set([...matchesForPath(path, trustedImpactManifest), ...matchesForPath(path, candidateImpactManifest)].map(entry => entry.executionBlocker).filter(Boolean));
+    for (const catalog of [trustedVerificationCatalog, candidateVerificationCatalog]) {
+      const owners = Object.values(catalog.groups).filter(group =>
+        group.executionRole === 'canonical-machine' && group.specs.includes(path));
+      if (owners.length > 1 && !executionBlockers.some(row => row.reason === 'ambiguous-test-owner' && row.path === path)) {
+        executionBlockers.push({ reason: 'ambiguous-test-owner', path });
+      }
+    }
+    const blockers = new Set([...matchesForPath(path, trustedImpactManifest, trustedVerificationCatalog), ...matchesForPath(path, candidateImpactManifest, candidateVerificationCatalog)].map(entry => entry.executionBlocker).filter(Boolean));
     for (const reason of blockers) executionBlockers.push({ reason, path });
-    if (!matchesForPath(path, trustedImpactManifest).some(entry => !entry.defaultRule) || !matchesForPath(path, candidateImpactManifest).some(entry => !entry.defaultRule)) {
+    if (!matchesForPath(path, trustedImpactManifest, trustedVerificationCatalog).some(entry => !entry.defaultRule) || !matchesForPath(path, candidateImpactManifest, candidateVerificationCatalog).some(entry => !entry.defaultRule)) {
       executionBlockers.push({ reason: 'unknown-impact', path });
     }
     if ((path.startsWith('tests/') || path.startsWith('e2e/tests/')) && /\.(?:mjs|py)$/.test(path)

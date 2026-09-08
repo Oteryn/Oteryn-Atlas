@@ -46,5 +46,134 @@
     "fail": 2,
     "cause": "ENOENT for intentionally absent active workflows",
     "purpose": "confirm obsolete topology contract failures; deletion already independently authorized by protected inventory"
+  },
+  "historicalContinuationBeforeCorrection": {
+    "protectedBaseSha": "6a4172d518dd85b6447d6a4785eb0f87fc6c8a46",
+    "date": "2026-09-08",
+    "scope": "local inactive R1–R3; no product workflow, shadow, canary or real FullWorld run",
+    "qualification": {
+      "command": "node --test tests/verification/*.test.mjs tests/maintenance/maintenance-diff-policy.test.mjs",
+      "tests": 1076,
+      "pass": 1076,
+      "fail": 0,
+      "skipped": 0,
+      "retries": 0
+    },
+    "deterministicResolution": {
+      "groups": 16,
+      "productTests": 53,
+      "verificationTests": 150,
+      "resolvedCommands": 184,
+      "coveredTests": 203,
+      "uniqueCoverage": 203,
+      "missing": []
+    },
+    "productExecution": {
+      "commands": 48,
+      "coveredSpecs": 53,
+      "initialPassedCommands": 47,
+      "initialFailedCommands": 1,
+      "failure": "streamless gameplay-profile Response fixture",
+      "fix": "real streamed Response fixture; five original gameplay-profile cases pass",
+      "scopeLimit": "aggregate initial execution plus focused fixes and changed-oracle runs; actual deployment unqualified"
+    },
+    "playwrightList": {
+      "command": "npm ci --ignore-scripts --no-audit --no-fund; npx --no-install playwright test --list --reporter=list",
+      "tests": 79,
+      "specs": 36,
+      "qualificationFixtureTests": 74,
+      "reviewFrames": 30,
+      "missingReviewTestIds": 0,
+      "browserExecuted": false
+    },
+    "artifactVerifier": {
+      "tests": 7,
+      "pass": 7,
+      "scope": "bounded raw artifact fixtures; independent runtime/pixel/minimap verification; not real complete product evidence"
+    },
+    "protectedAdmission": {
+      "result": "BLOCKED",
+      "source": "local exact protected-base validator simulation",
+      "firstFrozenPath": "tests/creature-index-roles.py",
+      "requiredTransition": "prior exact A/M admission; self-frozen validator cannot admit its own transition"
+    },
+    "evidenceDigests": [
+      {
+        "name": "atlas-final-qualification.log",
+        "sha256": "db5831c2dbaed2b906b12453a11c4eb019ce3ce5346ce86588f653ba5b8dded2"
+      },
+      {
+        "name": "atlas-playwright-current-list.txt",
+        "sha256": "df1a327c5949032aa53a58d868eb70dfdeed7255f10c5f45d34010d960fd8920"
+      },
+      {
+        "name": "results.ndjson",
+        "sha256": "3216a6e1177b1036288ffc8d863bd4d6a4fcf9535ba6faa323315bfea39b3c3b"
+      }
+    ]
+  },
+  "correction": {
+    "protectedBaseSha": "6a4172d518dd85b6447d6a4785eb0f87fc6c8a46",
+    "predecessorHead": "46da2f861a770897eb516f88ab994d9bbb2a46d5",
+    "qualification": {
+      "command": "node --test tests/verification/*.test.mjs tests/maintenance/maintenance-diff-policy.test.mjs",
+      "tests": 1065,
+      "pass": 1065,
+      "fail": 0,
+      "skipped": 0,
+      "retries": 0,
+      "todo": 0
+    },
+    "changedLeafRegression": {
+      "before": "FAIL: source proof changed: tests/example.mjs",
+      "after": "PASS: actual candidate marker executed and failing candidate body preserved",
+      "protectedMetadataRepinnedForRegression": false
+    },
+    "routing": {
+      "duplicateEntriesRemoved": 90,
+      "duplicateBrowserExclusionsRemoved": 36,
+      "baselinePlansCompared": 239,
+      "changedGroupProfileBlockerPlans": 0
+    },
+    "deterministicResolution": {
+      "productTests": 53,
+      "verificationTests": 149,
+      "coveredTests": 202,
+      "uniqueCoverage": 202,
+      "resolvedCommands": 183
+    },
+    "browser": {
+      "listedCases": 79,
+      "specs": 36,
+      "reviewFrames": 30,
+      "executed": false
+    },
+    "r4": "DEFERRED; no generic execution PASS evaluator or producer transport",
+    "fullworld": "BLOCKED; no genuine protected complete-product receipts",
+    "evidenceDigests": [
+      {
+        "name": "changed-leaf-red.log",
+        "sha256": "72f7b002109a3faf4ad40df03f43b160d69889f1a1d80d0fd233666f2efe8a9d"
+      },
+      {
+        "name": "full-verification-final.log",
+        "sha256": "bdf2a89e147ef9734aba5504162c44a807f846c3ad9ebc8a80898a9dcc38abbf"
+      },
+      {
+        "name": "playwright-list.log",
+        "sha256": "df1a327c5949032aa53a58d868eb70dfdeed7255f10c5f45d34010d960fd8920"
+      },
+      {
+        "name": "full-verification-composition.log",
+        "sha256": "0e010b92940b800e2d21a2fb947f4019aea5b39c70a3c8f67afd3caf9e8ff54e"
+      }
+    ],
+    "admissionComposition": {
+      "sharedMaintenanceTestSha256": "936e96801dc94c2aae1ce331dcc9f37cf23971588533eaf7dea6679086181235",
+      "focusedPass": 58,
+      "fail": 0,
+      "skipped": 0,
+      "rule": "admission first; identical shared test absent effective implementation diff"
+    }
   }
 }

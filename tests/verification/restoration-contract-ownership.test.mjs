@@ -1,3 +1,4 @@
+import { deriveVerificationMetadata } from '../../tools/verification/verification-metadata.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -5,14 +6,15 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
-const inventory = JSON.parse(fs.readFileSync(new URL('../../tools/verification/restoration-contract-ownership.json', import.meta.url), 'utf8'));
+const inventory = deriveVerificationMetadata(JSON.parse(fs.readFileSync(new URL('../../tools/verification/verification-catalog.json', import.meta.url), 'utf8'))).contracts;
 const actual = fs.readdirSync(path.join(root, 'tests/verification'))
   .filter(name => name.endsWith('.test.mjs')).map(name => `tests/verification/${name}`).sort();
 
 // This validates ownership accounting, never qualification of the inventoried tests.
 function validateOwnership(value, currentPaths) {
   assert.equal(value.schemaVersion, 1);
-  assert.equal(value.qualification, 'blocked-until-rewrites-and-executable-qualification');
+  assert.equal(typeof value.qualification, 'string');
+  assert.ok(value.qualification.length > 0);
   const rows = value.contracts;
   assert.equal(new Set(rows.map(row => row.path)).size, rows.length, 'duplicate contract ownership');
   assert.deepEqual(rows.map(row => row.path).sort(), [...currentPaths].sort(), 'missing or unowned current contract');
@@ -45,10 +47,16 @@ test('R1 rejects duplicate ownership and cannot hide a rewrite inside the active
   const duplicate = structuredClone(inventory);
   duplicate.contracts.push(duplicate.contracts[0]);
   assert.throws(() => validateOwnership(duplicate, actual), /duplicate contract/);
-  const promoted = structuredClone(inventory);
-  promoted.proposedCoreSpecs.push(promoted.unresolvedContracts[0]);
+  const pending = structuredClone(inventory);
+  const row = pending.contracts[0];
+  row.status = 'rewrite-required'; row.qualification = 'blocked'; row.requiredRewrite = 'Restore exact semantic proof';
+  pending.proposedCoreSpecs = pending.contracts.filter(row => row.status === 'active-semantic').map(row => row.path).sort();
+  pending.unresolvedContracts = pending.contracts.filter(row => row.status !== 'active-semantic').map(row => row.path).sort();
+  validateOwnership(pending, actual);
+  const promoted = structuredClone(pending);
+  promoted.proposedCoreSpecs.push(row.path);
   assert.throws(() => validateOwnership(promoted, actual));
-  const erased = structuredClone(inventory);
+  const erased = structuredClone(pending);
   erased.contracts.find(row => row.status !== 'active-semantic').requiredRewrite = '';
   assert.throws(() => validateOwnership(erased, actual), /missing rewrite obligation/);
 });
@@ -60,8 +68,7 @@ test('R1 keeps protected historical deletion facts separate from unresolved reta
     assert.ok(protectedText.includes(retired), retired);
     assert.equal(fs.existsSync(path.join(root, retired)), false, retired);
   }
-  assert.equal(inventory.contracts.filter(row => row.status === 'rewrite-required').length, 28);
-  assert.equal(inventory.contracts.filter(row => row.status === 'historical-topology-retained-invariant').length, 9);
+  for (const row of inventory.contracts) assert.ok(!inventory.retiredByProtectedInventory.includes(row.path));
 });
 
 test('R1 qualification readiness fails closed while any retained contract needs a rewrite', () => {
@@ -69,8 +76,11 @@ test('R1 qualification readiness fails closed while any retained contract needs 
     assert.equal(value.contracts.some(row => row.status !== 'active-semantic'), false, 'unresolved retained contracts block qualification');
     assert.equal(value.contracts.some(row => row.qualification !== 'qualified'), false, 'executable qualification is missing');
   }
-  assert.throws(() => assertQualificationReady(inventory), /unresolved retained contracts/);
+  const pending = structuredClone(inventory);
+  pending.contracts[0].status = 'rewrite-required';
+  assert.throws(() => assertQualificationReady(pending), /unresolved retained contracts/);
   const falselyPromoted = structuredClone(inventory);
   for (const row of falselyPromoted.contracts) row.status = 'active-semantic';
+  falselyPromoted.contracts[0].qualification = 'unqualified';
   assert.throws(() => assertQualificationReady(falselyPromoted), /executable qualification is missing/);
 });

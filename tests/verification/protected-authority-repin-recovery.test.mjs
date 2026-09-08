@@ -1,14 +1,9 @@
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import path from 'node:path';
 import test from 'node:test';
-import { fileURLToPath } from 'node:url';
 
 import * as protectedExecution from '../../tools/verification/protected-hosted-execution.mjs';
 import * as protectedGate from '../../tools/verification/protected-hosted-gate.mjs';
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const workflowPath = path.join(ROOT, '.github/workflows/protected-execution-promotion-qualification.yml');
 const REPOSITORY = 'Oteryn/Oteryn-Atlas';
 const AUTHORITY_HEAD_REF = 'fix/issue-179-qualification-live-digest-authority';
 const SOURCE_HEAD_REF = 'fix/issue-179-qualification-functional-fixture';
@@ -147,37 +142,19 @@ test('historical authority repin proof is not an active product-qualification ad
   );
 });
 
-test('protected promotion workflow proves authority repin against its exact source PR without Molehill or FullWorld', () => {
-  const workflow = fs.readFileSync(workflowPath, 'utf8');
-  const job = workflow.split('  qualification-authority-repin:')[1]?.split('  qualification-functional-fixture:')[0] ?? '';
-  assert.match(job, /fix\/issue-179-qualification-live-digest-authority/);
-  assert.match(job, /runs-on:\s*ubuntu-24\.04/);
-  assert.match(job, /resolveProtectedAuthorityRepinQualification/);
-  assert.match(job, /validateProtectedAuthorityRepinSources/);
-  assert.match(job, /fix\/issue-179-qualification-functional-fixture/);
-  assert.match(job, /tests\/verification\/protected-hosted-execution\.test\.mjs/);
-  assert.match(job, /tools\/verification\/protected-hosted-execution\.mjs/);
-  assert.match(job, /pulls\?state=open/);
-  assert.match(job, /parse-playwright-test-list\.mjs/);
-  assert.match(job, /e2e\.full/);
-  assert.match(job, /buildQualificationWorld/);
-  assert.match(job, /qualificationTrustDescriptor/);
-  assert.match(job, /compose\.protected-hosted-executor\.yml/);
-  assert.match(job, /compose\.github-hosted\.yml/);
-  assert.match(job, /--workers=1/);
-  assert.match(job, /--retries=0/);
-  assert.match(job, /--network none/);
-  assert.match(job, /--read-only/);
-  assert.match(job, /--cap-drop ALL/);
-  assert.match(job, /assert-current-pr-head\.mjs/);
-  assert.match(job, /statuses:\s*write/);
-  assert.match(job, /context='atlas-protected-product-qualification'|context.*atlas-protected-product-qualification/s);
-  assert.match(job, /Protected GitHub-hosted qualification authority repin safety net/);
-  assert.doesNotMatch(job, /context='atlas-local-e2e'/);
-  assert.doesNotMatch(job, /group:\s*atlas-runners|labels:\s*oteryn-atlas-pc|visual-review\.json|synology|real_fullworld/i);
+test('repin source rejects a mirror digest not proven by the corresponding authority change', () => {
+  const input={authorityHeadRef:AUTHORITY_HEAD_REF,
+    trustedModuleSource:`expectedProductDigest: '${OLD_DIGEST}',`,
+    candidateModuleSource:`expectedProductDigest: '${NEW_DIGEST}',`,
+    trustedTestSource:`assert.equal(value, '${OLD_DIGEST}');`,
+    candidateTestSource:`assert.equal(value, '${NEW_DIGEST}');`};
+  assert.doesNotThrow(()=>protectedExecution.validateProtectedAuthorityRepinSources(input));
+  for(const candidateTestSource of [input.trustedTestSource, `assert.equal(value, 'sha256:${'f'.repeat(64)}');`, '// deleted proof'])
+    assert.throws(()=>protectedExecution.validateProtectedAuthorityRepinSources({...input,candidateTestSource}));
+  assert.throws(()=>protectedExecution.validateProtectedAuthorityRepinSources({...input,authorityHeadRef:'candidate/unauthorized'}));
 });
 
-test('legacy validator stays bounded but is no longer wired into the required PR gate', () => {
+test('historical bounded validator evidence cannot satisfy current product qualification', () => {
   assert.equal(typeof protectedGate.validateLegacyTransitionBootstrapGate, 'function');
   const protectedBaseSha = 'e31015d0880e9f81a4b96f990658490af45e8fa6';
   const candidateHeadSha = sha('d');
@@ -228,10 +205,7 @@ test('legacy validator stays bounded but is no longer wired into the required PR
     changedFiles: BOOTSTRAP_CHANGED_FILES,
   }), /association mismatch/i);
 
-  const ci = fs.readFileSync(path.join(ROOT, '.github/workflows/ci.yml'), 'utf8');
-  const browserJob = ci.split('  verification-browser:')[1]?.split('  atlas-gate:')[0] ?? '';
-  assert.match(browserJob, /node admission-authority\/tools\/verification\/consume-protected-admission\.mjs/);
-  assert.doesNotMatch(browserJob, /ATLAS_LEGACY_CUTOVER|validateLegacyTransitionBootstrapGate|legacy-molehill-transition-qualification|atlas-local-e2e/);
+  assert.throws(()=>protectedGate.validateProtectedProductQualificationGate(authorityGateFixture({producerRun})), /status|producer|qualification repair/i);
 
 });
 

@@ -1,3 +1,4 @@
+import { deriveVerificationMetadata } from '../../tools/verification/verification-metadata.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -67,7 +68,7 @@ test('duplicate selections deduplicate while stale import proof, cycles and opaq
 
 test('repository ownership preserves all 53 nonverification entrypoints and separates browser harnesses', () => {
   const root = new URL('../../', import.meta.url);
-  const inventory = JSON.parse(fs.readFileSync(new URL('tools/verification/deterministic-test-ownership.json', root)));
+  const inventory = deriveVerificationMetadata(JSON.parse(fs.readFileSync(new URL('tools/verification/verification-catalog.json', root)))).deterministic;
   const baseline = JSON.parse(fs.readFileSync(new URL('docs/maintenance/verification-restoration/contract-ownership.json', root)));
   assert.deepEqual(inventory.entries.map(row => row.spec).sort(), baseline.deterministicEntrypoints.filter(row => !row.path.startsWith('tests/verification/')).map(row => row.path).sort());
   assert.equal(inventory.entries.length, 53);
@@ -80,14 +81,15 @@ test('repository ownership preserves all 53 nonverification entrypoints and sepa
 
 test('repository commands preserve source tests without executing the historical core', () => {
   const root = new URL('../../', import.meta.url);
-  const ownership = JSON.parse(fs.readFileSync(new URL('tools/verification/deterministic-test-ownership.json', root)));
+  const ownership = deriveVerificationMetadata(JSON.parse(fs.readFileSync(new URL('tools/verification/verification-catalog.json', root)))).deterministic;
   const commands = resolveDeterministicCommands({ root, ownership, catalog: ownership.proposedCatalog, groupIds: ['deterministic.search', 'deterministic.farm-products'], requiredSpecs: ['tests/semantic-search.mjs', 'tests/farm-bundle.py'] });
-  assert.throws(() => resolveDeterministicCommands({ root, ownership, catalog: ownership.proposedCatalog, groupIds: ['deterministic.deployment'] }), /known qualification blocker/);
+  const deployment = resolveDeterministicCommands({ root, ownership, catalog: ownership.proposedCatalog, groupIds: ['deterministic.deployment'] });
+  assert.deepEqual(deployment.map(row=>row.spec),['tests/deployment-policy.mjs','tests/synology-live-workflow.mjs']);
   assert.equal(commands.length, 6);
   assert.equal(commands.filter(row => row.interpreter === 'python3').length, 3);
   assert.equal(commands.filter(row => row.interpreter === 'node').length, 3);
   assert.ok(commands.every(row => !row.spec.startsWith('tests/verification/')));
-  assert.throws(() => resolveDeterministicCommands({ root, ownership, catalog: ownership.proposedCatalog, groupIds: ['deterministic.fullworld-runtime'] }), /unproven subprocess/);
+
 });
 
 test('independent aggregators sharing an imported leaf cannot silently duplicate its proof', t => {
@@ -107,4 +109,77 @@ test('parent-only subprocess edges cannot execute unbound child tests', t => {
   assert.throws(() => resolveDeterministicCommands(value), /unproven subprocess/);
   fs.writeFileSync(path.join(value.root, 'tests/b.py'), 'raise RuntimeError("changed")\n');
   assert.throws(() => resolveDeterministicCommands(value), /unproven subprocess/);
+});
+
+function subprocessFixture(t) {
+  const value = fixture(t);
+  const row = value.ownership.entries[0];
+  const source = "import './leaf.mjs';\nimport { execFileSync } from 'node:child_process';\nexecFileSync('python3', ['tests/b.py'], { cwd: process.cwd() });\n";
+  fs.writeFileSync(path.join(value.root, row.spec), source);
+  row.sourceSha256 = crypto.createHash('sha256').update(source).digest('hex');
+  row.subprocessTests = [{ spec: 'tests/b.py', interpreter: 'python3', argv: ['tests/b.py'], cwd: '.', execution: 'unconditional-test' }];
+  return value;
+}
+
+test('reviewed parent-only subprocess coverage validates and covers children outside selection', t => {
+  const value = subprocessFixture(t);
+  value.groupIds = ['deterministic.node'];
+  const commands = resolveDeterministicCommands(value);
+  assert.equal(commands.length, 1);
+  assert.deepEqual(commands[0].coveredSpecs, ['tests/a.mjs', 'tests/b.py', 'tests/leaf.mjs']);
+  fs.appendFileSync(path.join(value.root, 'tests/b.py'), '# changed child\n');
+  assert.throws(() => resolveDeterministicCommands(value), /source proof changed/);
+});
+
+test('cross-group subprocess ownership deduplicates parent and standalone child', t => {
+  const value = subprocessFixture(t);
+  assert.equal(resolveDeterministicCommands(value).length, 1);
+  assert.deepEqual(resolveDeterministicCommands(value), resolveDeterministicCommands({ ...value, groupIds: [...value.groupIds].reverse() }));
+});
+
+test('subprocess child ownership, file, interpreter and unconditional proof fail closed', t => {
+  const value = subprocessFixture(t);
+  value.groupIds = ['deterministic.node'];
+  for (const patch of [{ interpreter: 'python' }, { interpreter: 'node' }, { argv: ['-c', 'pass'] }, { cwd: '/tmp' }, { execution: 'conditional' }, { spec: 'tests/unknown.py' }, { unexpected: true }]) {
+    const ownership = structuredClone(value.ownership);
+    Object.assign(ownership.entries[0].subprocessTests[0], patch);
+    assert.throws(() => resolveDeterministicCommands({ ...value, ownership }), /subprocess|missing/);
+  }
+  const ownership = structuredClone(value.ownership);
+  ownership.entries = ownership.entries.filter(row => row.spec !== 'tests/b.py');
+  assert.throws(() => resolveDeterministicCommands({ ...value, ownership }), /missing explicit/);
+  fs.unlinkSync(path.join(value.root, 'tests/b.py'));
+  assert.throws(() => resolveDeterministicCommands(value), /missing file/);
+});
+
+test('subprocess cycles and duplicate execution edges cannot claim once-only coverage', t => {
+  const value = subprocessFixture(t);
+  const parent = value.ownership.entries[0];
+  parent.subprocessTests.push({ spec: parent.spec, interpreter: 'node', argv: parent.argv, cwd: '.', execution: 'unconditional-test' });
+  assert.throws(() => resolveDeterministicCommands(value), /cycle/);
+  parent.subprocessTests.pop();
+  parent.subprocessTests.push({ ...parent.subprocessTests[0] });
+  assert.throws(() => resolveDeterministicCommands(value), /duplicate execution edge/);
+});
+
+test('authenticated changed leaf bytes preserve protected parent coverage once', t => {
+ const value=subprocessFixture(t);
+ fs.appendFileSync(path.join(value.root,'tests/leaf.mjs'),'// candidate leaf bytes\n');
+ fs.appendFileSync(path.join(value.root,'tests/b.py'),'# candidate Python bytes\n');
+ assert.throws(()=>resolveDeterministicCommands(value),/source proof changed/);
+ const commands=resolveDeterministicCommands({...value,changedSpecs:['tests/leaf.mjs','tests/b.py']});
+ assert.equal(commands.length,1);
+ assert.deepEqual(commands[0].coveredSpecs,['tests/a.mjs','tests/b.py','tests/leaf.mjs']);
+ fs.appendFileSync(path.join(value.root,'tests/a.mjs'),'// candidate parent bytes\n');
+ assert.throws(()=>resolveDeterministicCommands({...value,changedSpecs:['tests/a.mjs','tests/leaf.mjs','tests/b.py']}),/source proof changed/);
+});
+test('candidate changes cannot attest new test edges or replace protected command shape', t => {
+ const value=fixture(t);
+ fs.writeFileSync(path.join(value.root,'tests/leaf.mjs'),"import './b.py';\n");
+ // The bytes can be tested, but cannot claim another test's coverage or command.
+ const commands=resolveDeterministicCommands({...value,groupIds:['deterministic.node'],changedSpecs:['tests/leaf.mjs']});
+ assert.deepEqual(commands[0].coveredSpecs,['tests/a.mjs','tests/leaf.mjs']);
+ assert.deepEqual(commands[0].argv,['--test','tests/a.mjs']);
+ const malformed=structuredClone(value.ownership);delete malformed.entries[1].sourceSha256;
+ assert.throws(()=>resolveDeterministicCommands({...value,ownership:malformed,changedSpecs:['tests/leaf.mjs']}),/missing source proof/);
 });

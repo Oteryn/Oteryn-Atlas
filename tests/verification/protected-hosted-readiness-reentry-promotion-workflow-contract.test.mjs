@@ -1,34 +1,28 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { fileURLToPath } from 'node:url';
+import { publishReadyPublication, validateReadyPublication } from '../../tools/verification/publication-readiness.mjs';
+import { buildQualificationWorld, verifyQualificationWorld } from '../../tools/verification/qualification-world.mjs';
+const identity = { repository: 'Oteryn/Oteryn-Atlas', candidateSha: 'a'.repeat(40),
+  ...Object.fromEntries(['planSemanticDigest','planInstanceDigest','authorityDigest','environmentDigest','harnessDigest'].map((key,i) => [key, `sha256:${String(i).repeat(64)}`])), producerRunId: '42-1' };
+async function fixture(t) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-readiness-contract-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const source = path.join(root, 'source'), destination = path.join(root, 'ready');
+  const product = await buildQualificationWorld(source);
+  const manifest = publishReadyPublication({sourceDir: source, destinationDir: destination, ...identity});
+  return {root, source, destination, product, manifest, validate: () => validateReadyPublication({publicationDir: destination, manifest, ...identity})};
+}
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const workflowPath = path.join(ROOT, '.github/workflows/protected-hosted-readiness-reentry-promotion.yml');
-const legacyWorkflowPath = path.join(ROOT, '.github/workflows/legacy-molehill-transition-qualification.yml');
-
-test('protected hosted readiness reentry promotion is bounded GitHub-hosted proof and never Molehill E2E', () => {
-  assert.equal(fs.existsSync(workflowPath), true, 'protected hosted readiness reentry promotion workflow must exist');
-  const workflow = fs.readFileSync(workflowPath, 'utf8');
-  const legacy = fs.readFileSync(legacyWorkflowPath, 'utf8');
-  const heavy = legacy.split('  legacy-qualification:')[1]?.split('  protected-census-bootstrap:')[0] ?? '';
-
-  assert.match(workflow, /pull_request:\s*\n\s*types:\s*\[labeled\]/);
-  assert.match(workflow, /github\.event\.label\.name == 'atlas-legacy-transition-qualification'/);
-  assert.match(workflow, /fix\/issue-179-protected-hosted-readiness-reentry/);
-  assert.doesNotMatch(heavy, /fix\/issue-179-protected-hosted-readiness-reentry/);
-  assert.match(workflow, /runs-on:\s*ubuntu-24\.04/);
-  assert.doesNotMatch(workflow, /group:\s*atlas-runners|labels:\s*oteryn-atlas-pc/);
-  assert.match(workflow, /Require exact four-file readiness reentry delta/);
-  assert.match(workflow, /protected-hosted-compose-promotion\.test\.mjs/);
-  assert.match(workflow, /compose up -d --wait atlas-publication/);
-  assert.match(workflow, /compose run --rm atlas-publication-ready/);
-  assert.match(workflow, /\/__atlas\/readiness/);
-  assert.match(workflow, /fullworld\/publication\/publication\.json/);
-  assert.match(workflow, /data\/creatures\/index\.json/);
-  assert.match(workflow, /assert-current-pr-head\.mjs/);
-  assert.match(workflow, /statuses:\s*write/);
-  assert.match(workflow, /context='atlas-local-e2e'|context.*atlas-local-e2e/s);
-  assert.doesNotMatch(workflow, /playwright test|\\e2e\\run\.ps1|visual-review\.json|synology|molehill/i);
+test('readiness reentry validates exact immutable bytes and cannot overwrite an existing product', async t => {
+  const f = await fixture(t), before = fs.readFileSync(path.join(f.destination, 'atlas-publication-readiness.json'));
+  assert.deepEqual(f.validate(), f.manifest);
+  assert.deepEqual(f.validate(), f.manifest);
+  assert.throws(() => publishReadyPublication({sourceDir:f.source, destinationDir:f.destination, ...identity}), /overwrite/);
+  assert.deepEqual(fs.readFileSync(path.join(f.destination, 'atlas-publication-readiness.json')), before);
+  fs.appendFileSync(path.join(f.destination, 'publication/publication.json'), 'drift');
+  assert.throws(f.validate, /digest|size/);
+  assert.throws(() => publishReadyPublication({sourceDir:f.source, destinationDir:f.destination, ...identity}), /overwrite/);
 });

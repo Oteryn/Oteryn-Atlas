@@ -3,10 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 const exists = (path) => fs.existsSync(path);
-const read = (path) => exists(path) ? fs.readFileSync(path, 'utf8').replace(/\r\n/g, '\n') : '';
+const read = (path) => fs.readFileSync(path, 'utf8').replace(/\r\n/g, '\n');
 const compose = read('e2e/compose.selfhosted.yml');
-const ci = read('.github/workflows/ci.yml');
-const nightly = read('.github/workflows/verification-depth.yml');
 
 test('self-hosted Compose sends checkout into images instead of bind mounting runner paths', () => {
   assert.equal(exists('e2e/Dockerfile.web'), true);
@@ -17,13 +15,11 @@ test('self-hosted Compose sends checkout into images instead of bind mounting ru
   assert.doesNotMatch(compose, /\.\.\/web:|\.\.\/src:|ATLAS_E2E_ARTIFACTS_HOST/);
 });
 
-test('required PR gate validates hosted lifecycle artifacts while nightly keeps the no-bind self-hosted Compose path', () => {
-  assert.match(ci, /Protected Hosted Playwright evidence/);
-  assert.match(ci, /node admission-authority\/tools\/verification\/consume-protected-admission\.mjs/);
-  assert.match(ci, /ref: \$\{\{ github\.event\.pull_request\.base\.sha \}\}/);
-  assert.doesNotMatch(ci, /ATLAS_LEGACY_CUTOVER|validateLegacyTransitionBootstrapGate/);
-  assert.doesNotMatch(ci, /atlas-local-e2e/);
-  assert.doesNotMatch(ci, /compose\.selfhosted\.yml|docker cp/);
-  assert.match(nightly, /compose\.selfhosted\.yml/);
-  assert.match(nightly, /docker cp/);
+test('self-hosted checkout images preserve health ordering and isolated artifact output', () => {
+  assert.match(compose, /read_only: true/);
+  assert.match(compose, /condition: service_healthy/);
+  assert.match(compose, /ATLAS_EXPECTED_REVISION:/);
+  assert.match(compose, /ATLAS_ARTIFACTS_DIR: \/artifacts/);
+  assert.match(compose, /- artifacts:\/artifacts/);
+  assert.doesNotMatch(compose, /network_mode:\s*host|privileged:\s*true/);
 });

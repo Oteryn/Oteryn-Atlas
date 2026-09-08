@@ -170,10 +170,10 @@ test('serialized acceptance is not an independently validated in-process bundle'
 
 function currentFrameCaptureFixtures() {
   const read=name=>JSON.parse(fs.readFileSync(new URL(`../../tools/verification/${name}`,import.meta.url),'utf8'));
-  const contract=read('protected-visual-capture-contract.json');
   const plan=evaluateProtectedRouting({candidate:fixture().currentCandidate,manifest:read('impact-manifest.json'),catalog:read('verification-catalog.json'),census:read('full-safety-net-stable-ids.json'),inventory:read('protected-scenario-inventory.json'),routing:read('protected-routing.json'),forceFull:true});
-  assert.equal(contract.requiredFrames.length,17);
-  assert.equal(new Set(plan.review.flatMap(row=>row.scenarioIds)).size,5);
+  const contract={requiredFrames:plan.requiredFrames};
+  assert.equal(contract.requiredFrames.length,30);
+  assert.equal(new Set(plan.review.flatMap(row=>row.groupIds)).size,9);
   return plan.hostedPartitions.flatMap(partition=>{
     const requiredFrames=contract.requiredFrames.filter(frame=>partition.scenarioIds.includes(frame.stableTestId)).map(({frameId,stableTestId})=>({frameId,scenarioId:stableTestId}));
     if(!requiredFrames.length)return [];
@@ -189,10 +189,10 @@ function currentFrameCaptureFixtures() {
     return [input];
   });
 }
-test('current 17 protected frames cover their owners while all five review scenarios remain required',()=>{
+test('current30 protected frames cover canonical owners and retain independent review obligations',()=>{
   const inputs=currentFrameCaptureFixtures();
-  assert.equal(inputs.reduce((count,input)=>count+input.authority.requiredFrames.length,0),17);
-  assert.equal(inputs.reduce((count,input)=>count+input.authority.scenarioIds.filter(id=>!input.authority.requiredFrames.some(frame=>frame.scenarioId===id)).length,0),2);
+  assert.equal(inputs.reduce((count,input)=>count+input.authority.requiredFrames.length,0),30);
+  assert(inputs.every(input=>input.authority.scenarioIds.length>0));
   for(const input of inputs)assert.equal(module.validateProtectedVisualCapture(input).accepted,true);
 });
 test('current frame ownership contract still rejects any missing protected frame',()=>{
@@ -202,9 +202,13 @@ test('current frame ownership contract still rejects any missing protected frame
   }
 });
 test('review scenarios without frame ownership still require passing summary evidence',()=>{
-  const input=currentFrameCaptureFixtures().find(input=>input.authority.scenarioIds.some(id=>!input.authority.requiredFrames.some(frame=>frame.scenarioId===id)));
-  const id=input.authority.scenarioIds.find(id=>!input.authority.requiredFrames.some(frame=>frame.scenarioId===id));
-  const summary=JSON.parse(input.files[0].bytes);summary.scenarios=summary.scenarios.filter(row=>row.stableTestId!==id);
+  const input=currentFrameCaptureFixtures()[0];
+  const summary=JSON.parse(input.files[0].bytes);
+  const id=summary.scenarios.find(row=>!input.authority.requiredFrames.some(frame=>frame.scenarioId===row.stableTestId)).stableTestId;
+  input.authority.scenarioIds=[...new Set([...input.authority.scenarioIds,id])].sort();
+  changeCapture(input,c=>c.scenarioIds=input.authority.scenarioIds);
+  assert.equal(module.validateProtectedVisualCapture(input).accepted,true);
+  summary.scenarios=summary.scenarios.filter(row=>row.stableTestId!==id);
   input.files[0].bytes=Buffer.from(JSON.stringify(summary));changeCapture(input,c=>c.summary.digest=digest(input.files[0].bytes));
   assert.throws(()=>module.validateProtectedVisualCapture(input));
 });

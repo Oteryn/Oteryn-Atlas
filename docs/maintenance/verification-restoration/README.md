@@ -1,3 +1,5 @@
+> Current continuation: see [inactive execution readiness](execution-readiness.md). The preparation evidence below records the earlier baseline and is historical; it does not override current Issue #315 or the current canonical catalog.
+
 # Verification restoration — admissible preparation
 
 Baseline: protected `main@f00815858bb5b031c502ad19fb96a05ff66b4d84`.

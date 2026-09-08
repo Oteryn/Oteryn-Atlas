@@ -8,6 +8,9 @@ import {
   loadOverviewWorld,
   overviewDomains,
   queryOverviewCells,
+  validateOverviewChunk,
+  validateOverviewFloor,
+  validateOverviewWorld,
 } from '../../src/layers/overview.mjs';
 
 async function fixture() {
@@ -106,4 +109,25 @@ test('overview chunk corruption fails closed', async () => {
   const corrupt = new Uint8Array([...f.chunkBytes, 0x20]);
   const fetcher = fetcherFor(new Map([[`${base}chunks/a.json`, corrupt]]));
   await assert.rejects(() => loadOverviewChunk(base, f.world, f.floor, f.floor.chunks[0], fetcher), /byte count mismatch|content identity mismatch/);
+});
+
+test('overview validators reject unsafe paths, duplicate addresses, and false aggregate counts', async () => {
+  const f = await fixture();
+
+  const unsafeWorld = structuredClone(f.world);
+  unsafeWorld.floors[0].path = '../floors/f-7.json';
+  assert.throws(() => validateOverviewWorld(unsafeWorld), /unsafe overview path/);
+
+  const duplicateFloor = structuredClone(f.floor);
+  duplicateFloor.chunks.push(structuredClone(duplicateFloor.chunks[0]));
+  duplicateFloor.counts.chunks = 2;
+  assert.throws(() => validateOverviewFloor(duplicateFloor, f.world, f.world.floors[0]), /duplicate overview chunk logical address/);
+
+  const falseChunk = structuredClone(f.chunk);
+  falseChunk.counts.tiles += 1;
+  assert.throws(() => validateOverviewChunk(falseChunk, f.world, f.floor, f.floor.chunks[0]), /count mismatch/);
+
+  const unsortedChunk = structuredClone(f.chunk);
+  unsortedChunk.cells.reverse();
+  assert.throws(() => validateOverviewChunk(unsortedChunk, f.world, f.floor, f.floor.chunks[0]), /unsorted overview cells/);
 });

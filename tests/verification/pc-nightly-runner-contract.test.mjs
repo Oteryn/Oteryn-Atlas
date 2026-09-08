@@ -1,31 +1,25 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
-
-const read = (path) => fs.readFileSync(path, 'utf8').replace(/\r\n/g, '\n');
-const nightly = read('.github/workflows/verification-depth.yml');
-const live = read('.github/workflows/synology-live-acceptance.yml');
-
-function block(source, start, end = null) {
-  const begin = source.indexOf(start);
-  assert.notEqual(begin, -1, `missing ${start}`);
-  if (!end) return source.slice(begin);
-  const finish = source.indexOf(end, begin + start.length);
-  return source.slice(begin, finish === -1 ? source.length : finish);
-}
-
-test('heavy nightly browser depth is pinned to the dedicated Molehill Windows runner', () => {
-  const browser = block(nightly, '  browser-depth:\n');
-  assert.match(browser, /group: atlas-runners/);
-  assert.match(browser, /labels: oteryn-atlas-pc/);
-  assert.match(browser, /oteryn-molehill-atlas/);
-  assert.match(browser, /runner\.os[^\n]*Windows|RUNNER_OS[^\n]*Windows/);
-  assert.doesNotMatch(browser, /labels: oteryn-atlas\s*(?:\n|$)/);
+import {resolveBrowserExecution} from '../../tools/verification/browser-execution.mjs';
+import {deriveVerificationMetadata} from '../../tools/verification/verification-metadata.mjs';
+const registry=deriveVerificationMetadata(JSON.parse(fs.readFileSync(new URL('../../tools/verification/verification-catalog.json',import.meta.url)))).browser;
+import {createPublicationProofFixtures} from './helpers/publication-proof-fixture.mjs';
+const input={protectedRegistry:registry,requiredGroups:['fullworld.animation-census','e2e.bounded-stress'],atlasRevision:'a'.repeat(40),environmentDigest:'b'.repeat(64),protectedBaseSha:'f'.repeat(40),...createPublicationProofFixtures()};
+test('complete-product placement remains specialist-only and cannot run without authenticated proof',()=>{
+ const full=registry.catalog.groups['fullworld.animation-census'];
+ assert.equal(full.capabilities.dataCapability,'real_fullworld');
+ assert.equal(full.capabilities.hosted,false);
+ assert.equal(full.capabilities.specialistReason,'real-fullworld-product');
+ assert.throws(()=>resolveBrowserExecution(input),/raw publication proof for real_fullworld/);
+ const result=resolveBrowserExecution({...input,requiredGroups:['e2e.bounded-stress']});
+ assert(result.commands.length>0);
+ for(const command of result.commands)assert(result.partitions.hostedPlaywright.includes(command.executionKey));
+ assert(result.commands.every(command=>!command.argv.some(arg=>/synology|192\.168\./i.test(arg))));
 });
-
-test('Synology live acceptance remains on the Atlas Synology runner', () => {
-  assert.match(live, /group: atlas-runners/);
-  assert.match(live, /labels: oteryn-atlas\s*(?:\n|$)/);
-  assert.match(live, /oteryn-synology-atlas/);
-  assert.doesNotMatch(live, /oteryn-atlas-pc|oteryn-molehill-atlas/);
+test('specialist capacity cannot be substituted by absent source identity or candidate command changes',()=>{
+ const changed=structuredClone(input);delete changed.publicationProofs.real_fullworld;
+ assert.throws(()=>resolveBrowserExecution(changed),/publication|proof/);
+ const injected=structuredClone(input);injected.protectedRegistry.specs.find(row=>row.minimumDataCapability==='real_fullworld').execution.argv=['synology','run'];
+ assert.throws(()=>resolveBrowserExecution(injected),/argv/);
 });

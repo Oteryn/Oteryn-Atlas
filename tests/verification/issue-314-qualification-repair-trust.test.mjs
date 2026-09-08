@@ -1,12 +1,8 @@
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import path from 'node:path';
 import test from 'node:test';
-import { fileURLToPath } from 'node:url';
 
 import { resolveFullWorldTrust } from '../../src/browser/fullworld-trust.mjs';
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const CONTENT = `sha256:${'1'.repeat(64)}`;
 
 function qualificationDescriptor() {
@@ -35,9 +31,8 @@ test('qualification repair proof validates the actual runtime-trust contract', (
   assert.equal(trust.qualificationFixtureId, descriptor.fixtureId);
   assert.equal(trust.qualificationProductDigest, descriptor.productDigest);
 
-  const workflow = fs.readFileSync(path.join(ROOT, '.github/workflows/protected-qualification-repair.yml'), 'utf8');
-  assert.doesNotMatch(workflow, /trust\.dataCapability/);
-  assert.match(workflow, /descriptor\.dataCapability\s*!==\s*'qualification_fixture'/);
-  assert.match(workflow, /trust\.qualificationFixtureId\s*!==\s*descriptor\.fixtureId/);
-  assert.match(workflow, /trust\.qualificationProductDigest\s*!==\s*verified\.productDigest/);
+  for (const field of ['fixtureId', 'productDigest', 'dataCapability']) {
+    const invalid = { ...descriptor, [field]: 'untrusted' };
+    assert.throws(() => resolveFullWorldTrust({ __OTERYN_ATLAS_QUALIFICATION_TRUST__: invalid }));
+  }
 });

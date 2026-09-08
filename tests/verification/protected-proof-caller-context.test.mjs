@@ -26,6 +26,9 @@ test('review-bearing MQ fallback cannot mint replacement independent review even
 });
 test('actual shared executor rejects review-bearing MQ before Docker or proof generation',async t=>{
   const output=fs.mkdtempSync(path.join(os.tmpdir(),'atlas-proof-callers-'));t.after(()=>fs.rmSync(output,{recursive:true,force:true}));
+  const frameContract=JSON.parse(fs.readFileSync(path.join(root,'tools/verification/protected-visual-capture-contract.json'),'utf8'));
+  assert.equal(frameContract.requiredFrames.length,30,'MQ rejection must be reached through the complete canonical frame contract');
+  assert.equal(new Set(frameContract.requiredFrames.map(frame=>frame.frameId)).size,30);
   await assert.rejects(producer.executeProtectedCandidateProof({protectedRoot:root,candidateRoot:root,outputRoot:output,candidate:{repository:'Example/Atlas',prNumber:null,headSha:'a'.repeat(40),baseSha:'b'.repeat(40),treeSha:'c'.repeat(40),changedFiles:[{path:'web/fullworld-app.mjs',status:'modified'}]},admission:{eligible:true,forceFull:true},env:{GITHUB_EVENT_NAME:'merge_group'}}),/independent PR/);
   assert.deepEqual(fs.readdirSync(output),[],'context rejection must precede generated executable proof files');
 });

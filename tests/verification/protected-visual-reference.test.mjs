@@ -103,10 +103,10 @@ test('actual orchestration rejects artifact-contained reference output before st
  await assert.rejects(runProtectedVisualReference({outputRoot:path.join(artifacts,'private'),candidateWritablePaths:[artifacts],freshReadback:async()=>{throw Error('must reject mount graph before live reads');}}),/candidate writable mount/);
 });
 
-test('review artifact transports isolated reference images and manifest',()=>{
- const workflow=fs.readFileSync(new URL('../../.github/workflows/protected-admission.yml',import.meta.url),'utf8');
- const paths=workflow.split('name: protected-visual-frames-')[1]?.split('path: |')[1]?.split('retention-days:')[0];
- assert.ok(paths,'independent review artifact paths missing');
- assert.match(paths,/\/protected-admission\/private-visual-reference\/visual-reference\//);
- assert.match(paths,/browser-\*\/user-visual-evidence\//);
+test('reference evidence transport requires both complete image bytes and the sealed manifest',()=>{
+ const contract=create(), bytes=images(), manifest=reference.sealProtectedVisualReferences(contract,bytes);
+ const transported=JSON.parse(JSON.stringify(manifest));
+ assert.doesNotThrow(()=>reference.validateProtectedVisualReferences({contract,manifest:transported,images:new Map(bytes)}));
+ assert.throws(()=>reference.validateProtectedVisualReferences({contract,manifest:transported,images:new Map()}));
+ assert.throws(()=>reference.validateProtectedVisualReferences({contract,manifest:{...transported,images:[]},images:bytes}));
 });

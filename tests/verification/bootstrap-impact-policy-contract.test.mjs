@@ -4,7 +4,8 @@ import test from 'node:test';
 
 import { validateImpactManifest } from '../../tools/verification/verification-plan-schema.mjs';
 
-const catalog = JSON.parse(fs.readFileSync(new URL('../../tools/verification/verification-catalog.json', import.meta.url), 'utf8'));
+// Explicit legacy-schema fixture: migration must preserve these historical group names.
+const catalog = {schemaVersion:2,groups:Object.fromEntries(['deterministic.core','e2e.common-smoke','e2e.creatures','visual.creatures','e2e.full'].map(id=>[id,{specs:['tests/legacy-fixture.test.mjs'],projects:[],resourceClass:'cpu-light',evidence:'machine-summary',capabilities:{browser:false,hosted:true,requiresPublication:false,dataCapability:'qualification_fixture',visualReview:false,specialistReason:null}}]))};
 const protectedMainImpactV1 = {
   schemaVersion: 1,
   entries: [
@@ -16,7 +17,7 @@ const protectedMainImpactV1 = {
   ],
 };
 
-test('current protected-main impact schema v1 migrates exactly to v2 with no invented cross-domain rules', () => {
+test('exact historical impact schema v1 migrates exactly to v2 with no invented cross-domain rules', () => {
   const result = validateImpactManifest(protectedMainImpactV1, catalog);
   assert.equal(result.schemaVersion, 2);
   assert.deepEqual(result.entries, protectedMainImpactV1.entries);

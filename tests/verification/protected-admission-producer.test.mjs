@@ -9,7 +9,13 @@ test('publication fence rejects every exact identity drift', async()=>{const {as
 test('browser proof requires complete unique protected census, exact head, and zero retries',async()=>{const {validateBrowserSummary}=await producer();const summary={status:'passed',metadata:{expectedRevision:candidate.headSha,workers:1},scenarios:[{project:'desktop',specPath:'e2e/tests/a.mjs',scenario:'one',stableTestId:'desktop::e2e/tests/a.mjs::one',status:'passed',retry:0}]};assert.doesNotThrow(()=>validateBrowserSummary(summary,['desktop::e2e/tests/a.mjs::one'],candidate.headSha));for(const changed of [{...summary,scenarios:[]},{...summary,scenarios:[...summary.scenarios,...summary.scenarios]},{...summary,metadata:{...summary.metadata,workers:2}},{...summary,scenarios:[{...summary.scenarios[0],retry:1}]},{...summary,scenarios:[{...summary.scenarios[0],status:'skipped'}]},{...summary,metadata:{...summary.metadata,expectedRevision:'d'.repeat(40)}}])assert.throws(()=>validateBrowserSummary(changed,['desktop::e2e/tests/a.mjs::one'],candidate.headSha));});
 test('candidate sandbox contains no token, network, mutable input or privileged capability',async()=>{const {candidateSandboxArgs}=await producer();const args=candidateSandboxArgs({source:'/input',output:'/output',script:'/build.mjs'});assert.ok(args.includes('none'));assert.ok(args.includes('--read-only'));assert.ok(args.includes('ALL'));assert.ok(args.includes('no-new-privileges'));assert.ok(args.some(x=>x==='type=bind,src=/input,dst=/candidate,readonly'));assert.ok(!args.some(x=>/TOKEN|GITHUB|docker.sock/.test(x)));});
 test('census follows all protected full specs without historical numeric census shortcut',async()=>{const {resolveProtectedBrowserCensus}=await producer();const catalog={groups:{'e2e.full':{specs:['e2e/tests/a.spec.mjs','e2e/tests/b.spec.mjs']}}};const list='  [desktop] › a.spec.mjs:1:1 › one\n  [mobile] › b.spec.mjs:2:1 › two\n  [other] › excluded.spec.mjs:1:1 › excluded';const result=resolveProtectedBrowserCensus(list,catalog);assert.equal(result.scenarioIds.length,2);assert.match(result.testList,/one/);assert.match(result.testList,/two/);assert.doesNotMatch(result.testList,/excluded/);assert.throws(()=>resolveProtectedBrowserCensus('',catalog));assert.throws(()=>resolveProtectedBrowserCensus(list+'\n'+list,catalog));});
-test('protected producer workflow has no candidate-authority execution or manual green status',async()=>{const workflow=fs.readFileSync(new URL('../../.github/workflows/protected-admission.yml',import.meta.url),'utf8');assert.match(workflow,/pull_request_target:/);assert.match(workflow,/node trusted-base\/tools\/verification\/run-protected-admission.mjs/);assert.doesNotMatch(workflow,/statuses: write|checks: write|node candidate\//);assert.match(workflow,/protected-admission-evidence-\$\{\{ github.run_id \}\}-1/);});
+test('candidate sandbox receives explicit immutable proof bytes without control-plane credentials', async () => {
+  const {candidateSandboxArgs}=await producer();
+  const args=candidateSandboxArgs({source:'/candidate',output:'/artifacts',script:'/protected-proof.mjs',protectedTests:'/protected/tests'});
+  assert.ok(args.includes('type=bind,src=/protected/tests,dst=/candidate/tests,readonly'));
+  assert.ok(args.includes('type=bind,src=/candidate,dst=/candidate,readonly'));
+  assert.ok(!args.some(arg=>/TOKEN|SECRET|docker.sock|--privileged|--network=host/.test(arg)));
+});
 test('publication identity and qualification mode are generic protected environment inputs',()=>{const compose=fs.readFileSync(new URL('../../e2e/compose.github-hosted.yml',import.meta.url),'utf8');assert.match(compose,/repository: process.env.GITHUB_REPOSITORY/);assert.match(compose,/ATLAS_E2E_DATA_CAPABILITY: \$\{ATLAS_E2E_DATA_CAPABILITY:-qualification_fixture\}/);});
 test('ordinary scope produces neutral admission while malformed authority still fails closed', async () => {
   const { classifyAdmission } = await producer();
@@ -37,10 +43,10 @@ test('independent deterministic sandbox mounts protected tests over exact candid
  assert.ok(args.includes('type=bind,src=/protected/tests,dst=/candidate/tests,readonly'));
  assert.ok(args.includes('type=bind,src=/candidate-tree,dst=/candidate,readonly'));
 });
-test('deterministic census comes from every protected CI selected path without evaluating shell', async()=>{
+test('legacy deterministic pattern parser treats shell metacharacters as invalid data', async()=>{
  const { resolveProtectedDeterministicPatterns }=await producer();assert.equal(typeof resolveProtectedDeterministicPatterns,'function');
- const ci=fs.readFileSync(new URL('../../.github/workflows/ci.yml',import.meta.url),'utf8');const patterns=resolveProtectedDeterministicPatterns(ci);
- assert.ok(patterns.includes('tests/animation-runtime.mjs'));assert.ok(patterns.includes('tests/properties/*.test.mjs'));assert.ok(patterns.includes('tests/verification/*.test.mjs'));assert.equal(patterns.length,23);
+ const patterns=resolveProtectedDeterministicPatterns('files=( tests/animation-runtime.mjs tests/properties/*.test.mjs tests/verification/*.test.mjs )');
+ assert.deepEqual(patterns, ['tests/animation-runtime.mjs','tests/properties/*.test.mjs','tests/verification/*.test.mjs']);
  assert.throws(()=>resolveProtectedDeterministicPatterns('files=( $(curl malicious) )'),/deterministic/);
  assert.throws(()=>resolveProtectedDeterministicPatterns('files=( ../../escape.mjs )'),/deterministic/);
  assert.throws(()=>resolveProtectedDeterministicPatterns('files=( tests/a.mjs )\nfiles=( tests/b.mjs )'),/deterministic/);

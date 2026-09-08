@@ -114,5 +114,133 @@
       "effort": "medium",
       "scope": "independent authority boundary and archived workflow obligations"
     }
+  },
+  "continuation": {
+    "baseSha": "6a4172d518dd85b6447d6a4785eb0f87fc6c8a46",
+    "refreshedAt": "2026-09-08",
+    "issue315": {
+      "state": "OPEN",
+      "updatedAt": "2026-09-07T22:55:41Z",
+      "lifecycle": "R1_R3_IMPLEMENTATION_AUTHORIZED / ACTIVATION_PAUSED",
+      "oneTimeBypass": "consumed by PR #387"
+    },
+    "issue376": {
+      "state": "CLOSED",
+      "disposition": "completed in #388"
+    },
+    "sources": [
+      {
+        "path": "AGENTS.md",
+        "protectedBlob": "a08b82e1f5c9c21e936aade92f04c80f08537a61",
+        "candidateWorktreeBlob": "a08b82e1f5c9c21e936aade92f04c80f08537a61",
+        "scope": "R1\u2013R3 continuation",
+        "findings": "Inactive R1\u2013R3 implementation allowed; protected admission precedes integration; no activation or deletion exception.",
+        "consumedBy": [
+          "lead",
+          "contract_rewrites",
+          "deterministic_completion",
+          "provenance_oracles",
+          "source_route_decisions",
+          "execution_adversarial",
+          "final_r123_review"
+        ]
+      },
+      {
+        "path": "docs/agents/META_AGENT_POLICY_BINDING.json",
+        "protectedBlob": "cef7245d3bb9120126380b027de8efb3785949e7",
+        "candidateWorktreeBlob": "cef7245d3bb9120126380b027de8efb3785949e7",
+        "scope": "R1\u2013R3 continuation",
+        "findings": "META policy v3.0.0 at Oteryn/Oteryn@1dedfc0f264fe0e23e5365dbe9280c2d96df50c5, binding unchanged.",
+        "consumedBy": [
+          "lead",
+          "contract_rewrites",
+          "deterministic_completion",
+          "provenance_oracles",
+          "source_route_decisions",
+          "execution_adversarial",
+          "final_r123_review"
+        ]
+      },
+      {
+        "path": "docs/maintenance/ATLAS_VERIFICATION_RESTORATION_ALLOWLIST.json",
+        "protectedBlob": "3a9f0e4ffad11a05a3b6947854c2c2c74b60e7ed",
+        "candidateWorktreeBlob": "3a9f0e4ffad11a05a3b6947854c2c2c74b60e7ed",
+        "scope": "R1\u2013R3 continuation",
+        "findings": "19 exact rules; many additions only. Current modifications/new proof paths are not admitted. Allowlist self-frozen.",
+        "consumedBy": [
+          "lead",
+          "contract_rewrites",
+          "deterministic_completion",
+          "provenance_oracles",
+          "source_route_decisions",
+          "execution_adversarial",
+          "final_r123_review"
+        ]
+      },
+      {
+        "path": "tools/maintenance/verify-maintenance-diff.mjs",
+        "protectedBlob": "d30326a9130ace39cc8f79b646eee87512d54b5d",
+        "candidateWorktreeBlob": "d30326a9130ace39cc8f79b646eee87512d54b5d",
+        "scope": "R1\u2013R3 continuation",
+        "findings": "Protected-base validator admits only prior authority; restoration rule-count ceiling64; candidate policy cannot self-admit.",
+        "consumedBy": [
+          "lead",
+          "contract_rewrites",
+          "deterministic_completion",
+          "provenance_oracles",
+          "source_route_decisions",
+          "execution_adversarial",
+          "final_r123_review"
+        ]
+      },
+      {
+        "path": "tools/verification/verification-catalog.json",
+        "protectedBlob": "ae796706909b1390f208fdb7e617f0d598018ec4",
+        "candidateWorktreeBlob": "b9a633d84eb3af041f0d85830208a19b0e54d63e",
+        "scope": "R1\u2013R3 continuation",
+        "findings": "One canonical executionPolicy;16 deterministic,19 Playwright machine,9 review,1 full alias,1 complete-integrity proof group.",
+        "consumedBy": [
+          "lead",
+          "contract_rewrites",
+          "deterministic_completion",
+          "provenance_oracles",
+          "source_route_decisions",
+          "execution_adversarial",
+          "final_r123_review"
+        ]
+      },
+      {
+        "path": "tools/verification/impact-manifest.json",
+        "protectedBlob": "a7499f2d9a99ef7ee5f65bbf7231958e305b0136",
+        "candidateWorktreeBlob": "c42e66b27e2e8720877ea7885742d0990c91e57a",
+        "scope": "R1\u2013R3 continuation",
+        "findings": "Exact browser test/source routes; bounded source contract;10 complete-product source assignments retain specialist oracle blocker; unknown paths fail closed.",
+        "consumedBy": [
+          "lead",
+          "contract_rewrites",
+          "deterministic_completion",
+          "provenance_oracles",
+          "source_route_decisions",
+          "execution_adversarial",
+          "final_r123_review"
+        ]
+      },
+      {
+        "path": "tools/verification/verification-authority-manifest.json",
+        "protectedBlob": "482c5bdfd0d2ffefff5dbea208be9ee0bfbd9a91",
+        "candidateWorktreeBlob": "fcbb5171e294cece393b1f9ab8e998a9f81d2e98",
+        "scope": "R1\u2013R3 continuation",
+        "findings": "Current inactive chain plus maintenance authorities and local import closure; historical absent workflow entries removed.",
+        "consumedBy": [
+          "lead",
+          "contract_rewrites",
+          "deterministic_completion",
+          "provenance_oracles",
+          "source_route_decisions",
+          "execution_adversarial",
+          "final_r123_review"
+        ]
+      }
+    ]
   }
 }
