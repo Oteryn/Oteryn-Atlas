@@ -132,7 +132,12 @@ function authenticatePinnedProduct(proof, authority, publication) {
   if (manifest.fixtureId !== authority.product.id || manifest.dataCapability !== authority.dataCapability) fail('product manifest identity/capability mismatch');
   const files = normalizeProductFiles(proof.productFiles);
   const descriptors = files.map(({ descriptor }) => descriptor);
-  if (canonicalDigest(descriptors) !== canonicalDigest(manifest.files) || canonicalDigest(descriptors) !== manifest.productDigest) fail('product manifest does not close over exact file bytes');
+  // Existing proof fixtures hash canonical JSON without LF; immutable world
+  // builders hash the same inventory with LF. Recompute both exact encodings
+  // from raw files; the protected authority below still pins one exact digest.
+  const inventoryDigest = canonicalDigest(descriptors);
+  const worldInventoryDigest = bytesDigest(canonicalBytes(descriptors));
+  if (inventoryDigest !== canonicalDigest(manifest.files) || ![inventoryDigest, worldInventoryDigest].includes(manifest.productDigest)) fail('product manifest does not close over exact file bytes');
   if (manifest.productDigest !== authority.product.digest) fail('product digest does not match protected authority');
   const publicationFile = files.find(({ path }) => path === authority.publication.manifestPath);
   if (!publicationFile || !publicationFile.raw.equals(publication.raw)) fail('publication manifest is not the exact product file');

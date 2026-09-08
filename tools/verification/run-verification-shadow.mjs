@@ -62,6 +62,59 @@ function assertCheckout(root,revision) {
   if(git(root,'rev-parse','HEAD')!==revision||git(root,'status','--porcelain','--untracked-files=all')) fail('checkout identity or cleanliness');
 }
 
+function executionEntries(root,revision) {
+  if(!sha(revision)) fail('execution view revision');
+  return git(root,'ls-tree','-r','--full-tree',revision).split('\n').map(record=>{
+    const match=/^(100644|100755) blob ([a-f0-9]{40})\t([A-Za-z0-9._/-]+)$/.exec(record);
+    if(!match||match[3].split('/').some(part=>!part||part==='.'||part==='..')||match[3]==='e2e/node_modules'||match[3].startsWith('e2e/node_modules/')) fail('unsafe execution view tree');
+    return {mode:match[1],blob:match[2],name:match[3]};
+  });
+}
+export function verifyExecutionView({viewRoot,sourceRoot,revision}) {
+  const entries=executionEntries(sourceRoot,revision), expected=new Map(entries.map(row=>[row.name,row]));
+  const directories=new Set(['e2e','e2e/node_modules']);
+  for(const row of entries){let parent=path.posix.dirname(row.name);while(parent!=='.'){directories.add(parent);parent=path.posix.dirname(parent);}}
+  const seen=new Set();
+  const walk=(directory,prefix='')=>{
+    for(const name of fs.readdirSync(directory)) {
+      if(!prefix&&name==='.git'){if(!fs.lstatSync(path.join(directory,name)).isDirectory())fail('execution view git metadata');continue;}
+      const relative=prefix+name,absolute=path.join(directory,name),stat=fs.lstatSync(absolute);
+      if(stat.isDirectory()){if(!directories.has(relative))fail('unexpected execution view directory');walk(absolute,relative+'/');continue;}
+      const row=expected.get(relative);
+      if(!stat.isFile()||!row)fail('unexpected execution view path or symlink');
+      const bytes=fs.readFileSync(absolute),blob=createHash('sha1').update(`blob ${bytes.length}\0`).update(bytes).digest('hex');
+      if(blob!==row.blob||(stat.mode&0o777)!==(row.mode==='100755'?0o755:0o644))fail('execution view tracked bytes or mode changed');
+      seen.add(relative);
+    }
+  };
+  walk(viewRoot);
+  if(seen.size!==expected.size||!fs.existsSync(path.join(viewRoot,'e2e/node_modules'))||fs.readdirSync(path.join(viewRoot,'e2e/node_modules')).length)fail('execution view census');
+  return true;
+}
+export function prepareExecutionView({sourceRoot,revision,destination}) {
+  assertCheckout(sourceRoot,revision);executionEntries(sourceRoot,revision);
+  if(fs.existsSync(destination)||path.resolve(destination).startsWith(path.resolve(sourceRoot)+path.sep))fail('execution view destination');
+  // A fresh local clone preserves exact Git history for tests without copying
+  // checkout credentials/configuration or sharing writable object hardlinks.
+  const env={PATH:process.env.PATH,GIT_CONFIG_GLOBAL:'/dev/null',GIT_CONFIG_NOSYSTEM:'1',GIT_TERMINAL_PROMPT:'0'};
+  execFileSync('git',['-c','core.hooksPath=/dev/null','clone','--quiet','--no-hardlinks','--no-checkout','--',sourceRoot,destination],{stdio:'pipe',env});
+  const viewGit=(...args)=>execFileSync('git',['--no-replace-objects','-C',destination,'-c','core.hooksPath=/dev/null',...args],{stdio:'pipe',env});
+  viewGit('checkout','--quiet','--detach',revision);
+  viewGit('remote','remove','origin');
+  fs.mkdirSync(path.join(destination,'e2e/node_modules'),{recursive:true});
+  verifyExecutionView({viewRoot:destination,sourceRoot,revision});
+  assertCheckout(sourceRoot,revision);
+  return destination;
+}
+export function assertContainerStarted(container,result={}) {
+  const state=container?.State;
+  if(!state||state.Error||!state.StartedAt||/^0001-/.test(state.StartedAt)||!Number.isFinite(Date.parse(state.StartedAt))||result.status===125) {
+    const diagnostic={state:state??null,exitCode:result.status??null,signal:result.signal??null,stderrTail:String(result.stderr??'').slice(-4096)};
+    fail(`container never started; no specs executed: ${JSON.stringify(diagnostic)}`);
+  }
+  return true;
+}
+
 export function planShadow({candidate,root,protectedRoot}) {
   const protectedCatalog=readJson(path.join(protectedRoot,'tools/verification/verification-catalog.json'));
   const protectedImpactManifest=readJson(path.join(protectedRoot,'tools/verification/impact-manifest.json'));
@@ -121,7 +174,8 @@ function executeDeterministic(command,root,image,dependencyRoot,shimRoot) {
   try {
     result=spawnSync('docker',argv,{encoding:'utf8',timeout:command.timeoutSeconds*1000,maxBuffer:16*1024*1024,env:{PATH:process.env.PATH,HOME:process.env.HOME}});
     // Inspect the actual container, even for timeout/nonzero/daemon failures.
-    try {container=JSON.parse(execFileSync('docker',['inspect',name],{encoding:'utf8'}))[0];} catch {fail('container evidence missing');}
+    try {container=JSON.parse(execFileSync('docker',['inspect',name],{encoding:'utf8'}))[0];} catch {assertContainerStarted(null,result);}
+    assertContainerStarted(container,result);
     assertDeterministicContainer(container,{command,candidateRoot:root,dependencyRoot,shimRoot,image});
     return {commandId:command.id,argv:command.argv,cwd:command.cwd,groupIds:command.groupIds,
       expectedTestIds:command.expectedTestIds,censusKind:'external-command-and-spec',retry:0,
@@ -238,8 +292,9 @@ export async function runShadow(mode,root) {
       protectedExpectedAuthorities:fixture?{qualification_fixture:fixture.authority}:undefined,
       selectedGameplayFiles:selected?.productFiles});
     summary.contractDigest=contract.contractDigest;summary.environmentDigest=environmentDigest;summary.commands=contract.commands;
+    const executionRoot=contract.commands.some(command=>command.engine==='deterministic')?prepareExecutionView({sourceRoot:root,revision:candidate.headSha,destination:path.join(directory,'candidate-view')}):null;
     for(const command of contract.commands) {
-      if(command.engine==='deterministic') summary.results.push(executeDeterministic(command,root,config.container.image,path.join(controlRoot,'e2e/node_modules'),shimRoot));
+      if(command.engine==='deterministic') {verifyExecutionView({viewRoot:executionRoot,sourceRoot:root,revision:candidate.headSha});summary.results.push(executeDeterministic(command,executionRoot,config.container.image,path.join(controlRoot,'e2e/node_modules'),shimRoot));}
       else if(command.groupIds[0]==='e2e.layer-availability') summary.results.push(runFixture(command,{candidate,contract,fixture,directory,root}));
       else if(command.groupIds[0]==='integration.source-contract-http') {
         const result=await runSelectedGameplayHttp(selected.productFiles);
