@@ -113,7 +113,7 @@ def build(source: dict[str, Any], game_revision: str, kinds: set[str] | None = N
         value = dict(record)
         value["search_terms"] = {
             "label": normalize(record["label"]),
-            "aliases": sorted({normalize(alias) for alias in record["aliases"] if normalize(alias)}),
+            "aliases": sorted({normalized for alias in record["aliases"] if (normalized := normalize(alias))}),
         }
         indexed.append(value)
         by_kind.setdefault(record["kind"], []).append(record["id"])
