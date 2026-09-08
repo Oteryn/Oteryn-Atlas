@@ -55,7 +55,7 @@ def validate_registry(registry: dict[str, Any]) -> dict[str, int]:
         value = game.get(key); _require(isinstance(value, dict), f"game.{key} must be an object"); _sha(value.get("blob_sha"), f"game.{key}.blob_sha")
     producer = game["audited_producer"]
     _require(producer.get("path") == "tools/game-atlas-fullworld-source/producer.py", "full-world Game producer must be audited")
-    _require(set(producer.get("capabilities", [])) == EXPECTED_GAME_CAPABILITIES, "audited producer capabilities changed; re-audit authority")
+    _require(set(producer.get("capabilities", [])) == EXPECTED_GAME_CAPABILITIES, "audited producer capabilities changed; re-audit Game authority before enabling layers")
 
     dep = registry.get("publication_dependency"); _require(isinstance(dep, dict), "publication_dependency must be an object")
     _require(dep.get("required_gate") == "G3" and dep.get("status") == "PASS", "G3 publication dependency must be PASS")
