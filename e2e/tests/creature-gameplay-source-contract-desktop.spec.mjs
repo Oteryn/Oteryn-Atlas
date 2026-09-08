@@ -1,3 +1,4 @@
+// R4 hosted qualification: exercise this exact protected machine owner.
 import { expect, test } from '@playwright/test';
 
 const sourceMode = process.env.ATLAS_GAMEPLAY_SOURCE_MODE ?? 'published-gameplay';

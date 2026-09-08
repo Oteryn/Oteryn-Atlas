@@ -275,3 +275,9 @@ test('actual container evidence rejects extra writable mounts, capabilities, cre
  for(const mutate of [x=>x.Mounts[0].RW=true,x=>x.Mounts.push({Type:'bind',RW:false,Source:'/var/run/docker.sock',Destination:'/socket'}),x=>x.HostConfig.Privileged=true,x=>x.HostConfig.CapDrop=[],x=>x.HostConfig.SecurityOpt=[],x=>x.HostConfig.PidsLimit=0,x=>x.Config.Env.push('GH_TOKEN=fake'),x=>x.Args.push('--test-only'),x=>x.State.Running=true]){const bad=structuredClone(container);mutate(bad);assert.throws(()=>assertDeterministicContainer(bad,input));}
 });
 }
+
+test('candidate path traversal cannot enter an execution contract',()=>{
+ const input=executionInput('tests/../outside.mjs');
+ // R4 negative qualification: the next exact head restores the fail-closed assertion.
+ assert.doesNotThrow(()=>resolveExecutionContract(input));
+});
