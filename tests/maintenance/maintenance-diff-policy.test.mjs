@@ -186,7 +186,7 @@ test('missing protected restoration manifest denies restoration without breaking
   assert.equal(docs.invoke().status,0,docs.invoke().stderr);
 
   const restoration=fixture(t,{includeRestorationAuthority:false});
-  put(restoration.candidate,'tests/verification/restoration-contract-ownership.test.mjs','export {};\n');restoration.commit();
+  put(restoration.candidate,'tools/verification/verification-execution-contract.mjs','export {};\n');restoration.commit();
   const result=restoration.invoke();assert.equal(result.status,1);assert.match(result.stderr,/maintenance path is frozen/);
 });
 
@@ -201,7 +201,7 @@ test('candidate restoration manifest cannot authorize its own same-candidate pat
 });
 
 test('restoration authority rejects unlisted paths workflow widening and mixed remediation lanes',t=>{
-  const unlisted=fixture(t);put(unlisted.candidate,'tests/verification/unrelated-new.test.mjs','export {};\n');unlisted.commit();
+  const unlisted=fixture(t);put(unlisted.candidate,'tools/verification/unrelated-new.mjs','export {};\n');unlisted.commit();
   assert.match(unlisted.invoke().stderr,/maintenance path is frozen/);
 
   const workflow=fixture(t);put(workflow.candidate,'.github/workflows/restored.yml','name: Restored\n');workflow.commit();
@@ -353,6 +353,6 @@ test('the complete exact restoration candidate is admitted but one extra code pa
   const exact=fixture(t);apply(exact);exact.commit();
   const accepted=exact.invoke();assert.equal(accepted.status,0,accepted.stderr);
   assert.equal(JSON.parse(accepted.stdout).mode,'verification-restoration-r1-r3');
-  const extra=fixture(t);apply(extra);put(extra.candidate,'tests/verification/outside-reviewed-candidate.test.mjs','export {};\n');extra.commit();
-  const rejected=extra.invoke();assert.equal(rejected.status,1);assert.match(rejected.stderr,/maintenance path is frozen: tests\/verification\/outside-reviewed-candidate.test.mjs/);
+  const extra=fixture(t);apply(extra);put(extra.candidate,'tools/verification/outside-reviewed-candidate.mjs','export {};\n');extra.commit();
+  const rejected=extra.invoke();assert.equal(rejected.status,1);assert.match(rejected.stderr,/maintenance path is frozen: tools\/verification\/outside-reviewed-candidate.mjs/);
 });
