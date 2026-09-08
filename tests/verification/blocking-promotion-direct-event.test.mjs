@@ -19,7 +19,13 @@ function fixture(){
 
 test('direct merge_group binds protected base, queue ref, exact head and candidate tree',async()=>{
   const f=fixture();
-  assert.deepEqual(await resolveDirectMergeGroup(f.input),{repository,baseSha:base,headSha:head,treeSha:tree,headRef});
+  assert.deepEqual(await resolveDirectMergeGroup(f.input),{repository,baseSha:base,headSha:head,treeSha:tree,headRef,allowJustIntegratedHead:false});
+});
+
+test('direct merge_group accepts only the exact just-integrated head after event creation',async()=>{
+  const f=fixture();
+  f.responses[`/repos/${repository}/git/ref/heads/main`].object.sha=head;
+  assert.deepEqual(await resolveDirectMergeGroup(f.input),{repository,baseSha:base,headSha:head,treeSha:tree,headRef,allowJustIntegratedHead:true});
 });
 
 test('direct merge_group rejects stale base, wrong branch/action/head and synthetic topology',async()=>{
@@ -34,6 +40,7 @@ test('direct merge_group rejects stale base, wrong branch/action/head and synthe
     f=>{f.event.repository.full_name='Other/Atlas';},
     f=>{f.responses[`/repos/${repository}/git/commits/${head}`].tree.sha='bad';},
     f=>{f.responses[`/repos/${repository}/git/commits/${head}`].parents=[];},
+    f=>{f.responses[`/repos/${repository}/git/commits/${head}`].parents=[{sha:other}];},
   ];
   for(const mutate of mutations){const f=fixture();mutate(f);await assert.rejects(resolveDirectMergeGroup(f.input));}
 });
