@@ -75,7 +75,7 @@ def validate_registry(registry: dict[str, Any]) -> dict[str, int]:
         _require(isinstance(layer, dict), f"layers[{index}] must be an object")
         layer_id=layer.get("id"); _require(isinstance(layer_id,str) and layer_id, f"layers[{index}].id required"); ids.append(layer_id)
         status=layer.get("status"); _require(status in VALID_LAYER_STATUSES, f"{layer_id}: invalid status"); status_counts[status]+=1
-        _require(isinstance(layer.get("priority"),int) and layer["priority"]>0, f"{layer_id}: invalid priority")
+        _require(type(layer.get("priority")) is int and layer["priority"]>0, f"{layer_id}: invalid priority")
         _require(isinstance(layer.get("authority_evidence"),list), f"{layer_id}: authority_evidence must be an array")
         if status == "PROVEN":
             proven.add(layer_id)
