@@ -79,9 +79,14 @@ test('gameplay impact routing executes both functional fixture and bounded sourc
   assert.equal(catalog.groups['integration.source-contract-http'].capabilities.dataCapability, 'bounded_real_world');
   assert.ok(catalog.groups['integration.source-contract-http'].specs.includes('e2e/tests/creature-gameplay-source-contract-desktop.spec.mjs'));
 
-  const sourceSpecRule = impact.entries.find((entry) => entry.pathPrefix === 'e2e/tests/creature-gameplay-source-contract-desktop.spec.mjs');
-  assert.ok(sourceSpecRule, 'source-contract spec requires an explicit impact rule');
-  assert.ok(sourceSpecRule.requiredGroups.includes('integration.source-contract-http'));
+  const sourceSpecPlan = buildVerificationPlan({
+    repository: 'Oteryn/Oteryn-Atlas', headSha: 'a'.repeat(40),
+    integrationBaseSha: 'b'.repeat(40), mergeBaseSha: 'c'.repeat(40),
+    changedFiles: [{path: 'e2e/tests/creature-gameplay-source-contract-desktop.spec.mjs'}],
+    trustedImpactManifest: impact, candidateImpactManifest: impact, verificationCatalog: catalog,
+  });
+  assert.deepEqual(sourceSpecPlan.requiredGroupIds, ['integration.source-contract-http']);
+  assert.deepEqual(sourceSpecPlan.executionBlockers, []);
 
   const plan = buildVerificationPlan({
     repository: 'Oteryn/Oteryn-Atlas',

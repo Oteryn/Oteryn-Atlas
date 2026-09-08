@@ -39,3 +39,31 @@ test('semantic prefixes cannot be downgraded into default catchalls',()=>{
  assert.throws(()=>validateImpactManifest(manifest([{...narrow,exactMatch:'true'}]),catalog),/exactMatch/);
  assert.equal(validateImpactManifest(manifest([{...narrow,exactMatch:true}]),catalog).entries[0].exactMatch,true);
 });
+
+test('canonical test ownership routes without any duplicated manifest test rows',()=>{
+ const empty=manifest([]);
+ const p=plan(empty,empty,'tests/semantic-search.mjs');
+ assert.deepEqual(p.requiredGroupIds,['deterministic.search']);
+ assert.deepEqual(p.executionBlockers,[]);
+ const browser=plan(empty,empty,'e2e/tests/creature-gameplay-source-contract-desktop.spec.mjs');
+ assert.deepEqual(browser.requiredGroupIds,['integration.source-contract-http']);
+ assert.deepEqual(browser.executionBlockers,[]);
+ assert.equal(browser.requiresRealFullWorld,false);
+});
+test('canonical owner routing preserves extra impact obligations and protected ownership',()=>{
+ const extra=manifest([{pathPrefix:'tests/semantic-search.mjs',exactMatch:true,domains:['additional-proof'],minimumProfile:'focused',requiredGroups:['deterministic.core']}]);
+ const p=plan(extra,manifest([]),'tests/semantic-search.mjs');
+ assert.deepEqual(p.requiredGroupIds,['deterministic.core','deterministic.search']);
+ const candidate=structuredClone(catalog);
+ candidate.groups['deterministic.search'].specs=candidate.groups['deterministic.search'].specs.filter(spec=>spec!=='tests/semantic-search.mjs');
+ const narrowed=buildVerificationPlan({repository:'Oteryn/Oteryn-Atlas',headSha:'a'.repeat(40),integrationBaseSha:'b'.repeat(40),mergeBaseSha:'c'.repeat(40),changedFiles:[{path:'tests/semantic-search.mjs'}],trustedImpactManifest:manifest([]),candidateImpactManifest:manifest([]),trustedVerificationCatalog:catalog,candidateVerificationCatalog:candidate});
+ assert(narrowed.requiredGroupIds.includes('deterministic.search'));
+ assert(narrowed.executionBlockers.some(row=>row.reason==='unknown-impact'));
+});
+
+test('candidate duplicate owner produces an explicit execution blocker',()=>{
+ const candidate=structuredClone(catalog);
+ candidate.groups['deterministic.gameplay'].specs.push('tests/semantic-search.mjs');
+ const p=buildVerificationPlan({repository:'Oteryn/Oteryn-Atlas',headSha:'a'.repeat(40),integrationBaseSha:'b'.repeat(40),mergeBaseSha:'c'.repeat(40),changedFiles:[{path:'tests/semantic-search.mjs'}],trustedImpactManifest:manifest([]),candidateImpactManifest:manifest([]),trustedVerificationCatalog:catalog,candidateVerificationCatalog:candidate});
+ assert(p.executionBlockers.some(row=>row.reason==='ambiguous-test-owner'));
+});

@@ -1,92 +1,48 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {bindExecutionArtifacts} from './helpers/execution-proof-fixture.mjs';
-import {assertCandidateReadback, classifyProductEvent, assertExecutionWindow, evaluateFanIn} from '../../tools/verification/verification-execution-contract.mjs';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import {spawnSync} from 'node:child_process';
+import {createHash} from 'node:crypto';
+import {fileURLToPath} from 'node:url';
+import {assertCandidateReadback, resolveExecutionContract, sealExecutionContract} from '../../tools/verification/verification-execution-contract.mjs';
+import {createPublicationProofFixtures} from './helpers/publication-proof-fixture.mjs';
 const sha = c => c.repeat(40);
 const snapshot = () => ({repository:'Oteryn/Oteryn-Atlas',prNumber:7,headSha:sha('a'),baseSha:sha('b'),treeSha:sha('c'),changedFiles:[{path:'src/browser/loader.mjs',status:'modified'}]});
 const source = {sourceRepository:'Oteryn/Oteryn-Atlas',sourceRef:'refs/heads/main',sourceRevision:sha('b')};
+const root=fileURLToPath(new URL('../../',import.meta.url));
+function executionInput(path='tests/semantic-search.mjs') {
+ const candidate={...snapshot(),changedFiles:[{path,status:'modified'}]};
+ const protectedCatalog=JSON.parse(fs.readFileSync(`${root}/tools/verification/verification-catalog.json`));
+ const protectedImpactManifest=JSON.parse(fs.readFileSync(`${root}/tools/verification/impact-manifest.json`));
+ return {root,candidate,protectedCatalog,protectedImpactManifest,environmentDigest:'f'.repeat(64),
+  planInput:{repository:candidate.repository,headSha:candidate.headSha,integrationBaseSha:candidate.baseSha,mergeBaseSha:candidate.baseSha,changedFiles:candidate.changedFiles,
+   candidateVerificationCatalog:protectedCatalog,candidateImpactManifest:protectedImpactManifest}};
+}
 test('final candidate readback rejects head/base/tree/repository/file drift',()=>{
  const planned=snapshot();assert.equal(assertCandidateReadback({planned,current:snapshot(),...source}),true);
  for(const key of ['headSha','baseSha','treeSha','repository']) {const current=snapshot();current[key]=key==='repository'?'Other/Atlas':sha('d');assert.throws(()=>assertCandidateReadback({planned,current,...source}),/readback/);}
  const current=snapshot();current.changedFiles[0].path='README.md';assert.throws(()=>assertCandidateReadback({planned,current,...source}),/readback/);
 });
+
 test('candidate branches cannot impersonate protected execution source',()=>{
  for(const bad of [{sourceRef:'refs/heads/feature'},{sourceRepository:'Other/Atlas'},{sourceRevision:sha('d')}]) assert.throws(()=>assertCandidateReadback({planned:snapshot(),current:snapshot(),...source,...bad}),/protected source/);
 });
-test('product events exclude review and nonsemantic metadata but preserve PR/MQ candidates',()=>{
- for(const eventName of ['pull_request','pull_request_target']) assert.equal(classifyProductEvent({eventName,action:'synchronize'}),'product');
- assert.equal(classifyProductEvent({eventName:'merge_group',action:'checks_requested'}),'product');
- for(const action of ['submitted','edited','dismissed']) assert.equal(classifyProductEvent({eventName:'pull_request_review',action}),'authority-only');
- assert.equal(classifyProductEvent({eventName:'pull_request_target',action:'edited'}),'authority-only');
- assert.throws(()=>classifyProductEvent({eventName:'workflow_dispatch',action:'anything'}),/unsupported/);
-});
-test('bounded zero-retry execution rejects overtime and final identity drift',()=>{
- const input={before:snapshot(),after:snapshot(),startedAt:'2026-09-07T00:00:00Z',completedAt:'2026-09-07T00:00:05Z',timeoutSeconds:10,retries:0};
- assert.equal(assertExecutionWindow(input),true);
- assert.throws(()=>assertExecutionWindow({...input,timeoutSeconds:1}),/budget/);
- assert.throws(()=>assertExecutionWindow({...input,retries:1}),/retries/);
- assert.throws(()=>assertExecutionWindow({...input,after:{...snapshot(),headSha:sha('d')}}),/identity/);
-});
-test('fan-in cannot accept an unsealed or absent execution contract',()=>{
- assert.throws(()=>evaluateFanIn({contract:{},evidence:[]}),/contract/);
-});
 
-import {sealExecutionContract,validateGroupEvidence} from '../../tools/verification/verification-execution-contract.mjs';
-const h=c=>'sha256:'+c.repeat(64);
-function proofFixture(visual=false) {
- const identity={repository:'Oteryn/Oteryn-Atlas',headSha:sha('a'),protectedBaseSha:sha('b'),treeSha:sha('c'),candidateDigest:h('a'),environmentDigest:'f'.repeat(64),planDigest:h('c'),policyDigest:h('d')};
- const producerPolicy={repositoryId:1337995824,workflowPath:'.github/workflows/product-verification.yml',jobName:'proof',event:'pull_request_target'};
- const frame={frameId:'viewport',stableTestId:'desktop-chromium::e2e/tests/desktop.spec.mjs::smoke'};
- const contract=sealExecutionContract({schemaVersion:1,identity,producerPolicy,maxEvidenceAgeMs:60000,retries:0,commands:[{id:h('e'),argv:['node','--test','tests/a.mjs'],expectedTestIds:['tests/a.mjs'],timeoutSeconds:10}],groups:[{id:'deterministic.example',commandIds:[h('e')]}],reviews:visual?[{groupId:'review.example',frames:[frame],commandIds:[h('e')]}]:[]});
- const producer={...producerPolicy,repository:identity.repository,headSha:identity.headSha,baseSha:identity.protectedBaseSha,sourceSha:identity.protectedBaseSha,sourceRef:'refs/heads/main',headRepositoryId:producerPolicy.repositoryId,baseRepositoryId:producerPolicy.repositoryId,runId:12,jobId:13,runAttempt:1,status:'completed',conclusion:'success',artifactDigest:h('f')};
- const evidence={commandId:h('e'),identity,contractDigest:contract.contractDigest,status:'passed',exitCode:0,attempt:1,logDigest:h('1'),tests:[{id:'tests/a.mjs',status:'passed',attempt:1}],startedAt:'2026-09-07T00:00:00Z',completedAt:'2026-09-07T00:00:05Z',producer:{runId:12,jobId:13,artifactDigest:h('f')},captures:visual?[{...frame,screenshotDigest:h('2'),playwrightResultDigest:h('3')}]:[]};
- return bindExecutionArtifacts({contract,evidence:[evidence],producers:{[h('e')]:producer},now:'2026-09-07T00:00:10Z'});
-}
-test('exact trusted producer evidence closes every required command once',()=>assert.equal(evaluateFanIn(proofFixture()).status,'PASS'));
-test('missing and duplicate command proof cannot pass fan-in',()=>{
- const f=proofFixture();assert.equal(evaluateFanIn({...f,evidence:[]}).status,'BLOCKED');
- assert.throws(()=>evaluateFanIn({...f,evidence:[...f.evidence,...f.evidence]}),/duplicate/);
-});
-test('stale, skipped, retry, candidate, workflow and source substitutions fail closed',()=>{
- for(const mutate of [f=>f.evidence[0].tests[0].status='skipped',f=>f.evidence[0].attempt=2,f=>f.evidence[0].identity={...f.evidence[0].identity,headSha:sha('d')},f=>f.producers[h('e')]={...f.producers[h('e')],workflowPath:'.github/workflows/other.yml'},f=>f.producers[h('e')]={...f.producers[h('e')],sourceRef:'refs/heads/feature'},f=>f.producers[h('e')]={...f.producers[h('e')],headRepositoryId:2},f=>f.now='2026-09-08T00:00:10Z']) {
-  const f=proofFixture();mutate(f);assert.throws(()=>evaluateFanIn(f));
- }
-});
-test('machine success never discharges restricted visual review or reviewer authority',()=>{
- const f=proofFixture(true);assert.equal(evaluateFanIn(f).status,'BLOCKED');
- const review={reviewId:'trusted-review-7',groupId:'review.example',frameId:'viewport',stableTestId:'desktop-chromium::e2e/tests/desktop.spec.mjs::smoke',identity:f.contract.identity,contractDigest:f.contract.contractDigest,status:'approved',independent:true,reviewer:'independent-fixture-reviewer',screenshotDigest:h('2'),playwrightResultDigest:h('3')};
- assert.throws(()=>evaluateFanIn({...f,reviews:[review]}),/unauthenticated/);
- const complete={...f,reviews:[review],reviewAuthorizations:{[review.reviewId]:review}};
- assert.throws(()=>evaluateFanIn(complete),/unauthenticated/);
- complete.evidence[0].captures[0].screenshotDigest=h('4');assert.throws(()=>evaluateFanIn(complete),/artifact/);
-});
-
-import fs from 'node:fs';
-import {fileURLToPath} from 'node:url';
-import {resolveExecutionContract, evaluateCandidateEvidence} from '../../tools/verification/verification-execution-contract.mjs';
-const root=fileURLToPath(new URL('../../',import.meta.url));
-function executionInput(path='tests/semantic-search.mjs',event='pull_request_target') {
- const candidate={...snapshot(),changedFiles:[{path,status:'modified'}]};
- const protectedCatalog=JSON.parse(fs.readFileSync(`${root}/tools/verification/verification-catalog.json`));
- const protectedImpactManifest=JSON.parse(fs.readFileSync(`${root}/tools/verification/impact-manifest.json`));
- return {root,candidate,protectedCatalog,protectedImpactManifest,environmentDigest:'f'.repeat(64),
-  producerPolicy:{repositoryId:1337995824,workflowPath:'.github/workflows/product-verification.yml',jobName:'verify',event},
-  planInput:{repository:candidate.repository,headSha:candidate.headSha,integrationBaseSha:candidate.baseSha,mergeBaseSha:candidate.baseSha,changedFiles:candidate.changedFiles,
-   candidateVerificationCatalog:protectedCatalog,candidateImpactManifest:protectedImpactManifest}};
-}
 test('planner resolves exact deterministic commands and preserves changed-test coverage',()=>{
  const contract=resolveExecutionContract(executionInput());
  assert.deepEqual(contract.groups.map(g=>g.id),['deterministic.search']);
  assert(contract.commands.some(c=>c.expectedTestIds.includes('tests/semantic-search.mjs')));
  assert(contract.commands.every(c=>c.engine==='deterministic'&&c.argv[0]==='node'&&c.cwd==='.'&&c.dataCapability==='qualification_fixture'));
  assert.equal(new Set(contract.commands.flatMap(c=>c.expectedTestIds)).size,contract.commands.flatMap(c=>c.expectedTestIds).length);
- assert.equal(evaluateCandidateEvidence({executionInput:executionInput(),evidence:[],now:new Date().toISOString()}).status,'BLOCKED');
 });
+
 test('docs-only plan produces no command or runner and needs no publication',()=>{
  const input=executionInput('docs/ordinary.md');const contract=resolveExecutionContract(input);
  assert.deepEqual(contract.commands,[]);assert.deepEqual(contract.groups,[]);
- assert.equal(evaluateCandidateEvidence({executionInput:input,evidence:[],now:new Date().toISOString()}).status,'PASS');
 });
+
 test('unknown paths, candidate command widening and stale claimed plans fail closed',()=>{
  assert.throws(()=>resolveExecutionContract(executionInput('unknown/product.mjs')),/unresolved obligations/);
  const input=executionInput();input.planInput.candidateVerificationCatalog=structuredClone(input.protectedCatalog);
@@ -95,47 +51,7 @@ test('unknown paths, candidate command widening and stale claimed plans fail clo
  assert.throws(()=>resolveExecutionContract({...executionInput(),claimedPlan:{}}),/recomputed plan/);
  const changed=executionInput();changed.candidate.treeSha='bad';assert.throws(()=>resolveExecutionContract(changed),/readback identity/);
 });
-test('equivalent PR and MQ candidates resolve identical semantic commands',()=>{
- const pr=resolveExecutionContract(executionInput()),mq=resolveExecutionContract(executionInput('tests/semantic-search.mjs','merge_group'));
- assert.deepEqual(pr.commands,mq.commands);assert.deepEqual(pr.groups,mq.groups);
- assert.notEqual(pr.contractDigest,mq.contractDigest,'producer event must remain separately bound');
-});
 
-import {fixture as rawReviewFixture} from './fixtures/protected-review-fixture.mjs';
-import {authenticateExecutionReviews} from '../../tools/verification/verification-execution-contract.mjs';
-test('authenticated current review bundle closes visual fan-in; copies and revoked timeline do not',()=>{
- const input=rawReviewFixture();
- // All values are transport fixtures, never live review evidence.
- input.currentCandidate.repository='Oteryn/Oteryn-Atlas';
- const capture=JSON.parse(input.captureBytes),decision=JSON.parse(input.review.body);
- capture.candidate=input.currentCandidate;decision.candidate=input.currentCandidate;
- input.captureRun.repository.full_name=input.currentCandidate.repository;
- input.review.pull_request_url='https://api.github.com/repos/Oteryn/Oteryn-Atlas/pulls/7';
- input.captureBytes=Buffer.from(JSON.stringify(capture));
- decision.captureDigest='sha256:'+createHash('sha256').update(input.captureBytes).digest('hex');
- input.review.body=JSON.stringify({schemaVersion:1,kind:'protected-visual-review-bundle',candidate:input.currentCandidate,captures:[decision]});
- input.captures=[{authority:input.authority,captureBytes:input.captureBytes}];
- const f=proofFixture(true),frame=capture.frames[0];
- f.contract=sealExecutionContract({...f.contract,identity:{...f.contract.identity,treeSha:input.currentCandidate.treeSha,candidateDigest:'sha256:'+createHash('sha256').update(canonicalJson(input.currentCandidate)).digest('hex'),planDigest:capture.planDigest},reviews:[{groupId:'review.example',frames:[{frameId:frame.frameId,stableTestId:frame.scenarioId}],commandIds:[f.contract.commands[0].id]}]});
- f.evidence[0]={...f.evidence[0],identity:f.contract.identity,contractDigest:f.contract.contractDigest,captures:[{frameId:frame.frameId,stableTestId:frame.scenarioId,screenshotDigest:frame.digest,playwrightResultDigest:capture.summary.digest}]};
- const machine=bindExecutionArtifacts(f);
- const receipts=authenticateExecutionReviews({contract:f.contract,input,currentReviews:[input.review],candidateAuthorId:6});
- const reviews=Object.values(receipts).map(row=>structuredClone(row));
- assert.equal(evaluateFanIn({...machine,reviews,reviewAuthorizations:receipts}).status,'PASS');
- assert.throws(()=>evaluateFanIn({...machine,reviews,reviewAuthorizations:structuredClone(receipts)}),/unauthenticated/);
- assert.throws(()=>authenticateExecutionReviews({contract:f.contract,input,currentReviews:[input.review,{...input.review,id:45,state:'DISMISSED',submitted_at:'2026-09-06T10:11:00Z'}],candidateAuthorId:6}),/timeline/);
- assert.throws(()=>authenticateExecutionReviews({contract:f.contract,input,currentReviews:[input.review],candidateAuthorId:5}),/independent/);
-});
-import {createHash} from 'node:crypto';
-test('raw artifact digest and bytes are required independently of matching producer claims',()=>{
- const f=proofFixture();assert.throws(()=>evaluateFanIn({...f,artifacts:{}}),/execution report/);
- const altered={...f,artifacts:{...f.artifacts,[f.evidence[0].commandId]:Buffer.from('{}')}};
- assert.throws(()=>evaluateFanIn(altered),/execution report/);
-});
-
-import {canonicalJson} from '../../tools/verification/verification-plan-schema.mjs';
-
-import {createPublicationProofFixtures} from './helpers/publication-proof-fixture.mjs';
 test('HTTP Playwright proof resolves exact protected test census without browser or FullWorld',()=>{
  const input=executionInput('e2e/tests/creature-gameplay-source-contract-desktop.spec.mjs');
  input.protectedStableTestIds=JSON.parse(fs.readFileSync(`${root}/tools/verification/protected-scenario-inventory.json`)).stableTestIds;
@@ -150,6 +66,7 @@ test('HTTP Playwright proof resolves exact protected test census without browser
  const bad=structuredClone(input);bad.publicationProofs.bounded_real_world.source.revision='e'.repeat(40);
  assert.throws(()=>resolveExecutionContract(bad),/publication authentication/);
 });
+
 test('review frames remain additional obligations after exact browser command resolution',()=>{
  const input=executionInput('e2e/tests/creature-presentation-desktop.spec.mjs');
  input.protectedStableTestIds=JSON.parse(fs.readFileSync(`${root}/tools/verification/protected-scenario-inventory.json`)).stableTestIds;
@@ -169,4 +86,58 @@ test('review frame IDs cannot substitute for the complete protected machine test
  const command=contract.commands.find(row=>row.expectedTestIds.some(id=>id.includes('creature-gameplay-desktop.spec.mjs')));
  assert.equal(command.expectedTestIds.length,4);
  assert.equal(contract.reviews.find(row=>row.groupId==='review.creature-gameplay-desktop').frames.length,1);
+});
+
+test('actual changed candidate leaf executes without protected source repin', t => {
+ const input=executionInput('tests/example.mjs');
+ const directory=fs.mkdtempSync(path.join(os.tmpdir(),'atlas-candidate-bytes-'));
+ t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
+ fs.mkdirSync(path.join(directory,'tests'));
+ const baseline="import test from 'node:test'; test('baseline bytes',()=>{});\n";
+ fs.writeFileSync(path.join(directory,'tests/example.mjs'),baseline);
+ const oldSpecs=input.protectedCatalog.groups['deterministic.search'].specs;
+ input.protectedCatalog.groups['deterministic.search'].specs=['tests/example.mjs'];
+ input.protectedCatalog.executionPolicy.deterministic.entries=input.protectedCatalog.executionPolicy.deterministic.entries.filter(row=>!oldSpecs.includes(row.spec));
+ input.protectedCatalog.executionPolicy.deterministic.entries.push({spec:'tests/example.mjs',interpreter:'node',argv:['--test','tests/example.mjs'],sourceSha256:createHash('sha256').update(baseline).digest('hex'),imports:[],subprocessTests:[]});
+ input.root=directory;
+ const policyBefore=JSON.stringify(input.protectedCatalog);
+ const changed="import test from 'node:test'; test('CANDIDATE_BYTES_EXECUTED',()=>{});\n";
+ fs.writeFileSync(path.join(directory,'tests/example.mjs'),changed);
+ const contract=resolveExecutionContract(input);
+ assert.deepEqual(contract.groups.map(row=>row.id),['deterministic.search']);
+ assert.equal(contract.commands.length,1);
+ const command=contract.commands[0];
+ assert.deepEqual(command.argv,['node','--test','tests/example.mjs']);
+ const result=spawnSync(command.argv[0],command.argv.slice(1),{cwd:directory,encoding:'utf8',env:{...process.env,NODE_TEST_CONTEXT:undefined}});
+ assert.equal(result.status,0,result.stderr);
+ assert.match(result.stdout,/CANDIDATE_BYTES_EXECUTED/);
+ assert.equal(JSON.stringify(input.protectedCatalog),policyBefore);
+ fs.writeFileSync(path.join(directory,'tests/example.mjs'),"throw new Error('CANDIDATE_FAILURE_VISIBLE');\n");
+ const failedContract=resolveExecutionContract(input);
+ const failed=spawnSync(failedContract.commands[0].argv[0],failedContract.commands[0].argv.slice(1),{cwd:directory,encoding:'utf8',env:{...process.env,NODE_TEST_CONTEXT:undefined}});
+ assert.notEqual(failed.status,0);
+ assert.match(failed.stdout+failed.stderr,/CANDIDATE_FAILURE_VISIBLE/);
+});
+
+test('equivalent PR and MQ content resolves identical semantic obligations',()=>{
+ const pr=executionInput(),mq=executionInput();
+ mq.candidate.prNumber=null;
+ const left=resolveExecutionContract(pr),right=resolveExecutionContract(mq);
+ const semantic=contract=>({groups:contract.groups.map(g=>g.id),commands:contract.commands.map(({id,...row})=>row),reviews:contract.reviews});
+ assert.deepEqual(semantic(left),semantic(right));
+});
+test('candidate-only owner cannot become protected execution authority',()=>{
+ const input=executionInput('tests/new-candidate.mjs');
+ input.planInput.candidateVerificationCatalog=structuredClone(input.protectedCatalog);
+ input.planInput.candidateVerificationCatalog.groups['deterministic.search'].specs.push('tests/new-candidate.mjs');
+ assert.throws(()=>resolveExecutionContract(input),/unresolved obligations/);
+});
+test('candidate execution metadata cannot replace protected interpreter or hashes',()=>{
+ const input=executionInput();
+ input.planInput.candidateVerificationCatalog=structuredClone(input.protectedCatalog);
+ const row=input.planInput.candidateVerificationCatalog.executionPolicy.deterministic.entries.find(row=>row.spec==='tests/semantic-search.mjs');
+ row.interpreter='bash';row.argv=['-c','candidate-policy'];row.sourceSha256='0'.repeat(64);
+ const contract=resolveExecutionContract(input);
+ assert(contract.commands.every(row=>row.argv[0]==='node'));
+ assert(!JSON.stringify(contract).includes('candidate-policy'));
 });

@@ -248,10 +248,10 @@ export function validateImpactManifest(candidate, catalogCandidate) {
     if (domains.some((domain) => !GROUP_ID.test(domain))) invalid(kind, 'entry domains are invalid');
     const requiredGroups = uniqueStrings(entry.requiredGroups ?? [], kind, 'entry requiredGroups');
     if (requiredGroups.some((group) => !Object.hasOwn(catalog.groups, group))) invalid(kind, 'entry references unknown group');
-    if (entry.defaultRule && (entry.pathPrefix !== 'tests/'
-      || domains.some(domain => !['test-contract', 'test-default'].includes(domain))
+    if (entry.defaultRule && (!['tests/', 'e2e/'].includes(entry.pathPrefix)
+      || domains.some(domain => !(entry.pathPrefix === 'tests/' ? ['test-contract', 'test-default'] : ['verification-governance']).includes(domain))
       || requiredGroups.some(group => !['deterministic.core', 'e2e.full'].includes(group)))) {
-      invalid(kind, 'defaultRule is reserved for the tests/ ownership catchall');
+      invalid(kind, 'defaultRule is reserved for the tests/ and e2e/ ownership catchalls');
     }
     return { pathPrefix: entry.pathPrefix, domains, minimumProfile: entry.minimumProfile, requiredGroups,
       ...(entry.defaultRule === true ? { defaultRule: true } : {}),

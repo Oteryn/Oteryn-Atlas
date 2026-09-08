@@ -161,3 +161,25 @@ test('subprocess cycles and duplicate execution edges cannot claim once-only cov
   parent.subprocessTests.push({ ...parent.subprocessTests[0] });
   assert.throws(() => resolveDeterministicCommands(value), /duplicate execution edge/);
 });
+
+test('authenticated changed leaf bytes preserve protected parent coverage once', t => {
+ const value=subprocessFixture(t);
+ fs.appendFileSync(path.join(value.root,'tests/leaf.mjs'),'// candidate leaf bytes\n');
+ fs.appendFileSync(path.join(value.root,'tests/b.py'),'# candidate Python bytes\n');
+ assert.throws(()=>resolveDeterministicCommands(value),/source proof changed/);
+ const commands=resolveDeterministicCommands({...value,changedSpecs:['tests/leaf.mjs','tests/b.py']});
+ assert.equal(commands.length,1);
+ assert.deepEqual(commands[0].coveredSpecs,['tests/a.mjs','tests/b.py','tests/leaf.mjs']);
+ fs.appendFileSync(path.join(value.root,'tests/a.mjs'),'// candidate parent bytes\n');
+ assert.throws(()=>resolveDeterministicCommands({...value,changedSpecs:['tests/a.mjs','tests/leaf.mjs','tests/b.py']}),/source proof changed/);
+});
+test('candidate changes cannot attest new test edges or replace protected command shape', t => {
+ const value=fixture(t);
+ fs.writeFileSync(path.join(value.root,'tests/leaf.mjs'),"import './b.py';\n");
+ // The bytes can be tested, but cannot claim another test's coverage or command.
+ const commands=resolveDeterministicCommands({...value,groupIds:['deterministic.node'],changedSpecs:['tests/leaf.mjs']});
+ assert.deepEqual(commands[0].coveredSpecs,['tests/a.mjs','tests/leaf.mjs']);
+ assert.deepEqual(commands[0].argv,['--test','tests/a.mjs']);
+ const malformed=structuredClone(value.ownership);delete malformed.entries[1].sourceSha256;
+ assert.throws(()=>resolveDeterministicCommands({...value,ownership:malformed,changedSpecs:['tests/leaf.mjs']}),/missing source proof/);
+});

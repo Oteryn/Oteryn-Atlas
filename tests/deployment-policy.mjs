@@ -6,24 +6,22 @@ import test from 'node:test';
 import { planDeployment, runDeploymentTransaction } from '../tools/verification/deployment-execution-contract.mjs';
 const revision = 'a'.repeat(40), previousRevision = 'b'.repeat(40);
 const digest = `sha256:${'c'.repeat(64)}`;
-const source = () => ({ ref: 'refs/heads/main', triggeringRevision: revision, checkedOutRevision: revision, mergedMainRevision: revision, clean: true, previousRevision, previousMergedMainRevision: previousRevision, runId: '123', runAttempt: '1', pythonImage: `python@${digest}`, pythonNetwork: 'none', browserNetwork: 'bridge', previewUrl: 'http://127.0.0.1:8097', products: { animation: digest, creatures: digest, gameplay: digest } });
+const source = () => ({ ref: 'refs/heads/main', triggeringRevision: revision, checkedOutRevision: revision, mergedMainRevision: revision, clean: true, previousRevision, previousMergedMainRevision: previousRevision, pythonNetwork: 'none', browserNetwork: 'bridge', previewUrl: 'http://127.0.0.1:8097', products: { animation: digest, creatures: digest, gameplay: digest } });
 const observation = plan => ({ labelRevision: plan.revision, headerRevision: plan.revision, products: plan.products });
 
-test('deployment plans require exact clean merged main and isolated pinned execution', () => {
+test('deployment plans require exact clean merged main and isolated execution', () => {
   const plan = planDeployment(source());
   assert.equal(plan.revision, revision);
-  assert.equal(plan.stagedName, `.staged-${revision}-123-1`);
-  for (const patch of [{ ref: 'refs/heads/task' }, { clean: false }, { checkedOutRevision: previousRevision }, { mergedMainRevision: previousRevision }, { pythonImage: 'python:latest' }, { pythonNetwork: 'host' }, { browserNetwork: 'host' }, { previewUrl: 'file:///etc/passwd' }, { runId: '../live' }, { previousRevision: '' }, { previousMergedMainRevision: revision }, { products: { gameplay: digest } }]) {
+  for (const patch of [{ ref: 'refs/heads/task' }, { clean: false }, { checkedOutRevision: previousRevision }, { mergedMainRevision: previousRevision }, { pythonNetwork: 'host' }, { browserNetwork: 'host' }, { previewUrl: 'file:///etc/passwd' }, { previousRevision: '' }, { previousMergedMainRevision: revision }, { products: { gameplay: digest } }]) {
     assert.throws(() => planDeployment({ ...source(), ...patch }), /deployment/);
   }
-  assert.notEqual(planDeployment({ ...source(), runAttempt: '2' }).stagedName, plan.stagedName);
 });
 
 function transaction(t, failAt = null, sameRevision = false) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-deploy-contract-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const plan = planDeployment({ ...source(), previousRevision: sameRevision ? revision : previousRevision, previousMergedMainRevision: sameRevision ? revision : previousRevision });
-  const live = path.join(root, 'live'), backup = path.join(root, 'previous'), staged = path.join(root, plan.stagedName);
+  const live = path.join(root, 'live'), backup = path.join(root, 'previous'), staged = path.join(root, 'candidate');
   fs.mkdirSync(live); fs.writeFileSync(path.join(live, 'revision'), plan.previousRevision); fs.writeFileSync(path.join(live, 'creatures'), 'existing catalog');
   const calls = [];
   const adapter = {
@@ -34,18 +32,16 @@ function transaction(t, failAt = null, sameRevision = false) {
     async acceptLive() { calls.push('accept'); if (failAt === 'accept') throw Error('acceptance failed'); return observation(plan); },
     async restorePrevious() { calls.push('restore'); if (fs.existsSync(backup)) { if (fs.existsSync(live)) fs.rmSync(live, { recursive: true }); fs.renameSync(backup, live); } },
     async inspectPrevious() { calls.push('inspect'); const actual = fs.readFileSync(path.join(live, 'revision'), 'utf8'); return { labelRevision: actual, headerRevision: failAt === 'rollback' ? revision : actual }; },
-    async finalize() { calls.push('finalize'); fs.rmSync(backup, { recursive: true }); },
-    async cleanupStage() { calls.push('cleanup'); if (fs.existsSync(staged)) fs.rmSync(staged, { recursive: true }); },
   };
   return { plan, adapter, calls, live, backup };
 }
 
-test('candidate products qualify before previous revision is retained and live acceptance precedes finalization', async t => {
+test('candidate products qualify before previous revision is retained and prior revision remains retained after live acceptance', async t => {
   const f = transaction(t);
   await runDeploymentTransaction(f.plan, f.adapter);
-  assert.deepEqual(f.calls, ['stage', 'qualify', 'retain', 'start', 'accept', 'finalize', 'cleanup']);
+  assert.deepEqual(f.calls, ['stage', 'qualify', 'retain', 'start', 'accept']);
   assert.equal(fs.readFileSync(path.join(f.live, 'revision'), 'utf8'), revision);
-  assert.equal(fs.existsSync(f.backup), false);
+  assert.equal(fs.existsSync(f.backup), true);
 });
 
 test('qualification failure leaves live untouched; start and acceptance failures restore exact previous revision and catalog', async t => {
@@ -54,9 +50,7 @@ test('qualification failure leaves live untouched; start and acceptance failures
     await assert.rejects(runDeploymentTransaction(f.plan, f.adapter), /failed/);
     assert.equal(fs.readFileSync(path.join(f.live, 'revision'), 'utf8'), previousRevision);
     assert.equal(fs.readFileSync(path.join(f.live, 'creatures'), 'utf8'), 'existing catalog');
-    assert.equal(f.calls.includes('finalize'), false);
     assert.equal(f.calls.includes('restore'), failure !== 'qualify');
-    assert.equal(f.calls.at(-1), 'cleanup');
   }
 });
 
@@ -93,6 +87,5 @@ test('retain failures before and after rename preserve the exact original live c
     assert.ok(f.calls.includes('restore'));
     assert.ok(f.calls.includes('inspect'));
     assert.equal(f.calls.includes('start'), false);
-    assert.equal(f.calls.includes('finalize'), false);
   }
 });

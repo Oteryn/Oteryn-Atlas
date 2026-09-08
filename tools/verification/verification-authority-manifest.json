@@ -71,10 +71,6 @@
       "path": "tools/verification/deterministic-test-ownership.json"
     },
     {
-      "id": "tools-verification-execution-producer-mjs",
-      "path": "tools/verification/execution-producer.mjs"
-    },
-    {
       "id": "tools-verification-impact-manifest-json",
       "path": "tools/verification/impact-manifest.json"
     },

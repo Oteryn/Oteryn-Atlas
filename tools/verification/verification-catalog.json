@@ -33,7 +33,6 @@
         "tests/verification/evidence-manifest.test.mjs",
         "tests/verification/evidence-reuse.test.mjs",
         "tests/verification/execution-placement-policy-v2.test.mjs",
-        "tests/verification/execution-producer.test.mjs",
         "tests/verification/farm-explorer-contract.test.mjs",
         "tests/verification/fault-network.test.mjs",
         "tests/verification/framebuffer-probe.test.mjs",
@@ -1982,7 +1981,7 @@
     },
     "deterministic": {
       "mode": "Preparation only; ownership is not executable qualification or activation.",
-      "importProof": "Reviewed static ESM and unconditional awaited imports plus exact unconditional subprocess tests are bound to parent sourceSha256. Child interpreter, argv and bytes are independently validated. Review must establish failure propagation; source changes invalidate proof.",
+      "importProof": "Protected source hashes attest reviewed test-to-test imports and unconditional subprocess edges. An authenticated modified leaf may execute candidate bytes without protected repin; it receives no candidate-derived transitive coverage. Parent source changes invalidate edge/deduplication proof. Unchanged files retain hash verification.",
       "excludedBrowserHarnesses": [
         "tests/browser-proof.html",
         "tests/browser-proof.mjs",
@@ -2213,7 +2212,7 @@
             "--test",
             "tests/deployment-policy.mjs"
           ],
-          "sourceSha256": "be6421da9eaa1378f685354d2e93f6c2dd068d076f4648c098049cc4ca05fa27",
+          "sourceSha256": "def7a449a993e0d5a30cf6abdf427dd82a4486b66ffbb773fdaf3609c09ea02e",
           "imports": [],
           "subprocessTests": [],
           "qualification": "local-contract"
@@ -2634,7 +2633,7 @@
             "--test",
             "tests/synology-live-workflow.mjs"
           ],
-          "sourceSha256": "a1ff6f816b11137596da5f03a950e2c85cd2a4a1f86a6f4e9f27cfcf92caf0da",
+          "sourceSha256": "4b3f0ec9f1d96bb5ee974b6bb1d0120780de94abbe7b6806cb09399d8b9a9744",
           "imports": [],
           "subprocessTests": [],
           "qualification": "local-contract"
@@ -2802,7 +2801,7 @@
           "imports": [],
           "subprocessTests": [],
           "qualification": "local-contract",
-          "sourceSha256": "bb3f5655e5ce6c3947421f8643e6c2c9c44957bad2fc45a052045c53cc007b23",
+          "sourceSha256": "c217c1e1a3fbbbd0405ed9aa7e4eccbb552469a41958a02d209cf7ea8af6c6b9",
           "contract": {
             "status": "active-semantic",
             "retainedInvariant": "Separate exact-candidate evidence, docs-only classification and bounded execution invariants from removed CI/nightly/local-publisher wiring.",
@@ -2997,7 +2996,7 @@
           "imports": [],
           "subprocessTests": [],
           "qualification": "local-contract",
-          "sourceSha256": "52f0863edd476b0f4771e51db47ed09f4241d3abfe4ee7aaf98f4704db0f592c",
+          "sourceSha256": "3461eeabed6b82b63cd9d36bb64412aa63f6d0d0a9a33f917cedb9a91278c4a9",
           "contract": {
             "status": "active-semantic",
             "retainedInvariant": "Exact Node/Python commands preserve declared test/import coverage and fail closed for missing ownership, files, invalid paths, stale import proof and opaque subprocess overlap.",
@@ -3319,7 +3318,7 @@
           "imports": [],
           "subprocessTests": [],
           "qualification": "local-contract",
-          "sourceSha256": "9323420db5a6bc34328e12e2973560488b7a660db88a9fcc72005df7249c9e65",
+          "sourceSha256": "faa854e9e5a244106ae53ffb536ede3533a90ede49c8bb452cc252aee1ec9403",
           "contract": {
             "status": "active-semantic",
             "retainedInvariant": "Fail-closed routing and exact execution/review ownership for current restoration contracts.",
@@ -3387,7 +3386,7 @@
           "imports": [],
           "subprocessTests": [],
           "qualification": "local-contract",
-          "sourceSha256": "97d0334f9be6c097d3e55724c2f74b3a3ce46ccf01829ad6ab704d8e6c81a911",
+          "sourceSha256": "cbc899ca4a120d203e436b701276264551beb76248bca0f8be674646af9dd5ac",
           "contract": {
             "status": "active-semantic",
             "retainedInvariant": "Re-establish a bounded producer/consumer wait budget and exact fail-closed polling against future admitted execution, without restoring the old hosted gate.",
@@ -3523,7 +3522,7 @@
           "imports": [],
           "subprocessTests": [],
           "qualification": "local-contract",
-          "sourceSha256": "63d2f6bd7952e30de2a1cc69a8105ff3a426ef1a6fca9a3851744791a04cb022",
+          "sourceSha256": "dc361f4fa8fdd613cf326b76a7ed0fb05a40018abdc0ac7aaa100363daf39764",
           "contract": {
             "status": "active-semantic",
             "retainedInvariant": "Retain bounded runner, concurrency isolation and stale-live-revision rejection requirements; future admitted depth needs its own executable contract.",
@@ -3642,7 +3641,7 @@
           "imports": [],
           "subprocessTests": [],
           "qualification": "local-contract",
-          "sourceSha256": "99efd547caa1af3c273903eb5895e9170e2506d064b1c6acd21c8e2df58561f4",
+          "sourceSha256": "fdbcb13d7ea78d3dbdbc0862312d9c6c84cac4fb805303c2216024fbfc562262",
           "contract": {
             "status": "active-semantic",
             "retainedInvariant": "Preserve review freshness and exact protected evidence consumption; current event authority must be reviewed before replacement fan-in wiring.",
@@ -3693,7 +3692,7 @@
           "imports": [],
           "subprocessTests": [],
           "qualification": "local-contract",
-          "sourceSha256": "5ed7d7d725e0367ffd0e8661a7725b79b978813f8e821ca41e7c839ebda82c5c",
+          "sourceSha256": "46921e00e6609080fd5943efe7d64eedf8be1345d7e8ca021f2d8cb0317a9b75",
           "contract": {
             "status": "active-semantic",
             "retainedInvariant": "Preserve live-head association and protected-source dispatch behavior; separate legacy duplicate-producer topology assertion.",
@@ -3727,7 +3726,7 @@
           "imports": [],
           "subprocessTests": [],
           "qualification": "local-contract",
-          "sourceSha256": "126cf5111b30025b72b655463ae78199bd4278a0c72b6b24b2993ac83225d3e5",
+          "sourceSha256": "02258561453119bbcb60270e71b2ee36969123ad7fc92b54a49f305c9c1f4f6d",
           "contract": {
             "status": "active-semantic",
             "retainedInvariant": "Preserve shared PR/MQ exact evidence semantics against current admitted interfaces; remove dependencies on absent producer and PR workflows only after replacement proof.",
@@ -3880,7 +3879,7 @@
           "imports": [],
           "subprocessTests": [],
           "qualification": "local-contract",
-          "sourceSha256": "ac7046bd94ff73266193a6b8c4ee9fc6e8aaa63b3bb8a20804bab0f2e018486c",
+          "sourceSha256": "ab8d3406b18776e31716c58f3acf110e7e69131ef63887b80c0022e56d889ba2",
           "contract": {
             "status": "active-semantic",
             "retainedInvariant": "Retain exact producer/base-state identity, protected-source isolation and candidate-scoped concurrency; rewrite handoff proof against future admitted lifecycle.",
@@ -4152,7 +4151,7 @@
           "imports": [],
           "subprocessTests": [],
           "qualification": "local-contract",
-          "sourceSha256": "a5a9dd76e97c26ea5378d7b8c40ebe4221ccf8e471a39945b8fa5e2457728cb1",
+          "sourceSha256": "8b8cfc9b4d5b3f944c79c06f3a20e6bfe2e396f9583e9c732c0e08cff86e5dfd",
           "contract": {
             "status": "active-semantic",
             "retainedInvariant": "Exact evidence fan-in and bounded proof without unrelated heavy browser execution.",
@@ -4696,7 +4695,7 @@
           "imports": [],
           "subprocessTests": [],
           "qualification": "local-contract",
-          "sourceSha256": "d5f8e3968504ee774254795c6347aebb1c8c6c0e7e333a033f3cf9c569dcc503",
+          "sourceSha256": "bf88276d0db886384cbc8143f941224a43f3f360a568b14bafd2406176775b88",
           "contract": {
             "status": "active-semantic",
             "retainedInvariant": "qualification gameplay manifest has explicit non-Game authority and validates fail-closed; qualification gameplay service loads synthetic NPC and large-shop profiles through normal manifest/shard path; gameplay impact routing executes both functional fixture and bounded source-contract coverage",
@@ -4900,7 +4899,7 @@
           "imports": [],
           "subprocessTests": [],
           "qualification": "local-contract",
-          "sourceSha256": "f0b753008c8d6c97f53bdedb3d11561a71191c4abf480ec9db90493cf49376c2",
+          "sourceSha256": "e0ac397240dbda8f36a114355cfd7de51b0e27ef03ba1285851cfc6e9e800e4e",
           "contract": {
             "status": "active-semantic",
             "retainedInvariant": "Extract live-PR-metadata classification behavior from removed CI text; preserve complete changed-file evidence and review freshness.",
@@ -5169,7 +5168,7 @@
             "--test",
             "tests/verification/verification-execution-contract.test.mjs"
           ],
-          "sourceSha256": "a5aae9f518f48114757395d285865686c5d9d1515f95e2f5cfdb62616d8ff8a0",
+          "sourceSha256": "6ed53d4f712649899251221660e84ccb6e4438d2acc013fb0df8a2d55727d8f9",
           "imports": [],
           "subprocessTests": [],
           "qualification": "local-contract",
@@ -5187,23 +5186,6 @@
             "tests/verification/semantic-routing-closure.test.mjs"
           ],
           "sourceSha256": "f65eb283443330e0075b5cb47f0093fa5c05ef59a1c9f46de1227dd27d4a7de7",
-          "imports": [],
-          "subprocessTests": [],
-          "qualification": "active-semantic",
-          "contract": {
-            "status": "active-semantic",
-            "retainedInvariant": "Current inactive verification execution, routing and trust contract.",
-            "requiredRewrite": null
-          }
-        },
-        {
-          "spec": "tests/verification/execution-producer.test.mjs",
-          "interpreter": "node",
-          "argv": [
-            "--test",
-            "tests/verification/execution-producer.test.mjs"
-          ],
-          "sourceSha256": "b5bd81c0c05020f0eb703ed06e2879fea211869985bcf70d941a072c62f05548",
           "imports": [],
           "subprocessTests": [],
           "qualification": "active-semantic",

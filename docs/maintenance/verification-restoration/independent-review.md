@@ -1,3 +1,17 @@
+# Correction review scope — PR #391 directive
+
+The previous implementation verdict below is historical and does not qualify the
+corrected candidate. Sol High design reviews approved the changed-leaf trust split
+and removal of unconsumed R4 transport. A separate Sol High reviewer must review the
+exact final #390 head; its verdict is recorded on that PR and in the programme
+closeout, before regenerating or requesting admission of #389.
+
+Current evidence and limits: [correction ledger](correction-ledger.md) and
+[execution readiness](execution-readiness.md). No protected admission, R4, browser
+acceptance or FullWorld qualification follows from local tests.
+
+---
+
 ## Continuation review — 2026-09-08
 
 Independent Sol High reviewed implementation commit `34c26d0660d552ce6b9d12b11937e105f3949d94`, tree `e33fba0b4023e354d1b7e4237c9e75d04bc2f881`.

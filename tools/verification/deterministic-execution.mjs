@@ -4,9 +4,11 @@ import crypto from 'node:crypto';
 
 // The caller must supply protected ownership/catalog policy. This module resolves
 // commands, never executes them or treats candidate metadata as admission authority.
-export function resolveDeterministicCommands({ root, catalog, groupIds, ownership, requiredSpecs = [] }) {
+export function resolveDeterministicCommands({ root, catalog, groupIds, ownership, requiredSpecs = [], changedSpecs = [] }) {
   if (!Array.isArray(groupIds) || groupIds.length === 0) throw new Error('empty selection');
   if (ownership?.schemaVersion !== 1 || !Array.isArray(ownership.entries) || (ownership.importAggregators !== undefined && !Array.isArray(ownership.importAggregators))) throw new Error('unsupported ownership schema');
+  if (!Array.isArray(changedSpecs) || changedSpecs.some(spec => typeof spec !== 'string')) throw new Error('changed test census required');
+  const changed = new Set(changedSpecs);
   const realRoot = fs.realpathSync(root);
   function checkedFile(spec) {
     if (typeof spec !== 'string' || !/^tests\/[A-Za-z0-9_./-]+\.(mjs|py)$/.test(spec) || spec.split('/').some(part => !part || part === '.' || part === '..')) throw new Error(`exact safe test path required: ${spec}`);
@@ -42,8 +44,15 @@ export function resolveDeterministicCommands({ root, catalog, groupIds, ownershi
     if ((row.qualification === 'blocked' || row.qualification?.startsWith('blocked-'))) throw new Error(`known qualification blocker: ${spec}: ${row.qualification}`);
     const expected = spec.endsWith('.py') ? { interpreter: 'python3', argv: [spec] } : { interpreter: 'node', argv: ['--test', spec] };
     if (row.interpreter !== expected.interpreter || JSON.stringify(row.argv) !== JSON.stringify(expected.argv)) throw new Error(`unsupported interpreter or argv: ${spec}`);
-    if (typeof row.sourceSha256 !== 'string' || crypto.createHash('sha256').update(bytes).digest('hex') !== row.sourceSha256) throw new Error(`source proof changed: ${spec}`);
     if (!Array.isArray(row.imports) || !Array.isArray(row.subprocessTests)) throw new Error(`missing import proof: ${spec}`);
+    if (!/^[a-f0-9]{64}$/.test(row.sourceSha256 ?? '')) throw new Error(`missing source proof: ${spec}`);
+    const sourceMatches = crypto.createHash('sha256').update(bytes).digest('hex') === row.sourceSha256;
+    // The authenticated diff permits candidate leaf bytes to be test subjects.
+    // Only unchanged protected parent bytes may attest test-to-test execution
+    // edges and deduplication. Candidate bytes never add coverage authority.
+    if (!sourceMatches && (!changed.has(spec) || row.imports.length || row.subprocessTests.length)) {
+      throw new Error(`source proof changed: ${spec}`);
+    }
     visiting.add(spec);
     const covered = new Set([spec]);
     const direct = new Set();

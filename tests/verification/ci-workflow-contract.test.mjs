@@ -7,7 +7,6 @@ const catalog=read('verification-catalog.json'),impact=read('impact-manifest.jso
 const input=()=>({repository:'Oteryn/Oteryn-Atlas',headSha:'a'.repeat(40),integrationBaseSha:'b'.repeat(40),mergeBaseSha:'c'.repeat(40),changedFiles:[{path:'tests/verification/example.test.mjs'}],trustedImpactManifest:impact,candidateImpactManifest:impact,trustedVerificationCatalog:catalog,candidateVerificationCatalog:catalog});
 
 import {spawnSync} from 'node:child_process';
-import {classifyProductEvent} from '../../tools/verification/verification-execution-contract.mjs';
 const classify=paths=>{
  const result=spawnSync(process.execPath,[new URL('../../tools/verification/classify-pr-changes.mjs',import.meta.url).pathname],{input:paths.join('\n')+'\n',encoding:'utf8'});
  assert.equal(result.status,0,result.stderr);return result.stdout;
@@ -23,9 +22,4 @@ test('unknown executable impact retains the complete protected safety-net floor 
  assert.deepEqual(plan.requiredGroupIds,Object.entries(catalog.groups).filter(([,g])=>g.executionRole!=='aggregate'&&(g.fullSafetyNet||g.executionRole==='canonical-review')).map(([id])=>id).sort());
  assert.equal(plan.headSha,'a'.repeat(40));assert.equal(plan.integrationBaseSha,'b'.repeat(40));
  assert.equal(plan.retryPolicy.retries,0);
-});
-test('ordinary product events are explicit and review metadata never reruns the product',()=>{
- for(const action of ['opened','synchronize','reopened','ready_for_review'])assert.equal(classifyProductEvent({eventName:'pull_request',action}),'product');
- for(const action of ['submitted','edited','dismissed'])assert.equal(classifyProductEvent({eventName:'pull_request_review',action}),'authority-only');
- assert.equal(classifyProductEvent({eventName:'merge_group',action:'checks_requested'}),'product');
 });

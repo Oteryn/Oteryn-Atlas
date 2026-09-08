@@ -3,10 +3,6 @@ import {createHash} from 'node:crypto';
 import test from 'node:test';
 import {fixture} from './fixtures/protected-review-fixture.mjs';
 import {validateProtectedVisualCapture,validateProtectedReviewEvidence,selectLatestProtectedReview} from '../../tools/verification/protected-review-evidence.mjs';
-import {classifyProductEvent} from '../../tools/verification/verification-execution-contract.mjs';
-test('review submission edits and dismissal evaluate authority without rerunning product execution',()=>{
- for(const action of ['submitted','edited','dismissed'])assert.equal(classifyProductEvent({eventName:'pull_request_review',action}),'authority-only');
-});
 test('review fan-in retains complete passing machine evidence as an independent prerequisite',()=>{
  const valid=fixture();assert.equal(validateProtectedVisualCapture(valid).accepted,true);assert.equal(validateProtectedReviewEvidence(valid).accepted,true);
  for(const status of ['failed','cancelled','skipped']){
