@@ -57,7 +57,7 @@ def validate_source(source: dict[str, Any]) -> list[dict[str, Any]]:
     if not isinstance(aliases, dict) or len(aliases) > 64:
         raise ValueError("invalid input floor aliases")
     for key, value in aliases.items():
-        if not re.fullmatch(r"-?\d+", str(key)) or type(value) is not int:
+        if not re.fullmatch(r"-?\d+", str(key)) or str(int(key)) != key or type(value) is not int:
             raise ValueError("invalid input floor alias")
     records = source.get("records")
     if not isinstance(records, list) or len(records) > MAX_RECORDS:
