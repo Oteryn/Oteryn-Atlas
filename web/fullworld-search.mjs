@@ -87,7 +87,7 @@ function kindLabel(kind) {
 }
 
 function resultIdentity(record) {
-  return record.id ?? `${record.kind}:${record.label.toLowerCase()}:${record.position.floor}:${record.position.x}:${record.position.y}`;
+  return record.record_id ?? record.id ?? `${record.kind}:${record.label.toLowerCase()}:${record.position.floor}:${record.position.x}:${record.position.y}`;
 }
 
 function queryAll(raw) {
