@@ -10,6 +10,8 @@ const RETAINED_WORKFLOWS=new Set([
   '.github/workflows/terminal-branch-lifecycle.yml',
 ]);
 const TEMPLATE='tools/maintenance/minimal-merge-group-gate.yml';
+const SHADOW_WORKFLOW='.github/workflows/verification-shadow.yml';
+const SHADOW_TEMPLATE='tools/maintenance/verification-shadow.yml';
 const ARCHIVE_ROOT='docs/maintenance/suspended-workflows/';
 const REMEDIATION_ALLOWLIST='docs/maintenance/ATLAS_REMEDIATION_ALLOWLIST.json';
 const OBSOLETE_VERIFICATION_CONTRACTS='docs/maintenance/OBSOLETE_VERIFICATION_CONTRACTS.json';
@@ -99,7 +101,7 @@ function loadVerificationRestorationAuthority(base){
   if(mode(trustedRoot,base,VERIFICATION_RESTORATION_ALLOWLIST)===null)return [];
   const raw=protectedJson(base,VERIFICATION_RESTORATION_ALLOWLIST);
   exactKeys(raw,['schemaVersion','programme','phase','rules'],'restoration allowlist');
-  if(raw.schemaVersion!==1||raw.programme!=='atlas-verification-restoration'||raw.phase!=='r1-r3'||!Array.isArray(raw.rules)||!raw.rules.length||raw.rules.length>97)fail('restoration allowlist identity is invalid');
+  if(raw.schemaVersion!==1||raw.programme!=='atlas-verification-restoration'||!['r1-r3','r1-r4'].includes(raw.phase)||!Array.isArray(raw.rules)||!raw.rules.length||raw.rules.length>104)fail('restoration allowlist identity is invalid');
   const paths=new Set(),rules=[];
   for(const rule of raw.rules){
     exactKeys(rule,['operations','path'],'restoration rule');
@@ -246,6 +248,25 @@ function verifyCutover(changes,base,head){
   return {mode:'workflow-suspension-cutover',suspendedWorkflows:suspendable.map(name=>path.posix.basename(name)).sort()};
 }
 
+// One dormant, protected template may be copied into one new active workflow.
+// This does not permit the candidate to modify its admission or source template.
+function verifyShadowActivation(changes,base,head){
+  const workflowChanges=changes.filter(change=>[change.path,change.oldPath].filter(Boolean).some(name=>name.startsWith('.github/workflows/')||name.startsWith(ARCHIVE_ROOT)));
+  if(workflowChanges.length!==1||workflowChanges[0].path!==SHADOW_WORKFLOW||workflowChanges[0].status!=='A'||workflowChanges[0].oldPath)fail('shadow activation requires exactly one added workflow');
+  if(!sameList(treePaths(candidateRoot,base,'.github/workflows').filter(name=>/\.ya?ml$/.test(name)),RETAINED_WORKFLOWS)
+    ||!sameList(treePaths(candidateRoot,head,'.github/workflows').filter(name=>/\.ya?ml$/.test(name)),[...RETAINED_WORKFLOWS,SHADOW_WORKFLOW]))fail('shadow workflow inventory mismatch');
+  for(const retained of RETAINED_WORKFLOWS){
+    if(mode(candidateRoot,head,retained)!=='100644'||!blob(trustedRoot,base,retained).equals(blob(candidateRoot,head,retained)))fail('shadow changed retained workflow');
+  }
+  if(mode(trustedRoot,base,SHADOW_TEMPLATE)!=='100644'||mode(candidateRoot,head,SHADOW_TEMPLATE)!=='100644'
+    ||!blob(trustedRoot,base,SHADOW_TEMPLATE).equals(blob(candidateRoot,head,SHADOW_TEMPLATE)))fail('shadow template is absent or changed');
+  verifyRegularText(candidateRoot,head,SHADOW_WORKFLOW);
+  if(!blob(trustedRoot,base,SHADOW_TEMPLATE).equals(blob(candidateRoot,head,SHADOW_WORKFLOW)))fail('shadow workflow differs from protected template');
+  const remaining=changes.filter(change=>change.path!==SHADOW_WORKFLOW);
+  if(remaining.length)verifyNormal(remaining,base,head);
+  return {mode:'verification-shadow-activation',changedPaths:changes.map(change=>change.path).sort()};
+}
+
 function verifyIdentity(){
   if(!trustedRoot||!candidateRoot)fail('trusted and candidate roots are required');
   const env=process.env;
@@ -275,7 +296,8 @@ try{
   const {base,head}=verifyIdentity();
   const changes=parseChanges(candidateRoot,base,head);
   const workflowChange=changes.some(change=>change.path.startsWith('.github/workflows/')||change.path.startsWith(ARCHIVE_ROOT)||change.oldPath?.startsWith('.github/workflows/'));
-  const result=workflowChange?verifyCutover(changes,base,head):verifyNormal(changes,base,head);
+  const shadowChange=changes.some(change=>change.path===SHADOW_WORKFLOW||change.oldPath===SHADOW_WORKFLOW);
+  const result=shadowChange&&mode(trustedRoot,base,SHADOW_TEMPLATE)!==null?verifyShadowActivation(changes,base,head):workflowChange?verifyCutover(changes,base,head):verifyNormal(changes,base,head);
   process.stdout.write(`${JSON.stringify({schemaVersion:1,result:'PASS',baseSha:base,headSha:head,...result})}\n`);
 }catch(error){
   process.stderr.write(`atlas maintenance gate: ${error?.message??error}\n`);

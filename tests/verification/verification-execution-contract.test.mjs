@@ -129,12 +129,15 @@ test('equivalent PR and MQ content resolves identical semantic obligations',()=>
 });
 test('added candidate test executes as an unprivileged subject while candidate-only owner metadata stays inert',t=>{
  const spec=`tests/pre-r4-add-${process.pid}-${Date.now()}.mjs`;
- const target=path.join(root,spec);
- t.after(()=>fs.rmSync(target,{force:true}));
+ const subjectRoot=fs.mkdtempSync(path.join(os.tmpdir(),'atlas-add-subject-'));
+ fs.cpSync(path.join(root,'tests'),path.join(subjectRoot,'tests'),{recursive:true});
+ const target=path.join(subjectRoot,spec);
+ t.after(()=>fs.rmSync(subjectRoot,{recursive:true,force:true}));
  fs.writeFileSync(target,"import test from 'node:test'; test('ADD_CANDIDATE_EXECUTED',()=>{});\n");
  const input=executionInput(spec);
  // Repository bytes are the known protected fixture; only the new subject differs.
  input.protectedRoot=root;
+ input.root=subjectRoot;
  input.candidate.changedFiles=[{path:spec,status:'added'}];
  input.planInput.changedFiles=input.candidate.changedFiles;
  input.planInput.candidateVerificationCatalog=structuredClone(input.protectedCatalog);
@@ -145,12 +148,12 @@ test('added candidate test executes as an unprivileged subject while candidate-o
  assert.deepEqual(command.argv,['node','--test',spec]);
  assert.deepEqual(command.groupIds,['deterministic.core']);
  assert.deepEqual(command.expectedTestIds,[spec]);
- let result=spawnSync(command.argv[0],command.argv.slice(1),{cwd:root,encoding:'utf8',env:{...process.env,NODE_TEST_CONTEXT:undefined}});
+ let result=spawnSync(command.argv[0],command.argv.slice(1),{cwd:subjectRoot,encoding:'utf8',env:{...process.env,NODE_TEST_CONTEXT:undefined}});
  assert.equal(result.status,0,result.stderr);assert.match(result.stdout,/ADD_CANDIDATE_EXECUTED/);
  fs.writeFileSync(target,"throw new Error('ADD_CANDIDATE_FAILURE_VISIBLE');\n");
  const failed=resolveExecutionContract(input);
  const failedCommand=failed.commands.find(row=>row.expectedTestIds.includes(spec));
- result=spawnSync(failedCommand.argv[0],failedCommand.argv.slice(1),{cwd:root,encoding:'utf8',env:{...process.env,NODE_TEST_CONTEXT:undefined}});
+ result=spawnSync(failedCommand.argv[0],failedCommand.argv.slice(1),{cwd:subjectRoot,encoding:'utf8',env:{...process.env,NODE_TEST_CONTEXT:undefined}});
  assert.notEqual(result.status,0);assert.match(result.stdout+result.stderr,/ADD_CANDIDATE_FAILURE_VISIBLE/);
 });
 
@@ -209,3 +212,66 @@ test('candidate execution metadata cannot replace protected interpreter or hashe
  assert(contract.commands.every(row=>row.argv[0]==='node'));
  assert(!JSON.stringify(contract).includes('candidate-policy'));
 });
+
+import {resolveShadowEvent,planShadow,deterministicDockerArgs} from '../../tools/verification/run-verification-shadow.mjs';
+import {assertDeterministicContainer} from '../../tools/verification/run-verification-shadow.mjs';
+{
+const repository='Oteryn/Oteryn-Atlas',base='a'.repeat(40),head='b'.repeat(40),tree='c'.repeat(40);
+const root=fileURLToPath(new URL('../../',import.meta.url));
+function fixture(){
+ const repo={full_name:repository,default_branch:'main'};
+ const run={id:12,repository:repo,event:'merge_group',path:'.github/workflows/merge-group-gate.yml',conclusion:'success',status:'completed',run_attempt:1,head_sha:head,head_branch:'gh-readonly-queue/main/pr-7'};
+ const responses={
+  [`/repos/${repository}/git/ref/heads/main`]:{object:{sha:base}},
+  [`/repos/${repository}/actions/runs/12`]:run,
+  [`/repos/${repository}/git/commits/${head}`]:{sha:head,parents:[{sha:base}]},
+ };
+ const event={repository:repo,action:'completed',workflow_run:{id:12,head_sha:head}};
+ return {run,responses,input:{eventName:'workflow_run',event,githubSha:base,request:async url=>{assert.ok(responses[url],url);return structuredClone(responses[url]);}}};
+}
+test('MQ source comes from protected workflow_run and binds successful exact parent before or just after integration',async()=>{
+ const f=fixture();let result=await resolveShadowEvent(f.input);assert.equal(result.baseSha,base);assert.equal(result.headSha,head);assert.equal(result.parentRunId,12);
+ f.responses[`/repos/${repository}/git/ref/heads/main`].object.sha=head;
+ assert.equal((await resolveShadowEvent(f.input)).baseSha,base);
+ f.input.githubSha=head;
+ result=await resolveShadowEvent(f.input);assert.equal(result.baseSha,base);
+});
+test('MQ rollback pair cannot impersonate a protected source',async()=>{const f=fixture();f.input.githubSha=head;await assert.rejects(resolveShadowEvent(f.input),/base moved/);});
+test('MQ spoofed event, workflow path, failed or repeated parent, head and unrelated main drift reject',async()=>{
+ const mutations=[f=>f.run.event='pull_request',f=>f.run.path='.github/workflows/other.yml',f=>f.run.conclusion='failure',f=>f.run.run_attempt=2,f=>f.run.head_sha='d'.repeat(40),f=>f.run.head_branch='feature/forged',f=>f.input.event.action='requested',f=>f.input.eventName='merge_group',f=>f.responses[`/repos/${repository}/git/ref/heads/main`].object.sha='d'.repeat(40),f=>f.input.githubSha='d'.repeat(40)];
+ for(const mutate of mutations){const f=fixture();mutate(f);await assert.rejects(resolveShadowEvent(f.input));}
+});
+test('PR source rejects fork, stale base and candidate workflow revision',async()=>{
+ const f=fixture();f.input.eventName='pull_request_target';f.input.event={repository:f.input.event.repository,action:'synchronize',pull_request:{number:7,base:{sha:base,ref:'main',repo:{full_name:repository}},head:{sha:head,repo:{full_name:repository}}}};
+ assert.equal((await resolveShadowEvent(f.input)).prNumber,7);
+ for(const mutate of [x=>x.event.pull_request.head.repo.full_name='Other/Fork',x=>x.event.pull_request.base.sha=head,x=>x.githubSha=head]){const input=structuredClone({...f.input,request:undefined});input.request=f.input.request;mutate(input);await assert.rejects(resolveShadowEvent(input));}
+});
+test('S0 plans zero groups and S2/S3 select only their narrow protected owners',()=>{
+ const candidate={repository,prNumber:7,baseSha:base,headSha:head,treeSha:tree,changedFiles:[{path:'docs/ordinary.md',status:'modified'}]};
+ const plan=name=>{candidate.changedFiles=[{path:name,status:'modified'}];return planShadow({candidate,root,protectedRoot:root}).plan;};
+ assert.deepEqual(plan('docs/ordinary.md').groups,[]);
+ assert.deepEqual(plan('e2e/tests/layer-audit-desktop.spec.mjs').groups.map(g=>g.id),['e2e.layer-availability']);
+ assert.deepEqual(plan('e2e/tests/creature-gameplay-source-contract-desktop.spec.mjs').groups.map(g=>g.id),['integration.source-contract-http']);
+ assert.throws(()=>plan('e2e/tests/soak-desktop.spec.mjs'),/bounded executor unavailable/);
+});
+test('deterministic runner has exact command and readonly credential-free mounts with bounded isolation',()=>{
+ const command={id:'sha256:'+'a'.repeat(64),engine:'deterministic',cwd:'.',argv:['node','--test','tests/example.mjs']};
+ const input={command,candidateRoot:'/candidate-source',dependencyRoot:'/protected-deps',shimRoot:'/python-shim',containerName:'atlas-r4-example',image:'image@sha256:'+'b'.repeat(64)};
+ const args=deterministicDockerArgs(input);
+ assert.deepEqual(args.slice(-3),command.argv);
+ for(const flag of ['--network=none','--read-only','--user=1000:1000','--cap-drop=ALL','--security-opt=no-new-privileges'])assert.ok(args.includes(flag));
+ assert.ok(args.filter(x=>x.startsWith('type=bind')).every(x=>x.endsWith(',readonly')));
+ assert.ok(!args.some(x=>/TOKEN|docker.sock|protected-control/.test(x)));
+ assert.throws(()=>deterministicDockerArgs({...input,command:{...command,argv:['sh','-c','true']}}));
+});
+
+test('actual container evidence rejects extra writable mounts, capabilities, credentials and argv drift',()=>{
+ const command={argv:['node','--test','tests/example.mjs']};
+ const input={command,candidateRoot:'/subject',dependencyRoot:'/deps',shimRoot:'/shim',image:'image@sha256:'+'b'.repeat(64)};
+ const container={Config:{Image:input.image,User:'1000:1000',WorkingDir:'/candidate',Env:['HOME=/tmp']},
+ HostConfig:{NetworkMode:'none',ReadonlyRootfs:true,Privileged:false,CapDrop:['ALL'],SecurityOpt:['no-new-privileges'],PidsLimit:192,Memory:1610612736,NanoCpus:2000000000,Tmpfs:{'/tmp':'rw,nodev,nosuid,size=256m'}},
+ State:{Running:false,OOMKilled:false},Path:'node',Args:command.argv.slice(1),Mounts:[{Type:'bind',RW:false,Source:'/subject',Destination:'/candidate'},{Type:'bind',RW:false,Source:'/deps',Destination:'/candidate/e2e/node_modules'},{Type:'bind',RW:false,Source:'/shim',Destination:'/tmp/atlas-python-bin'}]};
+ assert.equal(assertDeterministicContainer(container,input),true);
+ for(const mutate of [x=>x.Mounts[0].RW=true,x=>x.Mounts.push({Type:'bind',RW:false,Source:'/var/run/docker.sock',Destination:'/socket'}),x=>x.HostConfig.Privileged=true,x=>x.HostConfig.CapDrop=[],x=>x.HostConfig.SecurityOpt=[],x=>x.HostConfig.PidsLimit=0,x=>x.Config.Env.push('GH_TOKEN=fake'),x=>x.Args.push('--test-only'),x=>x.State.Running=true]){const bad=structuredClone(container);mutate(bad);assert.throws(()=>assertDeterministicContainer(bad,input));}
+});
+}

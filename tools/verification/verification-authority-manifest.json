@@ -23,6 +23,10 @@
       "path": "e2e/playwright.config.mjs"
     },
     {
+      "id": "e2e-tests-creature-gameplay-source-contract-desktop-spec-mjs",
+      "path": "e2e/tests/creature-gameplay-source-contract-desktop.spec.mjs"
+    },
+    {
       "id": "github-workflows-merge-authority-audit-yml",
       "path": ".github/workflows/merge-authority-audit.yml"
     },
@@ -35,8 +39,60 @@
       "path": ".github/workflows/terminal-branch-lifecycle.yml"
     },
     {
+      "id": "src-browser-animation-runtime-mjs",
+      "path": "src/browser/animation-runtime.mjs"
+    },
+    {
+      "id": "src-browser-creature-publication-source-mjs",
+      "path": "src/browser/creature-publication-source.mjs"
+    },
+    {
+      "id": "src-browser-creature-search-mjs",
+      "path": "src/browser/creature-search.mjs"
+    },
+    {
+      "id": "src-browser-fullworld-mjs",
+      "path": "src/browser/fullworld.mjs"
+    },
+    {
+      "id": "src-browser-fullworld-pixel-buckets-mjs",
+      "path": "src/browser/fullworld-pixel-buckets.mjs"
+    },
+    {
+      "id": "src-browser-fullworld-pixels-mjs",
+      "path": "src/browser/fullworld-pixels.mjs"
+    },
+    {
+      "id": "src-browser-fullworld-trust-mjs",
+      "path": "src/browser/fullworld-trust.mjs"
+    },
+    {
+      "id": "src-browser-loader-mjs",
+      "path": "src/browser/loader.mjs"
+    },
+    {
+      "id": "src-browser-semantic-mjs",
+      "path": "src/browser/semantic.mjs"
+    },
+    {
+      "id": "src-browser-semantic-search-mjs",
+      "path": "src/browser/semantic-search.mjs"
+    },
+    {
+      "id": "src-layers-minimap-mjs",
+      "path": "src/layers/minimap.mjs"
+    },
+    {
+      "id": "src-layers-overview-mjs",
+      "path": "src/layers/overview.mjs"
+    },
+    {
       "id": "tools-maintenance-minimal-merge-group-gate-yml",
       "path": "tools/maintenance/minimal-merge-group-gate.yml"
+    },
+    {
+      "id": "tools-maintenance-verification-shadow-yml",
+      "path": "tools/maintenance/verification-shadow.yml"
     },
     {
       "id": "tools-maintenance-verify-maintenance-diff-mjs",
@@ -83,12 +139,40 @@
       "path": "tools/verification/protected-candidate-snapshot.mjs"
     },
     {
+      "id": "tools-verification-protected-execution-environment-json",
+      "path": "tools/verification/protected-execution-environment.json"
+    },
+    {
+      "id": "tools-verification-protected-execution-environment-mjs",
+      "path": "tools/verification/protected-execution-environment.mjs"
+    },
+    {
       "id": "tools-verification-protected-review-evidence-mjs",
       "path": "tools/verification/protected-review-evidence.mjs"
     },
     {
+      "id": "tools-verification-qualification-fixture-definition-mjs",
+      "path": "tools/verification/qualification-fixture-definition.mjs"
+    },
+    {
+      "id": "tools-verification-qualification-world-mjs",
+      "path": "tools/verification/qualification-world.mjs"
+    },
+    {
       "id": "tools-verification-restoration-contract-ownership-json",
       "path": "tools/verification/restoration-contract-ownership.json"
+    },
+    {
+      "id": "tools-verification-run-verification-shadow-mjs",
+      "path": "tools/verification/run-verification-shadow.mjs"
+    },
+    {
+      "id": "tools-verification-shadow-gameplay-http-mjs",
+      "path": "tools/verification/shadow-gameplay-http.mjs"
+    },
+    {
+      "id": "tools-verification-shadow-gameplay-source-mjs",
+      "path": "tools/verification/shadow-gameplay-source.mjs"
     },
     {
       "id": "tools-verification-stable-id-mjs",
