@@ -3,7 +3,9 @@ import {canonicalJson, validateVerificationCatalog} from './verification-plan-sc
 import {buildVerificationPlan, assertPlanExecutable} from './build-verification-plan.mjs';
 import {deriveVerificationMetadata} from './verification-metadata.mjs';
 import {resolveDeterministicCommands} from './deterministic-execution.mjs';
-import {resolveBrowserExecution} from './browser-execution.mjs';
+import {R5_SEMANTIC_SOURCE, resolveBrowserExecution, verifyR5SemanticProduct} from './browser-execution.mjs';
+
+export {R5_SEMANTIC_SOURCE, verifyR5SemanticProduct};
 
 const fail = message => { throw new TypeError(`execution contract: ${message}`); };
 const equal = (left,right,label) => { if(canonicalJson(left)!==canonicalJson(right)) fail(`${label} mismatch`); };
@@ -12,6 +14,34 @@ const sha = value => /^[a-f0-9]{40}$/.test(value ?? '');
 const digest = value => /^sha256:[a-f0-9]{64}$/.test(value ?? '');
 const deterministicTest = value => typeof value==='string'&&/^tests\/[A-Za-z0-9_./-]+\.(mjs|py)$/.test(value)&&!value.split('/').some(part=>!part||part==='.'||part==='..');
 const freeze = value => {if(value && typeof value==='object' && !Object.isFrozen(value)){Object.values(value).forEach(freeze);Object.freeze(value);}return value;};
+
+export const R5_SEMANTIC_BUILDER_ORACLE = `import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import {spawnSync} from 'node:child_process';
+import {createHash} from 'node:crypto';
+const sha256=bytes=>createHash('sha256').update(bytes).digest('hex');
+const source='/protected-input/game-semantic-search-source.json';
+const output='/tmp/r5-semantic-index.json';
+const sourceBytes=fs.readFileSync(source);
+assert.equal(sourceBytes.length,2465);
+assert.equal(sha256(sourceBytes),'3075f42ee1b5502a10d23ec2df9171f9ef829158d82c9bba8ab9bb91abc654bc');
+const revision='54f19765c07e3b33ce2d9c10ad57df4818434a52';
+const result=spawnSync('/usr/bin/python3',['-I','-B','/candidate/tools/build-semantic-search-index.py',source,output,'--game-revision',revision],{cwd:'/candidate',env:{LANG:'C.UTF-8',LC_ALL:'C.UTF-8',HOME:'/tmp'},encoding:'utf8',shell:false,timeout:30000,maxBuffer:1048576});
+assert.equal(result.error,undefined);
+assert.equal(result.signal,null);
+assert.equal(result.status,0,result.stderr);
+const bytes=fs.readFileSync(output);
+assert.equal(bytes.length,3405);
+assert.equal(sha256(bytes),'080518a6ef859b1e277f2305178faee8a76e22e247266f8950c1feb66d02a3e6');
+const value=JSON.parse(bytes);
+assert.equal(value.source.game_revision,revision);
+assert.equal(value.source.semantic_digest,'sha256:a4a4703962bd6984d31ef1dafcd27bad475d6b61f570d013560c16a704989bf8');
+assert.deepEqual(value.records.map(({id})=>id),['npc:726487438c8308abf291622a52d91b24','semantic-record:23716a35099a04179f7b9e3e6c9198ee']);
+process.stdout.write(JSON.stringify({oracle:'r5-semantic-candidate-builder',passed:true,sourceSha256:sha256(sourceBytes),outputSha256:sha256(bytes)})+'\\n');
+`;
+export const R5_SEMANTIC_BUILDER_ORACLE_DIGEST = `sha256:${createHash('sha256').update(R5_SEMANTIC_BUILDER_ORACLE).digest('hex')}`;
+export const R5_SEMANTIC_BUILDER_ORACLE_TEST_ID = 'protected-oracle::tools/build-semantic-search-index.py::selected semantic product';
+const R5_SEMANTIC_BUILDER_PATH = 'tools/build-semantic-search-index.py';
 
 function normalizedSnapshot(value) {
   if(!value || value.repository!=='Oteryn/Oteryn-Atlas' || !['headSha','baseSha','treeSha'].every(key=>sha(value[key]))) fail('candidate readback identity');
@@ -55,9 +85,16 @@ export function sealExecutionContract(value) {
 
   if(new Set(value.commands.map(c=>c.id)).size!==value.commands.length || new Set(value.groups.map(g=>g.id)).size!==value.groups.length) fail('contract duplicate command/group');
   for(const command of value.commands) {
-    if(command.executionScope!==undefined&&command.executionScope!=='candidate-self-only')fail('contract execution scope');
+    if(command.executionScope!==undefined&&!['candidate-self-only','protected-harness'].includes(command.executionScope))fail('contract execution scope');
     if(!digest(command.id)||!Array.isArray(command.expectedTestIds)||!command.expectedTestIds.length||new Set(command.expectedTestIds).size!==command.expectedTestIds.length) fail('contract exact test census');
     if(!Array.isArray(command.argv)||!command.argv.length||!Number.isSafeInteger(command.timeoutSeconds)||command.timeoutSeconds<1) fail('contract executable command');
+    if(command.executionScope==='protected-harness') {
+      if(command.engine!=='deterministic'||canonicalJson(command.groupIds)!==canonicalJson(['deterministic.search'])
+        ||canonicalJson(command.expectedTestIds)!==canonicalJson([R5_SEMANTIC_BUILDER_ORACLE_TEST_ID])
+        ||canonicalJson(command.argv)!==canonicalJson(['node','/protected-harness/r5-semantic-builder-oracle.mjs'])
+        ||command.protectedHarnessDigest!==R5_SEMANTIC_BUILDER_ORACLE_DIGEST
+        ||command.protectedInputDigest!=='sha256:3075f42ee1b5502a10d23ec2df9171f9ef829158d82c9bba8ab9bb91abc654bc') fail('contract protected harness');
+    }
   }
   for(const group of value.groups) {
     if(typeof group.id!=='string'||!group.id||!Array.isArray(group.commandIds)||!group.commandIds.length||new Set(group.commandIds).size!==group.commandIds.length||group.commandIds.some(id=>!value.commands.some(c=>c.id===id))) fail('contract group command conservation');
@@ -87,7 +124,7 @@ export function sealExecutionContract(value) {
 // test paths may only widen execution as unprivileged test subjects.
 export function resolveExecutionContract({root, protectedRoot, candidate, planInput, claimedPlan,
   protectedCatalog, protectedImpactManifest, protectedStableTestIds,
-  environmentDigest, publicationProofs, protectedExpectedAuthorities, selectedGameplayFiles}) {
+  environmentDigest, publicationProofs, protectedExpectedAuthorities, selectedGameplayFiles, selectedSemanticFiles}) {
   const snapshot=normalizedSnapshot(candidate);
   if(!/^[a-f0-9]{64}$/.test(environmentDigest??'')) fail('environment digest');
   if(planInput?.repository!==snapshot.repository || planInput.headSha!==snapshot.headSha || planInput.integrationBaseSha!==snapshot.baseSha) fail('plan candidate identity');
@@ -118,13 +155,20 @@ export function resolveExecutionContract({root, protectedRoot, candidate, planIn
       if(command.executionScope==='candidate-self-only')candidateTestSubjects.push({spec:command.executionPath,commandId:id});
     }
   }
+  if(snapshot.changedFiles.some(row=>row.path===R5_SEMANTIC_BUILDER_PATH||row.previousPath===R5_SEMANTIC_BUILDER_PATH)) {
+    if(!deterministic.includes('deterministic.search')) fail('semantic builder oracle lost protected group');
+    const entry={executionScope:'protected-harness',argv:['node','/protected-harness/r5-semantic-builder-oracle.mjs'],cwd:'.',engine:'deterministic',
+      groupIds:['deterministic.search'],expectedTestIds:[R5_SEMANTIC_BUILDER_ORACLE_TEST_ID],resourceClass:'cpu-light',dataCapability:'qualification_fixture',timeoutSeconds:900,
+      protectedHarnessDigest:R5_SEMANTIC_BUILDER_ORACLE_DIGEST,protectedInputDigest:'sha256:3075f42ee1b5502a10d23ec2df9171f9ef829158d82c9bba8ab9bb91abc654bc'};
+    commands.push({...entry,id:hash({identity,...entry})});
+  }
   equal(candidateTestSubjects.map(row=>row.spec).sort(),plan.candidateTestSubjects,'recomputed candidate subject scope');
   const browserIds=plan.groups.filter(group=>group.executionEngine==='playwright').map(group=>group.id);
   if(browserIds.length) {
     if(!Array.isArray(protectedStableTestIds)||!protectedStableTestIds.length) fail('missing protected test census for Playwright execution');
     const resolved=resolveBrowserExecution({protectedRegistry:metadata.browser,requiredGroups:browserIds,
       atlasRevision:snapshot.headSha,protectedBaseSha:snapshot.baseSha,environmentDigest,policyResolved:true,
-      publicationProofs,protectedExpectedAuthorities,selectedGameplayFiles});
+      publicationProofs,protectedExpectedAuthorities,selectedGameplayFiles,selectedSemanticFiles});
     const keys=new Map();
     for(const command of resolved.commands) {
       const prefix=`${command.project}::${command.spec}::`;

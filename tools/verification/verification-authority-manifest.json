@@ -43,6 +43,10 @@
       "path": "src/browser/animation-runtime.mjs"
     },
     {
+      "id": "src-browser-creature-gameplay-profiles-mjs",
+      "path": "src/browser/creature-gameplay-profiles.mjs"
+    },
+    {
       "id": "src-browser-creature-publication-source-mjs",
       "path": "src/browser/creature-publication-source.mjs"
     },
@@ -101,6 +105,10 @@
     {
       "id": "tools-verification-anti-loop-common-mjs",
       "path": "tools/verification/anti-loop-common.mjs"
+    },
+    {
+      "id": "tools-verification-bounded-real-world-mjs",
+      "path": "tools/verification/bounded-real-world.mjs"
     },
     {
       "id": "tools-verification-browser-execution-mjs",
