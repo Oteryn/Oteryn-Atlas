@@ -183,6 +183,8 @@ function executeDeterministic(command,root,image,dependencyRoot,shimRoot) {
       isolationDigest:digest({config:container.Config,host:container.HostConfig,mounts:container.Mounts}),startedAt,finishedAt:new Date().toISOString(),
       exitCode:result.status,signal:result.signal,timeout:result.error?.code==='ETIMEDOUT',
       outputDigest:bytesDigest((result.stdout??'')+(result.stderr??'')),
+      failureOutput:result.error||result.status!==0||result.signal||container.State.ExitCode!==0
+        ? {stdoutTail:String(result.stdout??'').slice(-12288),stderrTail:String(result.stderr??'').slice(-4096)} : null,
       passed:!result.error&&result.status===0&&!result.signal&&container.State.ExitCode===0};
   } finally {spawnSync('docker',['rm','-f',name],{stdio:'ignore'});}
 }
