@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "programme": "atlas-verification-restoration",
-  "phase": "r1-r3",
+  "phase": "r1-r4",
   "rules": [
     {
       "path": "tests/creature-gameplay-profiles.mjs",
@@ -583,6 +583,48 @@
       "path": "tools/verification/verify-complete-product-artifacts.mjs",
       "operations": [
         "A"
+      ]
+    },
+    {
+      "path": "tools/verification/run-verification-shadow.mjs",
+      "operations": [
+        "A"
+      ]
+    },
+    {
+      "path": "tools/verification/shadow-gameplay-source.mjs",
+      "operations": [
+        "A"
+      ]
+    },
+    {
+      "path": "tools/verification/shadow-gameplay-http.mjs",
+      "operations": [
+        "A"
+      ]
+    },
+    {
+      "path": "tools/verification/protected-candidate-snapshot.mjs",
+      "operations": [
+        "M"
+      ]
+    },
+    {
+      "path": "e2e/tests/creature-gameplay-source-contract-desktop.spec.mjs",
+      "operations": [
+        "M"
+      ]
+    },
+    {
+      "path": "tools/verification/protected-execution-environment.json",
+      "operations": [
+        "M"
+      ]
+    },
+    {
+      "path": "tools/verification/protected-execution-environment.mjs",
+      "operations": [
+        "M"
       ]
     }
   ]

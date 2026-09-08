@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { verifySelectedGameplayProduct } from './shadow-gameplay-source.mjs';
 import { authenticatePublicationProofs } from './proof-provenance.mjs';
 import { canonicalJson, validateVerificationCatalog } from './verification-plan-schema.mjs';
 
@@ -19,7 +20,7 @@ const same = (left, right) => JSON.stringify(left) === JSON.stringify(right);
 // from authenticated protected-base code. This pure resolver does not authenticate
 // a repository revision and accepts no candidate catalog, command or ownership overrides.
 // It resolves obligations only: it neither executes tests nor activates routing.
-export function resolveBrowserExecution({ protectedRegistry, requiredGroups, atlasRevision, environmentDigest, protectedBaseSha, publicationProofs, protectedExpectedAuthorities } = {}) {
+export function resolveBrowserExecution({ protectedRegistry, requiredGroups, atlasRevision, environmentDigest, protectedBaseSha, publicationProofs, protectedExpectedAuthorities, selectedGameplayFiles } = {}) {
   requireValue(/^[0-9a-f]{40}$/.test(atlasRevision ?? ''), 'exact Atlas revision required');
   requireValue(/^[0-9a-f]{40}$/.test(protectedBaseSha ?? ''), 'exact protected base revision required');
   requireValue(/^[0-9a-f]{64}$/.test(environmentDigest ?? ''), 'environment digest required');
@@ -95,9 +96,23 @@ export function resolveBrowserExecution({ protectedRegistry, requiredGroups, atl
   }
   const machineGroups = [...selected].filter((id) => catalog[id].evidence === 'machine-summary').sort();
   const capabilities = [...new Set(machineGroups.map((id) => catalog[id].capabilities.dataCapability))].sort();
+  // A selected derived gameplay product is authority only for this HTTP contract.
+  // It is never a map/publication proof, even though both use bounded real data.
+  let selectedGameplay;
+  if (selectedGameplayFiles !== undefined) {
+    requireValue(machineGroups.includes('integration.source-contract-http'), 'selected gameplay requires its HTTP owner');
+    requireValue(machineGroups.filter(id => catalog[id].capabilities.dataCapability === 'bounded_real_world')
+      .every(id => id === 'integration.source-contract-http'), 'selected gameplay cannot authorize another bounded group');
+    const row = rows.get('e2e/tests/creature-gameplay-source-contract-desktop.spec.mjs');
+    requireValue(row?.execution.browser === false && row.execution.project === 'desktop-chromium'
+      && same(row.machineGroups, ['integration.source-contract-http']) && row.reviewGroups.length === 0,
+      'selected gameplay exact HTTP route');
+    selectedGameplay = verifySelectedGameplayProduct(selectedGameplayFiles);
+  }
   const selectedProofs = {};
   const selectedAuthorities = {};
   for (const capability of capabilities) {
+    if (capability === 'bounded_real_world' && selectedGameplay) continue;
     requireValue(publicationProofs?.[capability] != null, `raw publication proof for ${capability}`);
     requireValue(protectedExpectedAuthorities?.[capability] != null, `protected expected authority for ${capability}`);
     selectedProofs[capability] = publicationProofs[capability];
@@ -105,11 +120,17 @@ export function resolveBrowserExecution({ protectedRegistry, requiredGroups, atl
   }
   let authentication;
   try {
-    authentication = authenticatePublicationProofs({ publicationProofs: selectedProofs, protectedExpectedAuthorities: selectedAuthorities, protectedBaseSha });
+    authentication = Object.keys(selectedProofs).length ? authenticatePublicationProofs({ publicationProofs: selectedProofs, protectedExpectedAuthorities: selectedAuthorities, protectedBaseSha }) : { authenticatedPublicationIdentities: {}, trustReceiptDigest: null };
   } catch (error) {
     throw new TypeError(`browser execution unresolved: publication authentication failed: ${error.message}`);
   }
-  const boundPublications = authentication.authenticatedPublicationIdentities;
+  const boundPublications = structuredClone(authentication.authenticatedPublicationIdentities);
+  if (selectedGameplay) {
+    boundPublications.bounded_real_world = { kind: 'game-producer-derived-selected-gameplay',
+      ...selectedGameplay, protectedBaseSha, trustReceiptDigest: digest({ protectedBaseSha, selectedGameplay }) };
+    authentication = { ...authentication, trustReceiptDigest: digest({ publication: authentication.trustReceiptDigest,
+      selectedGameplay: boundPublications.bounded_real_world.trustReceiptDigest }) };
+  }
   const identityFor = (capability) => ({ atlasRevision, environmentDigest, protectedBaseSha, protectedRegistryDigest, dataCapability: capability, publication: structuredClone(boundPublications[capability]) });
   const commands = [];
   const partitions = { hostedPlaywright: [], specialistPlaywright: [] };

@@ -28,14 +28,14 @@ const config = {
     candidate: { source: 'exact-candidate-checkout', target: '/candidate', readOnly: true },
     dependencies: {
       source: 'protected-control/e2e/node_modules',
-      target: '/protected-e2e-node-modules/node_modules',
+      target: '/candidate/e2e/node_modules',
       readOnly: true,
     },
   },
   runtime: {
     node: { command: 'node' },
     npm: { command: 'npm' },
-    playwright: { command: '/protected-e2e-node-modules/node_modules/.bin/playwright', version: '1.62.0' },
+    playwright: { command: '/candidate/e2e/node_modules/.bin/playwright', version: '1.62.0' },
     chromium: { command: 'chromium' },
     python3: { command: 'python3' },
     python: {

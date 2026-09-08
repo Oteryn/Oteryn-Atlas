@@ -6,14 +6,15 @@ export function gitChangedFiles(root,base,head) {
   while(rows.length){const status=rows.shift(),path=rows.shift();if(!path||!['A','M','D'].includes(status))fail('unsupported changed-file status');files.push({path,status:{A:'added',M:'modified',D:'removed'}[status]});}
   return files.sort((a,b)=>a.path.localeCompare(b.path));
 }
-export async function readCandidateSnapshot({request=githubRequest,repository,baseSha,headSha,prNumber=null,changedFiles}) {
+export async function readCandidateSnapshot({request=githubRequest,repository,baseSha,headSha,prNumber=null,changedFiles,allowJustIntegratedHead=false}) {
   if(!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository))fail('repository');
   for(const sha of [baseSha,headSha])if(!/^[a-f0-9]{40}$/.test(sha??''))fail('revision');
   if(prNumber!==null&&(!Number.isSafeInteger(prNumber)||prNumber<1))fail('PR');
   const prefix=`/repos/${repository}`,repo=await request(prefix);
   if(repo.full_name!==repository||typeof repo.default_branch!=='string')fail('repository association');
   const base=await request(`${prefix}/git/ref/heads/${encodeURIComponent(repo.default_branch)}`);
-  if(base.object?.sha!==baseSha)fail('protected base moved');
+  if(typeof allowJustIntegratedHead!=='boolean'||(allowJustIntegratedHead&&prNumber!==null))fail('integrated MQ readback scope');
+  if(base.object?.sha!==baseSha&&!(allowJustIntegratedHead&&base.object?.sha===headSha))fail('protected base moved');
   if(prNumber!==null){
     const pr=await request(`${prefix}/pulls/${prNumber}`);
     if(pr.number!==prNumber||pr.state!=='open'||pr.merged||pr.head?.sha!==headSha||pr.base?.sha!==baseSha||pr.head?.repo?.full_name!==repository||pr.base?.repo?.full_name!==repository||pr.base?.ref!==repo.default_branch)fail('PR identity drift');

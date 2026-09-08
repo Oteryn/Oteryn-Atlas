@@ -79,7 +79,7 @@ export function sealExecutionContract(value) {
 // test paths may only widen execution as unprivileged test subjects.
 export function resolveExecutionContract({root, protectedRoot, candidate, planInput, claimedPlan,
   protectedCatalog, protectedImpactManifest, protectedStableTestIds,
-  environmentDigest, publicationProofs, protectedExpectedAuthorities}) {
+  environmentDigest, publicationProofs, protectedExpectedAuthorities, selectedGameplayFiles}) {
   const snapshot=normalizedSnapshot(candidate);
   if(!/^[a-f0-9]{64}$/.test(environmentDigest??'')) fail('environment digest');
   if(planInput?.repository!==snapshot.repository || planInput.headSha!==snapshot.headSha || planInput.integrationBaseSha!==snapshot.baseSha) fail('plan candidate identity');
@@ -114,7 +114,7 @@ export function resolveExecutionContract({root, protectedRoot, candidate, planIn
     if(!Array.isArray(protectedStableTestIds)||!protectedStableTestIds.length) fail('missing protected test census for Playwright execution');
     const resolved=resolveBrowserExecution({protectedRegistry:metadata.browser,requiredGroups:browserIds,
       atlasRevision:snapshot.headSha,protectedBaseSha:snapshot.baseSha,environmentDigest,policyResolved:true,
-      publicationProofs,protectedExpectedAuthorities});
+      publicationProofs,protectedExpectedAuthorities,selectedGameplayFiles});
     const keys=new Map();
     for(const command of resolved.commands) {
       const prefix=`${command.project}::${command.spec}::`;

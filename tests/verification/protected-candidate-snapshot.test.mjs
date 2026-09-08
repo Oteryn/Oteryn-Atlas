@@ -50,3 +50,13 @@ test('merge-group snapshot requires explicit complete files and binds exact synt
   assert.ok(!f.calls.some(endpoint=>endpoint.includes('/pulls/')));
   await assert.rejects(readCandidateSnapshot({...input,changedFiles:[]}),/complete changed files/);
 });
+
+test('completed MQ may read back exactly its just-integrated head but cannot widen PR or unrelated main',async()=>{
+ const f=fixture();f.responses[`/repos/${repository}/git/ref/heads/stable%2Fnext`].object.sha=headSha;
+ const input={...f.input,prNumber:null,changedFiles:[{path:'docs/a.md',status:'modified'}],allowJustIntegratedHead:true};
+ assert.equal((await readCandidateSnapshot(input)).baseSha,baseSha);
+ await assert.rejects(readCandidateSnapshot({...input,prNumber:7}),/scope/);
+ await assert.rejects(readCandidateSnapshot({...input,allowJustIntegratedHead:false}),/base moved/);
+ f.responses[`/repos/${repository}/git/ref/heads/stable%2Fnext`].object.sha='d'.repeat(40);
+ await assert.rejects(readCandidateSnapshot(input),/base moved/);
+});

@@ -1,5 +1,11 @@
 import { expect, test } from '@playwright/test';
 
+const sourceMode = process.env.ATLAS_GAMEPLAY_SOURCE_MODE ?? 'published-gameplay';
+if (!['published-gameplay', 'selected-gameplay-v1'].includes(sourceMode)) throw new TypeError('unsupported protected gameplay source mode');
+const semanticDigest = sourceMode === 'selected-gameplay-v1'
+  ? 'sha256:be06f49180535bcc764579209370cb5f1edafe2c7882e3380fb9cbdb807c153f'
+  : 'sha256:7ac7c08949aa498cb843ca26e3417e537b3409d89e4f265861f3f94855b96d28';
+
 const SOURCE_FACTS = Object.freeze({
   sam: Object.freeze({ entityId: 'npc-entity:f8d4f0200616061ffa4ae0b4c38c6d3e', name: 'Sam' }),
   rat: Object.freeze({ entityId: 'monster-entity:80295e51265b3662bfbea2ea01ee3ccb', name: 'Rat' }),
@@ -35,7 +41,7 @@ test('bounded real gameplay source preserves selected Game-owned NPC facts', asy
   expect(manifest.contract_id).toBe('oteryn-game-atlas-export-v1');
   expect(manifest.capability).toBe('creature-gameplay-profiles-v1');
   expect(manifest.producer_repository_sha).toBe('b56ce339281d252a9e01a5a2bed583582bf29e68');
-  expect(manifest.semantic_digest).toBe('sha256:7ac7c08949aa498cb843ca26e3417e537b3409d89e4f265861f3f94855b96d28');
+  expect(manifest.semantic_digest).toBe(semanticDigest);
 
   const sam = await profile(request, manifest, SOURCE_FACTS.sam);
   expect(sam.shop.sells).toEqual(expect.arrayContaining([

@@ -71,7 +71,7 @@ function normalizeConfig(candidate) {
   }
   if (!isPlainObject(mounts.dependencies)
     || mounts.dependencies.source !== 'protected-control/e2e/node_modules'
-    || mounts.dependencies.target !== '/protected-e2e-node-modules/node_modules'
+    || mounts.dependencies.target !== '/candidate/e2e/node_modules'
     || mounts.dependencies.readOnly !== true) {
     throw new TypeError('protected execution dependency mount must be protected and read-only');
   }
