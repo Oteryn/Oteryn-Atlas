@@ -63,7 +63,7 @@ function fixture(t,{includeRestorationAuthority=true,restorationAuthorityContent
     'src/browser/fullworld.mjs',
     ...publicationBuilders,
     ...verificationModified,
-    ...restorationModified,
+    ...(includeRestorationAuthority?restorationModified:[]),
   ]) put(trusted,name,`base:${name}\n`);
   put(trusted,'web/rogue.mjs','export const rogue=1;\n');
   put(trusted,'tools/maintenance/minimal-merge-group-gate.yml','name: Minimal MQ\n');
@@ -156,7 +156,7 @@ test('current F02 four-builder candidate resolves exactly to publication-safety'
 });
 
 test('current F11 F12 F13 fourteen-path candidate resolves exactly to verification',t=>{
-  const f=fixture(t);applyVerificationLane(f);f.commit();
+  const f=fixture(t,{includeRestorationAuthority:false});applyVerificationLane(f);f.commit();
   const result=f.invoke();assert.equal(result.status,0,result.stderr);assert.match(result.stdout,/"remediationLane":"verification"/);
 });
 
@@ -234,7 +234,7 @@ test('restoration lane preserves equivalent PR and merge-group identity handling
 });
 
 test('rejects a mixed verification and runtime candidate',t=>{
-  const f=fixture(t);applyVerificationLane(f);change(f.candidate,'src/browser/fullworld.mjs');f.commit();
+  const f=fixture(t,{includeRestorationAuthority:false});applyVerificationLane(f);change(f.candidate,'src/browser/fullworld.mjs');f.commit();
   const result=f.invoke();assert.equal(result.status,1);assert.match(result.stderr,/spans multiple remediation lanes/);
 });
 
@@ -320,4 +320,39 @@ test('organization-required entrypoint uses only protected maintenance authority
   assert.match(workflow,/node trusted-base\/tools\/maintenance\/verify-maintenance-diff\.mjs/);
   assert.doesNotMatch(workflow,/run-protected-authority-audit|candidate\/tools\/|docker|playwright|npm |python/iu);
   assert.equal((workflow.match(/uses: actions\/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1/g)??[]).length,2);
+});
+
+test('protected restoration rule count is bounded at the exact transition requirement',t=>{
+  const limit=Math.max(64,restorationRules.length);
+  const authority=count=>JSON.stringify({schemaVersion:1,programme:'atlas-verification-restoration',phase:'r1-r3',rules:Array.from({length:count},(_,index)=>({path:`tests/verification/bounded-${index}.test.mjs`,operations:['A']}))});
+  const accepted=fixture(t,{restorationAuthorityContent:authority(limit)});
+  put(accepted.candidate,'tests/verification/bounded-0.test.mjs','export {};\n');accepted.commit();
+  const ok=accepted.invoke();assert.equal(ok.status,0,ok.stderr);
+  const rejected=fixture(t,{restorationAuthorityContent:authority(limit+1)});
+  put(rejected.candidate,'tests/verification/bounded-0.test.mjs','export {};\n');rejected.commit();
+  const denied=rejected.invoke();assert.equal(denied.status,1);assert.match(denied.stderr,/restoration allowlist identity is invalid/);
+});
+
+test('restoration count expansion cannot admit deletions or protected authority and workflow paths',t=>{
+  for(const rule of [
+    {path:'tests/verification/bounded.test.mjs',operations:['D']},
+    {path:restorationAllowlist,operations:['M']},
+    {path:'tools/maintenance/verify-maintenance-diff.mjs',operations:['M']},
+    {path:'.github/workflows/restored.yml',operations:['A']},
+  ]){
+    const content=JSON.stringify({schemaVersion:1,programme:'atlas-verification-restoration',phase:'r1-r3',rules:[rule]});
+    const f=fixture(t,{restorationAuthorityContent:content});
+    put(f.candidate,'docs/evidence/bounded-authority.md','# Evidence\n');f.commit();
+    const result=f.invoke();assert.equal(result.status,1);
+    assert.match(result.stderr,/restoration operations are invalid|protected authority path|protected control-plane path/);
+  }
+});
+
+test('the complete exact restoration candidate is admitted but one extra code path is rejected',t=>{
+  const apply=f=>{for(const rule of restorationRules){assert.equal(rule.operations.length,1);put(f.candidate,rule.path,`candidate:${rule.path}\n`);}};
+  const exact=fixture(t);apply(exact);exact.commit();
+  const accepted=exact.invoke();assert.equal(accepted.status,0,accepted.stderr);
+  assert.equal(JSON.parse(accepted.stdout).mode,'verification-restoration-r1-r3');
+  const extra=fixture(t);apply(extra);put(extra.candidate,'tests/verification/outside-reviewed-candidate.test.mjs','export {};\n');extra.commit();
+  const rejected=extra.invoke();assert.equal(rejected.status,1);assert.match(rejected.stderr,/maintenance path is frozen: tests\/verification\/outside-reviewed-candidate.test.mjs/);
 });
