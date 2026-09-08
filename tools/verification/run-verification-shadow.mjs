@@ -139,7 +139,7 @@ export function deterministicDockerArgs({command,candidateRoot,dependencyRoot,sh
   if(!/^[a-z0-9-]+$/.test(containerName)||!/@sha256:[a-f0-9]{64}$/.test(image)) fail('container identity');
   return ['run','--name',containerName,'--network=none','--read-only','--user=1000:1000','--cap-drop=ALL',
     '--security-opt=no-new-privileges','--pids-limit=192','--memory=1610612736','--cpus=2',
-    '--tmpfs=/tmp:rw,exec,nodev,nosuid,size=256m','--mount',`type=bind,src=${candidateRoot},dst=/candidate,readonly`,
+    '--tmpfs=/tmp:rw,nodev,nosuid,size=256m','--mount',`type=bind,src=${candidateRoot},dst=/candidate,readonly`,
     '--mount',`type=bind,src=${dependencyRoot},dst=/candidate/e2e/node_modules,readonly`,
     '--mount',`type=bind,src=${shimRoot},dst=/tmp/atlas-python-bin,readonly`,
     '--workdir=/candidate','--env=PATH=/tmp/atlas-python-bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin','--env=HOME=/tmp','--env=PYTHONPYCACHEPREFIX=/tmp/atlas-python-pycache',image,
@@ -153,7 +153,7 @@ export function assertDeterministicContainer(container,{command,candidateRoot,de
     ||host.Privileged||canonicalJson(host.CapDrop)!==canonicalJson(['ALL'])
     ||!host.SecurityOpt?.some(x=>x==='no-new-privileges'||x==='no-new-privileges:true')
     ||host.PidsLimit!==192||host.Memory!==1610612736||host.NanoCpus!==2000000000
-    ||host.Tmpfs?.['/tmp']!=='rw,exec,nodev,nosuid,size=256m') fail('actual container isolation/completion');
+    ||host.Tmpfs?.['/tmp']!=='rw,nodev,nosuid,size=256m') fail('actual container isolation/completion');
   const expected=[{Source:candidateRoot,Destination:'/candidate'},
     {Source:dependencyRoot,Destination:'/candidate/e2e/node_modules'},
     {Source:shimRoot,Destination:'/tmp/atlas-python-bin'}].sort((a,b)=>a.Destination.localeCompare(b.Destination));
@@ -178,7 +178,7 @@ function executeDeterministic(command,root,image,dependencyRoot,shimRoot) {
     assertContainerStarted(container,result);
     assertDeterministicContainer(container,{command,candidateRoot:root,dependencyRoot,shimRoot,image});
     return {commandId:command.id,argv:command.argv,cwd:command.cwd,groupIds:command.groupIds,
-      expectedTestIds:command.expectedTestIds,censusKind:'external-command-and-spec',retry:0,
+      expectedTestIds:command.expectedTestIds,...(command.executionScope?{executionScope:command.executionScope}:{}),censusKind:'external-command-and-spec',retry:0,
       containerId:container.Id,imageId:container.Image,image,executedArgv:[container.Path,...container.Args],
       isolationDigest:digest({config:container.Config,host:container.HostConfig,mounts:container.Mounts}),startedAt,finishedAt:new Date().toISOString(),
       exitCode:result.status,signal:result.signal,timeout:result.error?.code==='ETIMEDOUT',
@@ -276,12 +276,14 @@ export async function runShadow(mode,root) {
     runId:currentRunId,runAttempt:1,workflowSourceRevision:process.env.GITHUB_SHA,apiRunHeadSha:currentRun.head_sha,planDigest:digest(plan),groups:plan.groups.map(g=>g.id),
     parentWorkflowDigest:event.parentRunId?bytesDigest(fs.readFileSync(path.join(controlRoot,'.github/workflows/merge-group-gate.yml'))):null,
     workflowDigest:bytesDigest(fs.readFileSync(path.join(controlRoot,TEMPLATE))),results:[],status:'UNRESOLVED'};
-  if(!plan.groups.length) {summary.status='NO_PRODUCT_WORK';summary.commands=[];}
+  const hasWork=plan.groups.length>0||plan.candidateTestSubjects.length>0;
+  summary.candidateTestSubjects=plan.candidateTestSubjects;
+  if(!hasWork) {summary.status='NO_PRODUCT_WORK';summary.commands=[];}
   if(mode==='plan') {
-    if(process.env.GITHUB_OUTPUT) fs.appendFileSync(process.env.GITHUB_OUTPUT,`has_commands=${plan.groups.length>0}\n`);
+    if(process.env.GITHUB_OUTPUT) fs.appendFileSync(process.env.GITHUB_OUTPUT,`has_commands=${hasWork}\n`);
     return summary;
   }
-  if(!plan.groups.length) fail('S0 must not start product job');
+  if(!hasWork) fail('S0 must not start product job');
   const directory=fs.mkdtempSync(path.join(os.tmpdir(),'atlas-r4-'));
   try {
     const config=readJson(path.join(controlRoot,'tools/verification/protected-execution-environment.json'));

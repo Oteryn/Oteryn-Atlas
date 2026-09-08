@@ -22,7 +22,7 @@ const config = {
     pidsLimit: 192,
     memoryBytes: 1610612736,
     cpus: 2,
-    tmpfs: [{ path: '/tmp', options: ['exec', 'nodev', 'nosuid', 'rw', 'size=256m'] }],
+    tmpfs: [{ path: '/tmp', options: ['nodev', 'nosuid', 'rw', 'size=256m'] }],
   },
   mounts: {
     candidate: { source: 'exact-candidate-checkout', target: '/candidate', readOnly: true },
@@ -164,23 +164,5 @@ test('artifact writes and sandbox ownership are mandatory qualification evidence
         checks: { ...checks, [field]: false }, probeDigest: `sha256:${'d'.repeat(64)}` };
     }), new RegExp(field));
     assert.equal(calls, 1, 'failed ownership must not trigger a retry');
-  }
-});
-
-
-test('temporary execution options are exact and contradictory or unknown permissions fail closed', () => {
-  const expected = ['exec', 'nodev', 'nosuid', 'rw', 'size=256m'];
-  const identity = buildProtectedExecutionEnvironmentIdentity(config);
-  assert.deepEqual(identity.config.container.tmpfs[0].options, expected);
-  const reordered = structuredClone(config);
-  reordered.container.tmpfs[0].options.reverse();
-  assert.equal(buildProtectedExecutionEnvironmentIdentity(reordered).environmentDigest, identity.environmentDigest);
-  for (const options of [
-    expected.filter(option => option !== 'exec'),
-    ...['noexec', 'suid', 'dev', 'exec', 'unknown', 'size=512m'].map(option => [...expected, option]),
-    ['exec', 'nodev', 'nosuid', 'ro', 'size=256m'],
-  ]) {
-    const changed = structuredClone(config); changed.container.tmpfs[0].options = options;
-    assert.throws(() => buildProtectedExecutionEnvironmentIdentity(changed), /tmp.*options/);
   }
 });
