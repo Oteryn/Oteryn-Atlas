@@ -40,6 +40,7 @@ test('custom monster search returns only resolved Game-owned monster entity iden
   const results = searchFarmMonsterTargets(records, 'alpha', { limit: 10 });
   assert.deepEqual(results.map((record) => record.entity_id), [monsterId]);
   assert.equal(results[0].label, 'Alpha Beast');
+  assert.deepEqual(searchFarmMonsterTargets(records, `  ${monsterId}  `).map((record) => record.entity_id), [monsterId]);
 });
 
 test('map-selected monster uses canonical creature state even when a farm target already exists', () => {

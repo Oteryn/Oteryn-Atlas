@@ -47,11 +47,12 @@ export function validateFarmCreatureCatalog(catalog, expectedSource = SOURCE_EXP
 export function searchFarmMonsterTargets(records, query, { limit = MAX_RESULTS } = {}) {
   requireValue(Array.isArray(records), 'creature records must be an array');
   requireValue(Number.isSafeInteger(limit) && limit > 0 && limit <= MAX_RESULTS, 'monster search limit invalid');
-  const needle = String(query ?? '').trim().toLocaleLowerCase('en-US');
+  const normalizedQuery = String(query ?? '').trim();
+  const needle = normalizedQuery.toLocaleLowerCase('en-US');
   if (!needle) return Object.freeze([]);
   const matches = records
     .filter((record) => record.kind === 'monster' && record.resolution_state === 'RESOLVED' && typeof record.entity_id === 'string' && record.entity_id.startsWith(MONSTER_ENTITY_PREFIX))
-    .filter((record) => record.label.toLocaleLowerCase('en-US').includes(needle) || record.entity_id === query)
+    .filter((record) => record.label.toLocaleLowerCase('en-US').includes(needle) || record.entity_id === normalizedQuery)
     .sort((a, b) => a.label.localeCompare(b.label) || a.entity_id.localeCompare(b.entity_id))
     .slice(0, limit);
   return Object.freeze(matches.map((record) => Object.freeze({ ...record })));
