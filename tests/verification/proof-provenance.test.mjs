@@ -1,5 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { buildQualificationWorld, verifyQualificationWorld } from '../../tools/verification/qualification-world.mjs';
 
 import { bytesDigest, canonicalDigest } from '../../tools/verification/anti-loop-common.mjs';
 import { canonicalJson } from '../../tools/verification/verification-plan-schema.mjs';
@@ -108,4 +112,33 @@ test('multi-capability authentication returns only recomputed identities and rec
   const result = authenticatePublicationProofs({ publicationProofs: { bounded_real_world: bounded.proof, qualification_fixture: fixture.proof }, protectedExpectedAuthorities: { bounded_real_world: bounded.authority, qualification_fixture: fixture.authority }, protectedBaseSha: sha('f') });
   assert.deepEqual(Object.keys(result.authenticatedPublicationIdentities), ['bounded_real_world', 'qualification_fixture']);
   assert.notEqual(result.trustReceiptDigest, result.authenticatedPublicationIdentities.bounded_real_world.trustReceiptDigest);
+});
+
+
+test('actual qualification builder LF product closure authenticates without relaxing raw census or protected pins', async () => {
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-provenance-fixture-'));
+  try {
+    const root = path.join(temporary, 'product');
+    await buildQualificationWorld(root);
+    const manifest = await verifyQualificationWorld(root);
+    assert.equal(manifest.productDigest, bytesDigest(canonicalBytes(manifest.files)));
+    assert.notEqual(manifest.productDigest, canonicalDigest(manifest.files));
+    const productManifestBytes = fs.readFileSync(path.join(root, 'fixture-manifest.json'));
+    const publicationManifestBytes = fs.readFileSync(path.join(root, 'publication/publication.json'));
+    const productFiles = manifest.files.map(({ path: relative }) => ({ path: relative, bytes: fs.readFileSync(path.join(root, relative)) }));
+    const authority = buildProtectedExpectedAuthority({ schemaVersion: 1, authorityId: PUBLICATION_AUTHORITY_ID, dataCapability: 'qualification_fixture', product: { id: manifest.fixtureId, manifestPath: 'fixture-manifest.json', digest: manifest.productDigest }, publication: { manifestPath: 'publication/publication.json', digest: bytesDigest(publicationManifestBytes) }, source: { kind: 'atlas-owned-fixture', repository: null, revision: null, selectedBytes: [] }, completeProductContractDigest: null });
+    const proof = { dataCapability: 'qualification_fixture', productManifestBytes, publicationManifestBytes, productFiles, source: null, completeProduct: null };
+    const authenticate = (publicationProof = proof, protectedExpectedAuthority = authority) => authenticatePublicationProof({ publicationProof, protectedExpectedAuthority, protectedBaseSha: sha('a') });
+    assert.equal(authenticate().productRootDigest, manifest.productDigest);
+    const changed = productFiles.map(file => ({ ...file, bytes: Buffer.from(file.bytes) }));
+    changed[0].bytes[0] ^= 1;
+    assert.throws(() => authenticate({ ...proof, productFiles: changed }), /does not close over exact file bytes/);
+    assert.throws(() => authenticate({ ...proof, productFiles: productFiles.slice(1) }), /does not close over exact file bytes/);
+    assert.throws(() => authenticate({ ...proof, productFiles: [...productFiles, { path: 'extra.bin', bytes: Buffer.from('extra') }] }), /does not close over exact file bytes/);
+    const rewritten = { ...manifest, files: changed.map(file => ({ path: file.path, bytes: file.bytes.length, digest: bytesDigest(file.bytes) })) };
+    rewritten.productDigest = bytesDigest(canonicalBytes(rewritten.files));
+    assert.throws(() => authenticate({ ...proof, productFiles: changed, productManifestBytes: canonicalBytes(rewritten) }), /product digest does not match protected authority/);
+    const wrongEncoding = { ...manifest, productDigest: canonicalDigest(manifest.files) };
+    assert.throws(() => authenticate({ ...proof, productManifestBytes: canonicalBytes(wrongEncoding) }), /product digest does not match protected authority/);
+  } finally { fs.rmSync(temporary, { recursive: true, force: true }); }
 });
