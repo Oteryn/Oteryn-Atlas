@@ -86,6 +86,8 @@ export function verifyExecutionView({viewRoot,sourceRoot,revision}) {
 export function prepareExecutionView({sourceRoot,revision,destination}) {
   assertCheckout(sourceRoot,revision);executionEntries(sourceRoot,revision);
   if(fs.existsSync(destination)||path.resolve(destination).startsWith(path.resolve(sourceRoot)+path.sep))fail('execution view destination');
+  // A fresh local clone preserves exact Git history for tests without copying
+  // checkout credentials/configuration or sharing writable object hardlinks.
   const env={PATH:process.env.PATH,GIT_CONFIG_GLOBAL:'/dev/null',GIT_CONFIG_NOSYSTEM:'1',GIT_TERMINAL_PROMPT:'0'};
   execFileSync('git',['-c','core.hooksPath=/dev/null','clone','--quiet','--no-hardlinks','--no-checkout','--',sourceRoot,destination],{stdio:'pipe',env});
   const viewGit=(...args)=>execFileSync('git',['--no-replace-objects','-C',destination,'-c','core.hooksPath=/dev/null',...args],{stdio:'pipe',env});
@@ -121,6 +123,8 @@ export function planShadow({candidate,root,protectedRoot}) {
   return {plan,input:{root,protectedRoot,candidate,planInput,protectedCatalog,protectedImpactManifest,protectedStableTestIds}};
 }
 
+// No language-owned reporter is accepted as evidence that a candidate assertion
+// ran. This census attests exact processes/spec files and their external exits.
 export function deterministicDockerArgs({command,candidateRoot,dependencyRoot,shimRoot,protectedHarnessFile,protectedInputFile,image,containerName}) {
   if(command.engine!=='deterministic'||command.cwd!=='.'||!['node','python','python3'].includes(command.argv?.[0])
     ||!command.argv.slice(1).every(value=>typeof value==='string')||!/^sha256:[a-f0-9]{64}$/.test(command.id)) fail('deterministic command');
@@ -169,6 +173,7 @@ function executeDeterministic(command,root,image,dependencyRoot,shimRoot,protect
   let result,container;
   try {
     result=spawnSync('docker',argv,{encoding:'utf8',timeout:command.timeoutSeconds*1000,maxBuffer:16*1024*1024,env:{PATH:process.env.PATH,HOME:process.env.HOME}});
+    // Inspect the actual container, even for timeout/nonzero/daemon failures.
     try {container=JSON.parse(execFileSync('docker',['inspect',name],{encoding:'utf8'}))[0];} catch {assertContainerStarted(null,result);}
     assertContainerStarted(container,result);
     assertDeterministicContainer(container,{command,candidateRoot:root,dependencyRoot,shimRoot,protectedHarnessFile,protectedInputFile,image});
@@ -274,6 +279,8 @@ function runPublicationBrowser(command,{candidate,contract,publication,directory
   const suffix=command.id.slice('sha256:'.length,'sha256:'.length+12);
   const context=path.join(directory,`browser-context-${suffix}`);fs.mkdirSync(context);
   for(const relative of ['web','src']) fs.cpSync(path.join(root,relative),path.join(context,relative),{recursive:true});
+  // Candidate web/source bytes are inert inputs. Every executable harness byte
+  // comes from the authenticated protected checkout.
   fs.cpSync(path.join(controlRoot,'e2e'),path.join(context,'e2e'),{recursive:true,filter:p=>!p.split(path.sep).includes('node_modules')});
   fs.mkdirSync(path.join(context,'tools','verification'),{recursive:true});
   fs.copyFileSync(path.join(controlRoot,'tools/verification/stable-id.mjs'),path.join(context,'tools/verification/stable-id.mjs'));
