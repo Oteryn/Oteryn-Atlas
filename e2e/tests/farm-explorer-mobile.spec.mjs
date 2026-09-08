@@ -7,6 +7,8 @@ import {
   waitForAtlas,
 } from './runtime.mjs';
 
+const SENTINEL = Object.freeze({label: 'Fixture Sentinel'});
+
 async function waitForFarm(page) {
   await page.waitForFunction(() => ['PASS', 'FAIL'].includes(globalThis.__OTERYN_ATLAS_FARM__?.status), null, { timeout: 30_000 });
   return page.evaluate(() => globalThis.__OTERYN_ATLAS_FARM__);
@@ -23,10 +25,10 @@ test('mobile Farm Explorer remains reachable and truthful in the existing contro
   await page.locator('#mobile-controls-toggle').click();
   await expect(page.locator('#mobile-controls-panel')).toHaveClass(/mobile-open/);
   await expect(page.locator('#farm-explorer')).toBeVisible();
-  await page.locator('#farm-creature-search').fill('Cave Rat');
-  const caveRat = page.locator('#farm-creature-results .farm-creature-result').filter({ hasText: /^Cave Rat$/ }).first();
-  await expect(caveRat).toBeVisible();
-  await caveRat.click();
+  await page.locator('#farm-creature-search').fill(SENTINEL.label);
+  const sentinel = page.locator('#farm-creature-results .farm-creature-result').filter({ hasText: new RegExp(`^${SENTINEL.label}$`) }).first();
+  await expect(sentinel).toBeVisible();
+  await sentinel.click();
   await page.locator('#farm-target-kills').fill('90');
   await page.locator('#farm-kph').fill('45');
   await page.locator('#farm-time-base').selectOption('trip_wall');
