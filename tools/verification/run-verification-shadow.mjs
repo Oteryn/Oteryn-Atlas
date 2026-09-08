@@ -139,7 +139,7 @@ export function deterministicDockerArgs({command,candidateRoot,dependencyRoot,sh
   if(!/^[a-z0-9-]+$/.test(containerName)||!/@sha256:[a-f0-9]{64}$/.test(image)) fail('container identity');
   return ['run','--name',containerName,'--network=none','--read-only','--user=1000:1000','--cap-drop=ALL',
     '--security-opt=no-new-privileges','--pids-limit=192','--memory=1610612736','--cpus=2',
-    '--tmpfs=/tmp:rw,nodev,nosuid,size=256m','--mount',`type=bind,src=${candidateRoot},dst=/candidate,readonly`,
+    '--tmpfs=/tmp:rw,exec,nodev,nosuid,size=256m','--mount',`type=bind,src=${candidateRoot},dst=/candidate,readonly`,
     '--mount',`type=bind,src=${dependencyRoot},dst=/candidate/e2e/node_modules,readonly`,
     '--mount',`type=bind,src=${shimRoot},dst=/tmp/atlas-python-bin,readonly`,
     '--workdir=/candidate','--env=PATH=/tmp/atlas-python-bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin','--env=HOME=/tmp','--env=PYTHONPYCACHEPREFIX=/tmp/atlas-python-pycache',image,
@@ -153,7 +153,7 @@ export function assertDeterministicContainer(container,{command,candidateRoot,de
     ||host.Privileged||canonicalJson(host.CapDrop)!==canonicalJson(['ALL'])
     ||!host.SecurityOpt?.some(x=>x==='no-new-privileges'||x==='no-new-privileges:true')
     ||host.PidsLimit!==192||host.Memory!==1610612736||host.NanoCpus!==2000000000
-    ||host.Tmpfs?.['/tmp']!=='rw,nodev,nosuid,size=256m') fail('actual container isolation/completion');
+    ||host.Tmpfs?.['/tmp']!=='rw,exec,nodev,nosuid,size=256m') fail('actual container isolation/completion');
   const expected=[{Source:candidateRoot,Destination:'/candidate'},
     {Source:dependencyRoot,Destination:'/candidate/e2e/node_modules'},
     {Source:shimRoot,Destination:'/tmp/atlas-python-bin'}].sort((a,b)=>a.Destination.localeCompare(b.Destination));

@@ -258,6 +258,8 @@ test('deterministic runner has exact command and readonly credential-free mounts
  const command={id:'sha256:'+'a'.repeat(64),engine:'deterministic',cwd:'.',argv:['node','--test','tests/example.mjs']};
  const input={command,candidateRoot:'/candidate-source',dependencyRoot:'/protected-deps',shimRoot:'/python-shim',containerName:'atlas-r4-example',image:'image@sha256:'+'b'.repeat(64)};
  const args=deterministicDockerArgs(input);
+ assert.ok(args.includes('--tmpfs=/tmp:rw,exec,nodev,nosuid,size=256m'));
+ assert.equal(args.filter(arg=>arg.startsWith('--tmpfs=')).length,1);
  assert.deepEqual(args.slice(-3),command.argv);
  for(const flag of ['--network=none','--read-only','--user=1000:1000','--cap-drop=ALL','--security-opt=no-new-privileges'])assert.ok(args.includes(flag));
  assert.ok(args.filter(x=>x.startsWith('type=bind')).every(x=>x.endsWith(',readonly')));
@@ -269,9 +271,10 @@ test('actual container evidence rejects extra writable mounts, capabilities, cre
  const command={argv:['node','--test','tests/example.mjs']};
  const input={command,candidateRoot:'/subject',dependencyRoot:'/deps',shimRoot:'/shim',image:'image@sha256:'+'b'.repeat(64)};
  const container={Config:{Image:input.image,User:'1000:1000',WorkingDir:'/candidate',Env:['HOME=/tmp']},
- HostConfig:{NetworkMode:'none',ReadonlyRootfs:true,Privileged:false,CapDrop:['ALL'],SecurityOpt:['no-new-privileges'],PidsLimit:192,Memory:1610612736,NanoCpus:2000000000,Tmpfs:{'/tmp':'rw,nodev,nosuid,size=256m'}},
+ HostConfig:{NetworkMode:'none',ReadonlyRootfs:true,Privileged:false,CapDrop:['ALL'],SecurityOpt:['no-new-privileges'],PidsLimit:192,Memory:1610612736,NanoCpus:2000000000,Tmpfs:{'/tmp':'rw,exec,nodev,nosuid,size=256m'}},
  State:{Running:false,OOMKilled:false},Path:'node',Args:command.argv.slice(1),Mounts:[{Type:'bind',RW:false,Source:'/subject',Destination:'/candidate'},{Type:'bind',RW:false,Source:'/deps',Destination:'/candidate/e2e/node_modules'},{Type:'bind',RW:false,Source:'/shim',Destination:'/tmp/atlas-python-bin'}]};
  assert.equal(assertDeterministicContainer(container,input),true);
+ for(const options of ['rw,nodev,nosuid,size=256m','rw,exec,noexec,nodev,nosuid,size=256m','rw,exec,nodev,suid,size=256m','rw,exec,dev,nosuid,size=256m','rw,exec,exec,nodev,nosuid,size=256m','rw,exec,nodev,nosuid,size=256m,unknown']){const bad=structuredClone(container);bad.HostConfig.Tmpfs['/tmp']=options;assert.throws(()=>assertDeterministicContainer(bad,input),/isolation/);}
  for(const mutate of [x=>x.Mounts[0].RW=true,x=>x.Mounts.push({Type:'bind',RW:false,Source:'/var/run/docker.sock',Destination:'/socket'}),x=>x.HostConfig.Privileged=true,x=>x.HostConfig.CapDrop=[],x=>x.HostConfig.SecurityOpt=[],x=>x.HostConfig.PidsLimit=0,x=>x.Config.Env.push('GH_TOKEN=fake'),x=>x.Args.push('--test-only'),x=>x.State.Running=true]){const bad=structuredClone(container);mutate(bad);assert.throws(()=>assertDeterministicContainer(bad,input));}
 });
 }
