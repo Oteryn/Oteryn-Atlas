@@ -26,6 +26,11 @@ function clean(value){return value.trim();}
 function assertSafePath(name){
   if(typeof name!=='string'||!name||name.startsWith('/')||name.includes('\\')||!/^[A-Za-z0-9._/-]+$/.test(name)||name.split('/').some(part=>!part||part==='.'||part==='..'))fail(`unsafe path: ${name}`);
 }
+function deterministicTestSubject(name){
+  return typeof name==='string'&&/^tests\/[A-Za-z0-9_./-]+\.(mjs|py)$/.test(name)
+    && !name.split('/').some(part=>!part||part==='.'||part==='..');
+}
+function sameDeterministicRuntime(left,right){return path.posix.extname(left)===path.posix.extname(right);}
 function treePaths(root,revision,prefix){
   const value=git(root,['ls-tree','-r','--name-only',revision,'--',prefix]);
   return value.split('\n').filter(Boolean);
@@ -37,9 +42,7 @@ function mode(root,revision,name){
 }
 function sameList(actual,expected){return JSON.stringify([...actual].sort())===JSON.stringify([...expected].sort());}
 function plainObject(value){return value!==null&&typeof value==='object'&&!Array.isArray(value);}
-function exactKeys(value,keys,label){
-  if(!plainObject(value)||!sameList(Object.keys(value),keys))fail(`${label} has invalid shape`);
-}
+function exactKeys(value,keys,label){if(!plainObject(value)||!sameList(Object.keys(value),keys))fail(`${label} has invalid shape`);}
 function protectedJson(base,name){
   let value;
   try{value=JSON.parse(blob(trustedRoot,base,name).toString('utf8'));}catch{fail(`protected authority is invalid JSON: ${name}`);}
@@ -116,8 +119,19 @@ function remediationLanes(change,lanes){
   }
   return matches;
 }
-function verificationRestoration(change,rules){
-  return !change.oldPath&&rules.some(rule=>rule.path===change.path&&rule.operations.has(change.status));
+function verificationRestoration(change,rules,base){
+  if(change.oldPath)return false;
+  const rule=rules.find(candidate=>candidate.path===change.path);
+  if(!rule)return false;
+  const protectedMode=mode(trustedRoot,base,rule.path);
+  if(change.status==='M')return protectedMode!==null;
+  if(change.status==='A')return protectedMode===null&&rule.operations.has('A');
+  return false;
+}
+function verificationTestSubject(change){
+  if(change.status==='C'||change.status==='D')return false;
+  if(change.status==='R')return deterministicTestSubject(change.oldPath)&&deterministicTestSubject(change.path)&&sameDeterministicRuntime(change.oldPath,change.path);
+  return (change.status==='A'||change.status==='M')&&deterministicTestSubject(change.path);
 }
 
 function parseChanges(root,base,head){
@@ -155,14 +169,18 @@ function verifyRegularText(root,revision,name){
   try{new TextDecoder('utf-8',{fatal:true}).decode(bytes);}catch{fail(`candidate path is not UTF-8 text content: ${name}`);}
 }
 
-function allowedNormal(change,authority){
+function allowedNormal(change,authority,base){
   const {status,path:name}=change;
-  if(change.oldPath)fail(`rename or copy is forbidden: ${change.oldPath} -> ${name}`);
   if(name.startsWith('tools/maintenance/')||name===REMEDIATION_ALLOWLIST||name===OBSOLETE_VERIFICATION_CONTRACTS||name===VERIFICATION_RESTORATION_ALLOWLIST)fail(`maintenance authority is immutable: ${name}`);
-  if(name.startsWith('.github/workflows/')||name.startsWith(ARCHIVE_ROOT))fail('workflow transition is not the complete suspension cutover');
-  const restoration=verificationRestoration(change,authority.restoration);
-  const lanes=remediationLanes(change,authority.lanes);
-  if(restoration||lanes.size)return {kind:'bounded-authority',restoration,lanes};
+  if(change.oldPath?.startsWith('tools/maintenance/')||change.oldPath===REMEDIATION_ALLOWLIST||change.oldPath===OBSOLETE_VERIFICATION_CONTRACTS||change.oldPath===VERIFICATION_RESTORATION_ALLOWLIST)fail(`maintenance authority is immutable: ${change.oldPath}`);
+  if(name.startsWith('.github/workflows/')||name.startsWith(ARCHIVE_ROOT)||change.oldPath?.startsWith('.github/workflows/')||change.oldPath?.startsWith(ARCHIVE_ROOT))fail('workflow transition is not the complete suspension cutover');
+  if(!change.oldPath){
+    const restoration=verificationRestoration(change,authority.restoration,base);
+    const lanes=remediationLanes(change,authority.lanes);
+    if(restoration||lanes.size)return {kind:'bounded-authority',restoration,lanes};
+  }
+  if(verificationTestSubject(change))return {kind:'verification-test-subject',restoration:true,lanes:new Set()};
+  if(change.oldPath)fail(`rename or copy is forbidden: ${change.oldPath} -> ${name}`);
   if(name==='AGENTS.md')return status==='M'?{kind:'maintenance'}:null;
   if(name.startsWith('docs/agents/')||name.startsWith('docs/evidence/')||name.startsWith('docs/maintenance/'))return ['A','M','D'].includes(status)?{kind:'maintenance'}:null;
   if(name.startsWith('tools/governance/'))return ['A','M','D'].includes(status)?{kind:'maintenance'}:null;
@@ -175,12 +193,15 @@ function verifyNormal(changes,base,head){
   if(changes.some(change=>change.path===VERIFICATION_RESTORATION_ALLOWLIST||change.oldPath===VERIFICATION_RESTORATION_ALLOWLIST))fail(`maintenance authority is immutable: ${VERIFICATION_RESTORATION_ALLOWLIST}`);
   const boundedAdmissions=[];
   for(const change of changes){
-    const admission=allowedNormal(change,authority);
+    const admission=allowedNormal(change,authority,base);
     if(!admission)fail(`maintenance path is frozen: ${change.path}`);
-    if(admission.kind==='bounded-authority')boundedAdmissions.push(admission);
+    if(admission.kind==='bounded-authority'||admission.kind==='verification-test-subject')boundedAdmissions.push(admission);
     if(change.status==='D'){
       if(mode(candidateRoot,base,change.path)!=='100644')fail(`removed path was not a regular 100644 file: ${change.path}`);
-    }else verifyRegularText(candidateRoot,head,change.path);
+    }else{
+      if(change.status==='R'&&mode(candidateRoot,base,change.oldPath)!=='100644')fail(`renamed path was not a regular 100644 file: ${change.oldPath}`);
+      verifyRegularText(candidateRoot,head,change.path);
+    }
   }
   const restorationOnly=boundedAdmissions.some(item=>item.restoration&&!item.lanes.size);
   const remediationOnly=boundedAdmissions.some(item=>!item.restoration&&item.lanes.size);
@@ -214,12 +235,7 @@ function verifyCutover(changes,base,head){
   for(let index=0;index<suspendable.length;index++){
     if(!blob(candidateRoot,base,suspendable[index]).equals(blob(candidateRoot,head,expectedArchives[index])))fail(`archived workflow bytes changed: ${suspendable[index]}`);
   }
-  const allowed=new Set([
-    ...suspendable,
-    ...expectedArchives,
-    '.github/workflows/merge-group-gate.yml',
-    'docs/maintenance/ATLAS-MAINTENANCE-MODE.md',
-  ]);
+  const allowed=new Set([...suspendable,...expectedArchives,'.github/workflows/merge-group-gate.yml','docs/maintenance/ATLAS-MAINTENANCE-MODE.md']);
   for(const change of changes){
     if(change.status==='R'||change.status==='C'){
       const expectedArchive=`${ARCHIVE_ROOT}${path.posix.basename(change.oldPath)}`;
