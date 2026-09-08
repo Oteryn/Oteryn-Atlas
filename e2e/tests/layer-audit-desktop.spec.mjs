@@ -52,3 +52,5 @@ test('layer controls expose correct availability and fail-closed states', async 
     await expect(row.locator(`input[data-creature-kind="${kind}"]`)).not.toBeChecked();
   }
 });
+
+// R4 S2 qualification: select the protected layer availability oracle.
