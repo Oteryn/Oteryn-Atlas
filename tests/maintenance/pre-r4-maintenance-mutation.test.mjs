@@ -16,6 +16,12 @@ const r5CanaryPaths=[
   'web/fullworld-farm-explorer.mjs',
   'tools/build-semantic-search-index.py',
 ];
+const r5CorrectivePaths=[
+  'e2e/tests/farm-explorer-desktop.spec.mjs',
+  'e2e/tests/farm-explorer-mobile.spec.mjs',
+  'web/fullworld-search.mjs',
+];
+const r5AuthorizedPaths=[...r5CanaryPaths,...r5CorrectivePaths];
 const readSource=name=>fs.readFileSync(path.join(sourceRoot,name),'utf8');
 function git(root,...args){return execFileSync('git',['-C',root,'-c','core.hooksPath=/dev/null',...args],{encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim();}
 function put(root,name,content='export {};\n'){const target=path.join(root,name);fs.mkdirSync(path.dirname(target),{recursive:true});fs.writeFileSync(target,content);}
@@ -27,7 +33,7 @@ function fixture(t){
   put(trusted,restoration,readSource(restoration));put(trusted,remediation,readSource(remediation));put(trusted,obsolete,readSource(obsolete));
   put(trusted,'tools/verification/verification-execution-contract.mjs');
   put(trusted,'tools/verification/build-verification-plan.mjs');
-  for(const name of r5CanaryPaths)put(trusted,name);
+  for(const name of r5AuthorizedPaths)put(trusted,name);
   put(trusted,'src/browser/semantic.mjs');
   put(trusted,'tests/browser-semantic.mjs');
   put(trusted,'tests/existing.mjs',"import test from 'node:test';test('existing',()=>{});\n");
@@ -74,8 +80,8 @@ test('candidate restoration authority cannot self-admit unrelated code',t=>{
   const f=fixture(t);const manifest=JSON.parse(fs.readFileSync(path.join(f.candidate,restoration),'utf8'));manifest.rules.push({path:'web/rogue.mjs',operations:['M']});put(f.candidate,restoration,`${JSON.stringify(manifest)}\n`);put(f.candidate,'web/rogue.mjs','// candidate\n');f.commit();const r=f.invoke();assert.equal(r.status,1);assert.match(r.stderr,/maintenance authority is immutable/);
 });
 
-test('protected R5 authority admits only the three exact canary paths equivalently for PR and MQ',t=>{
-  for(const name of r5CanaryPaths){
+test('protected R5 authority admits only the exact canary and corrective paths equivalently for PR and MQ',t=>{
+  for(const name of r5AuthorizedPaths){
     const f=fixture(t);put(f.candidate,name,'// realistic R5 canary\n');f.commit();
     const pr=f.invoke();pass(pr);
     const head=git(f.candidate,'rev-parse','HEAD');
@@ -86,6 +92,9 @@ test('protected R5 authority admits only the three exact canary paths equivalent
     'tools/fullworld-layers/verify_authority_registry-extra.py',
     'web/fullworld-farm-explorer-extra.mjs',
     'tools/build-semantic-search-index-extra.py',
+    'e2e/tests/farm-explorer-desktop-extra.spec.mjs',
+    'e2e/tests/farm-explorer-mobile-extra.spec.mjs',
+    'web/fullworld-search-extra.mjs',
   ]){
     const f=fixture(t);put(f.candidate,name,'// near-neighbor\n');f.commit();
     const result=f.invoke();assert.equal(result.status,1);assert.match(result.stderr,/maintenance path is frozen/);
