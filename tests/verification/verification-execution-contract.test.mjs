@@ -217,7 +217,16 @@ test('candidate execution metadata cannot replace protected interpreter or hashe
  assert(!JSON.stringify(contract).includes('candidate-policy'));
 });
 
-import {resolveShadowEvent,planShadow,deterministicDockerArgs} from '../../tools/verification/run-verification-shadow.mjs';
+import {resolveShadowEvent,planShadow,deterministicDockerArgs,fixtureBrowserArgs} from '../../tools/verification/run-verification-shadow.mjs';
+test('fixture browser preserves runner ownership of report artifacts',()=>{
+ const compose=['compose','-p','protected-fixture','-f','/protected/compose.yml'];
+ assert.deepEqual(fixtureBrowserArgs(compose,{uid:1001,gid:1002}),[...compose,'run','--user','1001:1002','--rm','--no-deps','e2e']);
+ assert.deepEqual(fixtureBrowserArgs(compose),[...compose,'run','--user',`${process.getuid()}:${process.getgid()}`,'--rm','--no-deps','e2e']);
+ for(const bad of [-1,1.5,'1001',NaN,Infinity]){
+  assert.throws(()=>fixtureBrowserArgs(compose,{uid:bad,gid:1002}),/fixture host identity/);
+  assert.throws(()=>fixtureBrowserArgs(compose,{uid:1001,gid:bad}),/fixture host identity/);
+ }
+});
 import {assertDeterministicContainer} from '../../tools/verification/run-verification-shadow.mjs';
 {
 const repository='Oteryn/Oteryn-Atlas',base='a'.repeat(40),head='b'.repeat(40),tree='c'.repeat(40);
