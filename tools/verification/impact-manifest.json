@@ -1072,6 +1072,28 @@
         "fullworld.complete-integrity"
       ],
       "executionBlocker": "unqualified-complete-product-oracle"
+    },
+    {
+      "pathPrefix": "tests/maintenance/pre-r4-maintenance-mutation.test.mjs",
+      "exactMatch": true,
+      "domains": [
+        "maintenance-retirement"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.maintenance"
+      ]
+    },
+    {
+      "pathPrefix": "tests/maintenance/r4-shadow-admission.test.mjs",
+      "exactMatch": true,
+      "domains": [
+        "maintenance-retirement"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.maintenance"
+      ]
     }
   ],
   "crossDomainEscalations": [

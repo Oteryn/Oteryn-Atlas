@@ -1,7 +1,0 @@
-{
-  "schemaVersion": 1,
-  "paths": [
-    "tests/verification/anti-loop-transition-compose-contract.test.mjs",
-    "tests/verification/bootstrap-catalog-workflow-contract.test.mjs"
-  ]
-}

@@ -11,6 +11,17 @@ test('unknown source preserves broad partial proof but cannot qualify as complet
  assert(p.executionBlockers.some(x=>x.path==='new-product/compiler.py'&&x.reason==='unknown-impact'));
  assert.throws(()=>planner.assertPlanExecutable(p),/unresolved/);
 });
+test('exact delete-only maintenance retirement keeps impact proof without requiring a live test owner',()=>{
+ for(const path of ['tests/maintenance/pre-r4-maintenance-mutation.test.mjs','tests/maintenance/r4-shadow-admission.test.mjs']){
+  const removed=planner.buildVerificationPlan({repository:'Oteryn/Oteryn-Atlas',headSha:'a'.repeat(40),integrationBaseSha:'b'.repeat(40),mergeBaseSha:'c'.repeat(40),changedFiles:[{path,status:'removed'}],verificationCatalog:catalog,trustedImpactManifest:manifest,candidateImpactManifest:manifest});
+  assert.deepEqual(removed.executionBlockers,[]);
+  assert.deepEqual(removed.requiredGroupIds,['deterministic.maintenance']);
+  assert.equal(planner.assertPlanExecutable(removed),removed);
+  const modified=planner.buildVerificationPlan({repository:'Oteryn/Oteryn-Atlas',headSha:'a'.repeat(40),integrationBaseSha:'b'.repeat(40),mergeBaseSha:'c'.repeat(40),changedFiles:[{path,status:'modified'}],verificationCatalog:catalog,trustedImpactManifest:manifest,candidateImpactManifest:manifest});
+  assert(modified.executionBlockers.some(x=>x.reason==='unowned-test'&&x.path===path));
+  assert(!modified.executionBlockers.some(x=>x.reason==='unknown-impact'&&x.path===path));
+ }
+});
 test('a broad tests prefix cannot hide a new unowned deterministic test',()=>{
  const p=plan('tests/new-feature.py');
  assert(p.executionBlockers.some(x=>x.reason==='unowned-test'));

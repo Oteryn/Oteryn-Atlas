@@ -123,7 +123,9 @@
         "tests/maintenance/maintenance-diff-policy.test.mjs",
         "tools/verification/impact-manifest.json",
         "tests/verification/plan-execution-readiness.test.mjs",
-        "tests/verification/protected-admission-cli-census.test.mjs"
+        "tests/verification/protected-admission-cli-census.test.mjs",
+        "tools/verification/build-verification-plan.mjs",
+        "tools/verification/deterministic-execution.mjs"
       ]
     }
   }

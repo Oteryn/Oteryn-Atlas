@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 import { resolveDeterministicCommands } from '../../tools/verification/deterministic-execution.mjs';
 
 function fixture(t) {
@@ -30,6 +31,13 @@ test('exact selected Node/Python commands retain imported leaf coverage once', t
   assert.throws(() => resolveDeterministicCommands({ ...value, groupIds: ['deterministic.node'], requiredSpecs: ['tests/b.py'] }), /required test is not selected/);
 });
 
+test('delete-only unowned subjects do not create commands while removed selected owners still fail closed', t => {
+  const value = fixture(t);
+  const commands = resolveDeterministicCommands({ ...value, groupIds: ['deterministic.python'], changedFiles: [{ path: 'tests/retired-maintenance.test.mjs', status: 'removed' }] });
+  assert.deepEqual(commands.map(row => row.spec), ['tests/b.py']);
+  fs.unlinkSync(path.join(value.root, 'tests/b.py'));
+  assert.throws(() => resolveDeterministicCommands({ ...value, groupIds: ['deterministic.python'], changedFiles: [{ path: 'tests/b.py', status: 'removed' }] }), /missing file/);
+});
 test('missing files, missing or empty groups, browser groups and unsupported interpreters fail closed', t => {
   const value = fixture(t);
   assert.throws(() => resolveDeterministicCommands({ ...value, groupIds: ['missing'] }), /unknown group/);
@@ -66,12 +74,35 @@ test('duplicate selections deduplicate while stale import proof, cycles and opaq
   assert.throws(() => resolveDeterministicCommands(value), /source proof changed/);
 });
 
-test('repository ownership preserves all 53 nonverification entrypoints and separates browser harnesses', () => {
+test('repository ownership preserves all current nonverification deterministic entrypoints and separates explicit noncanonical harnesses', () => {
   const root = new URL('../../', import.meta.url);
+  const rootPath = fileURLToPath(root);
   const inventory = deriveVerificationMetadata(JSON.parse(fs.readFileSync(new URL('tools/verification/verification-catalog.json', root)))).deterministic;
-  const baseline = JSON.parse(fs.readFileSync(new URL('docs/maintenance/verification-restoration/contract-ownership.json', root)));
-  assert.deepEqual(inventory.entries.map(row => row.spec).sort(), baseline.deterministicEntrypoints.filter(row => !row.path.startsWith('tests/verification/')).map(row => row.path).sort());
-  assert.equal(inventory.entries.length, 53);
+  const noncanonical = new Set([
+    'tests/browser-proof.html',
+    'tests/browser-proof.mjs',
+    'tests/fixtures/game-semantic-search-source.json',
+    'tests/fullworld-mobile-layout-proof.html',
+    'tests/semantic-search-browser-proof.mjs',
+    'tests/semantic-search-browser.html',
+  ]);
+  const discovered = [];
+  const walk = directory => {
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      const location = new URL(entry.name + (entry.isDirectory() ? '/' : ''), directory);
+      if (entry.isDirectory()) walk(location);
+      else if (['.mjs', '.js', '.cjs', '.py'].includes(path.extname(entry.name))) {
+        const spec = path.relative(rootPath, fileURLToPath(location)).split(path.sep).join('/');
+        if (!spec.startsWith('tests/verification/') && !noncanonical.has(spec)) discovered.push(spec);
+      }
+    }
+  };
+  walk(new URL('tests/', root));
+  const expected = new Set(discovered);
+  const owned = new Set(inventory.entries.map(row => row.spec));
+  assert.deepEqual([...owned].filter(spec => !expected.has(spec)).sort(), [], 'catalog cannot own missing/noncanonical entrypoints');
+  assert.deepEqual([...expected].filter(spec => !owned.has(spec)).sort(), [], 'every current deterministic source entrypoint requires canonical ownership');
+  assert.equal(inventory.entries.length, expected.size);
   for (const row of inventory.entries) {
     assert.ok(inventory.proposedCatalog.groups[row.group].specs.includes(row.spec), row.spec);
     assert.ok(!row.spec.endsWith('.html'));

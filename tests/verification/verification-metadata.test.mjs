@@ -10,7 +10,7 @@ test('one canonical policy projects complete browser, product and verification o
   const catalog = load();
   const { browser, deterministic, contracts } = deriveVerificationMetadata(catalog);
   assert.equal(browser.specs.length, 36);
-  assert.equal(deterministic.entries.length, 53);
+  assert.equal(deterministic.entries.length, 57);
   assert.deepEqual(deterministic.proposedCatalog.groups['deterministic.core'].specs, catalog.groups['deterministic.core'].specs, 'contract disposition never narrows canonical execution');
   const actual = fs.readdirSync(new URL('tests/verification/', root)).filter(p => p.endsWith('.test.mjs')).map(p => `tests/verification/${p}`).sort();
   assert.deepEqual(contracts.contracts.map(row => row.path).sort(), actual);
