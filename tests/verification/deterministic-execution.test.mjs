@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 import { resolveDeterministicCommands } from '../../tools/verification/deterministic-execution.mjs';
 
 function fixture(t) {
@@ -68,6 +69,7 @@ test('duplicate selections deduplicate while stale import proof, cycles and opaq
 
 test('repository ownership preserves current entrypoints and exposes only exact bounded transition gaps', () => {
   const root = new URL('../../', import.meta.url);
+  const rootPath = fileURLToPath(root);
   const inventory = deriveVerificationMetadata(JSON.parse(fs.readFileSync(new URL('tools/verification/verification-catalog.json', root)))).deterministic;
   const noncanonical = new Set([
     'tests/browser-proof.html',
@@ -92,8 +94,8 @@ test('repository ownership preserves current entrypoints and exposes only exact 
     for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
       const location = new URL(entry.name + (entry.isDirectory() ? '/' : ''), directory);
       if (entry.isDirectory()) walk(location);
-      else {
-        const spec = 'tests/' + decodeURIComponent(location.pathname.split('/tests/')[1]);
+      else if (['.mjs', '.js', '.cjs', '.py'].includes(path.extname(entry.name))) {
+        const spec = path.relative(rootPath, fileURLToPath(location)).split(path.sep).join('/');
         if (!spec.startsWith('tests/verification/') && !noncanonical.has(spec) && !pendingRetirement.has(spec)) discovered.push(spec);
       }
     }
