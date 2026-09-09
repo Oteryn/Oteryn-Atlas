@@ -30,6 +30,8 @@ Selective verification is active blocking authority through `.github/workflows/v
 - Unknown or unowned paths fail closed.
 - Accepted deterministic and browser retries are zero; do not rerun-until-green, broaden allowlists, hide failures, or add arbitrary sleeps.
 
+User-visible changes require real-browser journeys and reviewed full-frame evidence. Accepted visual evidence must identify the reviewer, exact Atlas revision, exact Playwright result, and screenshot digests before it can support a protected acceptance claim.
+
 The expected protection chain is ruleset `22103758` (`Protect main`), organization workflow authority `22352928`, and selective-verification ruleset `22592581`. Do not weaken, remove, or bypass those protections without explicit owner authority for the exact action.
 
 ## Verification capability route
