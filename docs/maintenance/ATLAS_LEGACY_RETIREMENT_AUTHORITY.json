@@ -106,7 +106,9 @@
         "docs/maintenance/verification-restoration/context-ledger.json",
         "docs/maintenance/verification-restoration/contract-ownership.json",
         "docs/maintenance/verification-restoration/live-state.json",
-        "docs/maintenance/verification-restoration/validation.json"
+        "docs/maintenance/verification-restoration/validation.json",
+        "tests/maintenance/pre-r4-maintenance-mutation.test.mjs",
+        "tests/maintenance/r4-shadow-admission.test.mjs"
       ],
       "supportModify": [
         "AGENTS.md",
