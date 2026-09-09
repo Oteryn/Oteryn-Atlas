@@ -74,7 +74,7 @@ test('duplicate selections deduplicate while stale import proof, cycles and opaq
   assert.throws(() => resolveDeterministicCommands(value), /source proof changed/);
 });
 
-test('repository ownership preserves current entrypoints and exposes only exact bounded transition gaps', () => {
+test('repository ownership preserves all current nonverification deterministic entrypoints and separates explicit noncanonical harnesses', () => {
   const root = new URL('../../', import.meta.url);
   const rootPath = fileURLToPath(root);
   const inventory = deriveVerificationMetadata(JSON.parse(fs.readFileSync(new URL('tools/verification/verification-catalog.json', root)))).deterministic;
@@ -86,16 +86,6 @@ test('repository ownership preserves current entrypoints and exposes only exact 
     'tests/semantic-search-browser-proof.mjs',
     'tests/semantic-search-browser.html',
   ]);
-  const pendingRetirement = new Set([
-    'tests/maintenance/pre-r4-maintenance-mutation.test.mjs',
-    'tests/maintenance/r4-shadow-admission.test.mjs',
-  ]);
-  const pendingCanonical = new Set([
-    'tests/authority-registry-invalid-utf8.py',
-    'tests/authority-registry-priority-type.py',
-    'tests/r4-path-confinement.mjs',
-    'tests/r5-search-routing-regression.mjs',
-  ]);
   const discovered = [];
   const walk = directory => {
     for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
@@ -103,7 +93,7 @@ test('repository ownership preserves current entrypoints and exposes only exact 
       if (entry.isDirectory()) walk(location);
       else if (['.mjs', '.js', '.cjs', '.py'].includes(path.extname(entry.name))) {
         const spec = path.relative(rootPath, fileURLToPath(location)).split(path.sep).join('/');
-        if (!spec.startsWith('tests/verification/') && !noncanonical.has(spec) && !pendingRetirement.has(spec)) discovered.push(spec);
+        if (!spec.startsWith('tests/verification/') && !noncanonical.has(spec)) discovered.push(spec);
       }
     }
   };
@@ -111,11 +101,8 @@ test('repository ownership preserves current entrypoints and exposes only exact 
   const expected = new Set(discovered);
   const owned = new Set(inventory.entries.map(row => row.spec));
   assert.deepEqual([...owned].filter(spec => !expected.has(spec)).sort(), [], 'catalog cannot own missing/noncanonical entrypoints');
-  const missing = [...expected].filter(spec => !owned.has(spec)).sort();
-  const exactPending = [...pendingCanonical].filter(spec => !owned.has(spec)).sort();
-  assert.deepEqual(missing, exactPending, 'only the exact bounded canonical-ownership transition may remain');
-  assert.equal(inventory.entries.length, expected.size - exactPending.length);
-  for (const spec of [...pendingCanonical, ...pendingRetirement]) assert.ok(fs.existsSync(new URL(spec, root)), spec);
+  assert.deepEqual([...expected].filter(spec => !owned.has(spec)).sort(), [], 'every current deterministic source entrypoint requires canonical ownership');
+  assert.equal(inventory.entries.length, expected.size);
   for (const row of inventory.entries) {
     assert.ok(inventory.proposedCatalog.groups[row.group].specs.includes(row.spec), row.spec);
     assert.ok(!row.spec.endsWith('.html'));

@@ -5,36 +5,27 @@
 ## Authority boundary
 
 - `Oteryn-Game` owns canonical World/Content semantics.
-- `Oteryn-Atlas` consumes explicit, versioned, public-safe Game exports and owns derived publication/indexing, browser rendering, search, inspection and Atlas-specific presentation.
-- Legacy OTBM/Tibia/Canary/Crystal data is migration/reference evidence only and is not a browser-runtime source of truth.
-- Atlas must not become a second authoritative item/NPC/monster/loot/world database or invent Game-owned coordinates, floors, ordering or identities.
+- Atlas consumes explicit, versioned, public-safe Game exports and owns derived publication/indexing, browser rendering, search, inspection, and Atlas presentation.
+- Legacy OTBM/Tibia/Canary/Crystal data is migration/reference evidence only, not browser-runtime authority.
+- Atlas must not become a second canonical item/NPC/monster/loot/world database or invent Game-owned coordinates, floors, ordering, or identities.
 
-## Current product scope
+## Active verification model
 
-The repository has progressed beyond the original bounded Semantic Thais Z7 proof. Current Atlas source contains the FullWorld publication/runtime path and browser capabilities including map navigation, floor/mode state, semantic search, creature/NPC presentation and inspection, and related derived exploration surfaces.
+Selective verification is blocking authority on protected `main`. PRs are evaluated through protected `pull_request_target`; Merge Queue uses direct `merge_group: checks_requested`. Protected workflow/planner/catalog/impact/stable-ID policy decides the obligations, while candidate bytes remain inert verification subjects.
 
-Game data remains external authority; Atlas publications are derived, integrity-checked products rather than canonical game state.
+Verification profile and data capability are independent. The data capabilities are `qualification_fixture`, `bounded_real_world`, and `real_fullworld`; ordinary verification uses the minimum truthful capability, while FullWorld/Molehill is specialist-only when the oracle genuinely requires it. Accepted deterministic/browser retries are zero.
 
-## Temporary maintenance state
-
-Atlas is currently in the temporary maintenance lifecycle tracked by GitHub Issue #315. The historical product verification/deployment workflow stack is suspended while corrective engineering and verification reconstruction proceed through protected repository governance. Production publication/deployment remains suspended until current authority explicitly restores it.
-
-For mutable status and execution rules, use:
-
-1. protected `main`;
-2. root `AGENTS.md`;
-3. Issue #315;
-4. the workflow files currently present under `.github/workflows/`.
-
-Historical prompts, evidence, plans and suspended workflow copies are provenance or implementation material; they are not substitutes for current lifecycle authority.
+Existing repository and organization rulesets plus Merge Queue remain merge authority. Verification success does not imply publication or deployment authority; those are separate lifecycles.
 
 ## Repository areas
 
 - `src/` — browser/runtime code and derived Atlas semantics;
 - `web/` — browser portal surfaces;
-- `tools/` — publication, generation, verification and maintenance tooling;
-- `e2e/` — retained Playwright/Docker verification harness;
-- `docs/` — architecture, operations, maintenance, agent-task and evidence material;
+- `tools/` — publication, generation, verification, and governance tooling;
+- `e2e/` — Playwright/Docker verification harness;
+- `docs/` — architecture, operations, agent, and historical evidence;
 - `.github/workflows/` — current active GitHub Actions topology.
 
-Before changing verification or live-deployment behavior, follow the capability routes referenced from `AGENTS.md` rather than resurrecting historical workflow assumptions.
+For verification placement read `docs/agents/operations/VERIFICATION_CAPABILITY.md`. For separately authorized live operations read `docs/agents/operations/LIVE_DEPLOYMENT.md`, `docs/operations/ATLAS-LIVE-OPERATIONS.md`, and `docs/recovery/ATLAS-LIVE-RECOVERY.md`.
+
+Completed maintenance/restoration material is historical evidence, not standing authority to restart retired lifecycle phases.

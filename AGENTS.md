@@ -2,68 +2,56 @@
 
 These instructions govern `Oteryn/Oteryn-Atlas`.
 
-## Organization-policy bootstrap
+## Authority bootstrap
 
-Resolve `docs/agents/META_AGENT_POLICY_BINDING.json` before material mutation. The binding selects one immutable, merged META policy revision; it does not grant repository, merge, production, secret, or cross-repository authority. If required bound authority cannot be authenticated, fail closed for the affected operation while continuing safe independent work.
+Resolve `docs/agents/META_AGENT_POLICY_BINDING.json` before material mutation. The binding selects immutable organization policy; it does not grant repository, merge, production, secret, or cross-repository authority.
 
-GitHub Issues remain Atlas lifecycle authority. Use one dedicated task branch and writable worktree per mutating owner, preserve unrelated work, and integrate only through the repository's protected PR and Merge Queue path. Repository, user, and task authority govern; skills and plugins are subordinate execution aids.
+Current execution authority comes from protected `main`, the current GitHub task/Issue authority, and the workflows and rulesets active on protected `main`. Issue #315 is the lifecycle record for the completed verification-restoration and legacy-retirement programme; it is not standing authority to restart R1-R5 or revive retired topology.
 
-For an already-authorized write to an existing task branch/PR, if `GH_TOKEN` and `GITHUB_TOKEN` are unset but agent-visible `GH` is present, it may be mapped transiently to `GH_TOKEN` for the exact authorized `gh` command. Never embed that credential in a remote URL or persist a new credential helper. Credential presence does not broaden repository, branch, path, merge, production, or secret authority.
-
-## Retired framework routing
-
-- `docs/superpowers/**` is retained historical provenance only. It is not current execution, lifecycle, review, testing, or merge authority and must not be loaded by default.
-- Legacy prompt text that asks an agent to use Superpowers tooling or treats a `docs/superpowers/**` document as a mandatory execution contract is superseded by this rule. Use the current repository-selected workflow, live GitHub Issue/task state, current contracts, and strict TDD where the task requires TDD.
-- Consult `docs/superpowers/**` only when current live authority explicitly requires investigation of a specific historical decision. Historical framework availability never changes task authority or completion requirements.
+Use one task branch per mutating owner, preserve unrelated work, and integrate only through protected PR and Merge Queue paths. Never direct-push or force-push protected `main`.
 
 ## Atlas authority and data boundaries
 
-- Oteryn-Game is canonical World/Content authority.
+- `Oteryn/Oteryn-Game` owns canonical World/Content semantics.
 - Atlas is a derived semantic projection/read model and must not invent Game-owned coordinates, floors, ordering, identity, or content semantics.
-- Legacy OTBM/Tibia/Canary/Crystal inputs are migration/reference evidence only. Browser runtime must never parse them as fallback authority.
-- Platform may coordinate Atlas contracts but is not an Atlas runtime data source.
-- Treat unknown provenance, rights, coordinates, or semantics as a blocker to the affected claim, never permission to guess.
+- Legacy OTBM/Tibia/Canary/Crystal inputs are migration/reference evidence only. Browser runtime must never use them as fallback authority.
+- Platform may coordinate contracts but is not an Atlas runtime data source.
+- Unknown provenance, rights, coordinates, or semantics block the affected claim; they never authorize guessing.
 
-## Active maintenance remediation mode
+## Blocking verification authority
 
-- Issue #315 is lifecycle authority. The old Atlas test/verification/depth/dispatcher/publication/deployment workflow stack remains suspended. Production deployment and automatic publication remain outside the F01–F16 remediation programme and require separate authority.
-- The organization-required `.github/workflows/merge-authority-audit.yml` evaluates the complete exact candidate diff with protected-base code and never executes candidate code. The maintenance validator and active workflow control plane remain self-frozen in steady state.
-- Ordinary maintenance changes remain limited to the closed documentation/governance allowlist enforced by the protected validator.
-- Corrective engineering for audit findings F01–F16 is admitted only by protected-base `docs/maintenance/ATLAS_REMEDIATION_ALLOWLIST.json`. All remediation paths in a candidate must resolve to exactly one protected lane; additions/modifications must match that lane's exact rules. Candidate edits to the allowlist cannot authorize the same candidate.
-- Verification-test deletion is not path-pattern authority. A verification contract may be deleted only when its exact path is already present in protected-base `docs/maintenance/OBSOLETE_VERIFICATION_CONTRACTS.json`. Editing that inventory and deleting a newly listed path in the same candidate fails closed.
-- The active workflow inventory remains exactly `.github/workflows/merge-authority-audit.yml`, `.github/workflows/merge-group-gate.yml`, and `.github/workflows/terminal-branch-lifecycle.yml`. Normal remediation does not authorize workflow additions or restoration of the retired aggregate stack.
-- The repository ruleset requires the strict `Merge authority audit / protected-base validate` status from GitHub Actions and Merge Queue. The retained merge-group workflow emits an additional `atlas-gate` check for merge groups; `atlas-gate` is not the configured required status during maintenance. Both retained gates run protected-base maintenance authority.
-- Issue #315 authorizes only R1-R3 verification contract, ownership and routing
-  implementation through the separate protected-base exact-path restoration
-  allowlist. This preparation does not activate execution. Shadow mode, PR/MQ
-  product canaries, blocking promotion, workflow restoration, deployment and
-  publication remain paused and require later explicit lifecycle authority.
+Selective verification is active blocking authority through `.github/workflows/verification-shadow.yml` on protected `main`.
 
-## Projection, provenance, and rendering invariants
+- PR verification uses protected `pull_request_target` semantics.
+- Merge Queue verification uses direct `merge_group: checks_requested` semantics.
+- Protected `main` owns workflow, planner, catalog, impact-routing, stable-ID, execution-policy, and verification-oracle authority.
+- Candidate bytes are inert subjects. Candidate code cannot narrow, replace, or spoof protected verification authority.
+- Qualification fixtures and production data used to prove equivalent behavior must traverse the same publication manifest, floor/chunk/range, digest-validation, loader, runtime, renderer, and interaction seams; a parallel mock application is not equivalent evidence.
+- Preserve independent test oracles. Test hooks and diagnostics may expose truthful read-only state, but must not mutate product state, inject fake authority, bypass normal loading, or become an alternate runtime source.
+- Protected and candidate checkouts do not persist credentials.
+- Unknown or unowned paths fail closed.
+- Accepted deterministic and browser retries are zero; do not rerun-until-green, broaden allowlists, hide failures, or add arbitrary sleeps.
 
-- The immutable qualification world and production data must traverse the same publication manifest, floor/chunk/range, digest validation, loader, runtime, renderer, and interaction seams. A mock or alternate test application is not a substitute.
-- Preserve independent test oracles. Test hooks may expose truthful read-only diagnostics but must not mutate product state, inject fake authority, bypass normal loading, or become another runtime source.
-- Map, camera, floor, viewport, WebGL, world-anchored layer, marker, creature, and animation changes require applicable geometry, transform, render-synchronization, and bounded performance proof.
-- User-visible changes require real-browser journeys and reviewed full-frame evidence where applicable. Evidence must bind the reviewer, exact Atlas revision, exact Playwright result, and screenshot digests; an agent cannot approve images it did not inspect.
-- Keep deterministic failures visible. Do not use retries, broad allowlists, enlarged tolerances, arbitrary sleeps, or unconditional skips to turn a first failure green.
-- Every reproducible defect receives a deterministic regression test before acceptance. Tests must prove behavior, failure paths, state transitions, reload/history behavior, malformed or unavailable inputs, and integration boundaries as applicable.
-- Do not add user-facing verification/status UI. Executable exact-revision evidence is the source of truth.
+User-visible changes require real-browser journeys and reviewed full-frame evidence. Accepted visual evidence must identify the reviewer, exact Atlas revision, exact Playwright result, and screenshot digests before it can support a protected acceptance claim.
+
+The expected protection chain is ruleset `22103758` (`Protect main`), organization workflow authority `22352928`, and selective-verification ruleset `22592581`. Do not weaken, remove, or bypass those protections without explicit owner authority for the exact action.
 
 ## Verification capability route
 
-Before selecting a verification profile, data capability or runner, or performing specialist/nightly verification, read `docs/agents/operations/VERIFICATION_CAPABILITY.md`. This route does not restore suspended verification or alter protected maintenance admission.
+Verification profile (`none`, `focused`, `targeted`, `broad`, `full`) and data capability are independent. The data capabilities are `qualification_fixture`, `bounded_real_world`, and `real_fullworld`.
 
-## Integration and live deployment
+Use the minimum truthful capability for the oracle. Ordinary functional, interaction, state, geometry, responsive, accessibility, fault/race, and similar verification must not require complete FullWorld bytes when a qualification fixture or bounded real-world substrate proves the same invariant. `real_fullworld` and Molehill-PC are specialist-only when the protected plan proves a genuine complete-product, native/GPU, scale/performance/soak, or equivalent specialist requirement.
 
-- During F01–F16 remediation, run the narrow focused checks that prove the edited behavior and review the complete changed-file set and exact final-head diff. Suspended historical workflows are not current qualification evidence and must not be resurrected as a prerequisite.
-- Require the repository's configured exact-candidate protected maintenance status and normal Merge Queue before integration. A remediation PR is not qualified merely because local focused tests pass.
-- Verify that browser runtime consumes Atlas projection data only.
+Before selecting a profile, capability, or specialist runner, read `docs/agents/operations/VERIFICATION_CAPABILITY.md`.
 
-Before any separately authorized deployment, live acceptance or rollback, read `docs/agents/operations/LIVE_DEPLOYMENT.md`. Deployment sources remain clean, merged `main` revisions; active maintenance restrictions still govern whether the operation is permitted.
+## Integration, publication, and deployment
 
-## Safety
+Require the repository's protected exact-candidate checks and normal Merge Queue integration. Local tests are supporting evidence, not merge authority.
 
-- Do not commit raw OTBM/OTB/SPR/DAT inputs, secrets, credentials, private data, or unlicensed proprietary assets.
-- Do not publish Tibia/CipSoft-derived pixels without explicit rights/provenance authority for that publication surface.
-- Do not weaken protection, validation, provenance, or maintenance gates to make a task pass.
-- Production deployment, protected environments, secrets, and live-system mutation require separate explicit authority.
+Verification success does not authorize publication or deployment. Publication and live deployment are separate lifecycles requiring their own explicit authority. A separately authorized deployment must originate from an exact clean revision already merged to protected `main` and follow `docs/agents/operations/LIVE_DEPLOYMENT.md` plus the current live-operations runbook.
+
+## Historical material and safety
+
+`docs/superpowers/**` and completed maintenance/restoration evidence are historical provenance only unless current live authority explicitly asks for a specific historical decision. Do not reconstruct retired workflow topology from historical material.
+
+Preserve projection, provenance, rendering, geometry, and browser-oracle integrity. Do not commit secrets, private data, raw proprietary inputs, or unlicensed assets. Do not weaken verification, protection, provenance, or review requirements to make a change pass.

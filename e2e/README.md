@@ -1,42 +1,33 @@
 # Atlas E2E harness
 
-The `e2e/` tree contains the Dockerized Playwright harness used by Atlas verification work. During the temporary maintenance state tracked by Issue #315, the historical product/E2E workflow stack is suspended and this harness is **not** a current required PR gate or an automatically scheduled qualification path.
+The `e2e/` tree contains the Playwright/Docker browser harness used by active Atlas selective verification and local diagnostics.
 
 ## Current authority
 
-Do not infer active CI or deployment topology from this directory. Current repository authority is:
+Do not infer verification authority from scripts in this directory. Protected `main` owns the active workflow, planner, catalog, impact routing, stable IDs, execution policy, and oracle definitions.
 
-1. protected `main`;
-2. root `AGENTS.md`;
-3. Issue #315 for the temporary maintenance lifecycle;
-4. the workflows that actually exist under `.github/workflows/` on protected `main`.
+PR execution is initiated through protected `pull_request_target`; Merge Queue uses `merge_group: checks_requested`. Candidate checkout bytes are verification subjects, never policy authority, and checkout credentials are not persisted.
 
-Suspended workflow definitions are retained under `docs/maintenance/suspended-workflows/` as implementation/history material. Their old trigger, runner, status-publishing and deployment behavior is not current authority while suspended.
+## Data capabilities
 
-## Harness purpose
+Verification profile and data capability are separate decisions:
 
-The harness runs the Atlas FullWorld portal in digest-pinned Playwright Chromium without requiring host-installed Node, Playwright or a browser. In checkout-overlay mode, an unprivileged Nginx container serves the selected `web/` and `src/` checkout while proxying approved publication paths from an explicitly selected origin. Runtime trust validation remains fail-closed on product-identity mismatches.
+- `qualification_fixture` is the default immutable product for ordinary functional/browser verification;
+- `bounded_real_world` is for bounded compatibility/oracle checks that genuinely depend on selected real Game bytes;
+- `real_fullworld` is specialist-only for complete-product/root/census, generator determinism, scale/performance/soak, overview/minimap consistency, release acceptance, or another explicit complete-world oracle.
 
-The harness is retained so verification groups can be repaired and re-qualified incrementally during the later #315 restoration phase. Reintroduction must follow the current repository policy: restore a bounded group in non-blocking/shadow execution, prove real PR/Merge Queue canaries, and only then make impact-applicable coverage blocking. Do not revive the retired aggregate stack merely because scripts or historical workflow files still exist.
+A broad or full verification profile does not automatically require FullWorld. Use the minimum truthful data capability.
 
-## Manual/local use
+## Execution characteristics
 
-Local execution is diagnostic or qualification evidence only when separately authorized by the current task and policy. Typical entry points are:
+The suite covers map navigation, floors/modes, semantic search, creature/NPC presentation and interaction, state/history, geometry, responsive/mobile behavior, accessibility, fault/race handling, performance, and reviewed visual scenarios where applicable.
 
-```bash
-ATLAS_PUBLICATION_ORIGIN=http://<publication-origin> ./e2e/run.sh
-```
+Accepted browser retries are zero. Failures must remain visible; do not turn a first failure green with reruns, broad allowlists, enlarged tolerances, arbitrary sleeps, or unconditional skips.
 
-```powershell
-$env:ATLAS_PUBLICATION_ORIGIN = 'http://<publication-origin>'
-$env:ATLAS_E2E_WORKERS = '1'
-.\e2e\run.ps1
-```
+## Local and specialist use
 
-Direct deployed-preview mode uses `ATLAS_BASE_URL` and, for an exact-revision claim, `ATLAS_EXPECTED_REVISION`. Generated reports and visual evidence remain local/CI artifacts unless a current repository procedure explicitly accepts them.
+Local execution is supporting diagnostic/qualification evidence only; it does not replace protected GitHub checks. Common local entry points remain `./e2e/run.sh` and `e2e/run.ps1` with an explicitly selected publication origin or base URL.
 
-## Verification characteristics
+Molehill-PC is not a default E2E farm. Use it only when the protected plan requires `real_fullworld`, native Windows/GPU, restricted visual review, or another explicit specialist capability. Synology is reserved for separately authorized merged-main live deployment/acceptance, not ordinary verification.
 
-The retained suite covers FullWorld loading and range behavior, semantic search, navigation/history, map geometry, floors/modes, creature presentation and interaction, responsive/mobile behavior, failure handling, accessibility and reviewed visual scenarios. The suite is designed for zero-retry deterministic evidence; failures must remain visible rather than being converted to success through retries, broad allowlists or enlarged tolerances.
-
-Before using any specialist/nightly profile, data capability, runner, status publisher or visual-approval flow, read `docs/agents/operations/VERIFICATION_CAPABILITY.md` and current Issue #315 state. Historical commands and artifacts are not authority for reactivating suspended verification.
+Before selecting a specialist/nightly profile or data capability, read `docs/agents/operations/VERIFICATION_CAPABILITY.md`. Publication/deployment remains a separate lifecycle and is never implied by a green E2E result.
