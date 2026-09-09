@@ -31,6 +31,13 @@ test('exact selected Node/Python commands retain imported leaf coverage once', t
   assert.throws(() => resolveDeterministicCommands({ ...value, groupIds: ['deterministic.node'], requiredSpecs: ['tests/b.py'] }), /required test is not selected/);
 });
 
+test('delete-only unowned subjects do not create commands while removed selected owners still fail closed', t => {
+  const value = fixture(t);
+  const commands = resolveDeterministicCommands({ ...value, groupIds: ['deterministic.python'], changedFiles: [{ path: 'tests/retired-maintenance.test.mjs', status: 'removed' }] });
+  assert.deepEqual(commands.map(row => row.spec), ['tests/b.py']);
+  fs.unlinkSync(path.join(value.root, 'tests/b.py'));
+  assert.throws(() => resolveDeterministicCommands({ ...value, groupIds: ['deterministic.python'], changedFiles: [{ path: 'tests/b.py', status: 'removed' }] }), /missing file/);
+});
 test('missing files, missing or empty groups, browser groups and unsupported interpreters fail closed', t => {
   const value = fixture(t);
   assert.throws(() => resolveDeterministicCommands({ ...value, groupIds: ['missing'] }), /unknown group/);
