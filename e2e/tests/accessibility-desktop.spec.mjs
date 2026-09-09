@@ -13,11 +13,22 @@ test('desktop critical controls expose truthful accessible names and disabled st
   await expect(page.getByRole('button', { name: 'Higher floor' })).toBeEnabled();
   await expect(page.getByRole('button', { name: 'Lower floor' })).toBeEnabled();
   await expect(page.getByRole('group', { name: 'Atlas view mode' })).toBeVisible();
-  await expect(page.getByRole('complementary', { name: 'Inspector and provenance' })).toBeVisible();
+  const inspectorToggle = page.locator('#desktop-inspector-toggle');
+  const inspectorPanel = page.locator('#mobile-inspector-panel');
+  await expect(inspectorToggle).toBeVisible();
+  await expect(inspectorToggle).toHaveAccessibleName('Open inspector');
+  await expect(inspectorToggle).toHaveAttribute('aria-expanded', 'false');
+  await expect(inspectorPanel).toHaveAttribute('aria-hidden', 'true');
+  expect(await inspectorPanel.evaluate((element) => element.inert)).toBeTruthy();
   await expect(page.locator('#atlas')).toHaveAttribute('aria-label', 'Full-world WebGL2 Atlas');
-  await expect(page.getByRole('searchbox', { name: 'Search Areas and Subareas' })).toBeDisabled();
-  await expect(page.getByRole('combobox', { name: 'Region family' })).toBeDisabled();
-  await expect(page.getByRole('button', { name: 'Zoom to area' })).toBeDisabled();
+  const areaTools = page.locator('#area-tools-disclosure');
+  await expect(areaTools).not.toHaveAttribute('open', '');
+  await expect(page.locator('#region-search')).toBeDisabled();
+  await expect(page.locator('#region-family')).toBeDisabled();
+  await expect(page.locator('#region-zoom')).toBeDisabled();
+  await expect(page.locator('#region-search')).toBeHidden();
+  await expect(page.locator('#region-family')).toBeHidden();
+  await expect(page.locator('#region-zoom')).toBeHidden();
 
   for (const label of ['Areas', 'Subareas', 'Towns', 'Temples', 'Teleports / transitions', 'Houses', 'House doors', 'Action IDs', 'Unique IDs', 'Waypoints', 'Mechanics', 'Raids / encounters', 'Quest areas', 'POIs']) {
     const row = page.locator('#semantic-layer-list .layer').filter({ has: page.getByText(label, { exact: true }) });
@@ -28,8 +39,10 @@ test('desktop critical controls expose truthful accessible names and disabled st
   const playback = page.getByRole('checkbox', { name: /Playback/ });
   await expect(playback).toBeEnabled();
   await expect(playback).not.toBeChecked();
-  await expect(page.getByRole('button', { name: 'Open Atlas controls' })).toBeHidden();
-  await expect(page.getByRole('button', { name: 'Open inspector' })).toBeHidden();
+  await expect(page.locator('#desktop-controls-toggle')).toBeVisible();
+  await expect(page.locator('#desktop-controls-toggle')).toHaveAttribute('aria-expanded', 'true');
+  await expect(inspectorToggle).toBeVisible();
+  await expect(inspectorToggle).toHaveAttribute('aria-expanded', 'false');
   assertNoRuntimeFailures(runtime);
 });
 

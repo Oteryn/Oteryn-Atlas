@@ -35,6 +35,21 @@ function applyShellPolish() {
   }
 }
 
+function focusOpenedPanel(name) {
+  const panel = panels[name];
+  const target = $(`#mobile-${name}-close`);
+  if (!panel || !target) return;
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    focus(target);
+    return;
+  }
+  const onEnd = event => {
+    if (event.target !== panel || event.propertyName !== 'transform') return;
+    panel.removeEventListener('transitionend', onEnd);
+    focus(target);
+  };
+  panel.addEventListener('transitionend', onEnd);
+}
 function focus(element) {
   if (element instanceof HTMLElement && element.isConnected && !element.closest('[inert]')) element.focus({ preventScroll: true });
 }
@@ -91,11 +106,12 @@ function closeDrawer({ restore = true } = {}) {
 function openPanel(name, { moveFocus = true } = {}) {
   if (mobileQuery.matches) {
     if (!drawer) returnFocus = document.activeElement;
+    if (moveFocus && document.activeElement instanceof HTMLElement) document.activeElement.blur();
     if (name === 'controls') $('#mobile-search-input').value = $('#search-input').value;
     drawer = name;
   } else { savedPanels = null; desktopOpen[name] = true; }
   sync();
-  if (moveFocus) focus($(`#mobile-${name}-close`));
+  if (moveFocus) focusOpenedPanel(name);
 }
 
 function togglePanel(name) {

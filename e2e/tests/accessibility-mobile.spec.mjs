@@ -25,7 +25,7 @@ test('mobile drawers expose truthful hidden state and restore keyboard focus', a
   await gotoAtlas(page, MOBILE_ENTRY);
   await waitForAtlas(page);
 
-  const controlsToggle = page.getByRole('button', { name: 'Open Atlas controls' });
+  const controlsToggle = page.locator('#mobile-controls-toggle');
   const controlsPanel = page.locator('#mobile-controls-panel');
   const controlsClose = page.getByRole('button', { name: 'Close Atlas controls' });
   await expectClosedDrawer(controlsPanel, controlsToggle);
@@ -33,7 +33,8 @@ test('mobile drawers expose truthful hidden state and restore keyboard focus', a
   await controlsToggle.focus();
   await page.keyboard.press('Enter');
   await expect(controlsToggle).toHaveAttribute('aria-expanded', 'true');
-  await expect(controlsPanel).toHaveAttribute('aria-hidden', 'false');
+  await expect(controlsToggle).toHaveAccessibleName('Hide Atlas controls');
+  await expect(controlsPanel).not.toHaveAttribute('aria-hidden', 'true');
   expect(await controlsPanel.evaluate((element) => element.inert)).toBeFalsy();
   await expect(controlsClose).toBeFocused();
   await expect(page.getByRole('combobox', { name: 'Global semantic Atlas search' })).toBeVisible();
@@ -42,14 +43,15 @@ test('mobile drawers expose truthful hidden state and restore keyboard focus', a
   await expectClosedDrawer(controlsPanel, controlsToggle);
   await expect(controlsToggle).toBeFocused();
 
-  const inspectorToggle = page.getByRole('button', { name: 'Open inspector' });
+  const inspectorToggle = page.locator('#mobile-inspector-toggle');
   const inspectorPanel = page.locator('#mobile-inspector-panel');
   const inspectorClose = page.getByRole('button', { name: 'Close inspector' });
   await expectClosedDrawer(inspectorPanel, inspectorToggle);
   await inspectorToggle.focus();
   await page.keyboard.press('Enter');
   await expect(inspectorToggle).toHaveAttribute('aria-expanded', 'true');
-  await expect(inspectorPanel).toHaveAttribute('aria-hidden', 'false');
+  await expect(inspectorToggle).toHaveAccessibleName('Hide inspector');
+  await expect(inspectorPanel).not.toHaveAttribute('aria-hidden', 'true');
   expect(await inspectorPanel.evaluate((element) => element.inert)).toBeFalsy();
   await expect(inspectorClose).toBeFocused();
   await page.keyboard.press('Escape');
@@ -69,9 +71,10 @@ test('mobile core controls are touch-reachable in portrait and landscape', async
   await zoomIn.tap();
   await expect.poll(() => Number(new URL(page.url()).searchParams.get('zoom'))).toBeGreaterThan(zoomBefore);
 
-  const controlsToggle = page.getByRole('button', { name: 'Open Atlas controls' });
+  const controlsToggle = page.locator('#mobile-controls-toggle');
   await controlsToggle.tap();
   await expect(controlsToggle).toHaveAttribute('aria-expanded', 'true');
+  await expect(controlsToggle).toHaveAccessibleName('Hide Atlas controls');
   await expectElementInsideViewport(page.getByRole('combobox', { name: 'Exported floor' }), page);
   await expectElementInsideViewport(page.locator('#mobile-search-input'), page);
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBeTruthy();
@@ -81,6 +84,7 @@ test('mobile core controls are touch-reachable in portrait and landscape', async
   await expect(controlsToggle).toBeVisible();
   await controlsToggle.tap();
   await expect(controlsToggle).toHaveAttribute('aria-expanded', 'true');
+  await expect(controlsToggle).toHaveAccessibleName('Hide Atlas controls');
   await expectElementInsideViewport(page.getByRole('button', { name: 'Close Atlas controls' }), page);
   await expectElementInsideViewport(page.locator('#mobile-search-input'), page);
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBeTruthy();
