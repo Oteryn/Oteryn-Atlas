@@ -77,7 +77,8 @@ test('protected authenticated handoff can execute an added deterministic subject
   unprivilegedDeterministicSubjects:['tests/new-feature.py']});
  assert.deepEqual(p.executionBlockers,[]);
  assert.equal(p.profile,'focused');
- assert.deepEqual(p.requiredGroupIds,['deterministic.core']);
+ assert.deepEqual(p.requiredGroupIds,[]);
+ assert.deepEqual(p.candidateTestSubjects,['tests/new-feature.py']);
  assert.equal(planner.assertPlanExecutable(p),p);
 });
 
