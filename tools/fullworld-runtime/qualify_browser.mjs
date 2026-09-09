@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { promisify } from 'node:util';
 import { detailQualificationSatisfied } from '../../src/browser/fullworld-progressive.mjs';
+import { CdpSession } from './cdp-session.mjs';
 
 function option(name, fallback = null) {
   const index = process.argv.indexOf(name);
@@ -18,12 +19,16 @@ const output = option('--output');
 const screenshot = option('--screenshot');
 const stepsPath = option('--steps');
 const timeoutMs = Number(option('--timeout-ms', '120000'));
+const cdpRpcTimeoutMs = Number(option('--cdp-rpc-timeout-ms', '10000'));
 const viewportWidth = Number(option('--viewport-width', '1920'));
 const viewportHeight = Number(option('--viewport-height', '1080'));
 const mobile = process.argv.includes('--mobile');
 const lodCycle = process.argv.includes('--lod-cycle');
 if (!chrome || !url || !output || !screenshot) {
-  throw new Error('usage: qualify_browser.mjs --chrome PATH --url URL --output JSON --screenshot PNG [--timeout-ms N]');
+  throw new Error('usage: qualify_browser.mjs --chrome PATH --url URL --output JSON --screenshot PNG [--timeout-ms N] [--cdp-rpc-timeout-ms N]');
+}
+if (!Number.isFinite(timeoutMs) || timeoutMs <= 0 || !Number.isFinite(cdpRpcTimeoutMs) || cdpRpcTimeoutMs <= 0) {
+  throw new Error('timeout values must be positive finite numbers');
 }
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -120,41 +125,6 @@ async function waitForTarget(port, deadline) {
   throw new Error('Chrome page target was not available before timeout');
 }
 
-class CdpSession {
-  constructor(webSocketUrl) {
-    this.ws = new WebSocket(webSocketUrl);
-    this.nextId = 1;
-    this.pending = new Map();
-  }
-  async open() {
-    await new Promise((resolve, reject) => {
-      this.ws.addEventListener('open', resolve, { once: true });
-      this.ws.addEventListener('error', reject, { once: true });
-    });
-    this.ws.addEventListener('message', (event) => {
-      const message = JSON.parse(String(event.data));
-      if (!message.id) return;
-      const pending = this.pending.get(message.id);
-      if (!pending) return;
-      this.pending.delete(message.id);
-      if (message.error) pending.reject(new Error(`${message.error.code}: ${message.error.message}`));
-      else pending.resolve(message.result);
-    });
-  }
-
-  send(method, params = {}) {
-    const id = this.nextId++;
-    return new Promise((resolve, reject) => {
-      this.pending.set(id, { reject, resolve });
-      this.ws.send(JSON.stringify({ id, method, params }));
-    });
-  }
-
-  close() {
-    this.ws.close();
-  }
-}
-
 async function waitForQualification(deadline, expectedView = null) {
   while (performance.now() < deadline) {
     const evaluation = await cdp.send('Runtime.evaluate', {
@@ -220,7 +190,7 @@ try {
     '--no-default-browser-check',
     '--enable-precise-memory-info',
     '--force-device-scale-factor=1',
-    `--window-size=${viewportWidth},${viewportHeight}`, 
+    `--window-size=${viewportWidth},${viewportHeight}`,
     '--remote-debugging-port=0',
     `--user-data-dir=${profile}`,
     url,
@@ -231,7 +201,7 @@ try {
   child.stderr.on('data', (chunk) => stderr.push(String(chunk)));
   const port = await waitForDebugPort(deadline);
   const target = await waitForTarget(port, deadline);
-  cdp = new CdpSession(target.webSocketDebuggerUrl);
+  cdp = new CdpSession(target.webSocketDebuggerUrl, { deadline, rpcTimeoutMs: cdpRpcTimeoutMs });
   await cdp.open();
   await cdp.send('Emulation.setDeviceMetricsOverride', { width: viewportWidth, height: viewportHeight, deviceScaleFactor: 1, mobile });
   await cdp.send('Performance.enable');

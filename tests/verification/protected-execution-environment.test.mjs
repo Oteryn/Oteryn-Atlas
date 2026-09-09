@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
@@ -29,14 +28,14 @@ const config = {
     candidate: { source: 'exact-candidate-checkout', target: '/candidate', readOnly: true },
     dependencies: {
       source: 'protected-control/e2e/node_modules',
-      target: '/protected-e2e-node-modules/node_modules',
+      target: '/candidate/e2e/node_modules',
       readOnly: true,
     },
   },
   runtime: {
     node: { command: 'node' },
     npm: { command: 'npm' },
-    playwright: { command: '/protected-e2e-node-modules/node_modules/.bin/playwright', version: '1.62.0' },
+    playwright: { command: '/candidate/e2e/node_modules/.bin/playwright', version: '1.62.0' },
     chromium: { command: 'chromium' },
     python3: { command: 'python3' },
     python: {
@@ -156,17 +155,30 @@ test('repository environment config is the canonical pinned protected environmen
 });
 
 
-test('environment artifact bind ownership is handed to sandbox uid and restored', () => {
-  const workflow = fs.readFileSync(new URL('../../.github/workflows/protected-hosted-executor.yml', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
-  const start = workflow.indexOf('      - name: Qualify exact protected environment once');
-  const end = workflow.indexOf('      - name: Bind environment qualification into dependency evidence', start);
-  assert.notEqual(start, -1);
-  assert.notEqual(end, -1);
-  const probe = workflow.slice(start, end);
-  assert.match(probe, /host_uid="\$\(id -u\)"/);
-  assert.match(probe, /host_gid="\$\(id -g\)"/);
-  assert.match(probe, /sudo chown 1000:1000 artifacts\/environment/);
-  assert.match(probe, /trap restore_artifact_ownership EXIT/);
-  assert.match(probe, /restore_artifact_ownership\n\s+trap - EXIT/);
-  assert.ok(probe.indexOf('sudo chown 1000:1000 artifacts/environment') < probe.indexOf('docker run --rm'));
+test('artifact writes and sandbox ownership are mandatory qualification evidence', async () => {
+  for (const field of ['artifactWrite', 'uidGid']) {
+    let calls = 0;
+    await assert.rejects(qualifyProtectedExecutionEnvironment(config, async identity => {
+      calls += 1;
+      return { schemaVersion: 1, status: 'QUALIFIED', environmentDigest: identity.environmentDigest,
+        checks: { ...checks, [field]: false }, probeDigest: `sha256:${'d'.repeat(64)}` };
+    }), new RegExp(field));
+    assert.equal(calls, 1, 'failed ownership must not trigger a retry');
+  }
+});
+
+test('tmpfs accepts only the exact protected option set with order-stable identity', () => {
+  const expected = config.container.tmpfs[0].options;
+  const withOptions = options => ({ ...config, container: { ...config.container,
+    tmpfs: [{ path: '/tmp', options }] } });
+  const identity = buildProtectedExecutionEnvironmentIdentity(config);
+  assert.deepEqual(buildProtectedExecutionEnvironmentIdentity(withOptions([...expected].reverse())), identity);
+  for (const options of [
+    ...expected.map(option => expected.filter(value => value !== option)),
+    ...['exec', 'noexec', 'suid', 'dev', 'unknown', 'ro', 'size=128m', 'rw'].map(option => [...expected, option]),
+    expected.map(option => option === 'size=256m' ? 'size=128m' : option),
+    expected.map(option => option === 'rw' ? 'ro' : option),
+  ]) {
+    assert.throws(() => buildProtectedExecutionEnvironmentIdentity(withOptions(options)), /tmp/, JSON.stringify(options));
+  }
 });

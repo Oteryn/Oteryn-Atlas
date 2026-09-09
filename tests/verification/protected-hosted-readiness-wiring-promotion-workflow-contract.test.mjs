@@ -1,34 +1,24 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
+import {spawnSync} from 'node:child_process';
+import {fileURLToPath} from 'node:url';
 import test from 'node:test';
-import { fileURLToPath } from 'node:url';
-
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const workflowPath = path.join(ROOT, '.github/workflows/protected-hosted-readiness-wiring-promotion.yml');
-const legacyWorkflowPath = path.join(ROOT, '.github/workflows/legacy-molehill-transition-qualification.yml');
-
-test('protected hosted readiness wiring promotion is bounded GitHub-hosted proof and never Molehill E2E', () => {
-  assert.equal(fs.existsSync(workflowPath), true, 'protected hosted readiness wiring promotion workflow must exist');
-  const workflow = fs.readFileSync(workflowPath, 'utf8');
-  const legacy = fs.readFileSync(legacyWorkflowPath, 'utf8');
-  const heavy = legacy.split('  legacy-qualification:')[1]?.split('  protected-census-bootstrap:')[0] ?? '';
-
-  assert.match(workflow, /pull_request:\s*\n\s*types:\s*\[labeled\]/);
-  assert.match(workflow, /github\.event\.label\.name == 'atlas-legacy-transition-qualification'/);
-  assert.match(workflow, /fix\/issue-179-protected-hosted-readiness-wiring/);
-  assert.doesNotMatch(heavy, /fix\/issue-179-protected-hosted-readiness-wiring/);
-  assert.match(workflow, /runs-on:\s*ubuntu-24\.04/);
-  assert.doesNotMatch(workflow, /group:\s*atlas-runners|labels:\s*oteryn-atlas-pc/);
-  assert.match(workflow, /Require exact five-file readiness wiring delta/);
-  assert.match(workflow, /protected-hosted-compose-promotion\.test\.mjs/);
-  assert.match(workflow, /docker compose/);
-  assert.match(workflow, /up -d --wait atlas-publication/);
-  assert.match(workflow, /\/__atlas\/readiness/);
-  assert.match(workflow, /fullworld\/publication\/publication\.json/);
-  assert.match(workflow, /data\/creatures\/index\.json/);
-  assert.match(workflow, /assert-current-pr-head\.mjs/);
-  assert.match(workflow, /statuses:\s*write/);
-  assert.match(workflow, /context='atlas-local-e2e'|context.*atlas-local-e2e/s);
-  assert.doesNotMatch(workflow, /playwright test|\\e2e\\run\.ps1|visual-review\.json|synology|molehill/i);
+const root=fileURLToPath(new URL('../../',import.meta.url));
+const compose=fs.readFileSync(path.join(root,'e2e/compose.github-hosted.yml'),'utf8');
+const blocks=[...compose.matchAll(/node --input-type=module <<'NODE'\n([\s\S]*?)        NODE/g)];
+assert.equal(blocks.length,2,'exact publication and web bootstrap scripts required');
+test('actual Compose publication initializer binds environment identity and validates reentry',t=>{
+ const temp=fs.mkdtempSync(path.join(os.tmpdir(),'atlas-compose-ready-'));t.after(()=>fs.rmSync(temp,{recursive:true,force:true}));
+ const source=path.join(temp,'source'),ready=path.join(temp,'ready');fs.mkdirSync(source);fs.mkdirSync(ready);fs.writeFileSync(path.join(source,'product.json'),'{"product":"exact"}');
+ const script=blocks[0][1].replace(/^        /gm,'').replaceAll('/protected-control/',root).replaceAll("'/source'",JSON.stringify(source)).replaceAll("'/ready/fullworld'",JSON.stringify(path.join(ready,'fullworld')));
+ const env={...process.env,GITHUB_REPOSITORY:'Oteryn/Oteryn-Atlas',GITHUB_RUN_ID:'42',ATLAS_E2E_SHARD:'1/1',ATLAS_CODE_REVISION:'a'.repeat(40),...Object.fromEntries(['ATLAS_PLAN_SEMANTIC_DIGEST','ATLAS_PLAN_INSTANCE_DIGEST','ATLAS_AUTHORITY_DIGEST','ATLAS_ENVIRONMENT_DIGEST'].map((key,i)=>[key,`sha256:${String(i).repeat(64)}`]))};
+ const run=override=>spawnSync(process.execPath,['--input-type=module'],{input:script,env:{...env,...override},encoding:'utf8'});
+ assert.equal(run().status,0);assert.equal(run().status,0);
+ const manifest=JSON.parse(fs.readFileSync(path.join(ready,'fullworld/atlas-publication-readiness.json')));
+ assert.equal(manifest.producerRunId,'42-1');assert.equal(manifest.candidateSha,env.ATLAS_CODE_REVISION);
+ assert.notEqual(run({ATLAS_CODE_REVISION:'b'.repeat(40)}).status,0);
+ assert.notEqual(run({ATLAS_E2E_SHARD:'0/1'}).status,0);
+ fs.appendFileSync(path.join(ready,'fullworld/product.json'),'drift');assert.notEqual(run().status,0);
 });

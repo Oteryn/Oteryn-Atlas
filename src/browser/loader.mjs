@@ -6,19 +6,36 @@ const ROOT_DOMAIN = 'OTERYN-DYN-ATLAS-COMPACT-JSON-V0\0';
 
 export class LoadError extends Error {}
 
-function sortCanonical(value) {
-  if (Array.isArray(value)) return value.map(sortCanonical);
-  if (value && typeof value === 'object') {
-    const result = {};
-    for (const key of Object.keys(value).sort()) result[key] = sortCanonical(value[key]);
-    return result;
+function compareUnicodeCodePoints(left, right) {
+  let leftIndex = 0;
+  let rightIndex = 0;
+  while (leftIndex < left.length && rightIndex < right.length) {
+    const leftPoint = left.codePointAt(leftIndex);
+    const rightPoint = right.codePointAt(rightIndex);
+    if (leftPoint !== rightPoint) return leftPoint < rightPoint ? -1 : 1;
+    leftIndex += leftPoint > 0xffff ? 2 : 1;
+    rightIndex += rightPoint > 0xffff ? 2 : 1;
   }
-  return value;
+  if (leftIndex < left.length) return 1;
+  if (rightIndex < right.length) return -1;
+  return 0;
+}
+
+function canonicalJsonText(value) {
+  if (Array.isArray(value)) return `[${value.map(canonicalJsonText).join(',')}]`;
+  if (value && typeof value === 'object') {
+    const entries = Object.keys(value)
+      .sort(compareUnicodeCodePoints)
+      .map((key) => `${JSON.stringify(key)}:${canonicalJsonText(value[key])}`);
+    return `{${entries.join(',')}}`;
+  }
+  const text = JSON.stringify(value);
+  if (text === undefined) throw new TypeError('unsupported canonical JSON value');
+  return text;
 }
 
 export function canonicalJsonBytes(value) {
-  const text = `${JSON.stringify(sortCanonical(value))}\n`;
-  return new TextEncoder().encode(text);
+  return new TextEncoder().encode(`${canonicalJsonText(value)}\n`);
 }
 
 const SHA256_K = Object.freeze([
@@ -114,13 +131,84 @@ export async function computeRootContentId(manifest) {
   return sha256ContentId(joined);
 }
 
-async function readBoundedResponse(response, limit, label) {
-  if (!response?.ok) throw new LoadError(`${label} fetch failed: ${response?.status ?? 'unknown'}`);
+function throwTyped(errorClass, message) {
+  throw new errorClass(message);
+}
+
+export function validateRelativePath(path, label = 'path', { errorClass = LoadError } = {}) {
+  if (typeof path !== 'string' || path.length === 0) throwTyped(errorClass, `${label} missing`);
+  if (/^[a-z][a-z0-9+.-]*:/i.test(path) || path.startsWith('/') || path.includes('\\') || path.includes('?') || path.includes('#')) throwTyped(errorClass, `${label} is not a safe relative path`);
+  const parts = path.split('/');
+  if (parts.some((part) => part === '' || part === '.' || part === '..')) throwTyped(errorClass, `${label} is not a safe relative path`);
+  for (let index = 0; index < parts.length; index += 1) {
+    const part = parts[index];
+    let decoded;
+    try { decoded = decodeURIComponent(part); }
+    catch { throwTyped(errorClass, `${label} has invalid percent encoding`); }
+    if (decoded === '' || decoded === '.' || decoded === '..' || decoded.includes('/') || decoded.includes('\\') || (index === 0 && /^[a-z][a-z0-9+.-]*:/i.test(decoded))) throwTyped(errorClass, `${label} is not a safe relative path`);
+  }
+  return path;
+}
+
+export function resolveTrustedRelativeUrl(path, baseUrl, label = 'path', { errorClass = LoadError } = {}) {
+  const relative = validateRelativePath(path, label, { errorClass });
+  let base;
+  let resolved;
+  try {
+    base = new URL(baseUrl);
+    resolved = new URL(relative, base);
+  } catch {
+    throwTyped(errorClass, `${label} URL resolution failed`);
+  }
+  const baseDirectory = base.pathname.endsWith('/') ? base : new URL('./', base);
+  if (resolved.protocol !== base.protocol || resolved.origin !== base.origin) throwTyped(errorClass, `${label} escapes trusted origin`);
+  if (resolved.search || resolved.hash) throwTyped(errorClass, `${label} must not contain query or fragment state`);
+  if (!resolved.pathname.startsWith(baseDirectory.pathname)) throwTyped(errorClass, `${label} escapes trusted path prefix`);
+  return resolved;
+}
+
+export async function readBoundedResponseBytes(response, limit, label, { errorClass = LoadError, expectedBytes = null } = {}) {
+  if (!Number.isSafeInteger(limit) || limit < 0) throwTyped(errorClass, `${label} byte limit invalid`);
+  if (!response?.ok) throwTyped(errorClass, `${label} fetch failed: ${response?.status ?? 'unknown'}`);
   const declared = response.headers?.get?.('content-length');
-  if (declared !== null && declared !== undefined && Number(declared) > limit) throw new LoadError(`${label} declared bytes exceed proof limit`);
-  const bytes = new Uint8Array(await response.arrayBuffer());
-  if (bytes.byteLength > limit) throw new LoadError(`${label} bytes exceed proof limit`);
+  if (declared !== null && declared !== undefined) {
+    const declaredBytes = Number(declared);
+    if (Number.isFinite(declaredBytes) && declaredBytes > limit) throwTyped(errorClass, `${label} declared bytes exceed proof limit`);
+  }
+  const reader = response.body?.getReader?.();
+  if (!reader) throwTyped(errorClass, `${label} response body is not stream-readable`);
+  const chunks = [];
+  let total = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const chunk = value instanceof Uint8Array ? value : new Uint8Array(value);
+      total += chunk.byteLength;
+      if (total > limit) {
+        try { await reader.cancel(); } catch {}
+        throwTyped(errorClass, `${label} bytes exceed proof limit`);
+      }
+      chunks.push(chunk);
+    }
+  } catch (error) {
+    if (error instanceof errorClass) throw error;
+    throwTyped(errorClass, `${label} body read failed: ${error?.message ?? String(error)}`);
+  } finally {
+    try { reader.releaseLock?.(); } catch {}
+  }
+  if (expectedBytes != null && total !== expectedBytes) throwTyped(errorClass, `${label} byte count mismatch`);
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
   return bytes;
+}
+
+async function readBoundedResponse(response, limit, label) {
+  return readBoundedResponseBytes(response, limit, label);
 }
 
 function decodeJson(bytes, label) {
@@ -143,7 +231,7 @@ export async function loadManifest(url, fetcher = fetch) {
 export async function loadChunk(baseUrl, entry, manifest, fetcher = fetch) {
   if (!entry || typeof entry !== 'object') throw new LoadError('invalid chunk index entry');
   if (!Number.isSafeInteger(entry.bytes) || entry.bytes < 1 || entry.bytes > MAX_CHUNK_BYTES) throw new LoadError('invalid indexed chunk byte size');
-  const url = new URL(entry.path, baseUrl).toString();
+  const url = resolveTrustedRelativeUrl(entry.path, baseUrl, 'chunk path').toString();
   const response = await fetcher(url, { cache: 'no-store' });
   const bytes = await readBoundedResponse(response, MAX_CHUNK_BYTES, 'chunk');
   if (bytes.byteLength !== entry.bytes) throw new LoadError('chunk byte count differs from manifest');

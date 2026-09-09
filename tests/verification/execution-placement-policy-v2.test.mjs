@@ -1,27 +1,31 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
-
-const agents = fs.readFileSync(new URL('../../AGENTS.md', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
-
-test('execution policy separates verification profile from data capability', () => {
-  assert.match(agents, /verification profile.*independent.*data capability/i);
-  for (const capability of ['qualification_fixture', 'bounded_real_world', 'real_fullworld']) {
-    assert.match(agents, new RegExp(`\\b${capability}\\b`));
-  }
-  assert.match(agents, /profile.?=.?full.*does not imply.*real_fullworld/i);
+import {deriveVerificationMetadata} from '../../tools/verification/verification-metadata.mjs';
+import {resolveBrowserExecution} from '../../tools/verification/browser-execution.mjs';
+import {createPublicationProofFixtures} from './helpers/publication-proof-fixture.mjs';
+const catalog=JSON.parse(fs.readFileSync(new URL('../../tools/verification/verification-catalog.json',import.meta.url)));
+const registry=deriveVerificationMetadata(catalog).browser;
+const resolve=groups=>resolveBrowserExecution({protectedRegistry:registry,requiredGroups:groups,atlasRevision:'a'.repeat(40),environmentDigest:'b'.repeat(64),protectedBaseSha:'c'.repeat(40),...createPublicationProofFixtures()});
+test('full fixture obligation does not imply complete-product capability',()=>{
+ const full=catalog.groups['e2e.full'];
+ assert.equal(full.executionRole,'aggregate');
+ const result=resolve(full.dependsOnGroups);
+ assert(result.commands.length>0);
+ assert(result.commands.every(command=>command.dataCapability==='qualification_fixture'));
+ assert.deepEqual(result.partitions.specialistPlaywright,[]);
 });
-
-test('ordinary functional E2E is GitHub-hosted and Molehill is specialist-only', () => {
-  assert.match(agents, /GitHub-hosted.*ordinary functional E2E/i);
-  assert.match(agents, /Molehill-PC.*specialist/i);
-  assert.match(agents, /requiresRealFullWorld/i);
-  assert.match(agents, /Synology.*deployment.*live acceptance/i);
-  assert.doesNotMatch(agents, /GitHub-hosted CI owns[\s\S]{0,300}does not replace the heavy physical browser qualification/i);
-  assert.doesNotMatch(agents, /Molehill-PC[^\n]*owns heavy exact-head browser verification:[^\n]*full Docker Playwright PR gate/i);
+test('bounded source contracts retain hosted request-only and browser execution',()=>{
+ const result=resolve(['integration.source-contract-http','integration.source-contract-browser']);
+ assert(result.commands.length>0);
+ assert(result.commands.every(command=>command.dataCapability==='bounded_real_world'));
+ assert.deepEqual(result.partitions.specialistPlaywright,[]);
+ assert.equal(result.partitions.hostedPlaywright.length,result.commands.length);
 });
-
-test('legacy atlas-local-e2e is explicitly transitional rather than target architecture', () => {
-  assert.match(agents, /atlas-local-e2e.*legacy|legacy.*atlas-local-e2e/i);
-  assert.match(agents, /not (?:the )?target architecture/i);
+test('complete FullWorld placement stays specialist and missing execution proof fails closed',()=>{
+ const group=catalog.groups['fullworld.animation-census'];
+ assert.equal(group.capabilities.dataCapability,'real_fullworld');
+ assert.equal(group.capabilities.hosted,false);
+ assert.equal(group.capabilities.specialistReason,'real-fullworld-product');
+ assert.throws(()=>resolve(['fullworld.animation-census']),/raw publication proof for real_fullworld/);
 });

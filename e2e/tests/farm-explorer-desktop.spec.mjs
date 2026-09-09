@@ -7,6 +7,8 @@ import {
   waitForAtlas,
 } from './runtime.mjs';
 
+const SENTINEL = Object.freeze({entityId: `monster-entity:${'a'.repeat(32)}`, label: 'Fixture Sentinel'});
+
 async function waitForFarm(page) {
   await page.waitForFunction(() => ['PASS', 'FAIL'].includes(globalThis.__OTERYN_ATLAS_FARM__?.status), null, { timeout: 30_000 });
   return page.evaluate(() => globalThis.__OTERYN_ATLAS_FARM__);
@@ -23,11 +25,11 @@ test('desktop Farm Explorer fails closed for upstream facts and keeps custom kil
   await page.locator('#farm-custom-disclosure > summary').click();
   await expect(page.locator('#farm-explorer')).toContainText('Monster drop sources');
   await expect(page.locator('#farm-explorer')).toContainText('UPSTREAM_BLOCKED');
-  await page.locator('#farm-creature-search').fill('Cave Rat');
-  const caveRat = page.locator('#farm-creature-results .farm-creature-result').filter({ hasText: /^Cave Rat$/ }).first();
-  await expect(caveRat).toBeVisible();
-  await caveRat.click();
-  await expect.poll(() => new URL(page.url()).searchParams.get('farmCreature')).toBe('monster-entity:8b41afe4c98e72744557d7adc250f7e6');
+  await page.locator('#farm-creature-search').fill(SENTINEL.label);
+  const sentinel = page.locator('#farm-creature-results .farm-creature-result').filter({ hasText: new RegExp(`^${SENTINEL.label}$`) }).first();
+  await expect(sentinel).toBeVisible();
+  await sentinel.click();
+  await expect.poll(() => new URL(page.url()).searchParams.get('farmCreature')).toBe(SENTINEL.entityId);
   await page.locator('#farm-target-kills').fill('120');
   await page.locator('#farm-kph').fill('60');
   await page.locator('#farm-time-base').selectOption('hunt_wall');
@@ -41,7 +43,7 @@ test('desktop Farm Explorer fails closed for upstream facts and keeps custom kil
   await page.reload({ waitUntil: 'domcontentloaded' });
   await waitForAtlas(page);
   const reloaded = await waitForFarm(page);
-  expect(reloaded.selectedCreatureId).toBe('monster-entity:8b41afe4c98e72744557d7adc250f7e6');
+  expect(reloaded.selectedCreatureId).toBe(SENTINEL.entityId);
   await expect(page.locator('#farm-target-kills')).toHaveValue('120');
   await expect(page.locator('#farm-kph')).toHaveValue('60');
   await expect(page.locator('#farm-estimate-output')).toContainText('2.00 h');

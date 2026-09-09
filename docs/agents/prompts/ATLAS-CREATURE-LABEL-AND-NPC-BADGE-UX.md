@@ -22,38 +22,15 @@ Canonical Game/World authority:
 
 Oteryn-Game is authoritative for creature identity, placement, outfit/presentation facts and NPC role semantics. Atlas is presentation/read-model code and must not invent new Game-owned facts.
 
-## Mandatory GitHub-first preflight
+## Task-specific live locators and dependencies
 
-Before any product mutation:
+Use current repository authority to resolve Issue #115, its design packet, and active creature interaction/rendering ownership. Read the current implementation surfaces and tests named below because they define this task's existing seams:
 
-1. Refresh `Oteryn/Oteryn-Atlas` and resolve the exact current `main` SHA from GitHub.
-2. Read root `AGENTS.md` and any nearer instructions for touched paths.
-3. Read Issue #115 in full.
-4. Read the current-main version of:
-   - `docs/agents/tasks/active/ATLAS-CREATURE-LABEL-AND-NPC-BADGE-UX.md`;
-   - this prompt.
-5. Confirm the design/prompt have landed on `main`. If they exist only on an unmerged docs PR, do not start ordinary product mutation from that docs branch; report the lifecycle blocker unless the owner explicitly authorizes an exception.
-6. Read the canonical shipped NPC baseline:
-   - Issue #64;
-   - merged PR #83;
-   - `src/browser/npc-markers.mjs`;
-   - `tests/npc-markers.mjs`;
-   - `tests/creature-index-roles.py`.
-7. Do not use Issue #61 as the shipped baseline. It is historical/overlapping context; #64 + PR #83 define the currently shipped NPC role/icon/filter implementation.
-8. Read current creature/runtime code and applicable tests, including:
-   - `web/fullworld-creatures.mjs`;
-   - `web/fullworld-app.mjs`;
-   - `web/fullworld-minimap.mjs`;
-   - `web/fullworld.css`;
-   - `e2e/tests/creatures-desktop.spec.mjs`;
-   - applicable mobile/visual acceptance specs;
-   - renderer/creature diagnostics helpers.
-9. Refresh Issue #113 and every active branch/PR touching creature interaction/rendering. A planning review observed branch `feat/issue-113-creature-cards`; do not assume that state is still current.
-10. Refresh #111 and #85 to discover the current visual-user acceptance and exact-head verification path.
-11. Revalidate factual real-data acceptance anchors from the exact current Game-derived publication. Planning anchors were:
-   - Albinius `npc:994e4a2decd5f718ccbc37c1d94bbbeb` with roles `shop`, `quest`;
-   - Eremo `npc:d6f7fbe1e22b73f3b04a708fd0a219a5` with roles `travel`, `shop`, `quest`, `blessing`, `trainer`.
-12. Record the exact starting `main` SHA and any revalidated factual acceptance record IDs in the implementation PR.
+- Issue #64, merged PR #83, `src/browser/npc-markers.mjs`, `tests/npc-markers.mjs`, and `tests/creature-index-roles.py` are the shipped NPC baseline; Issue #61 is historical context only.
+- `web/fullworld-creatures.mjs`, `web/fullworld-app.mjs`, `web/fullworld-minimap.mjs`, `web/fullworld.css`, `e2e/tests/creatures-desktop.spec.mjs`, applicable mobile/visual specs, and renderer diagnostics are the primary implementation and acceptance surfaces.
+- Issue #113 may own overlapping creature interaction/rendering work. The planning-time branch `feat/issue-113-creature-cards` is only a locator and must be resolved from live state.
+- #111 and #85 identify relevant visual-user acceptance and exact-head verification work.
+- Revalidate Game-derived acceptance records rather than treating planning anchors as current facts. The recorded anchors were Albinius `npc:994e4a2decd5f718ccbc37c1d94bbbeb` (`shop`, `quest`) and Eremo `npc:d6f7fbe1e22b73f3b04a708fd0a219a5` (`travel`, `shop`, `quest`, `blessing`, `trainer`).
 
 ## Work boundary
 

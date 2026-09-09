@@ -1,33 +1,41 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { fileURLToPath } from 'node:url';
+import { publishReadyPublication, validateReadyPublication } from '../../tools/verification/publication-readiness.mjs';
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const workflowPath = path.join(ROOT, '.github/workflows/protected-publication-readiness-promotion.yml');
-const legacyWorkflowPath = path.join(ROOT, '.github/workflows/legacy-molehill-transition-qualification.yml');
+const identity = {
+  repository: 'Oteryn/Oteryn-Atlas',
+  candidateSha: 'a'.repeat(40),
+  planSemanticDigest: `sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb`,
+  planInstanceDigest: `sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc`,
+  authorityDigest: `sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd`,
+  environmentDigest: `sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee`,
+  harnessDigest: `sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff`,
+  producerRunId: '42-1',
+};
 
-test('protected publication readiness promotion is bounded GitHub-hosted proof and never Molehill E2E', () => {
-  assert.equal(fs.existsSync(workflowPath), true, 'protected publication readiness promotion workflow must exist');
-  const workflow = fs.readFileSync(workflowPath, 'utf8');
-  const legacy = fs.readFileSync(legacyWorkflowPath, 'utf8');
-  const heavy = legacy.split('  legacy-qualification:')[1]?.split('  protected-census-bootstrap:')[0] ?? '';
+function fixture(t) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-readiness-identity-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const source = path.join(root, 'source'), destination = path.join(root, 'ready');
+  fs.mkdirSync(source);
+  fs.writeFileSync(path.join(source, 'product.json'), '{}\n');
+  const manifest = publishReadyPublication({ sourceDir: source, destinationDir: destination, ...identity });
+  return { destination, manifest };
+}
 
-  assert.match(workflow, /pull_request:\s*\n\s*types:\s*\[labeled\]/);
-  assert.match(workflow, /github\.event\.label\.name == 'atlas-legacy-transition-qualification'/);
-  assert.match(workflow, /fix\/issue-179-protected-publication-readiness-promotion/);
-  assert.doesNotMatch(heavy, /fix\/issue-179-protected-publication-readiness-promotion/);
-  assert.match(workflow, /runs-on:\s*ubuntu-24\.04/);
-  assert.doesNotMatch(workflow, /group:\s*atlas-runners|labels:\s*oteryn-atlas-pc/);
-  assert.match(workflow, /Require exact four-file readiness promotion delta/);
-  assert.match(workflow, /publication-readiness\.test\.mjs/);
-  assert.match(workflow, /--network none/);
-  assert.match(workflow, /--read-only/);
-  assert.match(workflow, /--cap-drop ALL/);
-  assert.match(workflow, /no-new-privileges/);
-  assert.match(workflow, /assert-current-pr-head\.mjs/);
-  assert.match(workflow, /statuses:\s*write/);
-  assert.match(workflow, /context='atlas-local-e2e'|context.*atlas-local-e2e/s);
-  assert.doesNotMatch(workflow, /playwright test|\\e2e\\run\.ps1|ATLAS_PUBLICATION_ORIGIN|visual-review\.json|synology/i);
+test('publication readiness rejects producer-run and harness identity drift', t => {
+  const f = fixture(t);
+  assert.deepEqual(validateReadyPublication({ publicationDir: f.destination, manifest: f.manifest, ...identity }), f.manifest);
+  for (const [field, value] of [
+    ['producerRunId', '43-1'],
+    ['harnessDigest', `sha256:0000000000000000000000000000000000000000000000000000000000000000`],
+  ]) {
+    assert.throws(
+      () => validateReadyPublication({ publicationDir: f.destination, manifest: f.manifest, ...identity, [field]: value }),
+      /identity|stale/i,
+    );
+  }
 });

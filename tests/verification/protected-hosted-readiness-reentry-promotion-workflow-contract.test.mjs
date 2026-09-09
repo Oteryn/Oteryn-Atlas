@@ -1,34 +1,33 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { fileURLToPath } from 'node:url';
+import { publishReadyPublication } from '../../tools/verification/publication-readiness.mjs';
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const workflowPath = path.join(ROOT, '.github/workflows/protected-hosted-readiness-reentry-promotion.yml');
-const legacyWorkflowPath = path.join(ROOT, '.github/workflows/legacy-molehill-transition-qualification.yml');
+const identity = {
+  repository: 'Oteryn/Oteryn-Atlas',
+  candidateSha: 'a'.repeat(40),
+  planSemanticDigest: `sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb`,
+  planInstanceDigest: `sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc`,
+  authorityDigest: `sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd`,
+  environmentDigest: `sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee`,
+  harnessDigest: `sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff`,
+  producerRunId: '42-1',
+};
 
-test('protected hosted readiness reentry promotion is bounded GitHub-hosted proof and never Molehill E2E', () => {
-  assert.equal(fs.existsSync(workflowPath), true, 'protected hosted readiness reentry promotion workflow must exist');
-  const workflow = fs.readFileSync(workflowPath, 'utf8');
-  const legacy = fs.readFileSync(legacyWorkflowPath, 'utf8');
-  const heavy = legacy.split('  legacy-qualification:')[1]?.split('  protected-census-bootstrap:')[0] ?? '';
-
-  assert.match(workflow, /pull_request:\s*\n\s*types:\s*\[labeled\]/);
-  assert.match(workflow, /github\.event\.label\.name == 'atlas-legacy-transition-qualification'/);
-  assert.match(workflow, /fix\/issue-179-protected-hosted-readiness-reentry/);
-  assert.doesNotMatch(heavy, /fix\/issue-179-protected-hosted-readiness-reentry/);
-  assert.match(workflow, /runs-on:\s*ubuntu-24\.04/);
-  assert.doesNotMatch(workflow, /group:\s*atlas-runners|labels:\s*oteryn-atlas-pc/);
-  assert.match(workflow, /Require exact four-file readiness reentry delta/);
-  assert.match(workflow, /protected-hosted-compose-promotion\.test\.mjs/);
-  assert.match(workflow, /compose up -d --wait atlas-publication/);
-  assert.match(workflow, /compose run --rm atlas-publication-ready/);
-  assert.match(workflow, /\/__atlas\/readiness/);
-  assert.match(workflow, /fullworld\/publication\/publication\.json/);
-  assert.match(workflow, /data\/creatures\/index\.json/);
-  assert.match(workflow, /assert-current-pr-head\.mjs/);
-  assert.match(workflow, /statuses:\s*write/);
-  assert.match(workflow, /context='atlas-local-e2e'|context.*atlas-local-e2e/s);
-  assert.doesNotMatch(workflow, /playwright test|\\e2e\\run\.ps1|visual-review\.json|synology|molehill/i);
+test('publication readiness refuses overwrite and preserves existing bytes', t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-readiness-overwrite-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const source = path.join(root, 'source'), destination = path.join(root, 'ready');
+  fs.mkdirSync(source);
+  fs.writeFileSync(path.join(source, 'product.json'), '{}\n');
+  publishReadyPublication({ sourceDir: source, destinationDir: destination, ...identity });
+  const manifestPath = path.join(destination, 'atlas-publication-readiness.json');
+  const productPath = path.join(destination, 'product.json');
+  const beforeManifest = fs.readFileSync(manifestPath);
+  const beforeProduct = fs.readFileSync(productPath);
+  assert.throws(() => publishReadyPublication({ sourceDir: source, destinationDir: destination, ...identity }), /overwrite/i);
+  assert.deepEqual(fs.readFileSync(manifestPath), beforeManifest);
+  assert.deepEqual(fs.readFileSync(productPath), beforeProduct);
 });

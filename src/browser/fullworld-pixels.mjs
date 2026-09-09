@@ -1,4 +1,4 @@
-import { canonicalJsonBytes, sha256ContentId } from './loader.mjs';
+import { canonicalJsonBytes, readBoundedResponseBytes, resolveTrustedRelativeUrl, sha256ContentId } from './loader.mjs';
 import { safeRelativePath } from './fullworld.mjs';
 
 export const PIXEL_PROFILE = 'oteryn-atlas-fullworld-pixel-publication-v0';
@@ -31,13 +31,7 @@ async function rootedContentId(value) {
 }
 
 async function readBounded(response, maxBytes, label, expectedBytes = null) {
-  requireValue(response?.ok, `${label} fetch failed: ${response?.status ?? 'unknown'}`);
-  const declared = response.headers?.get?.('content-length');
-  if (declared != null) requireValue(Number(declared) <= maxBytes, `${label} declared bytes exceed limit`);
-  const bytes = new Uint8Array(await response.arrayBuffer());
-  requireValue(bytes.byteLength <= maxBytes, `${label} bytes exceed limit`);
-  if (expectedBytes != null) requireValue(bytes.byteLength === expectedBytes, `${label} byte count mismatch`);
-  return bytes;
+  return readBoundedResponseBytes(response, maxBytes, label, { errorClass: FullWorldPixelError, expectedBytes });
 }
 
 function decodeCanonical(bytes) {
@@ -49,9 +43,21 @@ function decodeCanonical(bytes) {
   return value;
 }
 
+async function persistentGet(cache, contentId, expectedBytes) {
+  if (!cache?.get) return null;
+  try { return await cache.get(contentId, expectedBytes); }
+  catch { return null; }
+}
+
+async function persistentPut(cache, contentId, bytes) {
+  if (!cache?.put) return false;
+  try { return await cache.put(contentId, bytes); }
+  catch { return false; }
+}
+
 export async function loadFullWorldPixelCatalog(publicationBaseUrl, publication, trust, fetcher = fetch) {
   requireValue(isSha256(trust?.pixelRoot), 'trusted pixel root required');
-  const manifestUrl = new URL(safeRelativePath(publication.pixels.path), publicationBaseUrl);
+  const manifestUrl = resolveTrustedRelativeUrl(publication.pixels.path, publicationBaseUrl, 'pixel manifest path', { errorClass: FullWorldPixelError });
   const response = await fetcher(manifestUrl, { cache: 'no-store' });
   const manifest = decodeCanonical(await readBounded(response, MAX_MANIFEST_BYTES, 'pixel manifest'));
   requireValue(manifest.profile === PIXEL_PROFILE, 'unsupported pixel publication profile');
@@ -102,14 +108,21 @@ export async function loadVerifiedPixelPack(catalog, packIndex, fetcher = fetch,
   const pack = catalog.packs[packIndex];
   requireValue(pack, `pixel pack ${packIndex} is not published`);
   const contentId = `sha256:${pack.sha256}`;
-  let bytes = await options.persistentCache?.get?.(contentId, pack.bytes) ?? null;
+  let bytes = await persistentGet(options.persistentCache, contentId, pack.bytes);
+  if (bytes) {
+    const valid = bytes instanceof Uint8Array
+      && bytes.byteLength === pack.bytes
+      && await sha256ContentId(bytes) === contentId;
+    if (!valid) bytes = null;
+  }
   if (bytes) options.onLoad?.({ source: 'cache', bytes: bytes.byteLength, packIndex });
   if (!bytes) {
-    const response = await fetcher(new URL(safeRelativePath(pack.path), catalog.pixelBaseUrl), { cache: 'no-store', signal: options.signal ?? null });
+    const url = resolveTrustedRelativeUrl(pack.path, catalog.pixelBaseUrl, `pixel pack ${packIndex} path`, { errorClass: FullWorldPixelError });
+    const response = await fetcher(url, { cache: 'no-store', signal: options.signal ?? null });
     bytes = await readBounded(response, MAX_PACK_BYTES, `pixel pack ${packIndex}`, pack.bytes);
-    const actual = (await sha256ContentId(bytes)).slice('sha256:'.length);
-    requireValue(actual === pack.sha256, `pixel pack ${packIndex} SHA-256 mismatch`);
-    await options.persistentCache?.put?.(contentId, bytes);
+    const actual = await sha256ContentId(bytes);
+    requireValue(actual === contentId, `pixel pack ${packIndex} SHA-256 mismatch`);
+    await persistentPut(options.persistentCache, contentId, bytes);
     options.onLoad?.({ source: 'network', bytes: bytes.byteLength, packIndex });
   }
   return bytes;

@@ -1,4 +1,4 @@
-import { canonicalJsonBytes, sha256ContentId } from './loader.mjs';
+import { canonicalJsonBytes, readBoundedResponseBytes, resolveTrustedRelativeUrl, sha256ContentId, validateRelativePath } from './loader.mjs';
 
 export const PUBLICATION_PROFILE = 'oteryn-atlas-fullworld-publication-v0';
 export const SEMANTIC_PROFILE = 'oteryn-atlas-fullworld-semantic-publication-v0';
@@ -28,11 +28,17 @@ function isSha256(value) {
 }
 
 export function safeRelativePath(path) {
-  requireValue(typeof path === 'string' && path.length > 0, 'path missing');
-  requireValue(!path.startsWith('/') && !path.includes('\\'), 'unsafe path');
-  const parts = path.split('/');
-  requireValue(!parts.some((part) => part === '' || part === '.' || part === '..'), 'unsafe path');
-  return path;
+  requireValue(typeof path === 'string' && !/^[a-z][a-z0-9+.-]*:/i.test(path), 'unsafe path');
+  try {
+    return validateRelativePath(path, 'path', { errorClass: FullWorldError });
+  } catch (error) {
+    if (error instanceof FullWorldError) throw new FullWorldError('unsafe path');
+    throw error;
+  }
+}
+
+function trustedRelativeUrl(path, baseUrl, label) {
+  return resolveTrustedRelativeUrl(path, baseUrl, label, { errorClass: FullWorldError });
 }
 
 function concatBytes(a, b) {
@@ -49,13 +55,7 @@ export async function rootedContentId(domain, value) {
 }
 
 async function readBounded(response, maxBytes, label, expectedBytes = null) {
-  requireValue(response?.ok, `${label} fetch failed: ${response?.status ?? 'unknown'}`);
-  const declared = response.headers?.get?.('content-length');
-  if (declared != null) requireValue(Number(declared) <= maxBytes, `${label} declared bytes exceed limit`);
-  const bytes = new Uint8Array(await response.arrayBuffer());
-  requireValue(bytes.byteLength <= maxBytes, `${label} bytes exceed limit`);
-  if (expectedBytes != null) requireValue(bytes.byteLength === expectedBytes, `${label} byte count mismatch`);
-  return bytes;
+  return readBoundedResponseBytes(response, maxBytes, label, { errorClass: FullWorldError, expectedBytes });
 }
 
 function decodeCanonical(bytes, label) {
@@ -95,7 +95,7 @@ export async function loadFullWorldPublication(baseUrl, trust, fetcher = fetch) 
 }
 
 export async function loadSemanticWorld(publicationBaseUrl, publication, trust, fetcher = fetch) {
-  const url = new URL(safeRelativePath(publication.semantic.path), publicationBaseUrl);
+  const url = trustedRelativeUrl(publication.semantic.path, publicationBaseUrl, 'semantic world path');
   const world = await fetchCanonical(url, MAX_WORLD_BYTES, 'semantic world', fetcher);
   requireValue(world.profile === SEMANTIC_PROFILE, 'unsupported semantic world profile');
   requireValue(world.rootContentId === await rootedContentId(SEMANTIC_DOMAIN, world), 'semantic world root mismatch');
@@ -115,8 +115,10 @@ export async function loadSemanticWorld(publicationBaseUrl, publication, trust, 
 }
 
 export async function loadSemanticFloor(publicationBaseUrl, publication, world, floorEntry, fetcher = fetch) {
-  const semanticBase = new URL('./', new URL(safeRelativePath(publication.semantic.path), publicationBaseUrl));
-  const floor = await fetchCanonical(new URL(safeRelativePath(floorEntry.path), semanticBase), MAX_FLOOR_BYTES, `semantic floor ${floorEntry.floor}`, fetcher);
+  const semanticManifestUrl = trustedRelativeUrl(publication.semantic.path, publicationBaseUrl, 'semantic world path');
+  const semanticBase = new URL('./', semanticManifestUrl);
+  const floorUrl = trustedRelativeUrl(floorEntry.path, semanticBase, `semantic floor ${floorEntry.floor} path`);
+  const floor = await fetchCanonical(floorUrl, MAX_FLOOR_BYTES, `semantic floor ${floorEntry.floor}`, fetcher);
   requireValue(floor.profile === SEMANTIC_PROFILE, 'unsupported semantic floor profile');
   requireValue(floor.floor === floorEntry.floor, 'semantic floor identity mismatch');
   requireValue(floor.rootContentId === await rootedContentId(FLOOR_DOMAIN, floor), 'semantic floor root mismatch');
@@ -175,7 +177,8 @@ export function validateWorldChunkDescriptor(chunk, runtimeWorld, runtimeFloor) 
 }
 
 export async function loadRuntimeFloor(baseUrl, runtimeWorld, floorEntry, fetcher = fetch) {
-  const floor = await fetchCanonical(new URL(safeRelativePath(floorEntry.path), baseUrl), MAX_FLOOR_BYTES, `runtime floor ${floorEntry.floor}`, fetcher);
+  const floorUrl = trustedRelativeUrl(floorEntry.path, baseUrl, `runtime floor ${floorEntry.floor} path`);
+  const floor = await fetchCanonical(floorUrl, MAX_FLOOR_BYTES, `runtime floor ${floorEntry.floor}`, fetcher);
   requireValue(floor.profile === RUNTIME_FLOOR_PROFILE && floor.floor === floorEntry.floor, 'runtime floor identity mismatch');
   requireValue(floor.rootContentId === await rootedContentId(RUNTIME_FLOOR_DOMAIN, floor), 'runtime floor root mismatch');
   requireValue(floor.rootContentId === floorEntry.rootContentId, 'runtime floor root linkage mismatch');
@@ -430,14 +433,22 @@ export class SemanticRangeStore {
     this.cache = new Map();
     this.cacheBytes = 0;
     this.fullChunkCache = new Map();
+    this.inflight = new Map();
     this.networkBytes = 0;
     this.rangeRequests = 0;
     this.cacheHits = 0;
     this.cacheMisses = 0;
+    this.inflightHits = 0;
     this.persistentHits = 0;
+    this.persistentErrors = 0;
   }
 
   remember(key, group, tiles) {
+    const previous = this.cache.get(key);
+    if (previous) {
+      this.cache.delete(key);
+      this.cacheBytes -= previous.bytes;
+    }
     this.cache.set(key, { bytes: group.bytes, tiles });
     this.cacheBytes += group.bytes;
     while (this.cacheBytes > this.cacheByteBudget && this.cache.size > 1) {
@@ -457,21 +468,57 @@ export class SemanticRangeStore {
       this.cache.set(key, existing);
       return existing.tiles;
     }
+    const pending = this.inflight.get(key);
+    if (pending) {
+      this.inflightHits += 1;
+      return pending;
+    }
     this.cacheMisses += 1;
+    const request = this.loadGroupUncached(floor, chunk, group, options);
+    this.inflight.set(key, request);
+    try {
+      return await request;
+    } finally {
+      if (this.inflight.get(key) === request) this.inflight.delete(key);
+    }
+  }
 
-    let bytes = await this.persistentCache?.get?.(group.contentId, group.bytes) ?? null;
-    if (bytes) this.persistentHits += 1;
+  async loadGroupUncached(floor, chunk, group, options) {
+    let bytes = null;
+    if (this.persistentCache?.get) {
+      try {
+        bytes = await this.persistentCache.get(group.contentId, group.bytes);
+      } catch {
+        this.persistentErrors += 1;
+      }
+    }
+    if (bytes) {
+      const valid = bytes instanceof Uint8Array
+        && bytes.byteLength === group.bytes
+        && await sha256ContentId(bytes) === group.contentId;
+      if (valid) this.persistentHits += 1;
+      else {
+        this.persistentErrors += 1;
+        bytes = null;
+      }
+    }
     if (!bytes) {
-      const url = new URL(safeRelativePath(chunk.path), this.semanticBaseUrl).toString();
+      const url = trustedRelativeUrl(chunk.path, this.semanticBaseUrl, 'semantic chunk path').toString();
       bytes = await loadRangeBytes(url, chunk, group, this.fetcher, this.fullChunkCache, options.signal ?? null);
       requireValue(bytes.byteLength === group.bytes, 'semantic authenticated range byte count mismatch');
       requireValue(await sha256ContentId(bytes) === group.contentId, 'semantic authenticated range identity mismatch');
       this.networkBytes += bytes.byteLength;
       this.rangeRequests += 1;
-      await this.persistentCache?.put?.(group.contentId, bytes);
+      if (this.persistentCache?.put) {
+        try {
+          await this.persistentCache.put(group.contentId, bytes);
+        } catch {
+          this.persistentErrors += 1;
+        }
+      }
     }
     const tiles = decodeSemanticGroup(bytes, { chunk, floor, group, regionSpan: this.runtimeWorld.regionSpan, visualBounds: this.runtimeWorld.visualBounds });
-    this.remember(key, group, tiles);
+    this.remember(`${chunk.contentId}:${group.offset}:${group.bytes}`, group, tiles);
     return tiles;
   }
 
@@ -487,7 +534,9 @@ export class SemanticRangeStore {
       cachedGroups: this.cache.size,
       cacheHits: this.cacheHits,
       cacheMisses: this.cacheMisses,
+      inflightHits: this.inflightHits,
       persistentHits: this.persistentHits,
+      persistentErrors: this.persistentErrors,
       networkBytes: this.networkBytes,
       rangeRequests: this.rangeRequests,
     });

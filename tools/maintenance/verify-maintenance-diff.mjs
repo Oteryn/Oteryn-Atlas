@@ -1,16 +1,16 @@
 import {execFileSync} from 'node:child_process';
-import fs from 'node:fs';
-import path from 'node:path';
 
 const [trustedRoot,candidateRoot]=process.argv.slice(2);
-const MAX_TEXT_BYTES=2*1024*1024;
-const RETAINED_WORKFLOWS=new Set([
-  '.github/workflows/merge-authority-audit.yml',
-  '.github/workflows/merge-group-gate.yml',
-  '.github/workflows/terminal-branch-lifecycle.yml',
-]);
-const TEMPLATE='tools/maintenance/minimal-merge-group-gate.yml';
+const RETIREMENT_AUTHORITY='docs/maintenance/ATLAS_LEGACY_RETIREMENT_AUTHORITY.json';
 const ARCHIVE_ROOT='docs/maintenance/suspended-workflows/';
+const RESTORATION_ROOT='docs/maintenance/verification-restoration/';
+const LEGACY_EXACT=new Set([
+  'docs/maintenance/ATLAS-MAINTENANCE-MODE.md',
+  'docs/maintenance/ATLAS_REMEDIATION_ALLOWLIST.json',
+  'docs/maintenance/ATLAS_VERIFICATION_RESTORATION_ALLOWLIST.json',
+  'docs/maintenance/OBSOLETE_VERIFICATION_CONTRACTS.json',
+]);
+const REGULAR_MODES=new Set(['100644','100755']);
 const sha=/^[0-9a-f]{40}$/;
 
 function fail(message){throw new TypeError(message);}
@@ -21,107 +21,136 @@ function git(root,args,{buffer=false}={}){
 }
 function clean(value){return value.trim();}
 function assertSafePath(name){
-  if(typeof name!=='string'||!name||name.startsWith('/')||name.includes('\\')||!/^[A-Za-z0-9._/-]+$/.test(name)||name.split('/').some(part=>!part||part==='.'||part==='..'))fail(`unsafe path: ${name}`);
+  if(typeof name!=='string'||!name||name.startsWith('/')||name.includes('\\')||!/^[A-Za-z0-9._/-]+$/.test(name)
+    ||name.split('/').some(part=>!part||part==='.'||part==='..'))fail(`unsafe path: ${name}`);
 }
-function treePaths(root,revision,prefix){
-  const value=git(root,['ls-tree','-r','--name-only',revision,'--',prefix]);
-  return value.split('\n').filter(Boolean);
-}
+function sameList(actual,expected){return JSON.stringify([...actual].sort())===JSON.stringify([...expected].sort());}
+function plainObject(value){return value!==null&&typeof value==='object'&&!Array.isArray(value);}
+function exactKeys(value,keys,label){if(!plainObject(value)||!sameList(Object.keys(value),keys))fail(`${label} has invalid shape`);}
 function blob(root,revision,name){return git(root,['show',`${revision}:${name}`],{buffer:true});}
 function mode(root,revision,name){
   const row=git(root,['ls-tree',revision,'--',name]).trim();
   return row?row.split(/\s+/,1)[0]:null;
 }
-function sameList(actual,expected){return JSON.stringify([...actual].sort())===JSON.stringify([...expected].sort());}
-
+function jsonAt(root,revision,name){
+  try{return JSON.parse(blob(root,revision,name).toString('utf8'));}catch{fail(`protected authority is invalid JSON: ${name}`);}
+}
+function validatePaths(values,label){
+  if(!Array.isArray(values))fail(`${label} must be an array`);
+  const seen=new Set();
+  for(const name of values){
+    assertSafePath(name);
+    if(name===RETIREMENT_AUTHORITY||name.startsWith('.github/workflows/')||name.startsWith('tools/maintenance/'))
+      fail(`${label} targets protected control-plane path: ${name}`);
+    if(seen.has(name))fail(`${label} contains duplicate path: ${name}`);
+    seen.add(name);
+  }
+  return Object.freeze([...values]);
+}
+function loadRetirementAuthority(root,revision){
+  if(mode(root,revision,RETIREMENT_AUTHORITY)!=='100644')fail('legacy retirement authority is absent');
+  const raw=jsonAt(root,revision,RETIREMENT_AUTHORITY);
+  exactKeys(raw,['programme','schemaVersion','waves'],'legacy retirement authority');
+  if(raw.schemaVersion!==1||raw.programme!=='atlas-legacy-retirement'||!plainObject(raw.waves))
+    fail('legacy retirement authority identity is invalid');
+  const entries=Object.entries(raw.waves);
+  if(entries.length<1||entries.length>8)fail('legacy retirement wave count is invalid');
+  const retireByPath=new Map(),supportByPath=new Map(),waves=new Map();
+  let count=0;
+  for(const [wave,value] of entries){
+    if(!/^lr[2-9]-[a-z0-9][a-z0-9-]{0,63}$/.test(wave))fail(`legacy retirement wave id is invalid: ${wave}`);
+    exactKeys(value,['retireDelete','retireModifyDelete','supportModify'],`legacy retirement wave ${wave}`);
+    const modifyDelete=validatePaths(value.retireModifyDelete,`${wave}.retireModifyDelete`);
+    const deleteOnly=validatePaths(value.retireDelete,`${wave}.retireDelete`);
+    const support=validatePaths(value.supportModify,`${wave}.supportModify`);
+    if(!modifyDelete.length&&!deleteOnly.length)fail(`legacy retirement wave has no retirement targets: ${wave}`);
+    const local=new Set();
+    for(const name of [...modifyDelete,...deleteOnly,...support]){
+      if(local.has(name)||retireByPath.has(name)||supportByPath.has(name))fail(`duplicate legacy retirement path: ${name}`);
+      local.add(name);
+    }
+    for(const name of modifyDelete)retireByPath.set(name,Object.freeze({wave,operations:new Set(['M','D'])}));
+    for(const name of deleteOnly)retireByPath.set(name,Object.freeze({wave,operations:new Set(['D'])}));
+    for(const name of support)supportByPath.set(name,Object.freeze({wave,operations:new Set(['M'])}));
+    count+=local.size;
+    waves.set(wave,Object.freeze({retireModifyDelete:modifyDelete,retireDelete:deleteOnly,supportModify:support}));
+  }
+  if(count>192)fail('legacy retirement rule count is invalid');
+  return Object.freeze({raw,waves,retireByPath,supportByPath});
+}
+function verifyMonotonicAuthority(baseAuthority,candidateAuthority){
+  let grew=false;
+  for(const [wave,baseWave] of baseAuthority.waves){
+    const candidateWave=candidateAuthority.waves.get(wave);
+    if(!candidateWave)fail(`legacy retirement authority removed wave: ${wave}`);
+    for(const key of ['retireModifyDelete','retireDelete','supportModify']){
+      const candidate=new Set(candidateWave[key]);
+      for(const name of baseWave[key])if(!candidate.has(name))fail(`legacy retirement authority changed protected rule: ${name}`);
+      if(candidateWave[key].length>baseWave[key].length)grew=true;
+    }
+  }
+  if(candidateAuthority.waves.size>baseAuthority.waves.size)grew=true;
+  if(!grew)fail('legacy retirement authority update is not monotonic growth');
+}
+function controlPlanePath(name){return name.startsWith('.github/workflows/')||name.startsWith('tools/maintenance/');}
+function legacyNamespace(name,authority){
+  return name.startsWith(ARCHIVE_ROOT)||name.startsWith(RESTORATION_ROOT)||LEGACY_EXACT.has(name)||authority.retireByPath.has(name);
+}
 function parseChanges(root,base,head){
-  const tokens=git(root,['diff','--name-status','-z','-M','-C',base,head,'--'],{buffer:true}).toString('utf8').split('\0');
+  const tokens=git(root,['diff','--name-status','-z','--no-renames',base,head,'--'],{buffer:true}).toString('utf8').split('\0');
   if(tokens.at(-1)==='')tokens.pop();
   const changes=[];
   while(tokens.length){
-    const statusToken=tokens.shift();
-    const status=statusToken[0];
-    if(!['A','M','D','R','C'].includes(status))fail(`unsupported diff status: ${statusToken}`);
-    if(status==='R'||status==='C'){
-      const oldPath=tokens.shift(),newPath=tokens.shift();
-      assertSafePath(oldPath);assertSafePath(newPath);
-      changes.push({status,oldPath,newPath,path:newPath});
-    }else{
-      const name=tokens.shift();assertSafePath(name);changes.push({status,path:name});
-    }
+    const statusToken=tokens.shift(),status=statusToken[0];
+    if(!['A','M','D'].includes(status))fail(`unsupported diff status: ${statusToken}`);
+    const name=tokens.shift();assertSafePath(name);changes.push({status,path:name});
   }
-  if(!changes.length)fail('maintenance diff is empty');
-  const seen=new Set();
-  for(const change of changes){
-    for(const name of [change.oldPath,change.path].filter(Boolean)){
-      const key=`${change.status}:${name}`;
-      if(seen.has(key))fail(`duplicate diff path: ${name}`);seen.add(key);
-    }
-  }
+  if(!changes.length)fail('protected diff is empty');
   return changes;
 }
-
-function verifyRegularText(root,revision,name){
-  if(mode(root,revision,name)!=='100644')fail(`candidate path is not a regular 100644 file: ${name}`);
-  const bytes=blob(root,revision,name);
-  if(bytes.length>MAX_TEXT_BYTES)fail(`candidate text exceeds size limit: ${name}`);
-  if(bytes.includes(0))fail(`candidate path is not text content: ${name}`);
-  try{new TextDecoder('utf-8',{fatal:true}).decode(bytes);}catch{fail(`candidate path is not UTF-8 text content: ${name}`);}
+function verifyRegular(root,revision,name,label){
+  if(!REGULAR_MODES.has(mode(root,revision,name)))fail(`${label} is not a regular file: ${name}`);
 }
-
-function allowedNormal(change){
-  const {status,path:name}=change;
-  if(change.oldPath)fail(`rename or copy is forbidden: ${change.oldPath} -> ${name}`);
-  if(name.startsWith('tools/maintenance/'))fail(`maintenance authority is immutable: ${name}`);
-  if(name.startsWith('.github/workflows/')||name.startsWith(ARCHIVE_ROOT))fail('workflow transition is not the complete suspension cutover');
-  if(name==='AGENTS.md')return status==='M';
-  if(name.startsWith('docs/agents/')||name.startsWith('docs/evidence/')||name.startsWith('docs/maintenance/'))return ['A','M','D'].includes(status);
-  if(name.startsWith('tools/governance/'))return ['A','M','D'].includes(status);
-  if(/^tests\/verification\/[A-Za-z0-9][A-Za-z0-9._/-]*\.test\.mjs$/.test(name))return status==='D';
-  return false;
+function verifyChangeStorage(change,base,head){
+  if(change.status==='D'){verifyRegular(candidateRoot,base,change.path,'removed path');return;}
+  verifyRegular(candidateRoot,head,change.path,'candidate path');
 }
-
-function verifyNormal(changes,base,head){
+function verifyRetirement(changes,base,head,authority){
+  let wave=null,hasRetire=false;
   for(const change of changes){
-    if(!allowedNormal(change))fail(`maintenance path is frozen: ${change.path}`);
-    if(change.status==='D'){
-      if(mode(candidateRoot,base,change.path)!=='100644')fail(`removed path was not a regular 100644 file: ${change.path}`);
-    }else verifyRegularText(candidateRoot,head,change.path);
+    const retired=authority.retireByPath.get(change.path),support=authority.supportByPath.get(change.path);
+    let selected=null;
+    if(retired?.operations.has(change.status)){selected=retired;hasRetire=true;}
+    else if(support?.operations.has(change.status))selected=support;
+    else fail(`legacy retirement path is outside protected wave authority: ${change.path}`);
+    wave??=selected.wave;
+    if(selected.wave!==wave)fail('legacy retirement diff spans multiple waves');
+    verifyChangeStorage(change,base,head);
   }
-  return {mode:'maintenance-only',changedPaths:changes.map(change=>change.path).sort()};
+  if(!hasRetire)fail('legacy retirement wave requires at least one retirement target');
+  return {mode:'legacy-retirement',retirementWave:wave,changedPaths:changes.map(change=>change.path).sort()};
 }
-
-function verifyCutover(changes,base,head){
-  const protectedActive=treePaths(candidateRoot,base,'.github/workflows').filter(name=>/\.ya?ml$/.test(name));
-  const candidateActive=treePaths(candidateRoot,head,'.github/workflows').filter(name=>/\.ya?ml$/.test(name));
-  if(!sameList(candidateActive,RETAINED_WORKFLOWS))fail('workflow transition is not the complete suspension cutover: active workflow inventory is not the required three-file set');
-  for(const retained of ['.github/workflows/merge-authority-audit.yml','.github/workflows/terminal-branch-lifecycle.yml']){
-    if(!blob(candidateRoot,base,retained).equals(blob(candidateRoot,head,retained)))fail(`retained workflow changed: ${retained}`);
-  }
-  if(!blob(candidateRoot,head,'.github/workflows/merge-group-gate.yml').equals(blob(candidateRoot,base,TEMPLATE)))fail('minimal Merge Queue gate does not equal protected template');
-  const suspendable=protectedActive.filter(name=>!RETAINED_WORKFLOWS.has(name));
-  const expectedArchives=suspendable.map(name=>`${ARCHIVE_ROOT}${path.posix.basename(name)}`);
-  const actualArchives=treePaths(candidateRoot,head,ARCHIVE_ROOT);
-  if(!sameList(actualArchives,expectedArchives))fail('cutover archived workflow inventory is incomplete');
-  for(let index=0;index<suspendable.length;index++){
-    if(!blob(candidateRoot,base,suspendable[index]).equals(blob(candidateRoot,head,expectedArchives[index])))fail(`archived workflow bytes changed: ${suspendable[index]}`);
-  }
-  const allowed=new Set([
-    ...suspendable,
-    ...expectedArchives,
-    '.github/workflows/merge-group-gate.yml',
-    'docs/maintenance/ATLAS-MAINTENANCE-MODE.md',
-  ]);
+function verifyAuthorityUpdate(changes,base,head){
+  if(changes.length!==1||changes[0].path!==RETIREMENT_AUTHORITY||changes[0].status!=='M')
+    fail('legacy retirement authority update must be one isolated modification');
+  verifyRegular(candidateRoot,head,RETIREMENT_AUTHORITY,'candidate authority');
+  const protectedAuthority=loadRetirementAuthority(trustedRoot,base);
+  const candidateAuthority=loadRetirementAuthority(candidateRoot,head);
+  verifyMonotonicAuthority(protectedAuthority,candidateAuthority);
+  return {mode:'legacy-retirement-authority-update',changedPaths:[RETIREMENT_AUTHORITY]};
+}
+function verifySteadyState(changes,base,head){
+  if(changes.some(change=>change.path===RETIREMENT_AUTHORITY))return verifyAuthorityUpdate(changes,base,head);
+  const authority=loadRetirementAuthority(trustedRoot,base);
+  const retirementCandidate=changes.some(change=>authority.retireByPath.get(change.path)?.operations.has(change.status));
+  if(retirementCandidate)return verifyRetirement(changes,base,head,authority);
   for(const change of changes){
-    if(change.status==='R'||change.status==='C'){
-      const expectedArchive=`${ARCHIVE_ROOT}${path.posix.basename(change.oldPath)}`;
-      if(!suspendable.includes(change.oldPath)||change.path!==expectedArchive)fail(`rename or copy is forbidden: ${change.oldPath} -> ${change.path}`);
-    }else if(!allowed.has(change.path))fail(`cutover contains unrelated path: ${change.path}`);
-    if(change.status!=='D'&&change.path!=='docs/maintenance/ATLAS-MAINTENANCE-MODE.md')verifyRegularText(candidateRoot,head,change.path);
+    if(controlPlanePath(change.path))fail(`protected control-plane path is immutable: ${change.path}`);
+    if(legacyNamespace(change.path,authority))fail(`legacy path requires protected retirement authority: ${change.path}`);
+    verifyChangeStorage(change,base,head);
   }
-  return {mode:'workflow-suspension-cutover',suspendedWorkflows:suspendable.map(name=>path.posix.basename(name)).sort()};
+  return {mode:'steady-state',changedPaths:changes.map(change=>change.path).sort()};
 }
-
 function verifyIdentity(){
   if(!trustedRoot||!candidateRoot)fail('trusted and candidate roots are required');
   const env=process.env;
@@ -136,7 +165,7 @@ function verifyIdentity(){
     if(env.ATLAS_EVENT_ACTION!=='checks_requested')fail('merge-group action identity mismatch');
     if(env.ATLAS_BASE_REF!==`refs/heads/${env.ATLAS_DEFAULT_BRANCH}`)fail('base ref identity mismatch');
     if(env.GITHUB_SHA!==env.ATLAS_CODE_REVISION)fail('merge-group head identity mismatch');
-  }else fail('unsupported maintenance event');
+  }else fail('unsupported protected event');
   const base=env.ATLAS_PROTECTED_BASE_SHA,head=env.ATLAS_CODE_REVISION;
   if(!sha.test(base??'')||!sha.test(head??'')||base===head)fail('candidate revision identity is malformed');
   if(clean(git(trustedRoot,['rev-parse','HEAD']))!==base)fail('protected base identity mismatch');
@@ -150,8 +179,7 @@ function verifyIdentity(){
 try{
   const {base,head}=verifyIdentity();
   const changes=parseChanges(candidateRoot,base,head);
-  const workflowChange=changes.some(change=>change.path.startsWith('.github/workflows/')||change.path.startsWith(ARCHIVE_ROOT)||change.oldPath?.startsWith('.github/workflows/'));
-  const result=workflowChange?verifyCutover(changes,base,head):verifyNormal(changes,base,head);
+  const result=verifySteadyState(changes,base,head);
   process.stdout.write(`${JSON.stringify({schemaVersion:1,result:'PASS',baseSha:base,headSha:head,...result})}\n`);
 }catch(error){
   process.stderr.write(`atlas maintenance gate: ${error?.message??error}\n`);

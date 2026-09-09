@@ -32,6 +32,25 @@ test('validates the Game-derived semantic index', () => {
   assert.equal(validateSemanticSearchIndex(index), index);
 });
 
+test('search accepts a qualified source only when trusted expectations are explicit', () => {
+  const qualified = structuredClone(index);
+  qualified.source = {
+    authority: 'Oteryn/Oteryn-Atlas', repository: 'Oteryn/Oteryn-Atlas', game_revision: 'fixture',
+    contract_id: 'oteryn-atlas-qualification-fixture-v1', capability: 'qualification-semantic-search-v1',
+    profile_id: 'oteryn-atlas-qualification-semantic-search-v1', fixture_id: 'r5-qualified-fixture',
+    semantic_digest: `sha256:${'4'.repeat(64)}`,
+  };
+  const expectedSource = {
+    authority: 'Oteryn/Oteryn-Atlas', repository: 'Oteryn/Oteryn-Atlas', gameRevision: 'fixture',
+    contractId: 'oteryn-atlas-qualification-fixture-v1', capability: 'qualification-semantic-search-v1',
+    profileId: 'oteryn-atlas-qualification-semantic-search-v1', fixtureId: 'r5-qualified-fixture',
+    semanticDigest: qualified.source.semantic_digest,
+  };
+
+  assert.throws(() => searchSemanticIndex(qualified, 'Thais'), /source authority invalid/);
+  assert.equal(searchSemanticIndex(qualified, 'Thais', { expectedSource }).results[0].id, 'town:thais');
+});
+
 test('coordinate parser uses Game-published floor aliases', () => {
   const result = searchSemanticIndex(index, '32369 32220 7');
   assert.equal(result.mode, 'coordinate');

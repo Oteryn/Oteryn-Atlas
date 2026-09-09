@@ -1,12 +1,14 @@
 # ATLAS-E2E-VERIFICATION-OPTIMIZATION-IMPLEMENTATION — data-capability amendment
 
-Lifecycle authority: `Oteryn/Oteryn-Atlas#179`
+> **Lifecycle status: HISTORICAL / SUSPENDED.** Issue #179 is closed. This prompt is retained only as design and safety input for a later restoration phase explicitly authorized by live Issue #315 and current protected repository authority. It does not authorize execution, test or workflow restoration, deployment, or copying these procedures into active instructions.
 
-Status: **normative amendment** to `docs/agents/prompts/ATLAS-E2E-VERIFICATION-OPTIMIZATION-IMPLEMENTATION.md` and its P0 amendment.
+Historical lifecycle authority: `Oteryn/Oteryn-Atlas#179` (closed)
+
+Status: **historical normative amendment** to `docs/agents/prompts/ATLAS-E2E-VERIFICATION-OPTIMIZATION-IMPLEMENTATION.md` and its P0 amendment.
 
 This amendment corrects an over-broad assumption discovered during rebuilt Phase D work: ordinary browser E2E must not be treated as requiring the complete real FullWorld publication merely because the Atlas UI is rendered over a map.
 
-Where this amendment is stricter or more specific than the current implementation prompt, P0 amendment, hosted execution audit, readiness/concurrency contract, active PR descriptions, or historical handoff documents, this amendment governs lifecycle #179 until the primary documents are textually reconciled.
+Where this amendment was stricter or more specific than the implementation prompt, P0 amendment, hosted execution audit, readiness/concurrency contract, active PR descriptions, or older handoff documents, it governed lifecycle #179 until that lifecycle closed.
 
 ## Core rule
 

@@ -1,0 +1,85 @@
+name: Atlas verification shadow
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize, edited, ready_for_review]
+  merge_group:
+    types: [checks_requested]
+permissions: {}
+concurrency:
+  group: atlas-r4-shadow-${{ github.event_name }}-${{ github.event.pull_request.number || github.event.merge_group.head_sha }}
+  cancel-in-progress: false
+jobs:
+  plan:
+    if: github.event_name == 'pull_request_target' || github.event_name == 'merge_group'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+      actions: read
+    outputs:
+      has_commands: ${{ steps.plan.outputs.has_commands }}
+      base: ${{ steps.base.outputs.sha }}
+    steps:
+      - name: Resolve protected base
+        id: base
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          MQ_BASE: ${{ github.event.merge_group.base_sha }}
+        run: |
+          if [ "$EVENT_NAME" = pull_request_target ]; then
+            base="$PR_BASE"
+          elif [ "$EVENT_NAME" = merge_group ]; then
+            base="$MQ_BASE"
+          else
+            exit 1
+          fi
+          [[ "$base" =~ ^[0-9a-f]{40}$ ]] || exit 1
+          echo "sha=$base" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ steps.base.outputs.sha }}
+          path: protected
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
+          path: candidate
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Resolve protected obligations
+        id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node protected/tools/verification/run-verification-shadow.mjs plan "$PWD/candidate"
+  execute:
+    needs: plan
+    if: needs.plan.outputs.has_commands == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      pull-requests: read
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ needs.plan.outputs.base }}
+          path: protected
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
+          path: candidate
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Install protected runtime dependencies
+        working-directory: protected/e2e
+        run: npm ci --ignore-scripts
+      - name: Execute exact protected contract
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node protected/tools/verification/run-verification-shadow.mjs execute "$PWD/candidate"

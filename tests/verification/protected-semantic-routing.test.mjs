@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import {buildVerificationPlan} from '../../tools/verification/build-verification-plan.mjs';
 import { evaluateProtectedRouting, validateProtectedRouting } from '../../tools/verification/protected-semantic-routing.mjs';
 const read = name => JSON.parse(fs.readFileSync(new URL(`../../tools/verification/${name}.json`, import.meta.url)));
 const manifest = read('impact-manifest'), catalog = read('verification-catalog'), census = read('full-safety-net-stable-ids');
@@ -17,7 +18,7 @@ test('forced repair retains complete protected census and independent execution 
  const result = evaluateProtectedRouting({...input,forceFull:true});
  assert.ok(census.stableTestIds.every(id=>result.scenarioIds.includes(id)));
  assert.equal(result.workers,1);assert.equal(result.retries,0);
- assert.ok(result.requiredGroups.includes('e2e.full'));
+ for (const group of catalog.groups['e2e.full'].dependsOnGroups) assert.ok(result.requiredGroups.includes(group), group);
 });
 test('PR and MQ receive exactly the same normalized semantic contract', () => {
  assert.deepEqual(evaluateProtectedRouting(input),evaluateProtectedRouting(structuredClone(input)));
@@ -78,13 +79,17 @@ test('inventory cannot omit the historical floor or catalog browser specs',()=>{
  assert.throws(()=>evaluateProtectedRouting({...input,inventory:{stableTestIds:census.stableTestIds}}));
 });
 
-test('selective functional UI retains scale unique oracle and removes unrelated depth tax',()=>{
- const result=evaluateProtectedRouting({...input,candidate:{...candidate,changedFiles:[{path:'web/fullworld-search.mjs',status:'modified'}]},routing:{schemaVersion:1,mode:'selective'}});
- assert.ok(result.scenarioIds.some(id=>id.includes('/scale-desktop.')));
- assert.ok(!result.scenarioIds.some(id=>id.includes('/performance-desktop.')));
- assert.ok(!result.scenarioIds.some(id=>id.includes('/soak-desktop.')));
- assert.ok(!result.requiredGroups.includes('e2e.full'));
- assert.ok(result.requiredGroups.includes('functional.full'));
+test('selective routing is the canonical plan with exact project and spec ownership',()=>{
+ for(const path of ['web/fullworld-search.mjs','src/browser/verified-content-cache.mjs','src/browser/loader.mjs','src/layers/overview.mjs']) {
+  const changedFiles=[{path,status:'modified'}];
+  const result=evaluateProtectedRouting({...input,candidate:{...candidate,changedFiles},routing:{schemaVersion:1,mode:'selective'}});
+  const plan=buildVerificationPlan({repository:candidate.repository,headSha:candidate.headSha,integrationBaseSha:candidate.baseSha,mergeBaseSha:candidate.baseSha,changedFiles,trustedImpactManifest:manifest,candidateImpactManifest:manifest,verificationCatalog:catalog,protectedStableTestIds:inventory.stableTestIds});
+  assert.deepEqual(result.requiredGroups,plan.requiredGroupIds,path);
+  const machines=plan.groups.filter(group=>group.executionRole==='canonical-machine'&&group.executionEngine==='playwright');
+  const expected=inventory.stableTestIds.filter(id=>{const [project,spec]=id.split('::');return machines.some(group=>group.projects.includes(project)&&group.specs.includes(spec));}).sort();
+  assert.deepEqual(result.scenarioIds,expected,path);
+  assert(!result.requiredGroups.includes('e2e.full'));
+ }
 });
 test('protected depth purpose requires exact main and runs all four profile oracles',()=>{
  const result=evaluateProtectedRouting({...input,proofPurpose:'depth',candidate:{...candidate,prNumber:null,headSha:candidate.baseSha,changedFiles:[]}});
@@ -108,25 +113,10 @@ test('candidate cannot reassign profiles or defer transition properties',()=>{
   assert.ok(census.stableTestIds.every(id=>guarded.scenarioIds.includes(id)));
  }
 });
-test('depth dependency requirements widen a targeted protected classifier plan',()=>{
- const result=evaluateProtectedRouting({...input,candidate:{...candidate,changedFiles:[{path:'src/browser/verified-content-cache.mjs',status:'modified'}]},routing:{schemaVersion:1,mode:'selective'}});
- for(const name of ['performance','scale','soak','stress']) assert.ok(result.scenarioIds.some(id=>id.includes(`/${name}-desktop.`)),name);
-});
-
 test('selected evidence names every protected property and fixed profile',()=>{
  const result=evaluateProtectedRouting({...input,forceFull:true});
  assert.deepEqual(result.propertyObligations.map(row=>row.stableId),result.scenarioIds);
  const scale=result.propertyObligations.find(row=>row.profile==='scale');
  assert.ok(scale.properties.includes('invalid-query-rejection'));
  assert.ok(scale.properties.includes('bounded-search-dom'));
-});
-test('shared browser and layer changes preserve every protected functional floor property',()=>{
- const properties=read('protected-scenario-properties');
- const functionalFloor=census.stableTestIds.filter(id=>properties.scenarios.find(row=>row.stableId===id).profile==='functional');
- assert.equal(functionalFloor.length,64);
- for(const path of ['src/browser/loader.mjs','src/browser/verified-content-cache.mjs','src/layers/overview.mjs']) {
-  const result=evaluateProtectedRouting({...input,candidate:{...candidate,changedFiles:[{path,status:'modified'}]},routing:{schemaVersion:1,mode:'selective'}});
-  assert.ok(functionalFloor.every(id=>result.scenarioIds.includes(id)),path);
-  assert.ok(result.requiredGroups.includes('functional.full')||result.requiredGroups.includes('e2e.full'),path);
- }
 });

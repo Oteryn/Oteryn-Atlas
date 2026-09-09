@@ -28,7 +28,13 @@ import {
 } from '../../src/browser/fullworld-pixels.mjs';
 import { canonicalJsonBytes, sha256ContentId } from '../../src/browser/loader.mjs';
 import { createWorldQueryApi } from '../../src/browser/world-query.mjs';
-import { detailStreamWanted, lodBlend, normalizeViewMode } from '../../src/layers/minimap-lod.mjs';
+import {
+  detailStreamWanted,
+  lodBlend,
+  normalizeViewMode,
+  screenToWorld,
+  worldToScreen,
+} from '../../src/layers/minimap-lod.mjs';
 import {
   RUNTIME_PIXEL_BUCKET_DOMAIN,
   loadRuntimePixelBuckets,
@@ -138,6 +144,38 @@ test('classic minimap mode is stable, minimap-only and URL round-trippable', () 
   const state = parseFullWorldViewState('?floor=-7&x=32360&y=32230&zoom=1&mode=classic&animation=off', world);
   assert.equal(state.mode, 'classic');
   assert.match(serializeFullWorldViewState(state, world), /mode=classic/);
+});
+
+test('minimap LOD uses exact mode thresholds and AUTO hysteresis', () => {
+  assert.deepEqual(['AUTO', 'Minimap', 'classic', 'MAP'].map(normalizeViewMode), ['auto', 'minimap', 'classic', 'map']);
+  assert.throws(() => normalizeViewMode('satellite'), /unsupported Atlas view mode/);
+  assert.throws(() => detailStreamWanted(Number.NaN), /zoom must be finite/);
+
+  assert.equal(detailStreamWanted(0.419, false, 'auto'), false);
+  assert.equal(detailStreamWanted(0.42, false, 'auto'), true);
+  assert.equal(detailStreamWanted(0.339, true, 'auto'), false);
+  assert.equal(detailStreamWanted(0.34, true, 'auto'), true);
+  assert.equal(detailStreamWanted(0.379, true, 'map'), false);
+  assert.equal(detailStreamWanted(0.38, false, 'map'), true);
+  assert.equal(detailStreamWanted(16, true, 'minimap'), false);
+  assert.equal(detailStreamWanted(16, true, 'classic'), false);
+
+  assert.deepEqual(lodBlend(0.38), { detail: 0, minimap: 1, representation: 'minimap' });
+  assert.deepEqual(lodBlend(0.44), { detail: 0.5, minimap: 0.5, representation: 'transition' });
+  assert.deepEqual(lodBlend(0.5), { detail: 1, minimap: 0, representation: 'detail' });
+  assert.deepEqual(lodBlend(0.5, 'auto', false), { detail: 0, minimap: 1, representation: 'minimap-fallback' });
+});
+
+test('minimap screen/world transforms round-trip one floor at fractional zoom', () => {
+  const view = { x: 32360.25, y: 32230.75, floor: -7, zoom: 1.25 };
+  const viewport = { width: 1440, height: 900 };
+  const screen = { x: 917.5, y: 312.25 };
+  const world = screenToWorld(view, screen, viewport);
+  const restored = worldToScreen(view, world, viewport);
+  assert.equal(world.floor, view.floor);
+  assert.ok(Math.abs(restored.x - screen.x) < 1e-9);
+  assert.ok(Math.abs(restored.y - screen.y) < 1e-9);
+  assert.throws(() => worldToScreen(view, { ...world, floor: -6 }, viewport), /floor differs/);
 });
 
 test('runtime spatial index selects only intersecting authenticated row groups', () => {
@@ -320,7 +358,7 @@ test('runtime pixel bucket catalog verifies trusted root and selects only requir
 });
 
 test('runtime-index Python builder self-test is part of browser contract CI', () => {
-  execFileSync('python', ['tests/fullworld-runtime/runtime_index_self_test.py'], { cwd: repoRoot, stdio: 'pipe' });
+  execFileSync('python3', ['tests/fullworld-runtime/runtime_index_self_test.py'], { cwd: repoRoot, stdio: 'pipe' });
 });
 
 test('large semantic chunks fail closed when HTTP byte ranges are not supported', async () => {
@@ -348,5 +386,5 @@ test('large semantic chunks fail closed when HTTP byte ranges are not supported'
 });
 
 test('incremental content graph self-test proves selective invalidation', () => {
-  execFileSync('python', ['tests/fullworld-runtime/incremental_content_graph_self_test.py'], { cwd: repoRoot, stdio: 'pipe' });
+  execFileSync('python3', ['tests/fullworld-runtime/incremental_content_graph_self_test.py'], { cwd: repoRoot, stdio: 'pipe' });
 });

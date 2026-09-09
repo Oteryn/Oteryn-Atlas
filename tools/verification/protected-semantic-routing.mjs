@@ -3,8 +3,8 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 const PROPERTIES=JSON.parse(fs.readFileSync(new URL('./protected-scenario-properties.json',import.meta.url),'utf8'));
-const VISUAL_CAPTURE=JSON.parse(fs.readFileSync(new URL('./protected-visual-capture-contract.json',import.meta.url),'utf8'));
-const DEPTH_PROFILES=['performance','scale','soak','stress'];
+const MANUAL_DEPTH_GROUPS=['e2e.bounded-performance','e2e.bounded-soak','e2e.bounded-stress'];
+import { deriveVerificationMetadata } from './verification-metadata.mjs';
 import { buildVerificationPlan } from './build-verification-plan.mjs';
 import { canonicalJson } from './verification-plan-schema.mjs';
 const fail = label => { throw new TypeError(`protected routing: ${label}`); };
@@ -46,92 +46,84 @@ export function validateProtectedRouting(routing,census) {
  }
  return structuredClone(routing);
 }
-function matchesSpecPattern(pattern, spec) {
-  const expression = pattern
-    .split('*')
-    .map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
-    .join('[^/]*');
-  return new RegExp(`^${expression}$`).test(spec);
-}
-
 function matches(group,id) {
  const [project,spec]=id.split('::');
- return group.projects.includes(project)&&group.specs.some(pattern=>matchesSpecPattern(pattern,spec));
+ return group.projects.includes(project)&&group.specs.includes(spec);
 }
-function partitions(plan) {
- const hosted=new Map(),specialist=[],review=[];
- for(const group of plan.groups.filter(g=>g.capabilities.browser)) {
-  const scenarioIds=plan.stableTestIds.filter(id=>matches(group,id)).sort();
-  if(!scenarioIds.length) fail(`selected browser group ${group.id} has no protected scenarios`);
-  const {dataCapability,hosted:isHosted,visualReview,specialistReason}=group.capabilities;
-  if(visualReview) review.push({dataCapability,scenarioIds,groupIds:[group.id],evidenceKind:group.evidence});
-  if(isHosted) {
-   if(dataCapability==='real_fullworld') fail('real fullworld requires specialist placement');
-   if(!hosted.has(dataCapability)) hosted.set(dataCapability,new Set());
-   scenarioIds.forEach(id=>hosted.get(dataCapability).add(id));
-  } else if(dataCapability==='real_fullworld'&&specialistReason==='real-fullworld-product') {
-   specialist.push({dataCapability,scenarioIds,groupIds:[group.id],evidenceKind:group.evidence});
-  } else if(visualReview&&specialistReason==='private-visual') {
-   // Private visual proof remains independently reviewed outside hosted placement.
-  } else fail('unsupported non-hosted obligation');
- }
- return {hostedPartitions:[...hosted].sort(([a],[b])=>a.localeCompare(b)).map(([dataCapability,set])=>({dataCapability,scenarioIds:[...set].sort()})),specialist,review};
-}
+
+// Compatibility output only. Canonical planner ownership selects candidate
+// execution; old scenario properties supply labels, never selection or frames.
 export function evaluateProtectedRouting({candidate,manifest,catalog,census,inventory,routing,forceFull=false,proofPurpose='candidate'}={}) {
  if(!['candidate','depth'].includes(proofPurpose)) fail('unsupported proof purpose');
  const current=identity(candidate,proofPurpose), policy=validateProtectedRouting(routing,census);
  if(typeof forceFull!=='boolean') fail('forceFull must be boolean');
+ const {browser}=deriveVerificationMetadata(catalog);
  const allIds=ids(inventory?.stableTestIds);
  if(census.stableTestIds.some(id=>!allIds.includes(id))) fail('inventory omits protected census floor');
- for(const group of Object.values(catalog.groups).filter(g=>g.capabilities.browser)) {
-  for(const spec of group.specs) if(!allIds.some(id=>matches({...group,specs:[spec]},id))) fail(`inventory omits protected browser spec ${spec}`);
+ const bySpec=new Map(browser.specs.map(row=>[row.spec,row]));
+ for(const row of browser.specs) {
+  if(!allIds.some(id=>id.startsWith(`${row.execution.project}::${row.spec}::`))) fail(`inventory omits protected execution spec ${row.spec}`);
+ }
+ for(const id of allIds) {
+  const [project,spec]=id.split('::');
+  if(bySpec.get(spec)?.execution.project!==project) fail(`inventory contains unknown spec or project ${id}`);
  }
  const args={repository:current.repository,headSha:current.headSha,integrationBaseSha:current.baseSha,mergeBaseSha:current.baseSha,changedFiles:current.changedFiles,trustedImpactManifest:manifest,candidateImpactManifest:manifest,verificationCatalog:catalog,protectedStableTestIds:allIds};
  let plan=buildVerificationPlan(args);
- if(forceFull||(policy.mode==='conservative'&&plan.groups.some(g=>g.capabilities.browser))) plan=buildVerificationPlan({...args,requiredGroupFloor:['deterministic.core','e2e.full']});
- const propertyIds=PROPERTIES.scenarios.map(row=>row.stableId).sort();
- if(canonicalJson(propertyIds)!==canonicalJson(allIds)||new Set(propertyIds).size!==propertyIds.length) fail('protected property inventory drift');
- const propertyById=new Map(PROPERTIES.scenarios.map(row=>[row.stableId,row]));
- if(PROPERTIES.scenarios.some(row=>!['functional',...DEPTH_PROFILES].includes(row.profile)||!Array.isArray(row.properties)||!row.properties.length)) fail('protected property assignment');
- const transition=forceFull||plan.impactDomains.some(domain=>['verification-governance','unknown-runtime-impact','invalid-change-evidence'].includes(domain));
- const selectedDepth=new Set(proofPurpose==='depth'?DEPTH_PROFILES:[]);
- if(proofPurpose==='candidate') for(const rule of PROPERTIES.depthDependencies) {
-  if(current.changedFiles.some(file=>[file.path,file.previousPath].filter(Boolean).some(p=>rule.pathPrefixes.some(prefix=>p.startsWith(prefix))&&!(rule.excludedPaths??[]).includes(p)))) rule.profiles.forEach(p=>selectedDepth.add(p));
+ if(proofPurpose==='candidate'&&(forceFull||(policy.mode==='conservative'&&plan.groups.some(group=>group.executionEngine==='playwright')))) {
+  plan=buildVerificationPlan({...args,requiredGroupFloor:['deterministic.core','e2e.full']});
  }
- const functionalBroadening=proofPurpose==='candidate'&&PROPERTIES.functionalDependencies.some(rule=>current.changedFiles.some(file=>[file.path,file.previousPath].filter(Boolean).some(p=>rule.pathPrefixes.some(prefix=>p.startsWith(prefix)))));
- let scenarioIds=[...plan.stableTestIds].sort();
- if(proofPurpose==='depth') scenarioIds=PROPERTIES.scenarios.filter(row=>DEPTH_PROFILES.includes(row.profile)).map(row=>row.stableId).sort();
- else if(policy.mode==='selective'&&!transition) scenarioIds=scenarioIds.filter(id=>propertyById.get(id).profile==='functional'||selectedDepth.has(propertyById.get(id).profile));
- if(proofPurpose==='candidate'&&policy.mode==='selective'&&!transition) scenarioIds=[...new Set([...scenarioIds,...PROPERTIES.scenarios.filter(row=>selectedDepth.has(row.profile)).map(row=>row.stableId)])].sort();
- if(functionalBroadening) scenarioIds=[...new Set([...scenarioIds,...census.stableTestIds.filter(id=>propertyById.get(id).profile==='functional')])].sort();
- const requiresReview=proofPurpose==='candidate'&&Object.values(catalog.groups).some(g=>g.capabilities.visualReview&&scenarioIds.some(id=>matches(g,id)));
- const requiredFrames=requiresReview?structuredClone(VISUAL_CAPTURE.requiredFrames):[];
- const captureSpecs=new Set(requiredFrames.map(row=>row.stableTestId.split('::')[1]));
- const captureIds=allIds.filter(id=>captureSpecs.has(id.split('::')[1]));
- if(requiresReview) {
-  if(VISUAL_CAPTURE.schemaVersion!==1||!requiredFrames.length||new Set(requiredFrames.map(row=>row.frameId)).size!==requiredFrames.length||requiredFrames.some(row=>!allIds.includes(row.stableTestId))) fail('protected visual capture contract drift');
-  scenarioIds=[...new Set([...scenarioIds,...captureIds])].sort();
+ let groups=plan.groups;
+ if(proofPurpose==='depth') {
+  // Explicit inactive manual purpose, bound above to exact protected main.
+  // No invented changed file and no implicit property-profile filter.
+  groups=MANUAL_DEPTH_GROUPS.map(id=>{
+   const group=catalog.groups[id];
+   if(group?.executionRole!=='canonical-machine'||group.executionEngine!=='playwright'||group.capabilities.dataCapability!=='qualification_fixture') fail(`manual depth owner unresolved ${id}`);
+   return {...structuredClone(group),id};
+  });
  }
- // Keep the protected catalog for capability placement, with only exact selected
- // scenarios. Names expose the new semantics instead of claiming e2e.full on 64.
- let requiredGroups=proofPurpose==='depth'?DEPTH_PROFILES.map(p=>`depth.${p}`):plan.requiredGroupIds.flatMap(id=>id==='e2e.full'&&policy.mode==='selective'&&!transition?['functional.full',...DEPTH_PROFILES.filter(p=>scenarioIds.some(s=>propertyById.get(s).profile===p)).map(p=>`depth.${p}`)]:[id]);
- if(proofPurpose==='candidate'&&policy.mode==='selective'&&!transition) requiredGroups=[...new Set([...requiredGroups,...[...selectedDepth].map(p=>`depth.${p}`)])].sort();
- if(functionalBroadening&&!requiredGroups.includes('e2e.full')) requiredGroups=[...new Set([...requiredGroups,'functional.full'])].sort();
- const placementPlan={...plan,stableTestIds:scenarioIds,groups:plan.groups.filter(g=>!g.capabilities.browser||scenarioIds.some(id=>matches(g,id)))};
- if(proofPurpose==='candidate'&&(selectedDepth.size||functionalBroadening)&&!placementPlan.groups.some(g=>g.id==='e2e.full')) placementPlan.groups.push({...catalog.groups['e2e.full'],id:'e2e.full'});
- if(requiresReview) for(const [id,group] of Object.entries(catalog.groups)) {
-  if(group.capabilities.browser&&captureIds.some(s=>matches(group,s))&&!placementPlan.groups.some(g=>g.id===id)) {
-   placementPlan.groups.push({...group,id});
-   requiredGroups=[...new Set([...requiredGroups,id==='e2e.full'&&policy.mode==='selective'&&!transition?'functional.full':id])].sort();
+ if(groups.some(group=>group.executionRole==='aggregate'||group.id==='e2e.full')) fail('aggregate alias reached execution obligations');
+ const requiredGroups=groups.map(group=>group.id).sort();
+ const machineGroups=groups.filter(group=>group.executionEngine==='playwright'&&group.executionRole==='canonical-machine');
+ const selectedReviewGroups=groups.filter(group=>group.executionRole==='canonical-review');
+ const scenarioIds=[...new Set(machineGroups.flatMap(group=>allIds.filter(id=>matches(group,id))))].sort();
+ if(proofPurpose==='candidate'&&canonicalJson([...plan.stableTestIds].sort())!==canonicalJson(scenarioIds)) fail('planner scenario obligations differ from canonical execution owners');
+ const requiredFrames=[];
+ const review=[];
+ for(const group of selectedReviewGroups) {
+  const obligation=browser.reviewGroups[group.id];
+  if(!obligation||!obligation.requiredFrames.length) fail(`review owner unresolved ${group.id}`);
+  if(obligation.dependsOnMachineGroups.some(id=>!requiredGroups.includes(id))) fail(`review missing machine owner ${group.id}`);
+  for(const frame of obligation.requiredFrames) {
+   if(!scenarioIds.includes(frame.stableTestId)) fail(`review frame missing selected execution ${frame.frameId}`);
+   if(requiredFrames.some(existing=>existing.frameId===frame.frameId)) fail(`duplicate review frame ${frame.frameId}`);
+   requiredFrames.push(structuredClone(frame));
+  }
+  review.push({dataCapability:group.capabilities.dataCapability,scenarioIds:allIds.filter(id=>matches(group,id)).sort(),groupIds:[group.id],evidenceKind:group.evidence});
+ }
+ requiredFrames.sort((a,b)=>a.frameId.localeCompare(b.frameId));
+ const hosted=new Map(),specialist=[];
+ for(const group of machineGroups) {
+  const selected=allIds.filter(id=>matches(group,id)).sort();
+  if(!selected.length) fail(`selected execution group ${group.id} has no protected scenarios`);
+  const {dataCapability,hosted:isHosted,specialistReason}=group.capabilities;
+  if(isHosted) {
+   if(dataCapability==='real_fullworld') fail('real fullworld requires specialist placement');
+   if(!hosted.has(dataCapability)) hosted.set(dataCapability,new Set());
+   selected.forEach(id=>hosted.get(dataCapability).add(id));
+  } else {
+   if(!specialistReason) fail('unresolved specialist execution');
+   specialist.push({dataCapability,scenarioIds:selected,groupIds:[group.id],evidenceKind:group.evidence});
   }
  }
- if(proofPurpose==='depth') placementPlan.groups=[{...catalog.groups['e2e.full'],id:'e2e.full'}];
- // Group aliases are presentation only. They cannot replace protected group IDs,
- // alter minimum selection, or select capabilities/executors/assertions.
+ const hostedPartitions=[...hosted].sort(([a],[b])=>a.localeCompare(b)).map(([dataCapability,values])=>({dataCapability,scenarioIds:[...values].sort()}));
+ const propertyById=new Map(PROPERTIES.scenarios.map(row=>[row.stableId,row]));
+ if(propertyById.size!==PROPERTIES.scenarios.length) fail('duplicate protected property labels');
+ const propertyObligations=scenarioIds.map(stableId=>structuredClone(propertyById.get(stableId)??{stableId,properties:[]}));
  const scenarioGroups=policy.groups?Object.fromEntries(Object.entries(policy.groups).map(([name,values])=>[name,values.filter(id=>scenarioIds.includes(id)).sort()]).filter(([,values])=>values.length)):{};
- const placement=partitions(placementPlan);
- const capabilities=[...new Set([...plan.requiredDataCapabilities,...placement.hostedPartitions.map(p=>p.dataCapability),...placement.specialist.map(p=>p.dataCapability),...placement.review.map(p=>p.dataCapability)])].sort();
- const result={schemaVersion:1,candidate:current,...placement,proofPurpose,evidenceKind:proofPurpose==='depth'?'protected-main-depth-v1':'protected-candidate-v1',requiredGroups,scenarioIds,requiredFrames,propertyObligations:scenarioIds.map(id=>structuredClone(propertyById.get(id))),scenarioGroups,capabilities,profile:plan.profile,workers:1,retries:0};
- result.semanticDigest=`sha256:${crypto.createHash('sha256').update(canonicalJson({result,manifest,catalog,census,inventory,properties:PROPERTIES,visualCapture:VISUAL_CAPTURE,routing:policy,forceFull,proofPurpose})).digest('hex')}`;
+ const capabilities=[...new Set(groups.map(group=>group.capabilities.dataCapability))].sort();
+ const result={schemaVersion:1,candidate:current,hostedPartitions,specialist,review,proofPurpose,evidenceKind:proofPurpose==='depth'?'protected-main-depth-v1':'protected-candidate-v1',requiredGroups,scenarioIds,requiredFrames,propertyObligations,scenarioGroups,capabilities,profile:proofPurpose==='depth'?'full':plan.profile,workers:1,retries:0};
+ result.semanticDigest=`sha256:${crypto.createHash('sha256').update(canonicalJson({result,manifest,catalog,census,inventory,properties:PROPERTIES,routing:policy,forceFull,proofPurpose})).digest('hex')}`;
  return result;
 }

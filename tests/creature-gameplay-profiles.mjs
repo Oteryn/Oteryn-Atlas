@@ -60,8 +60,8 @@ function fetcherFor(files, calls) {
     const path = new URL(url).pathname.split('/creature-gameplay/')[1];
     calls.push(path);
     const data = files.get(path);
-    if (!data) return { ok: false, status: 404, headers: { get: () => null }, arrayBuffer: async () => new ArrayBuffer(0) };
-    return { ok: true, status: 200, headers: { get: (name) => name.toLowerCase() === 'content-length' ? String(data.length) : null }, arrayBuffer: async () => data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) };
+    if (!data) return new Response(null, { status: 404 });
+    return new Response(data, { status: 200, headers: { 'content-length': String(data.length) } });
   };
 }
 

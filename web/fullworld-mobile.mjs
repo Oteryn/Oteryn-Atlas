@@ -3,7 +3,7 @@ const $ = selector => document.querySelector(selector);
 const mobileQuery = matchMedia('(max-width: 980px)');
 const workspace = $('.workspace');
 const panels = { controls: $('#mobile-controls-panel'), inspector: $('#mobile-inspector-panel') };
-const desktopOpen = { controls: true, inspector: true };
+const desktopOpen = { controls: true, inspector: false };
 let drawer = null;
 let returnFocus = null;
 let savedPanels = null;

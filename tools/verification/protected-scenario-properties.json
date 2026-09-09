@@ -51,28 +51,42 @@
       ]
     },
     {
-      "stableId": "desktop-chromium::e2e/tests/creature-gameplay-desktop.spec.mjs::desktop PARTIAL shop never becomes an authoritative empty claim",
+      "stableId": "desktop-chromium::e2e/tests/creature-gameplay-desktop.spec.mjs::desktop qualification NPC activation opens Gameplay, preserves Semantic, and round-trips URL state",
       "profile": "functional",
       "properties": [
         "protected-scenario-oracle"
       ]
     },
     {
-      "stableId": "desktop-chromium::e2e/tests/creature-gameplay-desktop.spec.mjs::desktop Rat direct activation renders exact Loot Stats and placement-backed Spawns",
+      "stableId": "desktop-chromium::e2e/tests/creature-gameplay-desktop.spec.mjs::desktop qualification PARTIAL shop never becomes an authoritative empty claim",
       "profile": "functional",
       "properties": [
         "protected-scenario-oracle"
       ]
     },
     {
-      "stableId": "desktop-chromium::e2e/tests/creature-gameplay-desktop.spec.mjs::desktop Sam direct activation opens exact Gameplay shop, preserves Semantic, and round-trips URL state",
+      "stableId": "desktop-chromium::e2e/tests/creature-gameplay-desktop.spec.mjs::desktop qualification large shop stays bounded at 100 rendered rows and supports filtering",
       "profile": "functional",
       "properties": [
         "protected-scenario-oracle"
       ]
     },
     {
-      "stableId": "desktop-chromium::e2e/tests/creature-gameplay-desktop.spec.mjs::desktop real large shop stays bounded at 100 rendered rows",
+      "stableId": "desktop-chromium::e2e/tests/creature-gameplay-desktop.spec.mjs::desktop qualification monster renders Loot Stats and placement-backed Spawns",
+      "profile": "functional",
+      "properties": [
+        "protected-scenario-oracle"
+      ]
+    },
+    {
+      "stableId": "desktop-chromium::e2e/tests/creature-gameplay-source-contract-desktop.spec.mjs::bounded real gameplay source preserves selected Game-owned NPC facts",
+      "profile": "functional",
+      "properties": [
+        "protected-scenario-oracle"
+      ]
+    },
+    {
+      "stableId": "desktop-chromium::e2e/tests/creature-gameplay-source-contract-desktop.spec.mjs::bounded real gameplay source preserves selected Game-owned monster facts",
       "profile": "functional",
       "properties": [
         "protected-scenario-oracle"
@@ -448,14 +462,14 @@
       ]
     },
     {
-      "stableId": "mobile-chromium::e2e/tests/creature-gameplay-mobile.spec.mjs::mobile Rat direct tap renders exact loot stats and keeps topmost Escape behavior",
+      "stableId": "mobile-chromium::e2e/tests/creature-gameplay-mobile.spec.mjs::mobile qualification NPC tap reaches readable Gameplay data and touch-sized tabs",
       "profile": "functional",
       "properties": [
         "protected-scenario-oracle"
       ]
     },
     {
-      "stableId": "mobile-chromium::e2e/tests/creature-gameplay-mobile.spec.mjs::mobile Sam direct tap reaches readable Gameplay trade data and tabs",
+      "stableId": "mobile-chromium::e2e/tests/creature-gameplay-mobile.spec.mjs::mobile qualification monster renders loot/stats and keeps topmost Escape behavior",
       "profile": "functional",
       "properties": [
         "protected-scenario-oracle"

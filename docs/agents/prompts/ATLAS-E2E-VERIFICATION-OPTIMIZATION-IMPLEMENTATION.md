@@ -1,5 +1,7 @@
 # ATLAS-E2E-VERIFICATION-OPTIMIZATION-IMPLEMENTATION
 
+> **Lifecycle status: HISTORICAL / SUSPENDED.** Issue #179 is closed. This prompt is retained only as design and safety input for a later restoration phase explicitly authorized by live Issue #315 and current protected repository authority. It does not authorize execution, test or workflow restoration, deployment, or copying these procedures into active instructions.
+
 ALIAS:
 `ATLAS-E2E-VERIFICATION-OPTIMIZATION-IMPLEMENTATION`
 
@@ -29,7 +31,7 @@ These identifiers are discovery hints only. Resolve current state, heads, bases,
 
 ## Corrective authority
 
-This prompt is the current #179 execution authority where older audit/handoff/platform text conflicts with it.
+While #179 was active, this prompt was its execution authority where older audit, handoff, or platform text conflicted with it. That authority ended when #179 closed.
 
 The target architecture is:
 
@@ -151,7 +153,7 @@ No ordinary/full E2E, stress, scale, soak, performance, broad visual matrices or
 
 ## Mandatory agent inner-loop policy
 
-Mirror this into repository agent instructions during implementation.
+Historical implementation direction, now inert: this policy was to be mirrored into repository agent instructions during #179 implementation.
 
 During coding:
 

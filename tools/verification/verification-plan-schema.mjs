@@ -116,16 +116,22 @@ export function validateVerificationCatalog(candidate) {
       || !(value.capabilities.specialistReason === null || SPECIALIST_REASONS.has(value.capabilities.specialistReason))) {
       invalid(kind, `${id}.capabilities is not explicit semantic metadata`);
     }
-    if (value.capabilities.browser !== (projects.length > 0)) invalid(kind, `${id}.capabilities.browser conflicts with projects`);
+    if (value.capabilities.browser !== (projects.length > 0) && !(value.executionEngine === 'playwright' && !value.capabilities.browser && projects.length > 0)) invalid(kind, `${id}.capabilities.browser conflicts with projects`);
     if (value.capabilities.specialistReason !== null && value.capabilities.hosted) invalid(kind, `${id}.capabilities cannot be hosted and specialist-only`);
     if (value.capabilities.dataCapability === 'real_fullworld'
       && (value.capabilities.hosted || value.capabilities.specialistReason === null)) {
       invalid(kind, `${id}.real_fullworld must be specialist-only`);
     }
-    const stableTestIds = uniqueStrings(value.stableTestIds ?? [], kind, `${id}.stableTestIds`);
+    const projectedFrames = value.executionRole === 'canonical-review' && Array.isArray(candidate.executionPolicy?.browser?.specs)
+      ? candidate.executionPolicy.browser.specs.filter(row => specs.includes(row.spec)).flatMap(row => row.requiredFrames.map(frame => frame.stableTestId)) : null;
+    const stableTestIds = uniqueStrings(projectedFrames ? [...new Set(projectedFrames)] : value.stableTestIds ?? [], kind, `${id}.stableTestIds`);
     const dependsOnGroups = uniqueStrings(value.dependsOnGroups ?? [], kind, `${id}.dependsOnGroups`);
     if (dependsOnGroups.includes(id)) invalid(kind, `${id}.dependsOnGroups cannot include itself`);
+    if (value.executionRole !== undefined && !['canonical-machine', 'canonical-review', 'aggregate', 'legacy-fallback'].includes(value.executionRole)) invalid(kind, `${id}.executionRole is invalid`);
+    if (value.executionEngine !== undefined && !['deterministic', 'playwright', 'aggregate', 'complete-product'].includes(value.executionEngine)) invalid(kind, `${id}.executionEngine is invalid`);
     groups[id] = {
+      ...(value.executionRole ? { executionRole: value.executionRole } : {}),
+      ...(value.executionEngine ? { executionEngine: value.executionEngine } : {}),
       specs,
       projects,
       stableTestIds,
@@ -231,11 +237,27 @@ export function validateImpactManifest(candidate, catalogCandidate) {
     if (prefixes.has(entry.pathPrefix)) invalid(kind, 'contains duplicate pathPrefix');
     prefixes.add(entry.pathPrefix);
     if (!PROFILE_ORDER.includes(entry.minimumProfile)) invalid(kind, 'entry minimumProfile is invalid');
+    if (entry.defaultRule !== undefined && typeof entry.defaultRule !== 'boolean') invalid(kind, 'entry defaultRule must be boolean');
+    if (entry.exactMatch !== undefined && typeof entry.exactMatch !== 'boolean') invalid(kind, 'entry exactMatch must be boolean');
+    if (entry.exactMatch && entry.defaultRule) invalid(kind, 'exact entries cannot be default catchalls');
+    const excludedPaths = uniqueStrings(entry.excludedPaths ?? [], kind, 'entry excludedPaths');
+    if (excludedPaths.some(path => !safePrefix(path) || !path.startsWith(entry.pathPrefix) || path.endsWith('/') || path.includes('*'))
+      || (excludedPaths.length && (entry.exactMatch || entry.defaultRule))) invalid(kind, 'entry excludedPaths must be exact children of a semantic prefix');
+    if (entry.executionBlocker !== undefined && !['unqualified-complete-product-oracle', 'unresolved-source-impact'].includes(entry.executionBlocker)) invalid(kind, 'entry executionBlocker is not allowlisted');
     const domains = uniqueStrings(entry.domains, kind, 'entry domains');
     if (domains.some((domain) => !GROUP_ID.test(domain))) invalid(kind, 'entry domains are invalid');
     const requiredGroups = uniqueStrings(entry.requiredGroups ?? [], kind, 'entry requiredGroups');
     if (requiredGroups.some((group) => !Object.hasOwn(catalog.groups, group))) invalid(kind, 'entry references unknown group');
-    return { pathPrefix: entry.pathPrefix, domains, minimumProfile: entry.minimumProfile, requiredGroups };
+    if (entry.defaultRule && (!['tests/', 'e2e/'].includes(entry.pathPrefix)
+      || domains.some(domain => !(entry.pathPrefix === 'tests/' ? ['test-contract', 'test-default'] : ['verification-governance']).includes(domain))
+      || requiredGroups.some(group => !['deterministic.core', 'e2e.full'].includes(group)))) {
+      invalid(kind, 'defaultRule is reserved for the tests/ and e2e/ ownership catchalls');
+    }
+    return { pathPrefix: entry.pathPrefix, domains, minimumProfile: entry.minimumProfile, requiredGroups,
+      ...(entry.defaultRule === true ? { defaultRule: true } : {}),
+      ...(entry.exactMatch === true ? { exactMatch: true } : {}),
+      ...(excludedPaths.length ? { excludedPaths: excludedPaths.sort() } : {}),
+      ...(entry.executionBlocker ? { executionBlocker: entry.executionBlocker } : {}) };
   });
 
   const declaredDomains = new Set(entries.flatMap((entry) => entry.domains));

@@ -7,12 +7,20 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const POLICY = resolve(ROOT, 'docs/agents/DOCUMENTATION_AGENT_IA.md');
+const BINDING = resolve(ROOT, 'docs/agents/META_AGENT_POLICY_BINDING.json');
 const CANARY = resolve(ROOT, 'docs/agents/prompts/ATLAS-LEAN-PROMPT-CANARY.md');
 const REGISTRY = resolve(ROOT, 'docs/agents/DOCUMENTATION_AGENT_IA.json');
 const REGISTRY_VALIDATOR = resolve(ROOT, 'tools/governance/validate_documentation_ia.py');
 const REGISTRY_TEST = resolve(ROOT, 'tools/governance/test_documentation_ia.py');
 const ACTIVE_TASKS = resolve(ROOT, 'docs/agents/tasks/active');
 const ARCHIVED_TASKS = resolve(ROOT, 'docs/agents/tasks/archive');
+const TERMINAL_VERIFICATION_PROMPTS = [
+  'ATLAS-E2E-VERIFICATION-ANTI-LOOP-HARDENING.md',
+  'ATLAS-E2E-VERIFICATION-OPTIMIZATION-IMPLEMENTATION-DATA-CAPABILITY-AMENDMENT.md',
+  'ATLAS-E2E-VERIFICATION-OPTIMIZATION-IMPLEMENTATION-P0-AMENDMENT.md',
+  'ATLAS-E2E-VERIFICATION-OPTIMIZATION-IMPLEMENTATION.md',
+  'ATLAS-E2E-VERIFICATION-OPTIMIZATION-PRO-REVIEW.md',
+].map((name) => resolve(ROOT, 'docs/agents/prompts', name));
 
 const REQUIRED_CANARY_SECTIONS = ['Outcome', 'Scope', 'Atlas invariants', 'Acceptance'];
 const FORBIDDEN_CANARY_SECTIONS = [
@@ -40,6 +48,19 @@ test('Atlas Documentation/Agent IA has one mutable lifecycle authority', () => {
   assert.equal(existsSync(REGISTRY_TEST), false, 'registry-only validator test must be removed');
 
   const policy = readFileSync(POLICY, 'utf8');
+  const binding = JSON.parse(readFileSync(BINDING, 'utf8'));
+  assert.deepEqual(
+    {
+      policy_id: binding.policy_id,
+      policy_version: binding.policy_version,
+      authority_repository: binding.authority_repository,
+    },
+    {
+      policy_id: 'OTERYN_ORGANIZATION_AGENT_POLICY',
+      policy_version: '3.0.0',
+      authority_repository: 'Oteryn/Oteryn',
+    },
+  );
   for (const phrase of [
     '`docs/agents/prompts/*.md` are reusable prompt contracts',
     'GitHub Issues are mutable lifecycle authority',
@@ -75,6 +96,16 @@ test('task caches do not classify the same packet as active and archived', () =>
   assert.deepEqual(overlap, [], 'task packet cannot exist in both lifecycle cache directories');
 });
 
+test('terminal verification prompts carry historical authority markers', () => {
+  for (const prompt of TERMINAL_VERIFICATION_PROMPTS) {
+    const banner = readFileSync(prompt, 'utf8').split(/\r?\n/u).slice(0, 5).join('\n');
+    assert.match(banner, /Lifecycle status: HISTORICAL \/ SUSPENDED/u);
+    assert.match(banner, /Issue #179 is closed/u);
+    assert.match(banner, /live Issue #315/u);
+    assert.match(banner, /does not authorize execution, test or workflow restoration, deployment/u);
+  }
+});
+
 test('lean prompt canary is a task delta and does not copy repository policy', () => {
   const text = readFileSync(CANARY, 'utf8');
   const sections = text
@@ -87,5 +118,5 @@ test('lean prompt canary is a task delta and does not copy repository policy', (
     assert.equal(text.includes(`## ${forbidden}`), false, `canary copied repository policy section: ${forbidden}`);
   }
   assert.match(text, /GitHub Issue #322 owns mutable lifecycle state/u);
-  assert.match(text, /inherits current repository-wide execution, authorization, review, verification and Merge Queue policy/u);
+  assert.match(text, /relies on the bound organization policy and current repository-wide execution/u);
 });

@@ -6,7 +6,7 @@ Parent: Oteryn/Oteryn#140
 
 ## Outcome
 
-Prove that an Atlas reusable prompt can stay a task-specific delta while current repository authorities govern execution and integration.
+Prove that an Atlas reusable prompt can stay a task-specific delta over the immutable META policy selected by `docs/agents/META_AGENT_POLICY_BINDING.json` while current repository authorities govern execution and integration.
 
 ## Scope
 
@@ -18,7 +18,7 @@ Prove that an Atlas reusable prompt can stay a task-specific delta while current
 
 - Oteryn-Game remains canonical World/Content authority; Atlas is a derived semantic projection.
 - Preserve Atlas provenance, browser/render, FullWorld, specialist-runner, and merged-main deployment boundaries.
-- This prompt inherits current repository-wide execution, authorization, review, verification and Merge Queue policy instead of copying it.
+- This prompt relies on the bound organization policy and current repository-wide execution, authorization, review, verification and Merge Queue authority instead of copying them.
 - GitHub Issue #322 owns mutable lifecycle state.
 
 ## Acceptance

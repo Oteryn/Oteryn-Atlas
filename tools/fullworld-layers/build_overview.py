@@ -11,9 +11,11 @@ import argparse
 from concurrent.futures import ProcessPoolExecutor
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import shutil
+import time
 from typing import Any
 
 PUBLICATION_PROFILE = "oteryn-atlas-fullworld-publication-v0"
@@ -32,6 +34,69 @@ SPRITE_TOKEN = b'"sprite_source_id":'
 
 class OverviewError(RuntimeError):
     pass
+
+
+def _paths_overlap(left: Path, right: Path) -> bool:
+    return left == right or left in right.parents or right in left.parents
+
+
+def _require_resolved_disjointness(output: Path, inputs: list[tuple[str, Path | None]]) -> Path:
+    if output.is_symlink():
+        raise OverviewError("overview output must not be a symlink")
+    resolved_output = output.resolve(strict=False)
+    for label, source in inputs:
+        if source is None:
+            continue
+        resolved_source = source.resolve(strict=False)
+        if _paths_overlap(resolved_output, resolved_source):
+            raise OverviewError(f"unsafe overview output overlap with {label}")
+    return resolved_output
+
+
+def _allocate_staging_directory(output: Path, inputs: list[tuple[str, Path | None]]) -> Path:
+    resolved_output = output.resolve(strict=False)
+    resolved_output.parent.mkdir(parents=True, exist_ok=True)
+    for attempt in range(100):
+        staging = resolved_output.with_name(
+            f".{resolved_output.name}.staging-{os.getpid()}-{time.time_ns()}-{attempt}"
+        )
+        if staging.exists() or staging.is_symlink():
+            continue
+        _require_resolved_disjointness(staging, [*inputs, ("final output", resolved_output)])
+        return staging
+    raise OverviewError("unable to allocate safe overview staging directory")
+
+
+def _remove_path(path: Path) -> None:
+    if path.is_symlink() or path.is_file():
+        path.unlink(missing_ok=True)
+    elif path.exists():
+        shutil.rmtree(path)
+
+
+def _publish_staged_directory(staging: Path, output: Path) -> None:
+    if output.is_symlink():
+        raise OverviewError("overview output must not be a symlink")
+    resolved_output = output.resolve(strict=False)
+    resolved_staging = staging.resolve(strict=False)
+    if resolved_staging == resolved_output or resolved_staging.parent != resolved_output.parent:
+        raise OverviewError("overview staging directory is not an adjacent isolated sibling")
+    backup = resolved_output.with_name(
+        f".{resolved_output.name}.backup-{os.getpid()}-{time.time_ns()}"
+    )
+    if backup.exists() or backup.is_symlink():
+        raise OverviewError("overview backup path already exists")
+    had_output = resolved_output.exists()
+    if had_output:
+        os.replace(resolved_output, backup)
+    try:
+        os.replace(resolved_staging, resolved_output)
+    except BaseException:
+        if had_output and backup.exists():
+            os.replace(backup, resolved_output)
+        raise
+    if had_output:
+        _remove_path(backup)
 
 
 def canonical(value: Any) -> bytes:
@@ -222,7 +287,7 @@ def reuse_previous_chunk(previous: dict[str, Any], entry: dict[str, Any], cell_s
         "counts": chunk["counts"], "logicalAddress": logical, "path": f"chunks/{output_name}", "sourceContentId": entry["contentId"],
     }, raw)
 
-def build_overview(publication_root: Path, output_root: Path, *, expected_publication_root: str, cell_size: int = 16, workers: int = 1, previous_output: Path | None = None, expected_previous_root: str | None = None) -> dict[str, Any]:
+def _build_overview_into(publication_root: Path, output_root: Path, *, expected_publication_root: str, cell_size: int = 16, workers: int = 1, previous_output: Path | None = None, expected_previous_root: str | None = None) -> dict[str, Any]:
     if cell_size <= 0:
         raise OverviewError("cell size must be positive")
     publication = load_canonical_manifest(publication_root / "publication.json")
@@ -248,8 +313,6 @@ def build_overview(publication_root: Path, output_root: Path, *, expected_public
     previous_chunks = load_previous_chunks(previous_output, expected_previous_root, cell_size)
     reused_chunks = 0
     scanned_chunks = 0
-    if output_root.exists():
-        shutil.rmtree(output_root)
     (output_root / "chunks").mkdir(parents=True)
     (output_root / "floors").mkdir(parents=True)
 
@@ -380,6 +443,27 @@ def build_overview(publication_root: Path, output_root: Path, *, expected_public
     result = dict(world)
     result["_buildEvidence"] = {"reusedChunks": reused_chunks, "scannedChunks": scanned_chunks, "trustedPreviousRootUsed": bool(previous_chunks)}
     return result
+
+
+def build_overview(publication_root: Path, output_root: Path, *, expected_publication_root: str, cell_size: int = 16, workers: int = 1, previous_output: Path | None = None, expected_previous_root: str | None = None) -> dict[str, Any]:
+    inputs = [("publication source", publication_root), ("previous overview product", previous_output)]
+    _require_resolved_disjointness(output_root, inputs)
+    staging = _allocate_staging_directory(output_root, inputs)
+    try:
+        result = _build_overview_into(
+            publication_root,
+            staging,
+            expected_publication_root=expected_publication_root,
+            cell_size=cell_size,
+            workers=workers,
+            previous_output=previous_output,
+            expected_previous_root=expected_previous_root,
+        )
+        _publish_staged_directory(staging, output_root)
+        return result
+    except BaseException:
+        _remove_path(staging)
+        raise
 
 
 def main() -> int:

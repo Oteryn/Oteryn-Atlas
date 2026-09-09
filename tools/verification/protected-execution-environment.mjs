@@ -59,8 +59,10 @@ function normalizeConfig(candidate) {
     throw new TypeError('protected execution writable /tmp tmpfs is invalid');
   }
   const tmpOptions = [...container.tmpfs[0].options].sort();
-  for (const required of ['nodev', 'nosuid', 'rw', 'size=256m']) {
-    if (!tmpOptions.includes(required)) throw new TypeError(`protected execution /tmp is missing ${required}`);
+  const requiredTmpOptions = ['nodev', 'nosuid', 'rw', 'size=256m'];
+  if (tmpOptions.length !== requiredTmpOptions.length
+    || tmpOptions.some((option, index) => option !== requiredTmpOptions[index])) {
+    throw new TypeError('protected execution /tmp options must exactly match the protected option set');
   }
 
   const mounts = candidate.mounts;
@@ -71,7 +73,7 @@ function normalizeConfig(candidate) {
   }
   if (!isPlainObject(mounts.dependencies)
     || mounts.dependencies.source !== 'protected-control/e2e/node_modules'
-    || mounts.dependencies.target !== '/protected-e2e-node-modules/node_modules'
+    || mounts.dependencies.target !== '/candidate/e2e/node_modules'
     || mounts.dependencies.readOnly !== true) {
     throw new TypeError('protected execution dependency mount must be protected and read-only');
   }

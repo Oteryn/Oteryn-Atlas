@@ -40,6 +40,8 @@ export function createSearchView({ form, input, id, describe, onQuery, onChoose,
   hint.setAttribute('aria-hidden', 'true');
   host.append(status, list, message, hint);
   form.append(host);
+  input.placeholder = id === 'mobile' ? 'Search Atlas' : 'Search places, creatures or coordinates';
+  input.setAttribute('aria-label', 'Search the Oteryn world');
   input.setAttribute('role', 'combobox');
   input.setAttribute('aria-autocomplete', 'list');
   input.setAttribute('aria-controls', list.id);

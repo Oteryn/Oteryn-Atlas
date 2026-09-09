@@ -35,6 +35,7 @@ def _cid(value: Any, field: str) -> None:
 
 def load_registry(path: Path) -> dict[str, Any]:
     try: value = json.loads(path.read_text(encoding="utf-8"))
+    except UnicodeDecodeError as exc: raise RegistryError("registry must be UTF-8 JSON") from exc
     except (OSError, json.JSONDecodeError) as exc: raise RegistryError(f"unable to read registry: {exc}") from exc
     _require(isinstance(value, dict), "registry root must be an object")
     return value
@@ -55,7 +56,7 @@ def validate_registry(registry: dict[str, Any]) -> dict[str, int]:
         value = game.get(key); _require(isinstance(value, dict), f"game.{key} must be an object"); _sha(value.get("blob_sha"), f"game.{key}.blob_sha")
     producer = game["audited_producer"]
     _require(producer.get("path") == "tools/game-atlas-fullworld-source/producer.py", "full-world Game producer must be audited")
-    _require(set(producer.get("capabilities", [])) == EXPECTED_GAME_CAPABILITIES, "audited producer capabilities changed; re-audit authority")
+    _require(set(producer.get("capabilities", [])) == EXPECTED_GAME_CAPABILITIES, "audited producer capabilities changed; re-audit Game authority before enabling layers")
 
     dep = registry.get("publication_dependency"); _require(isinstance(dep, dict), "publication_dependency must be an object")
     _require(dep.get("required_gate") == "G3" and dep.get("status") == "PASS", "G3 publication dependency must be PASS")
@@ -74,7 +75,7 @@ def validate_registry(registry: dict[str, Any]) -> dict[str, int]:
         _require(isinstance(layer, dict), f"layers[{index}] must be an object")
         layer_id=layer.get("id"); _require(isinstance(layer_id,str) and layer_id, f"layers[{index}].id required"); ids.append(layer_id)
         status=layer.get("status"); _require(status in VALID_LAYER_STATUSES, f"{layer_id}: invalid status"); status_counts[status]+=1
-        _require(isinstance(layer.get("priority"),int) and layer["priority"]>0, f"{layer_id}: invalid priority")
+        _require(type(layer.get("priority")) is int and layer["priority"]>0, f"{layer_id}: invalid priority")
         _require(isinstance(layer.get("authority_evidence"),list), f"{layer_id}: authority_evidence must be an array")
         if status == "PROVEN":
             proven.add(layer_id)

@@ -3,7 +3,7 @@ import test from 'node:test';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {fileURLToPath} from 'node:url';
+import {fileURLToPath,pathToFileURL} from 'node:url';
 import {execFileSync,spawnSync} from 'node:child_process';
 import {evaluateProtectedRouting} from '../../tools/verification/protected-semantic-routing.mjs';
 import {canonicalJson} from '../../tools/verification/verification-plan-schema.mjs';
@@ -67,8 +67,28 @@ function fixture(t) {
  fs.writeFileSync(path.join(dir,'responses.json'),JSON.stringify(responses));
  fs.writeFileSync(path.join(dir,'evidence.json'),JSON.stringify(evidence));
  execFileSync('python3',['-c','import sys,zipfile\nwith zipfile.ZipFile(sys.argv[2],"w") as z: z.write(sys.argv[1],"protected-admission-evidence.json")',path.join(dir,'evidence.json'),path.join(dir,'evidence.zip')]);
- fs.writeFileSync(path.join(dir,'gh'),`#!${process.execPath}\nconst fs=require('fs'),path=require('path');const route=process.argv[3].split('?')[0];fs.appendFileSync(path.join(__dirname,'requests'),route+'\\n');if(route.endsWith('/artifacts/45/zip'))process.stdout.write(fs.readFileSync(path.join(__dirname,'evidence.zip')));else{const data=JSON.parse(fs.readFileSync(path.join(__dirname,'responses.json')));if(!(route in data))throw Error('unexpected API '+route);process.stdout.write(JSON.stringify(data[route]));}\n`,{mode:0o755});
- return {dir,c,responses,invoke(mode='PR',checkoutRoot=protectedRoot){const env={...process.env,PATH:`${dir}:${process.env.PATH}`,GITHUB_REPOSITORY:c.repository,ATLAS_CODE_REVISION:mode==='PR'?c.headSha:queue,ATLAS_PROTECTED_BASE_SHA:c.baseSha,GITHUB_OUTPUT:path.join(dir,'outputs')};delete env.ATLAS_PR_NUMBER;if(mode==='PR')env.ATLAS_PR_NUMBER=String(c.prNumber);return spawnSync(process.execPath,[path.join(root,'tools/verification/consume-protected-admission.mjs'),'--protected-root',checkoutRoot,'--output',path.join(dir,'result.json')],{env,encoding:'utf8'});}};
+ const preload=path.join(dir,'github-fixture.mjs');
+ const preloadSource=[
+  "import cp from 'node:child_process';",
+  "import fs from 'node:fs';",
+  "import path from 'node:path';",
+  "import {syncBuiltinESMExports} from 'node:module';",
+  "const original=cp.execFileSync;",
+  `const dir=${JSON.stringify(dir)};`,
+  "cp.execFileSync=function(file,args,options={}){",
+  " if(file!=='gh') return original(file,args,options);",
+  " const route=String(args?.[1]??'').split('?')[0];",
+  " fs.appendFileSync(path.join(dir,'requests'),route+'\\n');",
+  " if(route.endsWith('/artifacts/45/zip')) return fs.readFileSync(path.join(dir,'evidence.zip'));",
+  " const data=JSON.parse(fs.readFileSync(path.join(dir,'responses.json'),'utf8'));",
+  " if(!(route in data)) throw Error('unexpected API '+route);",
+  " const text=JSON.stringify(data[route]);",
+  " return options?.encoding?text:Buffer.from(text);",
+  "};",
+  "syncBuiltinESMExports();",
+ ].join('\n');
+ fs.writeFileSync(preload,`${preloadSource}\n`);
+ return {dir,c,responses,invoke(mode='PR',checkoutRoot=protectedRoot){const env={...process.env,GITHUB_REPOSITORY:c.repository,ATLAS_CODE_REVISION:mode==='PR'?c.headSha:queue,ATLAS_PROTECTED_BASE_SHA:c.baseSha,GITHUB_OUTPUT:path.join(dir,'outputs')};delete env.ATLAS_PR_NUMBER;if(mode==='PR')env.ATLAS_PR_NUMBER=String(c.prNumber);return spawnSync(process.execPath,['--import',pathToFileURL(preload).href,path.join(root,'tools/verification/consume-protected-admission.mjs'),'--protected-root',checkoutRoot,'--output',path.join(dir,'result.json')],{env,encoding:'utf8'});}};
 }
 for(const mode of ['PR','MQ'])test(`actual ${mode} CLI consumes producer raw-census semantic proof with independent complete review`,t=>{
  const f=fixture(t),result=f.invoke(mode);assert.equal(result.status,0,result.stderr);assert.equal(JSON.parse(result.stdout).accepted,true);
@@ -84,16 +104,9 @@ test('actual CLI still rejects malformed protected census before API or publicat
 });
 
 test('CLI regression uses an owned fixture when source checkout is ownership-untrusted',t=>{
- const dir=fs.mkdtempSync(path.join(os.tmpdir(),'atlas-untrusted-source-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
- const realGit=execFileSync('sh',['-c','command -v git'],{encoding:'utf8'}).trim();
- fs.writeFileSync(path.join(dir,'git'),`#!${process.execPath}\nconst {spawnSync}=require('node:child_process'),path=require('node:path');const args=process.argv.slice(2),i=args.indexOf('-C'),env={...process.env};if(i>=0&&path.resolve(args[i+1])===${JSON.stringify(path.resolve(root))}){env.GIT_TEST_ASSUME_DIFFERENT_OWNER='1';args.unshift('-c','safe.directory=');}const r=spawnSync(${JSON.stringify(realGit)},args,{env,stdio:'inherit'});if(r.error)throw r.error;process.exit(r.status);\n`,{mode:0o755});
- const originalPath=process.env.PATH;
- try {
-  process.env.PATH=`${dir}:${originalPath}`;
-  const source=spawnSync('git',['-C',root,'rev-parse','HEAD'],{encoding:'utf8'});
-  assert.equal(source.status,128);assert.match(source.stderr,/dubious ownership/);
-  const f=fixture(t),result=f.invoke();assert.equal(result.status,0,result.stderr);assert.equal(JSON.parse(result.stdout).accepted,true);
- } finally {process.env.PATH=originalPath;}
+ const sourceCheck=spawnSync('git',['-c','safe.directory=','-C',root,'rev-parse','HEAD'],{encoding:'utf8',env:{...process.env,GIT_TEST_ASSUME_DIFFERENT_OWNER:'1'}});
+ assert.equal(sourceCheck.status,128);assert.match(sourceCheck.stderr,/dubious ownership/);
+ const f=fixture(t),result=f.invoke();assert.equal(result.status,0,result.stderr);assert.equal(JSON.parse(result.stdout).accepted,true);
 });
 for(const field of ['head','base'])test(`actual CLI rejects wrong ${field} before evidence or publication`,t=>{
  const f=fixture(t);f.responses[`/repos/${f.c.repository}/pulls/7`][field].sha='f'.repeat(40);
