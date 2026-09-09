@@ -7,7 +7,7 @@ function fixture(){
  const commands=[{id:digest('e'),argv:['node','test.mjs'],expectedTestIds:['scene'],timeoutSeconds:10}];
  const groups=[{id:'machine.scene',commandIds:[commands[0].id]},{id:'review.scene',commandIds:[commands[0].id]}];
  const reviews=[{groupId:'review.scene',commandIds:[commands[0].id],frames:[{frameId:'full-frame',stableTestId:'scene'}]}];
- return {schemaVersion:1,identity,commands,groups,reviews};
+ return {schemaVersion:1,identity,commands,groups,reviews,candidateTestSubjects:[]};
 }
 test('machine command mapping preserves independent review frame obligations',()=>{
  const f=fixture(),contract=sealExecutionContract(f);

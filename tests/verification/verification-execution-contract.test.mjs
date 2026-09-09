@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
-import {fileURLToPath} from 'node:url';
+import {fileURLToPath,pathToFileURL} from 'node:url';
 import {R5_SEMANTIC_BUILDER_ORACLE, R5_SEMANTIC_BUILDER_ORACLE_DIGEST, R5_SEMANTIC_SOURCE, assertCandidateReadback, resolveExecutionContract, sealExecutionContract, verifyR5SemanticProduct} from '../../tools/verification/verification-execution-contract.mjs';
 import {createPublicationProofFixtures} from './helpers/publication-proof-fixture.mjs';
 const sha = c => c.repeat(40);
@@ -393,29 +393,26 @@ const repository='Oteryn/Oteryn-Atlas',base='a'.repeat(40),head='b'.repeat(40),t
 const root=fileURLToPath(new URL('../../',import.meta.url));
 function fixture(){
  const repo={full_name:repository,default_branch:'main'};
- const run={id:12,repository:repo,event:'merge_group',path:'.github/workflows/merge-group-gate.yml',conclusion:'success',status:'completed',run_attempt:1,head_sha:head,head_branch:'gh-readonly-queue/main/pr-7'};
+ const headRef='refs/heads/gh-readonly-queue/main/pr-7-deadbeef';
  const responses={
   [`/repos/${repository}/git/ref/heads/main`]:{object:{sha:base}},
-  [`/repos/${repository}/actions/runs/12`]:run,
-  [`/repos/${repository}/git/commits/${head}`]:{sha:head,parents:[{sha:base}]},
+  [`/repos/${repository}/git/commits/${head}`]:{sha:head,tree:{sha:tree},parents:[{sha:base},{sha:'d'.repeat(40)}]},
  };
- const event={repository:repo,action:'completed',workflow_run:{id:12,head_sha:head}};
- return {run,responses,input:{eventName:'workflow_run',event,githubSha:base,request:async url=>{assert.ok(responses[url],url);return structuredClone(responses[url]);}}};
+ const event={repository:repo,action:'checks_requested',merge_group:{base_ref:'refs/heads/main',base_sha:base,head_ref:headRef,head_sha:head}};
+ return {responses,input:{eventName:'merge_group',event,githubSha:head,githubRef:headRef,request:async url=>{assert.ok(responses[url],url);return structuredClone(responses[url]);}}};
 }
-test('MQ source comes from protected workflow_run and binds successful exact parent before or just after integration',async()=>{
- const f=fixture();let result=await resolveShadowEvent(f.input);assert.equal(result.baseSha,base);assert.equal(result.headSha,head);assert.equal(result.parentRunId,12);
+test('MQ source comes from protected merge_group and binds exact queue identity before or just after integration',async()=>{
+ const f=fixture();let result=await resolveShadowEvent(f.input);assert.equal(result.baseSha,base);assert.equal(result.headSha,head);assert.equal(result.parentRunId,null);assert.equal(result.treeSha,tree);
  f.responses[`/repos/${repository}/git/ref/heads/main`].object.sha=head;
- assert.equal((await resolveShadowEvent(f.input)).baseSha,base);
- f.input.githubSha=head;
- result=await resolveShadowEvent(f.input);assert.equal(result.baseSha,base);
+ result=await resolveShadowEvent(f.input);assert.equal(result.baseSha,base);assert.equal(result.headSha,head);
 });
-test('MQ rollback pair cannot impersonate a protected source',async()=>{const f=fixture();f.input.githubSha=head;await assert.rejects(resolveShadowEvent(f.input),/base moved/);});
-test('MQ spoofed event, workflow path, failed or repeated parent, head and unrelated main drift reject',async()=>{
- const mutations=[f=>f.run.event='pull_request',f=>f.run.path='.github/workflows/other.yml',f=>f.run.conclusion='failure',f=>f.run.run_attempt=2,f=>f.run.head_sha='d'.repeat(40),f=>f.run.head_branch='feature/forged',f=>f.input.event.action='requested',f=>f.input.eventName='merge_group',f=>f.responses[`/repos/${repository}/git/ref/heads/main`].object.sha='d'.repeat(40),f=>f.input.githubSha='d'.repeat(40)];
+test('MQ unrelated protected-main drift cannot impersonate a protected source',async()=>{const f=fixture();f.responses[`/repos/${repository}/git/ref/heads/main`].object.sha='e'.repeat(40);await assert.rejects(resolveShadowEvent(f.input),/protected base moved/);});
+test('MQ spoofed direct event, queue ref, head, tree or parent topology reject',async()=>{
+ const mutations=[f=>f.input.event.action='destroyed',f=>{f.input.event.merge_group.base_ref='refs/heads/other';},f=>{f.input.event.merge_group.head_ref='refs/heads/feature/forged';f.input.githubRef=f.input.event.merge_group.head_ref;},f=>{f.input.githubRef='refs/heads/gh-readonly-queue/main/pr-8-forged';},f=>{f.input.githubSha='d'.repeat(40);},f=>{f.responses[`/repos/${repository}/git/ref/heads/main`].object.sha='d'.repeat(40);},f=>{f.responses[`/repos/${repository}/git/commits/${head}`].tree.sha='bad';},f=>{f.responses[`/repos/${repository}/git/commits/${head}`].parents=[];},f=>{f.responses[`/repos/${repository}/git/commits/${head}`].parents=[{sha:'d'.repeat(40)}];}];
  for(const mutate of mutations){const f=fixture();mutate(f);await assert.rejects(resolveShadowEvent(f.input));}
 });
 test('PR source rejects fork, stale base and candidate workflow revision',async()=>{
- const f=fixture();f.input.eventName='pull_request_target';f.input.event={repository:f.input.event.repository,action:'synchronize',pull_request:{number:7,base:{sha:base,ref:'main',repo:{full_name:repository}},head:{sha:head,repo:{full_name:repository}}}};
+ const f=fixture();f.input.eventName='pull_request_target';f.input.githubSha=base;f.input.event={repository:f.input.event.repository,action:'synchronize',pull_request:{number:7,base:{sha:base,ref:'main',repo:{full_name:repository}},head:{sha:head,repo:{full_name:repository}}}};
  assert.equal((await resolveShadowEvent(f.input)).prNumber,7);
  for(const mutate of [x=>x.event.pull_request.head.repo.full_name='Other/Fork',x=>x.event.pull_request.base.sha=head,x=>x.githubSha=head]){const input=structuredClone({...f.input,request:undefined});input.request=f.input.request;mutate(input);await assert.rejects(resolveShadowEvent(input));}
 });
@@ -497,8 +494,8 @@ test('authenticated self-only subjects compose with docs, another subject and HT
   for(const subject of contract.candidateTestSubjects)assert.deepEqual(contract.commands.find(command=>command.id===subject.commandId).expectedTestIds,[subject.spec]);
  }
  const actualCore=resolveExecutionContract(input([{path:'tests/verification/artifacts.test.mjs',status:'modified'}]));
- assert.equal(actualCore.commands.filter(command=>command.groupIds.includes('deterministic.core')).length,139);
- assert.equal(actualCore.commands.length,140);
+ assert.equal(actualCore.commands.filter(command=>command.groupIds.includes('deterministic.core')).length,140);
+ assert.equal(actualCore.commands.length,141);
  assert.equal(actualCore.candidateTestSubjects.length,1);
  const subjectOnly=resolveExecutionContract(input());
  const forged=structuredClone(subjectOnly);forged.candidateTestSubjects[0].spec='tests/../outside.mjs';assert.throws(()=>sealExecutionContract(forged),/subject/);
@@ -516,21 +513,22 @@ test('authenticated self-only subjects compose with docs, another subject and HT
  samePathManifest.entries.push({pathPrefix:first,exactMatch:true,domains:['subject-semantic'],minimumProfile:'focused',requiredGroups:['deterministic.core']});
  const samePath=buildVerificationPlan({...planInput,trustedImpactManifest:samePathManifest,candidateImpactManifest:base.protectedImpactManifest});
  assert.ok(samePath.requiredGroupIds.includes('deterministic.core'));assert.deepEqual(samePath.candidateTestSubjects,[first]);
- assert.equal(resolveExecutionContract({...input(),protectedImpactManifest:samePathManifest}).commands.length,140);
+ assert.equal(resolveExecutionContract({...input(),protectedImpactManifest:samePathManifest}).commands.length,141);
  const escalatedManifest=structuredClone(base.protectedImpactManifest);
  escalatedManifest.entries.push({pathPrefix:first,exactMatch:true,domains:['subject-semantic'],minimumProfile:'focused',requiredGroups:[]});
  escalatedManifest.crossDomainEscalations.push({id:'subject-core-proof',whenDomains:['subject-semantic','documentation'],minimumProfile:'focused',requiredGroups:['deterministic.core']});
  const escalated=buildVerificationPlan({...planInput,changedFiles:[{path:first,status:'added'},{path:'docs/example.md',status:'added'}],trustedImpactManifest:escalatedManifest,candidateImpactManifest:escalatedManifest});
  assert.ok(escalated.requiredGroupIds.includes('deterministic.core'));assert.deepEqual(escalated.candidateTestSubjects,[first]);
- assert.equal(resolveExecutionContract({...input([{path:'docs/example.md',status:'added'}]),protectedImpactManifest:escalatedManifest}).commands.length,140);
+ assert.equal(resolveExecutionContract({...input([{path:'docs/example.md',status:'added'}]),protectedImpactManifest:escalatedManifest}).commands.length,141);
  const renamed=input();renamed.candidate.changedFiles=[{path:first,previousPath:'tests/old-unowned.mjs',status:'renamed'}];renamed.planInput.changedFiles=renamed.candidate.changedFiles;assert.equal(resolveExecutionContract(renamed).commands.length,1);
 });
 
 test('real protected shadow plan CLI schedules subject-only work and keeps docs-only S0 empty',t=>{
  const temporary=fs.mkdtempSync(path.join(os.tmpdir(),'atlas-shadow-plan-cli-'));t.after(()=>fs.rmSync(temporary,{recursive:true,force:true}));
  const control=path.join(temporary,'control'),candidateRoot=path.join(temporary,'candidate');
- const git=(directory,...args)=>{const result=spawnSync('git',['-C',directory,'-c','core.hooksPath=/dev/null',...args],{encoding:'utf8'});assert.equal(result.status,0,result.stderr);return result.stdout.trim();};
- git(root,'clone','--quiet','--shared',root,control);
+ const git=(directory,...args)=>{const result=spawnSync('git',['-c',`safe.directory=${directory}`,'-C',directory,'-c','core.hooksPath=/dev/null',...args],{encoding:'utf8'});assert.equal(result.status,0,result.stderr);return result.stdout.trim();};
+ git(root,'-c','core.autocrlf=false','clone','--quiet','--shared',root,control);
+ git(control,'config','core.autocrlf','false');git(control,'reset','--hard','HEAD');
  for(const file of ['browser-execution.mjs','build-verification-plan.mjs','deterministic-execution.mjs','verification-execution-contract.mjs','run-verification-shadow.mjs'])fs.copyFileSync(path.join(root,'tools/verification',file),path.join(control,'tools/verification',file));
  const commit=directory=>{git(directory,'add','.');git(directory,'-c','user.name=Fixture','-c','user.email=fixture@example.invalid','-c','commit.gpgsign=false','commit','--quiet','--allow-empty','-m','Fixture');return git(directory,'rev-parse','HEAD');};
  const base=commit(control);git(control,'clone','--quiet','--shared',control,candidateRoot);
@@ -546,7 +544,7 @@ test('real protected shadow plan CLI schedules subject-only work and keeps docs-
   const responses={ [prefix]:repository,[`${prefix}/git/ref/heads/main`]:{object:{sha:base}},[`${prefix}/pulls/7`]:pr,[`${prefix}/pulls/7/files?per_page=100&page=1`]:[{filename:subject,status:'added'}],[`${prefix}/git/commits/${head}`]:{sha:head,tree:{sha:tree}},[`${prefix}/actions/runs/19`]:{id:19,repository,path:'.github/workflows/verification-shadow.yml',event:'pull_request_target',run_attempt:1,status:'in_progress',head_sha:head}};
   const responseFile=path.join(temporary,'responses.json'),eventFile=path.join(temporary,'event.json'),output=path.join(temporary,expected?'subject-output':'docs-output');
   fs.writeFileSync(responseFile,JSON.stringify(responses));fs.writeFileSync(eventFile,JSON.stringify({repository,action:'synchronize',pull_request:pr}));
-  const result=spawnSync(process.execPath,['--import',preload,path.join(control,'tools/verification/run-verification-shadow.mjs'),'plan',candidateRoot],{encoding:'utf8',env:{PATH:process.env.PATH,HOME:os.tmpdir(),GITHUB_RUN_ATTEMPT:'1',GITHUB_EVENT_NAME:'pull_request_target',GITHUB_EVENT_PATH:eventFile,GITHUB_SHA:base,GITHUB_RUN_ID:'19',GITHUB_OUTPUT:output,ATLAS_TEST_GITHUB_RESPONSES:responseFile}});
+  const result=spawnSync(process.execPath,['--import',pathToFileURL(preload).href,path.join(control,'tools/verification/run-verification-shadow.mjs'),'plan',candidateRoot],{encoding:'utf8',env:{PATH:process.env.PATH,HOME:os.tmpdir(),GITHUB_RUN_ATTEMPT:'1',GITHUB_EVENT_NAME:'pull_request_target',GITHUB_EVENT_PATH:eventFile,GITHUB_SHA:base,GITHUB_RUN_ID:'19',GITHUB_OUTPUT:output,ATLAS_TEST_GITHUB_RESPONSES:responseFile}});
   assert.equal(result.status,0,result.stderr);assert.equal(fs.readFileSync(output,'utf8'),`has_commands=${expected}\n`);
   const summary=JSON.parse(result.stdout);assert.deepEqual(summary.groups,[]);assert.deepEqual(summary.candidateTestSubjects,expected?[subject]:[]);
   assert.equal(summary.status,expected?'UNRESOLVED':'NO_PRODUCT_WORK');if(!expected)assert.deepEqual(summary.commands,[]);
