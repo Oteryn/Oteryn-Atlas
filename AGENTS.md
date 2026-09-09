@@ -26,6 +26,8 @@ Selective verification is active blocking authority through `.github/workflows/v
 - Merge Queue verification uses direct `merge_group: checks_requested` semantics.
 - Protected `main` owns workflow, planner, catalog, impact-routing, stable-ID, execution-policy, and verification-oracle authority.
 - Candidate bytes are inert subjects. Candidate code cannot narrow, replace, or spoof protected verification authority.
+- Qualification fixtures and production data used to prove equivalent behavior must traverse the same publication manifest, floor/chunk/range, digest-validation, loader, runtime, renderer, and interaction seams; a parallel mock application is not equivalent evidence.
+- Preserve independent test oracles. Test hooks and diagnostics may expose truthful read-only state, but must not mutate product state, inject fake authority, bypass normal loading, or become an alternate runtime source.
 - Protected and candidate checkouts do not persist credentials.
 - Unknown or unowned paths fail closed.
 - Accepted deterministic and browser retries are zero; do not rerun-until-green, broaden allowlists, hide failures, or add arbitrary sleeps.

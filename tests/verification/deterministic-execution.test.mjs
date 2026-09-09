@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 import { resolveDeterministicCommands } from '../../tools/verification/deterministic-execution.mjs';
 
 function fixture(t) {
@@ -68,18 +69,13 @@ test('duplicate selections deduplicate while stale import proof, cycles and opaq
 
 test('repository ownership preserves all current nonverification deterministic entrypoints and separates explicit noncanonical harnesses', () => {
   const root = new URL('../../', import.meta.url);
+  const rootPath = fileURLToPath(root);
   const inventory = deriveVerificationMetadata(JSON.parse(fs.readFileSync(new URL('tools/verification/verification-catalog.json', root)))).deterministic;
-  const excluded = new Set([
-    'tests/authority-registry-invalid-utf8.py',
-    'tests/authority-registry-priority-type.py',
+  const noncanonical = new Set([
     'tests/browser-proof.html',
     'tests/browser-proof.mjs',
     'tests/fixtures/game-semantic-search-source.json',
     'tests/fullworld-mobile-layout-proof.html',
-    'tests/maintenance/pre-r4-maintenance-mutation.test.mjs',
-    'tests/maintenance/r4-shadow-admission.test.mjs',
-    'tests/r4-path-confinement.mjs',
-    'tests/r5-search-routing-regression.mjs',
     'tests/semantic-search-browser-proof.mjs',
     'tests/semantic-search-browser.html',
   ]);
@@ -88,15 +84,18 @@ test('repository ownership preserves all current nonverification deterministic e
     for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
       const location = new URL(entry.name + (entry.isDirectory() ? '/' : ''), directory);
       if (entry.isDirectory()) walk(location);
-      else {
-        const spec = 'tests/' + decodeURIComponent(location.pathname.split('/tests/')[1]);
-        if (!spec.startsWith('tests/verification/') && !excluded.has(spec)) discovered.push(spec);
+      else if (['.mjs', '.js', '.cjs', '.py'].includes(path.extname(entry.name))) {
+        const spec = path.relative(rootPath, fileURLToPath(location)).split(path.sep).join('/');
+        if (!spec.startsWith('tests/verification/') && !noncanonical.has(spec)) discovered.push(spec);
       }
     }
   };
   walk(new URL('tests/', root));
-  assert.deepEqual(inventory.entries.map(row => row.spec).sort(), discovered.sort());
-  assert.equal(inventory.entries.length, 53);
+  const expected = new Set(discovered);
+  const owned = new Set(inventory.entries.map(row => row.spec));
+  assert.deepEqual([...owned].filter(spec => !expected.has(spec)).sort(), [], 'catalog cannot own missing/noncanonical entrypoints');
+  assert.deepEqual([...expected].filter(spec => !owned.has(spec)).sort(), [], 'every current deterministic source entrypoint requires canonical ownership');
+  assert.equal(inventory.entries.length, expected.size);
   for (const row of inventory.entries) {
     assert.ok(inventory.proposedCatalog.groups[row.group].specs.includes(row.spec), row.spec);
     assert.ok(!row.spec.endsWith('.html'));
