@@ -46,7 +46,8 @@
       "supportModify": [
         "tools/verification/verification-catalog.json",
         "tools/verification/verification-authority-manifest.json",
-        "tests/verification/verification-execution-contract.test.mjs"
+        "tests/verification/verification-execution-contract.test.mjs",
+        "tests/verification/verification-metadata.test.mjs"
       ]
     },
     "lr3-suspended-workflows": {
