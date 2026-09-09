@@ -116,7 +116,8 @@
         "docs/operations/ATLAS-LIVE-OPERATIONS.md",
         "docs/recovery/ATLAS-LIVE-RECOVERY.md",
         "tests/verification/restoration-contract-ownership.test.mjs",
-        "tests/verification/deterministic-execution.test.mjs"
+        "tests/verification/deterministic-execution.test.mjs",
+        "tests/maintenance/maintenance-diff-policy.test.mjs"
       ]
     }
   }
