@@ -497,8 +497,8 @@ test('authenticated self-only subjects compose with docs, another subject and HT
   for(const subject of contract.candidateTestSubjects)assert.deepEqual(contract.commands.find(command=>command.id===subject.commandId).expectedTestIds,[subject.spec]);
  }
  const actualCore=resolveExecutionContract(input([{path:'tests/verification/artifacts.test.mjs',status:'modified'}]));
- assert.equal(actualCore.commands.filter(command=>command.groupIds.includes('deterministic.core')).length,149);
- assert.equal(actualCore.commands.length,150);
+ assert.equal(actualCore.commands.filter(command=>command.groupIds.includes('deterministic.core')).length,137);
+ assert.equal(actualCore.commands.length,138);
  assert.equal(actualCore.candidateTestSubjects.length,1);
  const subjectOnly=resolveExecutionContract(input());
  const forged=structuredClone(subjectOnly);forged.candidateTestSubjects[0].spec='tests/../outside.mjs';assert.throws(()=>sealExecutionContract(forged),/subject/);
@@ -516,13 +516,13 @@ test('authenticated self-only subjects compose with docs, another subject and HT
  samePathManifest.entries.push({pathPrefix:first,exactMatch:true,domains:['subject-semantic'],minimumProfile:'focused',requiredGroups:['deterministic.core']});
  const samePath=buildVerificationPlan({...planInput,trustedImpactManifest:samePathManifest,candidateImpactManifest:base.protectedImpactManifest});
  assert.ok(samePath.requiredGroupIds.includes('deterministic.core'));assert.deepEqual(samePath.candidateTestSubjects,[first]);
- assert.equal(resolveExecutionContract({...input(),protectedImpactManifest:samePathManifest}).commands.length,150);
+ assert.equal(resolveExecutionContract({...input(),protectedImpactManifest:samePathManifest}).commands.length,138);
  const escalatedManifest=structuredClone(base.protectedImpactManifest);
  escalatedManifest.entries.push({pathPrefix:first,exactMatch:true,domains:['subject-semantic'],minimumProfile:'focused',requiredGroups:[]});
  escalatedManifest.crossDomainEscalations.push({id:'subject-core-proof',whenDomains:['subject-semantic','documentation'],minimumProfile:'focused',requiredGroups:['deterministic.core']});
  const escalated=buildVerificationPlan({...planInput,changedFiles:[{path:first,status:'added'},{path:'docs/example.md',status:'added'}],trustedImpactManifest:escalatedManifest,candidateImpactManifest:escalatedManifest});
  assert.ok(escalated.requiredGroupIds.includes('deterministic.core'));assert.deepEqual(escalated.candidateTestSubjects,[first]);
- assert.equal(resolveExecutionContract({...input([{path:'docs/example.md',status:'added'}]),protectedImpactManifest:escalatedManifest}).commands.length,150);
+ assert.equal(resolveExecutionContract({...input([{path:'docs/example.md',status:'added'}]),protectedImpactManifest:escalatedManifest}).commands.length,138);
  const renamed=input();renamed.candidate.changedFiles=[{path:first,previousPath:'tests/old-unowned.mjs',status:'renamed'}];renamed.planInput.changedFiles=renamed.candidate.changedFiles;assert.equal(resolveExecutionContract(renamed).commands.length,1);
 });
 
