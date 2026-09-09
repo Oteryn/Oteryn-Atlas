@@ -8,9 +8,13 @@
 
 **Live META main observed by the corrected adoption resolver:** `ed6c8c98605a7fbfea858e0ef616f89baa617262`
 
-This maintenance-only adoption binds Atlas to `OTERYN_ORGANIZATION_AGENT_POLICY@3.1.0`, reduces the root instructions to an organization-policy bootstrap plus Atlas-owned invariants, and installs a fail-closed consumer for the binding, root overlay, and reusable prompt catalog. It does not change runtime, publication data, rendering, deployment, workflows, branch protection, or the suspended verification stack.
+This maintenance-only adoption binds Atlas to `OTERYN_ORGANIZATION_AGENT_POLICY@3.1.0`, reduces the root instructions to an organization-policy bootstrap plus Atlas-owned invariants, and installs a fail-closed consumer for the binding, root overlay, and reusable prompt catalog. It authors no Atlas runtime, publication-data, rendering, deployment, workflow, branch-protection, verification-code, verification-workflow, or verification-settings activation change. The binding itself is a declared verification-authority component, however, so this repin intentionally changes verification authority identity and invalidates reuse of verification evidence across this protected-base advance.
 
 The initial #345 binding selected the v3 introduction merge `8673d109d1a364efa7936133082a39750ca74cf9`. The central human policy and validator were unchanged afterward, but referenced execution and continuation machine authorities received material corrections in META #155/#158 and META `main` advanced through #159/#160. The first follow-up binding therefore selected `1dedfc0f264fe0e23e5365dbe9280c2d96df50c5`. Protected META PR #188 later integrated as `d1caa3adba0fa4b32b84985bf1d6dcbe8055858c`. After protected META PR #192 integrated through the real Merge Queue as `ed6c8c98605a7fbfea858e0ef616f89baa617262`, this adoption repins to that exact protected revision so Atlas consumes policy 3.1.0 and its native exact-head `merge-async` Merge Queue contract, including receipt-bound causal readback, real `merge_group` verification and protected-main readback.
+
+## Verification-authority effect
+
+The reviewed protected-base verification-authority digest is `sha256:8b0fd509627c6e2e274061a8d4fa7cd8332f463935b5ce2df84ca62cc250bf26`; the reviewed 3.1 adoption candidate digest is `sha256:5ec2c8624a208e829566c2374759b42faef46c45640e150b4de14c1b74fdb2f3`. Because `docs/agents/META_AGENT_POLICY_BINDING.json` participates in the declared verification-authority manifest, `classifyBaseAdvance` must classify this authority transition as `FULL_RERUN`; prior verification evidence is not reusable across this protected-base advance. This maintenance PR does not itself re-enable or execute the suspended heavy verification stack. It only records the truthful authority-identity consequence of the repin and leaves execution to the repository's protected verification policy.
 
 ## Evidence levels
 
@@ -49,4 +53,4 @@ Across the six edited prompts, this removes 416 words and 2,835 bytes. The open-
 
 ## Deferred execution configuration and W6
 
-`.agents/**` and `.codex/**` are outside the active maintenance allowlist, so W3B execution-configuration changes are not admitted. The current maintenance workflows already keep the heavy runtime stack suspended and use protected-base diff validation; no W6 workflow/gate change is justified by this adoption.
+`.agents/**` and `.codex/**` are outside the active maintenance allowlist, so W3B execution-configuration changes are not admitted. The current maintenance workflows already keep the heavy runtime stack suspended and use protected-base diff validation; no W6 workflow/gate implementation change is authored by this adoption. The verification-authority identity change above is nevertheless real and must be handled by protected `FULL_RERUN` qualification rather than evidence reuse.
