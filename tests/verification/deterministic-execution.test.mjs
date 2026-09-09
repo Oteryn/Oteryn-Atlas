@@ -101,7 +101,12 @@ test('repository ownership preserves current entrypoints and exposes only exact 
     }
   };
   walk(new URL('tests/', root));
-  const expected = new Set(discovered);
+  const governanceEntrypoints = [
+    'tools/governance/test_agent_prompt_lifecycle.mjs',
+    'tools/governance/test_validate_meta_agent_policy.py',
+  ];
+  for (const spec of governanceEntrypoints) assert.ok(fs.existsSync(new URL(spec, root)), spec);
+  const expected = new Set([...discovered, ...governanceEntrypoints]);
   const owned = new Set(inventory.entries.map(row => row.spec));
   assert.deepEqual([...owned].filter(spec => !expected.has(spec)).sort(), [], 'catalog cannot own missing/noncanonical entrypoints');
   const missing = [...expected].filter(spec => !owned.has(spec)).sort();

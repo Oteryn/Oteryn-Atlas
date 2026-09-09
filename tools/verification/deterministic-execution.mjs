@@ -3,9 +3,14 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 
 const TEST_PATH=/^tests\/[A-Za-z0-9_./-]+\.(mjs|py)$/;
+const EXACT_GOVERNANCE_TEST_PATHS=new Set([
+  'tools/governance/test_agent_prompt_lifecycle.mjs',
+  'tools/governance/test_validate_meta_agent_policy.py',
+]);
 function safeTestPath(spec){
-  return typeof spec==='string'&&TEST_PATH.test(spec)&&!spec.split('/').some(part=>!part||part==='.'||part==='..');
+  return typeof spec==='string'&&(TEST_PATH.test(spec)||EXACT_GOVERNANCE_TEST_PATHS.has(spec))&&!spec.split('/').some(part=>!part||part==='.'||part==='..');
 }
+
 function runtimeFor(spec){
   return spec.endsWith('.py')?{interpreter:'python3',argv:[spec]}:{interpreter:'node',argv:['--test',spec]};
 }
