@@ -412,7 +412,7 @@ test('MQ spoofed direct event, queue ref, head, tree or parent topology reject',
  for(const mutate of mutations){const f=fixture();mutate(f);await assert.rejects(resolveShadowEvent(f.input));}
 });
 test('PR source rejects fork, stale base and candidate workflow revision',async()=>{
- const f=fixture();f.input.eventName='pull_request_target';f.input.event={repository:f.input.event.repository,action:'synchronize',pull_request:{number:7,base:{sha:base,ref:'main',repo:{full_name:repository}},head:{sha:head,repo:{full_name:repository}}}};
+ const f=fixture();f.input.eventName='pull_request_target';f.input.githubSha=base;f.input.event={repository:f.input.event.repository,action:'synchronize',pull_request:{number:7,base:{sha:base,ref:'main',repo:{full_name:repository}},head:{sha:head,repo:{full_name:repository}}}};
  assert.equal((await resolveShadowEvent(f.input)).prNumber,7);
  for(const mutate of [x=>x.event.pull_request.head.repo.full_name='Other/Fork',x=>x.event.pull_request.base.sha=head,x=>x.githubSha=head]){const input=structuredClone({...f.input,request:undefined});input.request=f.input.request;mutate(input);await assert.rejects(resolveShadowEvent(input));}
 });
