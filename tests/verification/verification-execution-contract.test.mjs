@@ -248,6 +248,8 @@ test('R5 C1 selects only the exact deterministic authority-registry proof', () =
   assert.deepEqual(result.requiredGroupIds, ['deterministic.fullworld-layers']);
   assert.deepEqual(result.requiredDataCapabilities, ['qualification_fixture']);
   assert.deepEqual(result.groups[0].specs, [
+    'tests/authority-registry-invalid-utf8.py',
+    'tests/authority-registry-priority-type.py',
     'tests/fullworld-layers/overview-browser.test.mjs',
     'tests/fullworld-layers/test_authority_registry.py',
     'tests/fullworld-layers/test_overview.py',

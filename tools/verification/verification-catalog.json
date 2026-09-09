@@ -5010,7 +5010,7 @@
             "--test",
             "tests/verification/verification-execution-contract.test.mjs"
           ],
-          "sourceSha256": "04529a9c0b7f7121bee27e312d2c04641eb1f402d2f87306dff6833c834b87eb",
+          "sourceSha256": "655f7b144c161c592fed1ff823605554bee4a5bdee7d6127b3efd12061edeb0d",
           "imports": [],
           "subprocessTests": [],
           "qualification": "local-contract",
