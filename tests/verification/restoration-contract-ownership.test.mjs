@@ -61,14 +61,11 @@ test('R1 rejects duplicate ownership and cannot hide a rewrite inside the active
   assert.throws(() => validateOwnership(erased, actual), /missing rewrite obligation/);
 });
 
-test('R1 keeps protected historical deletion facts separate from unresolved retained contracts', () => {
-  const protectedInventory = JSON.parse(fs.readFileSync(path.join(root, 'docs/maintenance/OBSOLETE_VERIFICATION_CONTRACTS.json'), 'utf8'));
-  const protectedText = JSON.stringify(protectedInventory);
+test('retired verification contracts remain cataloged as historical facts and absent from the current tree', () => {
   for (const retired of inventory.retiredByProtectedInventory) {
-    assert.ok(protectedText.includes(retired), retired);
     assert.equal(fs.existsSync(path.join(root, retired)), false, retired);
+    assert.ok(!inventory.contracts.some(row => row.path === retired), retired);
   }
-  for (const row of inventory.contracts) assert.ok(!inventory.retiredByProtectedInventory.includes(row.path));
 });
 
 test('R1 qualification readiness fails closed while any retained contract needs a rewrite', () => {

@@ -67,13 +67,13 @@ test('repository retirement authority preserves the audited bounded wave census'
   assert.deepEqual(Object.keys(manifest.waves),['lr2-verification-contracts','lr3-suspended-workflows','lr4-governance-cleanup']);
   assert.equal(manifest.waves['lr2-verification-contracts'].retireModifyDelete.length,37);
   assert.equal(manifest.waves['lr2-verification-contracts'].retireDelete.length,0);
-  assert.equal(manifest.waves['lr2-verification-contracts'].supportModify.length,2);
+  assert.equal(manifest.waves['lr2-verification-contracts'].supportModify.length,3);
   assert.equal(manifest.waves['lr3-suspended-workflows'].retireModifyDelete.length,0);
   assert.equal(manifest.waves['lr3-suspended-workflows'].retireDelete.length,25);
   assert.equal(manifest.waves['lr3-suspended-workflows'].supportModify.length,0);
   assert.equal(manifest.waves['lr4-governance-cleanup'].retireModifyDelete.length,15);
   assert.equal(manifest.waves['lr4-governance-cleanup'].retireDelete.length,8);
-  assert.equal(manifest.waves['lr4-governance-cleanup'].supportModify.length,6);
+  assert.equal(manifest.waves['lr4-governance-cleanup'].supportModify.length,9);
 });
 
 test('admits ordinary product changes in steady state',t=>{

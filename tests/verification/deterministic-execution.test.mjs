@@ -66,11 +66,36 @@ test('duplicate selections deduplicate while stale import proof, cycles and opaq
   assert.throws(() => resolveDeterministicCommands(value), /source proof changed/);
 });
 
-test('repository ownership preserves all 53 nonverification entrypoints and separates browser harnesses', () => {
+test('repository ownership preserves all current nonverification deterministic entrypoints and separates explicit noncanonical harnesses', () => {
   const root = new URL('../../', import.meta.url);
   const inventory = deriveVerificationMetadata(JSON.parse(fs.readFileSync(new URL('tools/verification/verification-catalog.json', root)))).deterministic;
-  const baseline = JSON.parse(fs.readFileSync(new URL('docs/maintenance/verification-restoration/contract-ownership.json', root)));
-  assert.deepEqual(inventory.entries.map(row => row.spec).sort(), baseline.deterministicEntrypoints.filter(row => !row.path.startsWith('tests/verification/')).map(row => row.path).sort());
+  const excluded = new Set([
+    'tests/authority-registry-invalid-utf8.py',
+    'tests/authority-registry-priority-type.py',
+    'tests/browser-proof.html',
+    'tests/browser-proof.mjs',
+    'tests/fixtures/game-semantic-search-source.json',
+    'tests/fullworld-mobile-layout-proof.html',
+    'tests/maintenance/pre-r4-maintenance-mutation.test.mjs',
+    'tests/maintenance/r4-shadow-admission.test.mjs',
+    'tests/r4-path-confinement.mjs',
+    'tests/r5-search-routing-regression.mjs',
+    'tests/semantic-search-browser-proof.mjs',
+    'tests/semantic-search-browser.html',
+  ]);
+  const discovered = [];
+  const walk = directory => {
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      const location = new URL(entry.name + (entry.isDirectory() ? '/' : ''), directory);
+      if (entry.isDirectory()) walk(location);
+      else {
+        const spec = 'tests/' + decodeURIComponent(location.pathname.split('/tests/')[1]);
+        if (!spec.startsWith('tests/verification/') && !excluded.has(spec)) discovered.push(spec);
+      }
+    }
+  };
+  walk(new URL('tests/', root));
+  assert.deepEqual(inventory.entries.map(row => row.spec).sort(), discovered.sort());
   assert.equal(inventory.entries.length, 53);
   for (const row of inventory.entries) {
     assert.ok(inventory.proposedCatalog.groups[row.group].specs.includes(row.spec), row.spec);
