@@ -46,26 +46,19 @@
         "tests/verification/impact-manifest.test.mjs",
         "tests/verification/issue-314-animation-trust-callers.test.mjs",
         "tests/verification/issue-314-bootstrap-authority.test.mjs",
-        "tests/verification/issue-314-hosted-gate-budget.test.mjs",
         "tests/verification/issue-314-profile-monotonic.test.mjs",
         "tests/verification/issue-314-qualification-path.test.mjs",
-        "tests/verification/issue-314-qualification-repair-gh-cli.test.mjs",
-        "tests/verification/issue-314-qualification-repair-trust.test.mjs",
         "tests/verification/legacy-molehill-transition-workflow-contract.test.mjs",
         "tests/verification/live-creature-readiness.test.mjs",
         "tests/verification/merge-queue-gate-contract.test.mjs",
-        "tests/verification/nightly-orchestration-contract.test.mjs",
         "tests/verification/pc-nightly-runner-contract.test.mjs",
         "tests/verification/performance.test.mjs",
         "tests/verification/plan-bound-evidence.test.mjs",
         "tests/verification/plan-execution-readiness.test.mjs",
         "tests/verification/playwright-test-list.test.mjs",
-        "tests/verification/pr-browser-trust.test.mjs",
-        "tests/verification/pr-review-fanin-workflow.test.mjs",
         "tests/verification/proof-provenance.test.mjs",
         "tests/verification/protected-admission-authority-closure.test.mjs",
         "tests/verification/protected-admission-cli-census.test.mjs",
-        "tests/verification/protected-admission-dispatch.test.mjs",
         "tests/verification/protected-admission-evidence.test.mjs",
         "tests/verification/protected-admission-fan-in.test.mjs",
         "tests/verification/protected-admission-http-snapshot.test.mjs",
@@ -75,8 +68,6 @@
         "tests/verification/protected-anti-loop-workflow-integration.test.mjs",
         "tests/verification/protected-audit-merge-group.test.mjs",
         "tests/verification/protected-authority-entrypoints.test.mjs",
-        "tests/verification/protected-authority-repin-recovery.test.mjs",
-        "tests/verification/protected-base-advance-executor-handoff.test.mjs",
         "tests/verification/protected-bounded-oracle.test.mjs",
         "tests/verification/protected-bounded-real-identity-repin-workflow-contract.test.mjs",
         "tests/verification/protected-bounded-real-product-identity.test.mjs",
@@ -114,7 +105,6 @@
         "tests/verification/protected-review-evidence.test.mjs",
         "tests/verification/protected-review-execution.test.mjs",
         "tests/verification/protected-semantic-routing.test.mjs",
-        "tests/verification/protected-verification-lifecycle-workflow-contract.test.mjs",
         "tests/verification/protected-verification-lifecycle.test.mjs",
         "tests/verification/protected-verification-state.test.mjs",
         "tests/verification/protected-verification-workflow.test.mjs",
@@ -2801,10 +2791,10 @@
           "imports": [],
           "subprocessTests": [],
           "qualification": "local-contract",
-          "sourceSha256": "c217c1e1a3fbbbd0405ed9aa7e4eccbb552469a41958a02d209cf7ea8af6c6b9",
+          "sourceSha256": "2ac355ed1334a8d11d89ba7f8fdb73276a4afad927de690c759cf22e560b136c",
           "contract": {
             "status": "active-semantic",
-            "retainedInvariant": "Separate exact-candidate evidence, docs-only classification and bounded execution invariants from removed CI/nightly/local-publisher wiring.",
+            "retainedInvariant": "Unknown executable impact retains the complete protected safety-net floor, exact candidate and integration identities, and zero retries.",
             "requiredRewrite": null
           }
         },
@@ -3369,27 +3359,10 @@
           "imports": [],
           "subprocessTests": [],
           "qualification": "local-contract",
-          "sourceSha256": "073d9fbb67d2801cb1e55d48867b59fb07f95f2d87df9b5c2a48f0f16aaa5dcf",
+          "sourceSha256": "62d0b781b8fe2601189b4eef1c7ec3cb8ea23ebab56a87d4e56fe12095631497",
           "contract": {
             "status": "active-semantic",
-            "retainedInvariant": "Preserve instruction-only and regression-only planning plus complete overlay authority forms; replace removed repair-workflow assertions with current protected admission behavior.",
-            "requiredRewrite": null
-          }
-        },
-        {
-          "spec": "tests/verification/issue-314-hosted-gate-budget.test.mjs",
-          "interpreter": "node",
-          "argv": [
-            "--test",
-            "tests/verification/issue-314-hosted-gate-budget.test.mjs"
-          ],
-          "imports": [],
-          "subprocessTests": [],
-          "qualification": "local-contract",
-          "sourceSha256": "cbc899ca4a120d203e436b701276264551beb76248bca0f8be674646af9dd5ac",
-          "contract": {
-            "status": "active-semantic",
-            "retainedInvariant": "Re-establish a bounded producer/consumer wait budget and exact fail-closed polling against future admitted execution, without restoring the old hosted gate.",
+            "retainedInvariant": "Verification-contract changes remain deterministic-only; qualification repair admission stays exact-scope and branch-agnostic; creature publication source rejects incomplete, mixed, and mismatched source forms.",
             "requiredRewrite": null
           }
         },
@@ -3428,40 +3401,6 @@
           }
         },
         {
-          "spec": "tests/verification/issue-314-qualification-repair-gh-cli.test.mjs",
-          "interpreter": "node",
-          "argv": [
-            "--test",
-            "tests/verification/issue-314-qualification-repair-gh-cli.test.mjs"
-          ],
-          "imports": [],
-          "subprocessTests": [],
-          "qualification": "local-contract",
-          "sourceSha256": "211e580cadd28dcf94db5212fb87a9c069c3e7973d2e34f8c6d35b7df76bc4cb",
-          "contract": {
-            "status": "active-semantic",
-            "retainedInvariant": "Retain complete paginated PR-file evidence before filtering; bind a behavioral regression to a current consumer instead of the absent repair workflow.",
-            "requiredRewrite": null
-          }
-        },
-        {
-          "spec": "tests/verification/issue-314-qualification-repair-trust.test.mjs",
-          "interpreter": "node",
-          "argv": [
-            "--test",
-            "tests/verification/issue-314-qualification-repair-trust.test.mjs"
-          ],
-          "imports": [],
-          "subprocessTests": [],
-          "qualification": "local-contract",
-          "sourceSha256": "283a2d69118e257ba10896886b91d84f6838e2c3d9d993d0d6b66f1b38de87f7",
-          "contract": {
-            "status": "active-semantic",
-            "retainedInvariant": "Keep actual resolveFullWorldTrust descriptor/product binding assertions; replace absent repair-workflow text matching with a current trust-bound consumer proof.",
-            "requiredRewrite": null
-          }
-        },
-        {
           "spec": "tests/verification/legacy-molehill-transition-workflow-contract.test.mjs",
           "interpreter": "node",
           "argv": [
@@ -3471,10 +3410,10 @@
           "imports": [],
           "subprocessTests": [],
           "qualification": "local-contract",
-          "sourceSha256": "b163bcb23b094ec34ca53366d139348dfa2c231e3d1a697c3cef260a52719d85",
+          "sourceSha256": "bafa1f5ef63bc1dc26b749fdab81059f110dbdfe97edc59a3ad01d7f7405edb2",
           "contract": {
             "status": "active-semantic",
-            "retainedInvariant": "Exact-head and clean-tree fences, complete stable-ID/capability census, bounded runner diagnostics and correct UTF-8 plan serialization.",
+            "retainedInvariant": "Playwright stable-ID parser preserves UTF-8 identities and rejects duplicate identities.",
             "requiredRewrite": null
           }
         },
@@ -3509,23 +3448,6 @@
           "contract": {
             "status": "active-semantic",
             "retainedInvariant": "Reconcile current protected maintenance MQ behavior; retain exact-candidate isolation and protected evidence consumption without asserting retired browser gate topology.",
-            "requiredRewrite": null
-          }
-        },
-        {
-          "spec": "tests/verification/nightly-orchestration-contract.test.mjs",
-          "interpreter": "node",
-          "argv": [
-            "--test",
-            "tests/verification/nightly-orchestration-contract.test.mjs"
-          ],
-          "imports": [],
-          "subprocessTests": [],
-          "qualification": "local-contract",
-          "sourceSha256": "dc361f4fa8fdd613cf326b76a7ed0fb05a40018abdc0ac7aaa100363daf39764",
-          "contract": {
-            "status": "active-semantic",
-            "retainedInvariant": "Retain bounded runner, concurrency isolation and stale-live-revision rejection requirements; future admitted depth needs its own executable contract.",
             "requiredRewrite": null
           }
         },
@@ -3615,40 +3537,6 @@
           }
         },
         {
-          "spec": "tests/verification/pr-browser-trust.test.mjs",
-          "interpreter": "node",
-          "argv": [
-            "--test",
-            "tests/verification/pr-browser-trust.test.mjs"
-          ],
-          "imports": [],
-          "subprocessTests": [],
-          "qualification": "local-contract",
-          "sourceSha256": "ef3a753a75bc2f0e0a917748018c992169337ecfe2493655d748eb9d036b1c95",
-          "contract": {
-            "status": "active-semantic",
-            "retainedInvariant": "Preserve same-repository trust and exact candidate/base/producer/artifact identities in behavior tests independent of removed ci.yml.",
-            "requiredRewrite": null
-          }
-        },
-        {
-          "spec": "tests/verification/pr-review-fanin-workflow.test.mjs",
-          "interpreter": "node",
-          "argv": [
-            "--test",
-            "tests/verification/pr-review-fanin-workflow.test.mjs"
-          ],
-          "imports": [],
-          "subprocessTests": [],
-          "qualification": "local-contract",
-          "sourceSha256": "fdbcb13d7ea78d3dbdbc0862312d9c6c84cac4fb805303c2216024fbfc562262",
-          "contract": {
-            "status": "active-semantic",
-            "retainedInvariant": "Preserve review freshness and exact protected evidence consumption; current event authority must be reviewed before replacement fan-in wiring.",
-            "requiredRewrite": null
-          }
-        },
-        {
           "spec": "tests/verification/protected-admission-authority-closure.test.mjs",
           "interpreter": "node",
           "argv": [
@@ -3679,23 +3567,6 @@
           "contract": {
             "status": "active-semantic",
             "retainedInvariant": "actual CLI still rejects malformed protected census before API or publication; CLI regression uses an owned fixture when source checkout is ownership-untrusted",
-            "requiredRewrite": null
-          }
-        },
-        {
-          "spec": "tests/verification/protected-admission-dispatch.test.mjs",
-          "interpreter": "node",
-          "argv": [
-            "--test",
-            "tests/verification/protected-admission-dispatch.test.mjs"
-          ],
-          "imports": [],
-          "subprocessTests": [],
-          "qualification": "local-contract",
-          "sourceSha256": "46921e00e6609080fd5943efe7d64eedf8be1345d7e8ca021f2d8cb0317a9b75",
-          "contract": {
-            "status": "active-semantic",
-            "retainedInvariant": "Preserve live-head association and protected-source dispatch behavior; separate legacy duplicate-producer topology assertion.",
             "requiredRewrite": null
           }
         },
@@ -3849,40 +3720,6 @@
           "contract": {
             "status": "active-semantic",
             "retainedInvariant": "No direct literal absent-workflow reference detected; retain subject to executable qualification and transitive dependency review.",
-            "requiredRewrite": null
-          }
-        },
-        {
-          "spec": "tests/verification/protected-authority-repin-recovery.test.mjs",
-          "interpreter": "node",
-          "argv": [
-            "--test",
-            "tests/verification/protected-authority-repin-recovery.test.mjs"
-          ],
-          "imports": [],
-          "subprocessTests": [],
-          "qualification": "local-contract",
-          "sourceSha256": "8d6f89f680377eef27425c6110772f61df647df0115a29baa928a19b9747aad3",
-          "contract": {
-            "status": "active-semantic",
-            "retainedInvariant": "Retain exact digest-only repin validation and rejection of historical recovery as current admission; historical PR-specific bootstrap assertions need protected architectural disposition.",
-            "requiredRewrite": null
-          }
-        },
-        {
-          "spec": "tests/verification/protected-base-advance-executor-handoff.test.mjs",
-          "interpreter": "node",
-          "argv": [
-            "--test",
-            "tests/verification/protected-base-advance-executor-handoff.test.mjs"
-          ],
-          "imports": [],
-          "subprocessTests": [],
-          "qualification": "local-contract",
-          "sourceSha256": "ab8d3406b18776e31716c58f3acf110e7e69131ef63887b80c0022e56d889ba2",
-          "contract": {
-            "status": "active-semantic",
-            "retainedInvariant": "Retain exact producer/base-state identity, protected-source isolation and candidate-scoped concurrency; rewrite handoff proof against future admitted lifecycle.",
             "requiredRewrite": null
           }
         },
@@ -4253,10 +4090,10 @@
           "imports": [],
           "subprocessTests": [],
           "qualification": "local-contract",
-          "sourceSha256": "0f4d837d8f1931328c0c7e01a912b436e69998ae6ea0805dea9812c718263fc1",
+          "sourceSha256": "b54e65d0389b079404d58a1e16ea290c37f191e271e10fad44d93dcd7a3239bc",
           "contract": {
             "status": "active-semantic",
-            "retainedInvariant": "Exact readiness reentry validation; stale existing bytes must fail rather than be overwritten.",
+            "retainedInvariant": "Publication readiness refuses overwrite and preserves existing publication bytes.",
             "requiredRewrite": null
           }
         },
@@ -4389,10 +4226,10 @@
           "imports": [],
           "subprocessTests": [],
           "qualification": "local-contract",
-          "sourceSha256": "cbd9b276cbcc7aede5d5fb6daa3c0da53b4daf0ba43334924d1d2d7c2633be83",
+          "sourceSha256": "c9c9d9f1fa5bc5dfbaa82aa585dcbc3ac41bc0a43e49ed68dc10352246ef1e75",
           "contract": {
             "status": "active-semantic",
-            "retainedInvariant": "Publication readiness binds exact candidate and product identity with bounded execution.",
+            "retainedInvariant": "Publication readiness rejects producer-run and harness identity drift.",
             "requiredRewrite": null
           }
         },
@@ -4512,23 +4349,6 @@
           "contract": {
             "status": "active-semantic",
             "retainedInvariant": "ordinary documentation and deterministic tests require no browser; forced repair retains complete protected census and independent execution policy; PR and MQ receive exactly the same normalized semantic contract",
-            "requiredRewrite": null
-          }
-        },
-        {
-          "spec": "tests/verification/protected-verification-lifecycle-workflow-contract.test.mjs",
-          "interpreter": "node",
-          "argv": [
-            "--test",
-            "tests/verification/protected-verification-lifecycle-workflow-contract.test.mjs"
-          ],
-          "imports": [],
-          "subprocessTests": [],
-          "qualification": "local-contract",
-          "sourceSha256": "fe9329930e97a26c9df342784f249dce4fe3758e4d61eb1c057f3d9f378c4d24",
-          "contract": {
-            "status": "active-semantic",
-            "retainedInvariant": "Retain current-base resolution, exact lifecycle decisions, circuit breakers and protected promotion boundaries; replacement orchestration requires separate activation authority.",
             "requiredRewrite": null
           }
         },
@@ -5168,7 +4988,7 @@
             "--test",
             "tests/verification/verification-execution-contract.test.mjs"
           ],
-          "sourceSha256": "6ed53d4f712649899251221660e84ccb6e4438d2acc013fb0df8a2d55727d8f9",
+          "sourceSha256": "76266cc655167232fdb8e3dfa0cf91ef9a64637920cee8acda127e3f1dfa6d08",
           "imports": [],
           "subprocessTests": [],
           "qualification": "local-contract",

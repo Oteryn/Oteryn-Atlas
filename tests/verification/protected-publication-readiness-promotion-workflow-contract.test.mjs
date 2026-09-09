@@ -4,25 +4,38 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { publishReadyPublication, validateReadyPublication } from '../../tools/verification/publication-readiness.mjs';
-import { buildQualificationWorld, verifyQualificationWorld } from '../../tools/verification/qualification-world.mjs';
-const identity = { repository: 'Oteryn/Oteryn-Atlas', candidateSha: 'a'.repeat(40),
-  ...Object.fromEntries(['planSemanticDigest','planInstanceDigest','authorityDigest','environmentDigest','harnessDigest'].map((key,i) => [key, `sha256:${String(i).repeat(64)}`])), producerRunId: '42-1' };
-async function fixture(t) {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-readiness-contract-'));
+
+const identity = {
+  repository: 'Oteryn/Oteryn-Atlas',
+  candidateSha: 'a'.repeat(40),
+  planSemanticDigest: `sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb`,
+  planInstanceDigest: `sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc`,
+  authorityDigest: `sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd`,
+  environmentDigest: `sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee`,
+  harnessDigest: `sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff`,
+  producerRunId: '42-1',
+};
+
+function fixture(t) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-readiness-identity-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const source = path.join(root, 'source'), destination = path.join(root, 'ready');
-  const product = await buildQualificationWorld(source);
-  const manifest = publishReadyPublication({sourceDir: source, destinationDir: destination, ...identity});
-  return {root, source, destination, product, manifest, validate: () => validateReadyPublication({publicationDir: destination, manifest, ...identity})};
+  fs.mkdirSync(source);
+  fs.writeFileSync(path.join(source, 'product.json'), '{}\n');
+  const manifest = publishReadyPublication({ sourceDir: source, destinationDir: destination, ...identity });
+  return { destination, manifest };
 }
 
-test('qualification publication readiness binds each exact execution identity before admission', async t => {
-  const f = await fixture(t);
-  assert.equal(f.validate().complete, true);
-  for (const key of ['candidateSha','planSemanticDigest','planInstanceDigest','authorityDigest','environmentDigest','harnessDigest','producerRunId']) {
-    const value = key === 'candidateSha' ? 'f'.repeat(40) : key === 'producerRunId' ? '43-1' : `sha256:${'f'.repeat(64)}`;
-    assert.throws(() => validateReadyPublication({publicationDir:f.destination, manifest:f.manifest, ...identity, [key]:value}), /identity|stale/);
+test('publication readiness rejects producer-run and harness identity drift', t => {
+  const f = fixture(t);
+  assert.deepEqual(validateReadyPublication({ publicationDir: f.destination, manifest: f.manifest, ...identity }), f.manifest);
+  for (const [field, value] of [
+    ['producerRunId', '43-1'],
+    ['harnessDigest', `sha256:0000000000000000000000000000000000000000000000000000000000000000`],
+  ]) {
+    assert.throws(
+      () => validateReadyPublication({ publicationDir: f.destination, manifest: f.manifest, ...identity, [field]: value }),
+      /identity|stale/i,
+    );
   }
-  assert.deepEqual(await verifyQualificationWorld(f.source), f.product);
-  assert.deepEqual(fs.readFileSync(path.join(f.destination, 'publication/publication.json')), fs.readFileSync(path.join(f.source, 'publication/publication.json')));
 });

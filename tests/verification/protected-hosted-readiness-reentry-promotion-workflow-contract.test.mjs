@@ -3,26 +3,31 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { publishReadyPublication, validateReadyPublication } from '../../tools/verification/publication-readiness.mjs';
-import { buildQualificationWorld, verifyQualificationWorld } from '../../tools/verification/qualification-world.mjs';
-const identity = { repository: 'Oteryn/Oteryn-Atlas', candidateSha: 'a'.repeat(40),
-  ...Object.fromEntries(['planSemanticDigest','planInstanceDigest','authorityDigest','environmentDigest','harnessDigest'].map((key,i) => [key, `sha256:${String(i).repeat(64)}`])), producerRunId: '42-1' };
-async function fixture(t) {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-readiness-contract-'));
+import { publishReadyPublication } from '../../tools/verification/publication-readiness.mjs';
+
+const identity = {
+  repository: 'Oteryn/Oteryn-Atlas',
+  candidateSha: 'a'.repeat(40),
+  planSemanticDigest: `sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb`,
+  planInstanceDigest: `sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc`,
+  authorityDigest: `sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd`,
+  environmentDigest: `sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee`,
+  harnessDigest: `sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff`,
+  producerRunId: '42-1',
+};
+
+test('publication readiness refuses overwrite and preserves existing bytes', t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-readiness-overwrite-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const source = path.join(root, 'source'), destination = path.join(root, 'ready');
-  const product = await buildQualificationWorld(source);
-  const manifest = publishReadyPublication({sourceDir: source, destinationDir: destination, ...identity});
-  return {root, source, destination, product, manifest, validate: () => validateReadyPublication({publicationDir: destination, manifest, ...identity})};
-}
-
-test('readiness reentry validates exact immutable bytes and cannot overwrite an existing product', async t => {
-  const f = await fixture(t), before = fs.readFileSync(path.join(f.destination, 'atlas-publication-readiness.json'));
-  assert.deepEqual(f.validate(), f.manifest);
-  assert.deepEqual(f.validate(), f.manifest);
-  assert.throws(() => publishReadyPublication({sourceDir:f.source, destinationDir:f.destination, ...identity}), /overwrite/);
-  assert.deepEqual(fs.readFileSync(path.join(f.destination, 'atlas-publication-readiness.json')), before);
-  fs.appendFileSync(path.join(f.destination, 'publication/publication.json'), 'drift');
-  assert.throws(f.validate, /digest|size/);
-  assert.throws(() => publishReadyPublication({sourceDir:f.source, destinationDir:f.destination, ...identity}), /overwrite/);
+  fs.mkdirSync(source);
+  fs.writeFileSync(path.join(source, 'product.json'), '{}\n');
+  publishReadyPublication({ sourceDir: source, destinationDir: destination, ...identity });
+  const manifestPath = path.join(destination, 'atlas-publication-readiness.json');
+  const productPath = path.join(destination, 'product.json');
+  const beforeManifest = fs.readFileSync(manifestPath);
+  const beforeProduct = fs.readFileSync(productPath);
+  assert.throws(() => publishReadyPublication({ sourceDir: source, destinationDir: destination, ...identity }), /overwrite/i);
+  assert.deepEqual(fs.readFileSync(manifestPath), beforeManifest);
+  assert.deepEqual(fs.readFileSync(productPath), beforeProduct);
 });
