@@ -168,8 +168,10 @@ function matchesForPath(path, manifest, catalog, unprivilegedSubjects = new Map(
   const dependency = dependencyMetadataPath(path) ? [{
     pathPrefix: path,
     domains: ['dependency-governance'],
-    minimumProfile: 'full',
-    requiredGroups: FALLBACK_GROUPS,
+    minimumProfile: path.startsWith('e2e/') ? 'targeted' : 'focused',
+    requiredGroups: path.startsWith('e2e/')
+      ? ['deterministic.core', 'e2e.layer-availability']
+      : ['deterministic.core'],
   }] : [];
   const matches = manifest.entries.filter((entry) => (entry.exactMatch ? path === entry.pathPrefix : path.startsWith(entry.pathPrefix))
     && !(entry.excludedPaths ?? []).includes(path));
