@@ -36,7 +36,7 @@ test('mobile drawers expose truthful hidden state and restore keyboard focus', a
   await expect(controlsPanel).toHaveAttribute('aria-hidden', 'false');
   expect(await controlsPanel.evaluate((element) => element.inert)).toBeFalsy();
   await expect(controlsClose).toBeFocused();
-  await expect(page.getByRole('textbox', { name: 'Global semantic Atlas search' })).toBeVisible();
+  await expect(page.getByRole('combobox', { name: 'Global semantic Atlas search' })).toBeVisible();
   await expect(page.getByRole('combobox', { name: 'Exported floor' })).toBeVisible();
   await page.keyboard.press('Escape');
   await expectClosedDrawer(controlsPanel, controlsToggle);
