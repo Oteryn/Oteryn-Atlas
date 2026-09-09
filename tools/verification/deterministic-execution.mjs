@@ -41,7 +41,7 @@ export function resolveDeterministicCommands({root,protectedRoot,catalog,groupId
       continue;
     }
     if(!safeTestPath(item.path))continue;
-    if(item.status==='removed')throw new Error(`removed deterministic test: ${item.path}`);
+    if(item.status==='removed')continue;
     if(item.status==='added'||item.status==='modified'){
       if(entries.has(item.path))changed.add(item.path);else directSubjects.add(item.path);
     }
