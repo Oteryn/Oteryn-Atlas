@@ -114,7 +114,9 @@
         "e2e/README.md",
         "docs/agents/operations/VERIFICATION_CAPABILITY.md",
         "docs/operations/ATLAS-LIVE-OPERATIONS.md",
-        "docs/recovery/ATLAS-LIVE-RECOVERY.md"
+        "docs/recovery/ATLAS-LIVE-RECOVERY.md",
+        "tests/verification/restoration-contract-ownership.test.mjs",
+        "tests/verification/deterministic-execution.test.mjs"
       ]
     }
   }
