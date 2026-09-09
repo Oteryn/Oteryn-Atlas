@@ -10,6 +10,24 @@
       "requiredGroups": []
     },
     {
+      "pathPrefix": "README.md",
+      "domains": [
+        "documentation"
+      ],
+      "minimumProfile": "none",
+      "requiredGroups": [],
+      "exactMatch": true
+    },
+    {
+      "pathPrefix": "e2e/README.md",
+      "domains": [
+        "documentation"
+      ],
+      "minimumProfile": "none",
+      "requiredGroups": [],
+      "exactMatch": true
+    },
+    {
       "pathPrefix": "tools/dyn-atlas-semantic/",
       "domains": [
         "generator"
