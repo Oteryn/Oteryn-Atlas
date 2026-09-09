@@ -57,7 +57,7 @@ test('Atlas Documentation/Agent IA has one mutable lifecycle authority', () => {
     },
     {
       policy_id: 'OTERYN_ORGANIZATION_AGENT_POLICY',
-      policy_version: '3.0.0',
+      policy_version: '3.1.0',
       authority_repository: 'Oteryn/Oteryn',
     },
   );
