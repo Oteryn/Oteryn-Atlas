@@ -9,6 +9,32 @@ let returnFocus = null;
 let savedPanels = null;
 let findMode = false;
 
+function applyShellPolish() {
+  const sectionTitle = (anchorSelector, title) => {
+    const anchor = $(anchorSelector);
+    const heading = anchor?.closest('section')?.querySelector('h2');
+    if (heading) heading.textContent = title;
+  };
+  sectionTitle('#view-mode-control', 'Map style');
+  sectionTitle('#overview-layer', 'Map layers');
+  sectionTitle('#minimap', 'Coverage overview');
+  const overviewLayer = $('#overview-layer');
+  if (overviewLayer) {
+    const name = overviewLayer.querySelector('.layer-name');
+    const status = overviewLayer.querySelector('span:last-child');
+    if (name) name.textContent = 'Coverage overview';
+    if (status) status.textContent = 'MAP';
+  }
+  const lodNote = $('#lod-policy-note');
+  if (lodNote) lodNote.textContent = 'AUTO keeps the world readable at overview scale and adds verified detail as you zoom. CLASSIC shows the same verified map with a classic palette.';
+  for (const selector of ['#zoom-in', '#zoom-out', '#floor-up', '#floor-down']) {
+    const control = $(selector);
+    if (!control) continue;
+    control.style.display = 'grid';
+    control.style.placeItems = 'center';
+  }
+}
+
 function focus(element) {
   if (element instanceof HTMLElement && element.isConnected && !element.closest('[inert]')) element.focus({ preventScroll: true });
 }
@@ -145,7 +171,6 @@ $('#mobile-search-form')?.addEventListener('submit', event => {
   closeDrawer();
 });
 
-
 function openFind() {
   if (mobileQuery.matches) {
     findMode = true;
@@ -197,5 +222,6 @@ if (frame) new ResizeObserver(entries => {
   });
 }).observe(frame);
 
+applyShellPolish();
 sync();
 document.documentElement.dataset.mobileUi = 'ready';
