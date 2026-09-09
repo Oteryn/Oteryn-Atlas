@@ -45,7 +45,8 @@
       "retireDelete": [],
       "supportModify": [
         "tools/verification/verification-catalog.json",
-        "tools/verification/verification-authority-manifest.json"
+        "tools/verification/verification-authority-manifest.json",
+        "tests/verification/verification-execution-contract.test.mjs"
       ]
     },
     "lr3-suspended-workflows": {
