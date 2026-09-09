@@ -41,7 +41,7 @@ export function createSearchView({ form, input, id, describe, onQuery, onChoose,
   host.append(status, list, message, hint);
   form.append(host);
   input.placeholder = id === 'mobile' ? 'Search Atlas' : 'Search places, creatures or coordinates';
-  input.setAttribute('aria-label', 'Search the Oteryn world');
+  input.setAttribute('aria-label', 'Global semantic Atlas search');
   input.setAttribute('role', 'combobox');
   input.setAttribute('aria-autocomplete', 'list');
   input.setAttribute('aria-controls', list.id);
@@ -147,7 +147,7 @@ export function createSearchView({ form, input, id, describe, onQuery, onChoose,
       if (host.hidden) request();
       if (!records.length) return;
       event.preventDefault();
-      const next = event.key === 'ArrowDown'
+      const next = event.key === 'ArrowDow'
         ? Math.min(active + 1, records.length - 1)
         : active < 0 ? records.length - 1 : Math.max(0, active - 1);
       setActive(next, true);
@@ -165,7 +165,7 @@ export function createSearchView({ form, input, id, describe, onQuery, onChoose,
 
   return {
     show, close,
-    refresh() { if (!host.hidden && !form.closest('[inert]')) request(); },
+    refresh() { if (!host.hidden && !form.closest('inert]')) request(); },
   };
 }
 
