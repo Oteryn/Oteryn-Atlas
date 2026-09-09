@@ -339,6 +339,7 @@ export function buildVerificationPlan(input) {
   const candidateImpactManifest = validateImpactManifest(input.candidateImpactManifest, candidateVerificationCatalog);
   const changedPaths = allEvidencePaths(input.changedFiles);
   const unprivilegedSubjects = normalizeUnprivilegedDeterministicSubjects(input.unprivilegedDeterministicSubjects, input.changedFiles, trustedVerificationCatalog);
+  const removedPaths = new Set((Array.isArray(input.changedFiles) ? input.changedFiles : []).filter(row => row?.status === 'removed').map(row => row.path));
   const candidateTestSubjects = [...new Set((Array.isArray(input.changedFiles) ? input.changedFiles : []).filter(row =>
     ['added', 'modified', 'renamed'].includes(row?.status) && unprivilegedSubjects.has(row.path)
     && unprivilegedSubjects.get(row.path).length === 0).map(row => row.path))].sort();
@@ -362,6 +363,7 @@ export function buildVerificationPlan(input) {
       executionBlockers.push({ reason: 'unknown-impact', path });
     }
     if ((path.startsWith('tests/') || path.startsWith('e2e/tests/')) && /\.(?:mjs|py)$/.test(path)
+      && !removedPaths.has(path)
       && !unprivilegedSubjects.has(path)
       && !Object.values(verificationCatalog.groups).some(group => group.specs.some(pattern => !pattern.includes('*') && pattern === path))) {
       executionBlockers.push({ reason: 'unowned-test', path });
