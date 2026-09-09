@@ -3,6 +3,8 @@
   "groups": {
     "deterministic.core": {
       "specs": [
+        "tests/r4-path-confinement.mjs",
+        "tests/r5-search-routing-regression.mjs",
         "tests/verification/artifacts.test.mjs",
         "tests/verification/base-advance-compatibility.test.mjs",
         "tests/verification/benchmark-workers-contract.test.mjs",
@@ -467,6 +469,8 @@
     },
     "deterministic.fullworld-layers": {
       "specs": [
+        "tests/authority-registry-invalid-utf8.py",
+        "tests/authority-registry-priority-type.py",
         "tests/fullworld-layers/overview-browser.test.mjs",
         "tests/fullworld-layers/test_authority_registry.py",
         "tests/fullworld-layers/test_overview.py"
@@ -4907,7 +4911,7 @@
           "imports": [],
           "subprocessTests": [],
           "qualification": "local-contract",
-          "sourceSha256": "6583821e6cb93c676e19953c640c4662f0857d309e1ad0c4af94a2cdcaeecca8",
+          "sourceSha256": "ab8f09ec633c9040d2a073de2f71ad13f902adb804195bd4a5a9c6571250a748",
           "contract": {
             "status": "active-semantic",
             "retainedInvariant": "Canonical metadata projects complete unique ownership without duplicated execution facts; malformed or missing canonical ownership fails closed.",
@@ -5006,7 +5010,7 @@
             "--test",
             "tests/verification/verification-execution-contract.test.mjs"
           ],
-          "sourceSha256": "76266cc655167232fdb8e3dfa0cf91ef9a64637920cee8acda127e3f1dfa6d08",
+          "sourceSha256": "04529a9c0b7f7121bee27e312d2c04641eb1f402d2f87306dff6833c834b87eb",
           "imports": [],
           "subprocessTests": [],
           "qualification": "local-contract",
@@ -5049,6 +5053,52 @@
             "retainedInvariant": "Current inactive verification execution, routing and trust contract.",
             "requiredRewrite": null
           }
+        },
+        {
+          "spec": "tests/authority-registry-invalid-utf8.py",
+          "interpreter": "python3",
+          "argv": [
+            "tests/authority-registry-invalid-utf8.py"
+          ],
+          "sourceSha256": "91eb2f058278a608d654c8fbbdd6a858d8dd4449f606a0909a37414b74fe3189",
+          "imports": [],
+          "subprocessTests": [],
+          "qualification": "unqualified"
+        },
+        {
+          "spec": "tests/authority-registry-priority-type.py",
+          "interpreter": "python3",
+          "argv": [
+            "tests/authority-registry-priority-type.py"
+          ],
+          "sourceSha256": "2107101ec3515febb49ce7b310022034f4d52554435c771ded7cd21c598a428d",
+          "imports": [],
+          "subprocessTests": [],
+          "qualification": "unqualified"
+        },
+        {
+          "spec": "tests/r4-path-confinement.mjs",
+          "interpreter": "node",
+          "argv": [
+            "--test",
+            "tests/r4-path-confinement.mjs"
+          ],
+          "sourceSha256": "c450f7b23b670970fd6201d4d85a76980e717ddb895a955df585ab4f60aa78c0",
+          "imports": [],
+          "subprocessTests": [],
+          "qualification": "unqualified"
+        },
+        {
+          "spec": "tests/r5-search-routing-regression.mjs",
+          "interpreter": "node",
+          "argv": [
+            "--test",
+            "tests/r5-search-routing-regression.mjs"
+          ],
+          "sourceSha256": "16e5a6ab204bda5908677b213b7f5963de5f1a858397a905ecd2bb05020804b1",
+          "imports": [],
+          "subprocessTests": [],
+          "qualification": "unqualified"
         }
       ]
     },
