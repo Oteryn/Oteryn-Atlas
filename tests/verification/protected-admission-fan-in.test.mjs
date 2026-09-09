@@ -5,7 +5,7 @@ const sha=c=>c.repeat(40),digest=c=>`sha256:${c.repeat(64)}`;
 function fixture(){
  const identity={repository:'Oteryn/Oteryn-Atlas',headSha:sha('a'),protectedBaseSha:sha('b'),treeSha:sha('e'),candidateDigest:digest('f'),environmentDigest:'9'.repeat(64),planDigest:digest('c'),policyDigest:digest('d')};
  const commands=['e','f'].map((c,i)=>({id:digest(c),argv:['node','--test',`tests/proof-${i}.mjs`],expectedTestIds:[`proof-${i}`],timeoutSeconds:10}));
- return {schemaVersion:1,identity,commands,groups:[{id:'deterministic.example',commandIds:commands.map(c=>c.id)}],reviews:[]};
+ return {schemaVersion:1,identity,commands,groups:[{id:'deterministic.example',commandIds:commands.map(c=>c.id)}],reviews:[],candidateTestSubjects:[]};
 }
 test('sealed semantic contract preserves exact candidate and command identity without an execution verdict',()=>{
  const input=fixture(),contract=sealExecutionContract(input);

@@ -4,13 +4,13 @@
 
 **Atlas admission main:** `51623c7dab2346cee39cd51e3caa845bf4b65426`
 
-**Bound META authority:** `d1caa3adba0fa4b32b84985bf1d6dcbe8055858c`
+**Bound META authority:** `ed6c8c98605a7fbfea858e0ef616f89baa617262`
 
-**Live META main observed by the corrected adoption resolver:** `6496ed7f96f80d3dc2e64529c3a09a18c99215fb`
+**Live META main observed by the corrected adoption resolver:** `ed6c8c98605a7fbfea858e0ef616f89baa617262`
 
-This maintenance-only adoption binds Atlas to `OTERYN_ORGANIZATION_AGENT_POLICY@3.0.0`, reduces the root instructions to an organization-policy bootstrap plus Atlas-owned invariants, and installs a fail-closed consumer for the binding, root overlay, and reusable prompt catalog. It does not change runtime, publication data, rendering, deployment, workflows, branch protection, or the suspended verification stack.
+This maintenance-only adoption binds Atlas to `OTERYN_ORGANIZATION_AGENT_POLICY@3.1.0`, reduces the root instructions to an organization-policy bootstrap plus Atlas-owned invariants, and installs a fail-closed consumer for the binding, root overlay, and reusable prompt catalog. It does not change runtime, publication data, rendering, deployment, workflows, branch protection, or the suspended verification stack.
 
-The initial #345 binding selected the v3 introduction merge `8673d109d1a364efa7936133082a39750ca74cf9`. The central human policy and validator were unchanged afterward, but referenced execution and continuation machine authorities received material corrections in META #155/#158 and META `main` advanced through #159/#160. The first follow-up binding therefore selected `1dedfc0f264fe0e23e5365dbe9280c2d96df50c5`. After protected META PR #188 integrated as `d1caa3adba0fa4b32b84985bf1d6dcbe8055858c`, this adoption repins to that exact protected revision so Atlas consumes the current exact-target Merge Queue governance together with the earlier corrected machine authorities.
+The initial #345 binding selected the v3 introduction merge `8673d109d1a364efa7936133082a39750ca74cf9`. The central human policy and validator were unchanged afterward, but referenced execution and continuation machine authorities received material corrections in META #155/#158 and META `main` advanced through #159/#160. The first follow-up binding therefore selected `1dedfc0f264fe0e23e5365dbe9280c2d96df50c5`. Protected META PR #188 later integrated as `d1caa3adba0fa4b32b84985bf1d6dcbe8055858c`. After protected META PR #192 integrated through the real Merge Queue as `ed6c8c98605a7fbfea858e0ef616f89baa617262`, this adoption repins to that exact protected revision so Atlas consumes policy 3.1.0 and its native exact-head `merge-async` Merge Queue contract, including receipt-bound causal readback, real `merge_group` verification and protected-main readback.
 
 ## Evidence levels
 

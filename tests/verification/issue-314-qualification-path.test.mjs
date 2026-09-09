@@ -60,7 +60,7 @@ test('A: root instruction-only governance does not recursively require browser q
   assert.equal(plan.profile, 'none');
   assert.deepEqual(plan.requiredGroupIds, []);
 
-  const unknownMarkdown = planFor('README.md');
+  const unknownMarkdown = planFor('UNMAPPED-LR4.md');
   assert.equal(unknownMarkdown.profile, 'full', 'arbitrary Markdown must remain fail-closed');
   assert.deepEqual(unknownMarkdown.requiredGroupIds, Object.entries(verificationCatalog.groups).filter(([,group]) => group.executionRole !== 'aggregate' && (group.fullSafetyNet || group.executionRole === 'canonical-review')).map(([id]) => id).sort());
 });
