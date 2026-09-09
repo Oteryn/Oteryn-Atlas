@@ -6,6 +6,7 @@
         "tests/verification/artifacts.test.mjs",
         "tests/verification/base-advance-compatibility.test.mjs",
         "tests/verification/benchmark-workers-contract.test.mjs",
+        "tests/verification/blocking-promotion-direct-event.test.mjs",
         "tests/verification/bootstrap-impact-policy-contract.test.mjs",
         "tests/verification/bounded-real-browser-trust.test.mjs",
         "tests/verification/bounded-real-world.test.mjs",
@@ -2611,7 +2612,7 @@
             "--test",
             "tests/semantic-search.mjs"
           ],
-          "sourceSha256": "1776c6252f10a0d4884c619f96338c8b018a6828735bf122f21e02f9dcac7d75",
+          "sourceSha256": "b14328910d3ea3c4760abecc12287b2f46d00efe283f3cd9fa20ab01b66825a9",
           "imports": [],
           "subprocessTests": [],
           "qualification": "unqualified"
@@ -2676,6 +2677,23 @@
           "contract": {
             "status": "active-semantic",
             "retainedInvariant": "worker benchmark is measurement-only, repeatable and uses non-null telemetry sources",
+            "requiredRewrite": null
+          }
+        },
+        {
+          "spec": "tests/verification/blocking-promotion-direct-event.test.mjs",
+          "interpreter": "node",
+          "argv": [
+            "--test",
+            "tests/verification/blocking-promotion-direct-event.test.mjs"
+          ],
+          "imports": [],
+          "subprocessTests": [],
+          "qualification": "local-contract",
+          "sourceSha256": "ea797fc4918847a9e34f791b28a6d44e902b45a4f09706dd37011528fc7c0944",
+          "contract": {
+            "status": "active-semantic",
+            "retainedInvariant": "direct merge_group binds protected base, queue ref, exact head and candidate tree; just-integrated exact heads remain admissible; stale, spoofed or synthetic queue topology fails closed; protected verification workflow uses direct merge_group without workflow_run indirection",
             "requiredRewrite": null
           }
         },

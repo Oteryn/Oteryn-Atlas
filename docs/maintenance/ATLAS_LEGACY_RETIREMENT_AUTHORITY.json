@@ -118,7 +118,9 @@
         "tests/verification/restoration-contract-ownership.test.mjs",
         "tests/verification/deterministic-execution.test.mjs",
         "tests/maintenance/maintenance-diff-policy.test.mjs",
-        "tools/verification/impact-manifest.json"
+        "tools/verification/impact-manifest.json",
+        "tests/verification/plan-execution-readiness.test.mjs",
+        "tests/verification/protected-admission-cli-census.test.mjs"
       ]
     }
   }
