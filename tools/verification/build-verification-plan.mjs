@@ -29,6 +29,42 @@ const RESOURCE_RANK = Object.freeze({
   'artifact-build': 2,
 });
 const DETERMINISTIC_TEST_PATH = /^tests\/[A-Za-z0-9_./-]+\.(mjs|py)$/;
+const DEPENDENCY_METADATA_BASENAMES = Object.freeze([
+  '.gitmodules',
+  'package.json', 'package-lock.json', 'npm-shrinkwrap.json', 'yarn.lock',
+  'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'bun.lock', 'bun.lockb',
+  'deno.json', 'deno.jsonc', 'deno.lock',
+  'Cargo.toml', 'Cargo.lock',
+  'pyproject.toml', 'poetry.lock', 'pdm.lock', 'uv.lock', 'Pipfile', 'Pipfile.lock',
+  'setup.py', 'setup.cfg', 'environment.yml', 'environment.yaml', 'conda-lock.yml', 'conda-lock.yaml',
+  'go.mod', 'go.sum', 'go.work', 'go.work.sum',
+  'Gemfile', 'Gemfile.lock', 'gems.locked',
+  'composer.json', 'composer.lock',
+  'pom.xml', 'build.gradle', 'build.gradle.kts', 'settings.gradle', 'settings.gradle.kts',
+  'gradle.properties', 'gradle.lockfile',
+  'packages.config', 'packages.lock.json', 'Directory.Packages.props',
+  'Directory.Build.props', 'Directory.Build.targets', 'global.json', 'nuget.config',
+  'Package.swift', 'Package.resolved', 'Podfile', 'Podfile.lock', 'Cartfile', 'Cartfile.resolved',
+  'mix.exs', 'mix.lock', 'pubspec.yaml', 'pubspec.lock', '.terraform.lock.hcl',
+  'flake.nix', 'flake.lock', 'MODULE.bazel', 'MODULE.bazel.lock', 'WORKSPACE', 'WORKSPACE.bazel',
+  'vcpkg.json', 'vcpkg-configuration.json', 'conanfile.py', 'conanfile.txt', 'conan.lock',
+  'deps.edn', 'project.clj', 'build.sbt', 'Chart.yaml', 'Chart.lock',
+  'dependabot.yml', 'dependabot.yaml', 'renovate.json', 'renovate.json5',
+  '.renovaterc', '.renovaterc.json', '.renovaterc.json5',
+  'compose.yml', 'compose.yaml', 'docker-compose.yml', 'docker-compose.yaml',
+]);
+const DEPENDENCY_METADATA_PATTERNS = Object.freeze([
+  /(^|\/)requirements(?:[._-][^/]+)?\.(?:txt|in)$/,
+  /(^|\/)constraints(?:[._-][^/]+)?\.(?:txt|in)$/,
+  /(^|\/)[^/]+\.(?:csproj|fsproj|vbproj)$/,
+  /(^|\/)Dockerfile(?:\.[^/]+)?$/,
+  /(^|\/)[^/]+\.Dockerfile$/,
+  /(^|\/)gradle\/dependency-locks\/[^/]+\.lockfile$/,
+  /(^|\/)gradle\/libs\.versions\.toml$/,
+  /(^|\/)gradle\/wrapper\/gradle-wrapper\.properties$/,
+  /(^|\/)\.mvn\/wrapper\/maven-wrapper\.properties$/,
+  /(^|\/)[^/]+\.tf$/,
+]);
 
 function freeze(value) {
   if (value && typeof value === 'object' && !Object.isFrozen(value)) {
@@ -55,6 +91,13 @@ function safeChangedPath(value) {
     && !value.includes('//')
     && !value.split('/').includes('..')
     && !value.split('/').includes('.');
+}
+
+function dependencyMetadataPath(value) {
+  if (!safeChangedPath(value)) return false;
+  const basename = value.slice(value.lastIndexOf('/') + 1);
+  return DEPENDENCY_METADATA_BASENAMES.includes(basename)
+    || DEPENDENCY_METADATA_PATTERNS.some((pattern) => pattern.test(value));
 }
 
 function deterministicTestPath(value) {
@@ -122,6 +165,12 @@ function matchesForPath(path, manifest, catalog, unprivilegedSubjects = new Map(
     minimumProfile: path.startsWith('e2e/tests/') ? 'targeted' : 'focused',
     requiredGroups: owners.map(([id]) => id),
   }] : [];
+  const dependency = dependencyMetadataPath(path) ? [{
+    pathPrefix: path,
+    domains: ['dependency-governance'],
+    minimumProfile: 'full',
+    requiredGroups: FALLBACK_GROUPS,
+  }] : [];
   const matches = manifest.entries.filter((entry) => (entry.exactMatch ? path === entry.pathPrefix : path.startsWith(entry.pathPrefix))
     && !(entry.excludedPaths ?? []).includes(path));
   const subject = !owners.length && unprivilegedSubjects.has(path) ? [{
@@ -132,7 +181,7 @@ function matchesForPath(path, manifest, catalog, unprivilegedSubjects = new Map(
   }] : [];
   // Only explicitly designated catchalls yield. Every semantic match remains
   // additive; protected and candidate manifests are classified independently.
-  const semantic = [...ownership, ...subject, ...matches.filter((entry) => !entry.defaultRule)];
+  const semantic = [...ownership, ...subject, ...dependency, ...matches.filter((entry) => !entry.defaultRule)];
   return semantic.length ? semantic : matches;
 }
 

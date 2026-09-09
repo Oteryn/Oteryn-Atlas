@@ -67,3 +67,36 @@ test('candidate duplicate owner produces an explicit execution blocker',()=>{
  const p=buildVerificationPlan({repository:'Oteryn/Oteryn-Atlas',headSha:'a'.repeat(40),integrationBaseSha:'b'.repeat(40),mergeBaseSha:'c'.repeat(40),changedFiles:[{path:'tests/semantic-search.mjs'}],trustedImpactManifest:manifest([]),candidateImpactManifest:manifest([]),trustedVerificationCatalog:catalog,candidateVerificationCatalog:candidate});
  assert(p.executionBlockers.some(row=>row.reason==='ambiguous-test-owner'));
 });
+
+test('dependency manifests and lockfiles are protected semantic impacts instead of unknown paths',()=>{
+ const empty=manifest([]);
+ const dependencyPaths=[
+  'package.json','package-lock.json','e2e/package.json','e2e/package-lock.json',
+  'ui/pnpm-lock.yaml','ui/yarn.lock','ui/bun.lock','deno.json',
+  'Cargo.toml','crates/core/Cargo.lock','pyproject.toml','requirements-dev.txt','services/api/uv.lock',
+  'go.mod','services/gateway/go.sum','Gemfile.lock','composer.lock','pom.xml','build.gradle.kts',
+  'gradle/libs.versions.toml','src/Atlas.Core.csproj','Directory.Packages.props','Package.resolved',
+  'mix.lock','pubspec.lock','.terraform.lock.hcl','infra/providers.tf','Dockerfile','containers/worker.Dockerfile',
+  'compose.yaml','.github/dependabot.yml','renovate.json','.gitmodules','Chart.lock',
+ ];
+ for(const path of dependencyPaths){
+  const p=plan(empty,empty,path);
+  assert.equal(p.profile,'full',path);
+  assert(p.impactDomains.includes('dependency-governance'),path);
+  assert(!p.executionBlockers.some(row=>row.reason==='unknown-impact'&&row.path===path),path);
+  for(const id of catalog.groups['e2e.full'].dependsOnGroups)assert(p.requiredGroupIds.includes(id),`${path}: ${id}`);
+ }
+});
+
+test('dependency routing cannot be narrowed by candidate default metadata',()=>{
+ const candidateDefault=manifest([{pathPrefix:'e2e/',defaultRule:true,domains:['candidate-default'],minimumProfile:'none',requiredGroups:[]}]);
+ const p=plan(manifest([]),candidateDefault,'e2e/package-lock.json');
+ assert.equal(p.profile,'full');
+ assert(p.impactDomains.includes('dependency-governance'));
+ assert(!p.executionBlockers.some(row=>row.reason==='unknown-impact'));
+});
+
+test('unrecognized source paths remain fail-closed after dependency routing',()=>{
+ const p=plan(manifest([]),manifest([]),'new-runtime-family/opaque.source');
+ assert(p.executionBlockers.some(row=>row.reason==='unknown-impact'&&row.path==='new-runtime-family/opaque.source'));
+});
