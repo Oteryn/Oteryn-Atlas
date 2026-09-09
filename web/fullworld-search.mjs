@@ -22,35 +22,6 @@ const MAX_RESULTS = 12;
 const SOURCE_EXPECTATIONS = ancillarySourceExpectations(FULLWORLD_TRUST);
 const state = { index: null, creatureSearch: [], active: null, lastQuery: '', lastResults: 0, status: 'LOADING', error: null };
 
-function applyShellPolish() {
-  const $ = selector => document.querySelector(selector);
-  const sectionTitle = (anchorSelector, title) => {
-    const anchor = $(anchorSelector);
-    const heading = anchor?.closest('section')?.querySelector('h2');
-    if (heading) heading.textContent = title;
-  };
-  sectionTitle('#view-mode-control', 'Map style');
-  sectionTitle('#overview-layer', 'Map layers');
-  sectionTitle('#minimap', 'Coverage overview');
-  const overviewLayer = $('#overview-layer');
-  if (overviewLayer) {
-    const name = overviewLayer.querySelector('.layer-name');
-    const status = overviewLayer.querySelector('span:last-child');
-    if (name) name.textContent = 'Coverage overview';
-    if (status) status.textContent = 'MAP';
-  }
-  const lodNote = $('#lod-policy-note');
-  if (lodNote) {
-    lodNote.textContent = 'AUTO keeps the world readable at overview scale and adds verified detail as you zoom. CLASSIC shows the same verified map with a classic palette.';
-  }
-  for (const selector of ['#zoom-in', '#zoom-out', '#floor-up', '#floor-down']) {
-    const control = $(selector);
-    if (!control) continue;
-    control.style.display = 'grid';
-    control.style.placeItems = 'center';
-  }
-}
-
 function requireValue(condition, message) {
   if (!condition) throw new Error(message);
 }
@@ -224,7 +195,6 @@ async function loadCreatureSearch() {
 }
 
 async function boot() {
-  applyShellPolish();
   wireForm('#search-form', '#search-input', 'desktop');
   wireForm('#mobile-search-form', '#mobile-search-input', 'mobile');
   const raw = await boundedJson(INDEX_URL, MAX_INDEX_BYTES);

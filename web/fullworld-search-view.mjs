@@ -147,7 +147,7 @@ export function createSearchView({ form, input, id, describe, onQuery, onChoose,
       if (host.hidden) request();
       if (!records.length) return;
       event.preventDefault();
-      const next = event.key === 'ArrowDow'
+      const next = event.key === 'ArrowDown'
         ? Math.min(active + 1, records.length - 1)
         : active < 0 ? records.length - 1 : Math.max(0, active - 1);
       setActive(next, true);
@@ -165,7 +165,7 @@ export function createSearchView({ form, input, id, describe, onQuery, onChoose,
 
   return {
     show, close,
-    refresh() { if (!host.hidden && !form.closest('inert]')) request(); },
+    refresh() { if (!host.hidden && !form.closest('[inert]')) request(); },
   };
 }
 
