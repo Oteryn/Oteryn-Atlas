@@ -89,6 +89,7 @@
         "tests/verification/protected-hosted-plan-identity.test.mjs",
         "tests/verification/protected-hosted-plan.test.mjs",
         "tests/verification/protected-hosted-product-identities.test.mjs",
+        "tests/verification/protected-hosted-readiness-reentry-promotion-workflow-contract.test.mjs",
         "tests/verification/protected-hosted-readiness-wiring-promotion-workflow-contract.test.mjs",
         "tests/verification/protected-hosted-shard-capability-summary.test.mjs",
         "tests/verification/protected-hosted-shard-worker-policy-contract.test.mjs",
@@ -96,6 +97,7 @@
         "tests/verification/protected-main-depth.test.mjs",
         "tests/verification/protected-playwright-data-capability-selection.test.mjs",
         "tests/verification/protected-proof-caller-context.test.mjs",
+        "tests/verification/protected-publication-readiness-promotion-workflow-contract.test.mjs",
         "tests/verification/protected-qualification-live-run-identity.test.mjs",
         "tests/verification/protected-qualification-oracle.test.mjs",
         "tests/verification/protected-qualification-product-promotion-workflow-contract.test.mjs",
@@ -4079,6 +4081,23 @@
           }
         },
         {
+          "spec": "tests/verification/protected-hosted-readiness-reentry-promotion-workflow-contract.test.mjs",
+          "interpreter": "node",
+          "argv": [
+            "--test",
+            "tests/verification/protected-hosted-readiness-reentry-promotion-workflow-contract.test.mjs"
+          ],
+          "imports": [],
+          "subprocessTests": [],
+          "qualification": "local-contract",
+          "sourceSha256": "b54e65d0389b079404d58a1e16ea290c37f191e271e10fad44d93dcd7a3239bc",
+          "contract": {
+            "status": "active-semantic",
+            "retainedInvariant": "Publication readiness refuses overwrite and preserves existing publication bytes.",
+            "requiredRewrite": null
+          }
+        },
+        {
           "spec": "tests/verification/protected-hosted-readiness-wiring-promotion-workflow-contract.test.mjs",
           "interpreter": "node",
           "argv": [
@@ -4194,6 +4213,23 @@
           "contract": {
             "status": "active-semantic",
             "retainedInvariant": "PR capture requires current independently resolved job and fresh snapshot; standalone bound diagnostic may capture without pretending to be a PR event; nonreview candidate and depth execution need no visual producer context",
+            "requiredRewrite": null
+          }
+        },
+        {
+          "spec": "tests/verification/protected-publication-readiness-promotion-workflow-contract.test.mjs",
+          "interpreter": "node",
+          "argv": [
+            "--test",
+            "tests/verification/protected-publication-readiness-promotion-workflow-contract.test.mjs"
+          ],
+          "imports": [],
+          "subprocessTests": [],
+          "qualification": "local-contract",
+          "sourceSha256": "c9c9d9f1fa5bc5dfbaa82aa585dcbc3ac41bc0a43e49ed68dc10352246ef1e75",
+          "contract": {
+            "status": "active-semantic",
+            "retainedInvariant": "Publication readiness rejects producer-run and harness identity drift.",
             "requiredRewrite": null
           }
         },
@@ -4952,7 +4988,7 @@
             "--test",
             "tests/verification/verification-execution-contract.test.mjs"
           ],
-          "sourceSha256": "ef3e66dde386d67d9fa0679a6af1cf98ffe8cafd86c7dad1a5adf540a3cea19c",
+          "sourceSha256": "76266cc655167232fdb8e3dfa0cf91ef9a64637920cee8acda127e3f1dfa6d08",
           "imports": [],
           "subprocessTests": [],
           "qualification": "local-contract",
