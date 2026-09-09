@@ -527,7 +527,7 @@ test('real protected shadow plan CLI schedules subject-only work and keeps docs-
  const temporary=fs.mkdtempSync(path.join(os.tmpdir(),'atlas-shadow-plan-cli-'));t.after(()=>fs.rmSync(temporary,{recursive:true,force:true}));
  const control=path.join(temporary,'control'),candidateRoot=path.join(temporary,'candidate');
  const git=(directory,...args)=>{const safeDirectory=path.resolve(directory);const result=spawnSync('git',['-c',`safe.directory=${safeDirectory}`,'-C',safeDirectory,'-c','core.hooksPath=/dev/null',...args],{encoding:'utf8'});assert.equal(result.status,0,result.stderr);return result.stdout.trim();};
- git(root,'-c','core.autocrlf=false','clone','--quiet','--shared',root,control);
+ git(root,'-c','core.autocrlf=false','clone','--quiet','--shared',path.resolve(root),control);
  git(control,'config','core.autocrlf','false');git(control,'reset','--hard','HEAD');
  for(const file of ['browser-execution.mjs','build-verification-plan.mjs','deterministic-execution.mjs','verification-execution-contract.mjs','run-verification-shadow.mjs'])fs.copyFileSync(path.join(root,'tools/verification',file),path.join(control,'tools/verification',file));
  const commit=directory=>{git(directory,'add','.');git(directory,'-c','user.name=Fixture','-c','user.email=fixture@example.invalid','-c','commit.gpgsign=false','commit','--quiet','--allow-empty','-m','Fixture');return git(directory,'rev-parse','HEAD');};
