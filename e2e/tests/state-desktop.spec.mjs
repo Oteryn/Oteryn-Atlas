@@ -23,7 +23,7 @@ test('desktop invalid search and out-of-bounds coordinates fail safely', async (
   await search.fill('definitely-not-a-published-entity');
   const results = page.locator('#semantic-search-results-desktop');
   await expect(results).toBeVisible();
-  await expect(results).toContainText('No published semantic result.');
+  await expect(results).toContainText('No matching published places or creatures');
   await page.locator('#search-form button[type="submit"]').click();
   const afterInvalid = new URL(page.url());
   expect(afterInvalid.searchParams.get('x')).toBe(before.searchParams.get('x'));
