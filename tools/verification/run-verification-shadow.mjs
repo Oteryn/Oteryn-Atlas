@@ -113,7 +113,7 @@ export function planShadow({candidate,root,protectedRoot}) {
   const protectedStableTestIds=readJson(path.join(protectedRoot,'tools/verification/protected-scenario-inventory.json')).stableTestIds;
   const planInput={repository:REPOSITORY,headSha:candidate.headSha,integrationBaseSha:candidate.baseSha,
     mergeBaseSha:candidate.baseSha,changedFiles:candidate.changedFiles};
-  const unprivilegedDeterministicSubjects=[...new Set(candidate.changedFiles.flatMap(row=>row.status==='removed'?[]:[row.path,...(row.status==='renamed'?[row.previousPath]:[])].filter(name=>typeof name==='string'&&/^tests\/[A-Za-z0-9_./-]+\.(mjs|py)$/.test(name))))].sort();
+  const unprivilegedDeterministicSubjects=[...new Set(candidate.changedFiles.flatMap(row=>row.status==='renamed'?[row.previousPath,row.path]:['added','modified'].includes(row.status)?[row.path]:[]).filter(name=>typeof name==='string'&&/^tests\/[A-Za-z0-9_./-]+\.(mjs|py)$/.test(name)))].sort();
   const plan=buildVerificationPlan({...planInput,trustedVerificationCatalog:protectedCatalog,candidateVerificationCatalog:protectedCatalog,
     trustedImpactManifest:protectedImpactManifest,candidateImpactManifest:protectedImpactManifest,
     protectedStableTestIds,unprivilegedDeterministicSubjects});
@@ -139,7 +139,7 @@ export function deterministicDockerArgs({command,candidateRoot,dependencyRoot,sh
     '--mount',`type=bind,src=${dependencyRoot},dst=/candidate/e2e/node_modules,readonly`,
     '--mount',`type=bind,src=${shimRoot},dst=/tmp/atlas-python-bin,readonly`,
     ...(protectedHarness?['--mount',`type=bind,src=${protectedHarnessFile},dst=/protected-harness/r5-semantic-builder-oracle.mjs,readonly`,
-      '--mount',`type=bind,src=${protectedInputFile},dst=/protected-input/game-semantic-search-source.jsonl,readonly`]:[]),
+      '--mount',`type=bind,src=${protectedInputFile},dst=/protected-input/game-semantic-search-source.json,readonly`]:[]),
     '--workdir=/candidate','--env=PATH=/tmp/atlas-python-bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin','--env=HOME=/tmp','--env=PYTHONPYCACHEPREFIX=/tmp/atlas-python-pycache',image,
     command.argv[0]==='python'?'/usr/bin/python3':command.argv[0],...command.argv.slice(1)];
 }
