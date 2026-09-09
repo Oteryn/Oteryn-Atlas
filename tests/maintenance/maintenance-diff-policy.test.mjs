@@ -73,7 +73,7 @@ test('repository retirement authority preserves the audited bounded wave census'
   assert.equal(manifest.waves['lr3-suspended-workflows'].supportModify.length,0);
   assert.equal(manifest.waves['lr4-governance-cleanup'].retireModifyDelete.length,15);
   assert.equal(manifest.waves['lr4-governance-cleanup'].retireDelete.length,10);
-  assert.equal(manifest.waves['lr4-governance-cleanup'].supportModify.length,12);
+  assert.equal(manifest.waves['lr4-governance-cleanup'].supportModify.length,13);
 });
 
 test('admits ordinary product changes in steady state',t=>{
