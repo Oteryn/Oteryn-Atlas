@@ -4286,10 +4286,10 @@
           "imports": [],
           "subprocessTests": [],
           "qualification": "local-contract",
-          "sourceSha256": "c8c7250d1c1fd5ecae5b722ff9988af4515e5cb824ff416e49a3b8bc73157168",
+          "sourceSha256": "eff3389177e6cc03c3212eb1b965dd48a7369f864e39be0fb4e40decb931fcec",
           "contract": {
             "status": "active-semantic",
-            "retainedInvariant": "protected oracle preserves the existing verifier and trust descriptor for an exact valid product; protected oracle rejects lower-bound and source-oracle substitution even when the product is rehashed; mutable world, trust and semantic modules cannot become future protected verifier authority",
+            "retainedInvariant": "protected oracle preserves the existing verifier and trust descriptor for an exact valid product; protected oracle independently pins mounted qualification gameplay bytes after outer rehash; protected oracle rejects lower-bound and source-oracle substitution even when the product is rehashed; mutable world, trust and semantic modules cannot become future protected verifier authority; generated oracle source-pin inventory matches exact Git blobs used for reproducible payload review",
             "requiredRewrite": null
           }
         },
