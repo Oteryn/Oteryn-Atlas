@@ -13,10 +13,10 @@
 // Source blob 0f44da17c30a61089b0cec1c110d8411fedc8f94 src/browser/creature-publication-source.mjs
 // Source blob e732c6478251f476f09750687dadfb38799b521a src/browser/creature-search.mjs
 // Source blob e2a788657d92e0e641dad5627f12416507700055 src/browser/fullworld-trust.mjs
-// Source blob 2f56433f797b4178e28d7bf1cbf86487ac2832e8 src/browser/loader.mjs
-// Source blob 152b79dfe3f8fd92dd4159c236db55ef2a86d904 src/browser/semantic-search.mjs
-// Source blob 61df75f257812eea13ddaddb7b771ac3c722ad97 src/browser/semantic.mjs
-// Source blob 88fe5302a799c02f46c57154623d721435f9599a tools/verification/qualification-fixture-definition.mjs
+// Source blob 2ef07afddf4102be6cc67d418180343ebecafcf1 src/browser/loader.mjs
+// Source blob 65a075b7ac29984bd5892b7bab151ad18aace412 src/browser/semantic-search.mjs
+// Source blob 35a9cc3fcd6a7778692f8a5078d87d5f492d976e src/browser/semantic.mjs
+// Source blob ceb04ddbfb78261087b09cbbead14a0fdec223bb tools/verification/qualification-fixture-definition.mjs
 // Source blob 0d02ac81c9892b642b94e13bf002c316bcb9f016 tools/verification/qualification-world.mjs
 // Payload sha256 76e8a5260be5c71d4312adfca5990d896118115fc4ae508344c8d558bfaa0d55
 // BEGIN GENERATED ORACLE

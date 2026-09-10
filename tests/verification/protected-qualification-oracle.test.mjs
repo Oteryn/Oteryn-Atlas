@@ -177,6 +177,12 @@ if (process.argv.includes('--emit-entry')) {
 
   test('generated verifier closure imports only Node builtins and excludes product builder code', () => {
     const source = fs.readFileSync(path.join(repository, oraclePath), 'utf8');
+    const sourcePins = [...source.matchAll(/^\/\/ Source blob ([a-f0-9]{40}) (.+)$/gm)];
+    assert.equal(sourcePins.length, 9, 'generated source-pin inventory recorded');
+    for (const [, recordedBlob, relative] of sourcePins) {
+      const actualBlob = execFileSync('git', ['rev-parse', `HEAD:${relative}`], { cwd: repository, encoding: 'utf8' }).trim();
+      assert.equal(recordedBlob, actualBlob, `recorded source blob drift: ${relative}`);
+    }
     const recorded = source.match(/^\/\/ Payload sha256 ([a-f0-9]{64})$/m);
     assert.ok(recorded, 'generated payload identity recorded');
     const payload = source.split('// BEGIN GENERATED ORACLE\n')[1];
