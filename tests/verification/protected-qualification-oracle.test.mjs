@@ -10,6 +10,37 @@ import test from 'node:test';
 const repository = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const oraclePath = 'tools/verification/protected-qualification-oracle.mjs';
 
+const GAMEPLAY_PINS = Object.freeze([
+  { path: 'web/creature-gameplay/manifest.json', bytes: 1837, digest: 'sha256:577b40fb5c6dff901f1c3c9e76a1a401bc54f5771affebc0bbe98c9982262202' },
+  { path: 'web/creature-gameplay/shards/monster-aa.json', bytes: 648, digest: 'sha256:6167651f21b543888d4b1df962bf2ae94813c7823210b472874bbe9f66d4efa2' },
+  { path: 'web/creature-gameplay/shards/npc-11.json', bytes: 663, digest: 'sha256:28c2205766e898c62740acd1092e437ef15b152a4aceac22ea98423880960db9' },
+  { path: 'web/creature-gameplay/shards/npc-22.json', bytes: 557, digest: 'sha256:eddad6d57951750f71ca9d44abbc15c4b65c044785ae890f7501363cbe9c9a94' },
+  { path: 'web/creature-gameplay/shards/npc-44.json', bytes: 15577, digest: 'sha256:2839ded43ef67c3098fa9a8465127754364c3feded0a935964522a7d9ba537c8' },
+  { path: 'web/creature-gameplay/shards/npc-55.json', bytes: 353, digest: 'sha256:6e843dbbfdd4cb96de3a8ab63b7568699dacad19079f245f9a042e660aaf6176' },
+]);
+
+
+function gameplayOracleSource() {
+  return `const QUALIFICATION_GAMEPLAY_PINS = Object.freeze(${JSON.stringify(GAMEPLAY_PINS)}.map(Object.freeze));
+function verifyQualificationGameplayPins(root) {
+  const base = path.join(root, 'web', 'creature-gameplay');
+  const actual = [];
+  const walk = directory => { for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+    const full = path.join(directory, entry.name), stat = fs.lstatSync(full);
+    if (stat.isSymbolicLink() || (!stat.isFile() && !stat.isDirectory())) throw new TypeError('qualification gameplay contains nonregular input');
+    if (stat.isDirectory()) walk(full); else actual.push(path.relative(root, full).replaceAll(path.sep, '/'));
+  } };
+  walk(base); actual.sort();
+  const expected = QUALIFICATION_GAMEPLAY_PINS.map(pin => pin.path).sort();
+  if (JSON.stringify(actual) !== JSON.stringify(expected)) throw new TypeError('qualification gameplay file inventory mismatch');
+  for (const pin of QUALIFICATION_GAMEPLAY_PINS) { const bytes = fs.readFileSync(path.join(root, pin.path));
+    if (bytes.length !== pin.bytes || sha(bytes) !== pin.digest) throw new TypeError('qualification gameplay pinned byte mismatch: ' + pin.path); }
+  const manifest = JSON.parse(fs.readFileSync(path.join(root, 'web/creature-gameplay/manifest.json'), 'utf8'));
+  if (manifest.contract_id !== 'oteryn-atlas-qualification-fixture-v1' || manifest.capability !== 'qualification-creature-gameplay-v1' || manifest.fixture_id !== FIXTURE_ID || manifest.semantic_digest !== 'sha256:79e5814b4b6e1e8b794b90210411687598e21ea33ffffb4ce78ad2ca0cfdd158') throw new TypeError('qualification gameplay identity mismatch');
+}
+`;
+}
+
 // Mechanical source extraction for explicit maintainer regeneration only. This
 // is not an admission predicate and is never executed by candidate qualification.
 export function oracleEntry(root) {
@@ -23,11 +54,15 @@ export function oracleEntry(root) {
   const fixture = definition.match(/^export const QUALIFICATION_FIXTURE_ID = ('[^']+');$/m);
   const marker = source.match(/^const QUALIFICATION_TRUST_MARKER = '[^']+';$/m);
   assert.ok(fixture && marker, 'literal verifier identity constants exist');
+  const verifier = slice('export function qualificationTrustDescriptor(');
+  const gameplayCall = '  await verifyQualificationGameplay(root);\n';
+  assert.equal(verifier.split(gameplayCall).length, 2, 'candidate verifier gameplay call exists exactly once');
   return slice('import crypto', 'import {\n  FLOOR_DOMAIN')
     + `const FIXTURE_ID = ${fixture[1]};\n${marker[0]}\n`
     + slice('function sha(', 'function domainRoot(')
     + slice('function productEntries(', 'async function buildPixelPublication(')
-    + slice('export function qualificationTrustDescriptor(');
+    + gameplayOracleSource()
+    + verifier.replace(gameplayCall, '  verifyQualificationGameplayPins(root);\n');
 }
 
 if (process.argv.includes('--emit-entry')) {
@@ -63,6 +98,17 @@ if (process.argv.includes('--emit-entry')) {
       const verified = await oracle.verifyQualificationWorld(root);
       assert.deepEqual(oracle.qualificationTrustDescriptor(verified), originalDescriptor(verified));
       assert.deepEqual(Object.keys(oracle).sort(), ['qualificationTrustDescriptor', 'verifyQualificationWorld']);
+    } finally { fs.rmSync(parent, { recursive: true, force: true }); }
+  });
+
+  test('protected oracle independently pins mounted qualification gameplay bytes after outer rehash', async () => {
+    const parent = temporary(), root = path.join(parent, 'product');
+    try {
+      await buildQualificationWorld(root);
+      const shard = path.join(root, 'web/creature-gameplay/shards/npc-11.json');
+      fs.appendFileSync(shard, ' ');
+      repinManifest(root);
+      await assert.rejects(oracle.verifyQualificationWorld(root), /qualification gameplay pinned byte mismatch/);
     } finally { fs.rmSync(parent, { recursive: true, force: true }); }
   });
 
@@ -131,12 +177,19 @@ if (process.argv.includes('--emit-entry')) {
 
   test('generated verifier closure imports only Node builtins and excludes product builder code', () => {
     const source = fs.readFileSync(path.join(repository, oraclePath), 'utf8');
+    const sourcePins = [...source.matchAll(/^\/\/ Source blob ([a-f0-9]{40}) (.+)$/gm)];
+    assert.equal(sourcePins.length, 9, 'generated source-pin inventory recorded');
+    for (const [, recordedBlob, relative] of sourcePins) {
+      const actualBlob = execFileSync('git', ['rev-parse', `HEAD:${relative}`], { cwd: repository, encoding: 'utf8' }).trim();
+      assert.equal(recordedBlob, actualBlob, `recorded source blob drift: ${relative}`);
+    }
     const recorded = source.match(/^\/\/ Payload sha256 ([a-f0-9]{64})$/m);
     assert.ok(recorded, 'generated payload identity recorded');
     const payload = source.split('// BEGIN GENERATED ORACLE\n')[1];
     assert.equal(digest(payload), `sha256:${recorded[1]}`);
     const imports = [...source.matchAll(/^import .* from ["']([^"']+)["'];$/gm)].map(match => match[1]);
     assert.deepEqual(imports.sort(), ['node:crypto', 'node:fs', 'node:path']);
+    assert.match(source, /QUALIFICATION_GAMEPLAY_PINS/);
     assert.doesNotMatch(source, /\bimport\s*\(|\brequire\s*\(|\bbuildQualificationWorld\s*\(|\bQUALIFICATION_CREATURES\b/);
     const entry = oracleEntry(repository);
     assert.doesNotMatch(entry, /\bbuildQualificationWorld\s*\(|\bQUALIFICATION_CREATURES\b/);

@@ -18,6 +18,7 @@ import { PIXEL_HASH_DOMAIN, PIXEL_PROFILE, PIXEL_ROOT_DOMAIN } from '../../src/b
 import { RUNTIME_PIXEL_BUCKET_DOMAIN, RUNTIME_PIXEL_BUCKET_PROFILE } from '../../src/browser/fullworld-pixel-buckets.mjs';
 import { minimapDomains, minimapProfiles } from '../../src/layers/minimap.mjs';
 import { computeOverviewRoot, overviewDomains, overviewProfiles } from '../../src/layers/overview.mjs';
+import { buildQualificationGameplay, verifyQualificationGameplay } from './qualification-gameplay.mjs';
 import {
   QUALIFICATION_ACTIVE_FLOOR, QUALIFICATION_CENTER, QUALIFICATION_CREATURES, QUALIFICATION_FIXTURE_ID,
   QUALIFICATION_SEMANTIC_RECORD, QUALIFICATION_SOURCE_CONTRACT,
@@ -534,7 +535,7 @@ export async function buildQualificationWorld(destination) {
   const animation = await buildQualificationAnimation(root, semanticWorld.rootContentId, pixel.manifest.rootContentId, pixel.pixelContentId, pixel.pixels);
   const creatures = await buildQualificationCreatures(root, semanticWorld.rootContentId, animation);
   await buildQualificationSearch(root, semanticWorld.rootContentId, creatures.search);
-  writeJson(root, 'web/creature-gameplay/qualification-unavailable.json', { fixtureId: FIXTURE_ID, dataCapability: 'qualification_fixture', profileStatus: 'intentionally-unavailable' });
+  await buildQualificationGameplay(root);
 
   const files = productEntries(root);
   const result = Object.freeze({
@@ -610,5 +611,7 @@ export async function verifyQualificationWorld(root) {
   const semanticIndex = JSON.parse(fs.readFileSync(path.join(root, 'web/semantic-search/index.json'), 'utf8'));
   validateSemanticSearchIndex(semanticIndex, ancillary.semanticSearch);
   const semanticCreatures = JSON.parse(fs.readFileSync(path.join(root, 'web/semantic-search/creatures.json'), 'utf8'));
-  validateCreatureSearchCatalog(semanticCreatures, ancillary.semanticSearch);  return Object.freeze(manifest);
+  validateCreatureSearchCatalog(semanticCreatures, ancillary.semanticSearch);
+  await verifyQualificationGameplay(root);
+  return Object.freeze(manifest);
 }

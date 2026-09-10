@@ -163,6 +163,14 @@
       "path": "tools/verification/qualification-fixture-definition.mjs"
     },
     {
+      "id": "tools-verification-qualification-gameplay-mjs",
+      "path": "tools/verification/qualification-gameplay.mjs"
+    },
+    {
+      "id": "tools-verification-qualification-scenario-bindings-mjs",
+      "path": "tools/verification/qualification-scenario-bindings.mjs"
+    },
+    {
       "id": "tools-verification-qualification-world-mjs",
       "path": "tools/verification/qualification-world.mjs"
     },
