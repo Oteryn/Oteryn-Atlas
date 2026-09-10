@@ -4,6 +4,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import {fixture} from './fixtures/protected-review-fixture.mjs';
 import {evaluateProtectedRouting} from '../../tools/verification/protected-semantic-routing.mjs';
+import {shadowReviewArtifactName,shadowReviewPlanDigest,validateShadowReviewGate} from '../../tools/verification/verification-shadow-review.mjs';
 
 const module = await import('../../tools/verification/protected-review-evidence.mjs').catch(error => {
   if (error.code === 'ERR_MODULE_NOT_FOUND') return {};
@@ -229,4 +230,33 @@ test('review scenarios without frame ownership still require passing summary evi
   summary.scenarios=summary.scenarios.filter(row=>row.stableTestId!==id);
   input.files[0].bytes=Buffer.from(JSON.stringify(summary));changeCapture(input,c=>c.summary.digest=digest(input.files[0].bytes));
   assert.throws(()=>module.validateProtectedVisualCapture(input));
+});
+test('R5 review gate consumes only a prior exact capture run after fresh machine execution',async()=>{
+  const candidate={repository:'Oteryn/Oteryn-Atlas',prNumber:344,headSha:sha('a'),baseSha:sha('b'),treeSha:sha('c'),changedFiles:[{path:'web/fullworld.html',status:'modified'}]};
+  const stable='desktop-chromium::e2e/tests/visual-desktop.spec.mjs::full frame',commandId=hash('1');
+  const contract={commands:[{id:commandId,engine:'playwright',expectedTestIds:[stable],dataCapability:'qualification_fixture'}],groups:[{id:'e2e.visual-presentation'},{id:'review.visual-desktop'}],reviews:[{groupId:'review.visual-desktop',commandIds:[commandId],frames:[{frameId:'desktop.initial',stableTestId:stable}]}]};
+  const productDigest=hash('f'),oracleDigest=hash('e'),planDigest=shadowReviewPlanDigest(candidate,contract),summaryDigest=hash('9'),frameDigest=hash('8');
+  const capture={schemaVersion:1,kind:'protected-visual-capture',candidate,producer:{workflowPath:'.github/workflows/verification-shadow.yml',sourceSha:candidate.baseSha,runId:42,jobId:43,runAttempt:1},planDigest,oracleDigest,productDigest,dataCapability:'qualification_fixture',scenarioIds:[stable],summary:{path:'summary.json',digest:summaryDigest},frames:[{frameId:'desktop.initial',scenarioId:stable,path:'user-visual-evidence/desktop-chromium/desktop.initial/viewport.png',digest:frameDigest}]};
+  const captureBytes=Buffer.from(JSON.stringify(capture)),captureDigest=digest(captureBytes),reviewer={id:5,login:'maintainer'};
+  const decision={schemaVersion:1,kind:'protected-visual-review',candidate,captureDigest,planDigest,summaryDigest,reviewer,reviewedAllFrames:true,result:'PASS',frames:capture.frames.map(row=>({...row,result:'PASS'}))};
+  const review={id:44,user:reviewer,state:'COMMENTED',commit_id:candidate.headSha,pull_request_url:`https://api.github.com/repos/${candidate.repository}/pulls/${candidate.prNumber}`,submitted_at:'2026-09-06T10:10:00Z',body:JSON.stringify({schemaVersion:1,kind:'protected-visual-review-bundle',candidate,captures:[decision]})};
+  const priorRun={id:42,run_attempt:1,path:'.github/workflows/verification-shadow.yml',event:'pull_request_target',head_sha:candidate.headSha,status:'completed',conclusion:'failure',repository:{id:99,full_name:candidate.repository},created_at:'2026-09-06T10:00:00Z',updated_at:'2026-09-06T10:05:00Z',pull_requests:[{number:344,head:{sha:candidate.headSha,repo:{id:99}},base:{sha:candidate.baseSha,repo:{id:99}}}]};
+  const priorJobs={total_count:3,jobs:[{id:41,run_id:42,run_attempt:1,head_sha:candidate.headSha,name:'plan',status:'completed',conclusion:'success'},{id:43,run_id:42,run_attempt:1,head_sha:candidate.headSha,name:'execute',status:'completed',conclusion:'success',runner_group_id:0,labels:['ubuntu-24.04'],started_at:'2026-09-06T10:01:00Z',completed_at:'2026-09-06T10:04:00Z'},{id:44,run_id:42,run_attempt:1,head_sha:candidate.headSha,name:'review',status:'completed',conclusion:'failure'}]};
+  const currentJobs={total_count:3,jobs:[{id:101,run_id:100,run_attempt:1,head_sha:candidate.headSha,name:'plan',status:'completed',conclusion:'success'},{id:102,run_id:100,run_attempt:1,head_sha:candidate.headSha,name:'execute',status:'completed',conclusion:'success'},{id:103,run_id:100,run_attempt:1,head_sha:candidate.headSha,name:'review',status:'in_progress',conclusion:null}]};
+  const artifact={id:45,name:shadowReviewArtifactName(42),expired:false,size_in_bytes:4096,workflow_run:{id:42,repository_id:99,head_repository_id:99,head_sha:candidate.headSha}};
+  const responses=new Map([
+    [`/repos/${candidate.repository}/actions/runs/100/attempts/1/jobs?per_page=100`,currentJobs],
+    [`/repos/${candidate.repository}/pulls/344/reviews?per_page=100&page=1`,[review]],
+    [`/repos/${candidate.repository}/actions/workflows/verification-shadow.yml/runs?event=pull_request_target&head_sha=${candidate.headSha}&per_page=100&page=1`,{workflow_runs:[priorRun]}],
+    [`/repos/${candidate.repository}/actions/runs/42/artifacts?per_page=100&page=1`,{artifacts:[artifact]}],
+    [`/repos/${candidate.repository}/actions/runs/42`,priorRun],
+    [`/repos/${candidate.repository}/actions/runs/42/attempts/1/jobs?per_page=100`,priorJobs],
+    [`/repos/${candidate.repository}`,{id:99,full_name:candidate.repository}],
+    [`/repos/${candidate.repository}/collaborators/maintainer/permission`,{permission:'admin',role_name:'admin',user:reviewer}],
+  ]);
+  const request=async endpoint=>{if(!responses.has(endpoint))throw new Error(`unexpected endpoint ${endpoint}`);return structuredClone(responses.get(endpoint));};
+  const result=await validateShadowReviewGate({candidate,currentRunId:100,contract,productDigest,oracleDigest,request,downloadArtifact:()=>[captureBytes],now:'2026-09-06T10:15:00Z'});
+  assert.equal(result.accepted,true);assert.equal(result.captureRunId,42);assert.deepEqual(result.captureDigests,[captureDigest]);
+  const stale=structuredClone(priorRun);stale.pull_requests[0].head.sha=sha('d');responses.set(`/repos/${candidate.repository}/actions/runs/42`,stale);
+  await assert.rejects(validateShadowReviewGate({candidate,currentRunId:100,contract,productDigest,oracleDigest,request,downloadArtifact:()=>[captureBytes],now:'2026-09-06T10:15:00Z'}));
 });
