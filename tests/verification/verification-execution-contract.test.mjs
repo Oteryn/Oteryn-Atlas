@@ -222,6 +222,7 @@ test('candidate execution metadata cannot replace protected interpreter or hashe
 });
 
 import {authenticateR5SemanticSource,buildR5SemanticPublication,resolveShadowEvent,planShadow,deterministicDockerArgs,fixtureBrowserArgs} from '../../tools/verification/run-verification-shadow.mjs';
+import {assertShadowExecutorCoverage,assertShadowReviewCaptureCensus,normalizeShadowReviewChangedFiles,shadowReviewPlanDigest} from '../../tools/verification/verification-shadow-review.mjs';
 test('fixture browser preserves runner ownership of report artifacts',()=>{
  const compose=['compose','-p','protected-fixture','-f','/protected/compose.yml'];
  assert.deepEqual(fixtureBrowserArgs(compose,{uid:1001,gid:1002}),[...compose,'run','--user','1001:1002','--rm','--no-deps','e2e']);
@@ -320,14 +321,18 @@ test('R5 protected shadow planner accepts exact canary routes plus hosted depth/
     () => planShadow({ candidate: r5Candidate('e2e/tests/fullworld-animation-census-desktop.spec.mjs'), root, protectedRoot: root }),
     /executor unavailable|real[_ -]?fullworld|specialist/i,
   );
-  for (const changedPath of ['src/browser/animation-runtime.mjs', 'unknown/product.mjs']) {
-    assert.throws(() => planShadow({ candidate: r5Candidate(changedPath), root, protectedRoot: root }), /executor unavailable|unresolved obligations/i, changedPath);
-  }
+  const animation = planShadow({ candidate: r5Candidate('src/browser/animation-runtime.mjs'), root, protectedRoot: root }).plan;
+  assert.equal(animation.requiresRealFullWorld, false);
+  assert.deepEqual(animation.requiredDataCapabilities, ['qualification_fixture']);
+  assert.deepEqual(animation.requiredVisualGroupIds, ['review.creature-presentation-desktop','review.creature-presentation-mobile','review.visual-desktop','review.visual-mobile']);
+  assert.throws(() => planShadow({ candidate: r5Candidate('unknown/product.mjs'), root, protectedRoot: root }), /unresolved obligations/i);
   const mixed = {...r5Candidate('tools/verification/impact-manifest.json'), changedFiles:[
     {path:'tools/verification/impact-manifest.json',status:'modified'},
     {path:'src/browser/animation-runtime.mjs',status:'modified'},
   ]};
-  assert.throws(() => planShadow({candidate:mixed,root,protectedRoot:root}), /executor unavailable|unresolved obligations/i);
+  const mixedPlan=planShadow({candidate:mixed,root,protectedRoot:root}).plan;
+  assert.equal(mixedPlan.requiresRealFullWorld,false);
+  assert.equal(mixedPlan.requiredVisualGroupIds.length,9);
 });
 
 test('R5 bounded semantic publication derives from one exact authenticated Game source byte', async (t) => {
@@ -458,14 +463,36 @@ test('S0 plans zero groups and S2/S3 select only their narrow protected owners',
  assert.deepEqual(plan('docs/ordinary.md').groups,[]);
  assert.deepEqual(plan('e2e/tests/layer-audit-desktop.spec.mjs').groups.map(g=>g.id),['e2e.layer-availability']);
  assert.deepEqual(plan('e2e/tests/creature-gameplay-source-contract-desktop.spec.mjs').groups.map(g=>g.id),['integration.source-contract-http']);
- for(const name of ['e2e/tests/performance-desktop.spec.mjs','e2e/tests/soak-desktop.spec.mjs','e2e/tests/stress-desktop.spec.mjs']) assert.doesNotThrow(()=>plan(name),name);
+for(const name of ['e2e/tests/performance-desktop.spec.mjs','e2e/tests/soak-desktop.spec.mjs','e2e/tests/stress-desktop.spec.mjs']) assert.doesNotThrow(()=>plan(name),name);
  const full=plan('tools/verification/impact-manifest.json');
  for(const id of ['e2e.bounded-performance','e2e.bounded-soak','e2e.bounded-stress','e2e.common-smoke']) assert.ok(full.groups.some(group=>group.id===id),id);
  assert.deepEqual(full.requiredVisualGroupIds,[]);
  assert.equal(full.groups.some(group=>group.executionRole==='canonical-review'||group.evidence==='restricted-visual-review'||group.capabilities?.visualReview===true),false);
  assert.equal(full.groups.some(group=>group.capabilities?.dataCapability==='real_fullworld'),false);
  assert.throws(()=>plan('e2e/tests/fullworld-animation-census-desktop.spec.mjs'),/executor unavailable|real[_ -]?fullworld|specialist/i);
- assert.throws(()=>plan('src/browser/animation-runtime.mjs'),/bounded executor unavailable/);
+ const animation=plan('src/browser/animation-runtime.mjs');
+ assert.equal(animation.requiresRealFullWorld,false);
+ assert.deepEqual(animation.requiredDataCapabilities,['qualification_fixture']);
+ assert.deepEqual(animation.requiredVisualGroupIds,['review.creature-presentation-desktop','review.creature-presentation-mobile','review.visual-desktop','review.visual-mobile']);
+});
+test('R5 broad executor accepts hosted fixture machine/review groups but still rejects specialist Real-FullWorld',()=>{
+ const hosted={id:'e2e.bounded-soak',executionRole:'canonical-machine',executionEngine:'playwright',evidence:'machine-summary',capabilities:{browser:true,hosted:true,requiresPublication:true,dataCapability:'qualification_fixture',visualReview:false,specialistReason:null}};
+ const review={id:'review.visual-desktop',executionRole:'canonical-review',executionEngine:'playwright',evidence:'restricted-visual-review',capabilities:{browser:true,hosted:true,requiresPublication:true,dataCapability:'qualification_fixture',visualReview:true,specialistReason:null}};
+ assert.equal(assertShadowExecutorCoverage({groups:[hosted,review]}),true);
+ const specialist={...hosted,id:'fullworld.animation-census',capabilities:{...hosted.capabilities,hosted:false,dataCapability:'real_fullworld',specialistReason:'real-fullworld-product'}};
+ assert.throws(()=>assertShadowExecutorCoverage({groups:[specialist]}),/executor unavailable/);
+});
+test('R5 review binding is exact-tree portable from PR head to MQ and requires a complete frame census',()=>{
+ const baseSha=sha('b'),treeSha=sha('c'),prFiles=[{path:'web/new.mjs',status:'renamed',previousPath:'web/old.mjs'}],mqFiles=[{path:'web/new.mjs',status:'added'},{path:'web/old.mjs',status:'removed'}];
+ const pr={repository:'Oteryn/Oteryn-Atlas',prNumber:344,headSha:sha('a'),baseSha,treeSha,changedFiles:prFiles};
+ const mq={...pr,prNumber:null,headSha:sha('d'),changedFiles:mqFiles};
+ assert.deepEqual(normalizeShadowReviewChangedFiles(pr.changedFiles),normalizeShadowReviewChangedFiles(mq.changedFiles));
+ const contract={commands:[{id:'sha256:'+'1'.repeat(64),engine:'playwright',spec:'e2e/tests/visual-desktop.spec.mjs',projects:['desktop-chromium'],expectedTestIds:['desktop-chromium::e2e/tests/visual-desktop.spec.mjs::frame'],dataCapability:'qualification_fixture'}],groups:[{id:'e2e.visual-presentation'},{id:'review.visual-desktop'}],reviews:[{groupId:'review.visual-desktop',commandIds:['sha256:'+'1'.repeat(64)],frames:[{frameId:'desktop.initial',stableTestId:'desktop-chromium::e2e/tests/visual-desktop.spec.mjs::frame'}]}]};
+ assert.equal(shadowReviewPlanDigest(pr,contract),shadowReviewPlanDigest(mq,contract));
+ assert.notEqual(shadowReviewPlanDigest(pr,contract),shadowReviewPlanDigest({...mq,treeSha:sha('e')},contract));
+ const results=[{reviewCapture:{frames:[{frameId:'desktop.initial',scenarioId:'desktop-chromium::e2e/tests/visual-desktop.spec.mjs::frame'}]}}];
+ assert.equal(assertShadowReviewCaptureCensus(contract,results),true);
+ assert.throws(()=>assertShadowReviewCaptureCensus(contract,[]),/incomplete/);
 });
 test('deterministic runner has exact command and readonly credential-free mounts with bounded isolation',()=>{
  const command={id:'sha256:'+'a'.repeat(64),engine:'deterministic',cwd:'.',argv:['node','--test','tests/example.mjs']};
@@ -537,8 +564,8 @@ test('authenticated self-only subjects compose with docs, another subject and HT
   for(const subject of contract.candidateTestSubjects)assert.deepEqual(contract.commands.find(command=>command.id===subject.commandId).expectedTestIds,[subject.spec]);
  }
  const actualCore=resolveExecutionContract(input([{path:'tests/verification/artifacts.test.mjs',status:'modified'}]));
- assert.equal(actualCore.commands.filter(command=>command.groupIds.includes('deterministic.core')).length,142);
- assert.equal(actualCore.commands.length,143);
+ assert.equal(actualCore.commands.filter(command=>command.groupIds.includes('deterministic.core')).length,144);
+ assert.equal(actualCore.commands.length,145);
  assert.equal(actualCore.candidateTestSubjects.length,1);
  const subjectOnly=resolveExecutionContract(input());
  const forged=structuredClone(subjectOnly);forged.candidateTestSubjects[0].spec='tests/../outside.mjs';assert.throws(()=>sealExecutionContract(forged),/subject/);
@@ -556,13 +583,13 @@ test('authenticated self-only subjects compose with docs, another subject and HT
  samePathManifest.entries.push({pathPrefix:first,exactMatch:true,domains:['subject-semantic'],minimumProfile:'focused',requiredGroups:['deterministic.core']});
  const samePath=buildVerificationPlan({...planInput,trustedImpactManifest:samePathManifest,candidateImpactManifest:base.protectedImpactManifest});
  assert.ok(samePath.requiredGroupIds.includes('deterministic.core'));assert.deepEqual(samePath.candidateTestSubjects,[first]);
- assert.equal(resolveExecutionContract({...input(),protectedImpactManifest:samePathManifest}).commands.length,143);
+ assert.equal(resolveExecutionContract({...input(),protectedImpactManifest:samePathManifest}).commands.length,145);
  const escalatedManifest=structuredClone(base.protectedImpactManifest);
  escalatedManifest.entries.push({pathPrefix:first,exactMatch:true,domains:['subject-semantic'],minimumProfile:'focused',requiredGroups:[]});
  escalatedManifest.crossDomainEscalations.push({id:'subject-core-proof',whenDomains:['subject-semantic','documentation'],minimumProfile:'focused',requiredGroups:['deterministic.core']});
  const escalated=buildVerificationPlan({...planInput,changedFiles:[{path:first,status:'added'},{path:'docs/example.md',status:'added'}],trustedImpactManifest:escalatedManifest,candidateImpactManifest:escalatedManifest});
  assert.ok(escalated.requiredGroupIds.includes('deterministic.core'));assert.deepEqual(escalated.candidateTestSubjects,[first]);
- assert.equal(resolveExecutionContract({...input([{path:'docs/example.md',status:'added'}]),protectedImpactManifest:escalatedManifest}).commands.length,143);
+ assert.equal(resolveExecutionContract({...input([{path:'docs/example.md',status:'added'}]),protectedImpactManifest:escalatedManifest}).commands.length,145);
  const renamed=input();renamed.candidate.changedFiles=[{path:first,previousPath:'tests/old-unowned.mjs',status:'renamed'}];renamed.planInput.changedFiles=renamed.candidate.changedFiles;assert.equal(resolveExecutionContract(renamed).commands.length,1);
 });
 
@@ -586,7 +613,7 @@ test('real protected shadow plan CLI schedules subject-only work and keeps docs-
   const responseFile=path.join(temporary,'responses.json'),eventFile=path.join(temporary,'event.json'),output=path.join(temporary,expected?'subject-output':'docs-output');
   fs.writeFileSync(responseFile,JSON.stringify(responses));fs.writeFileSync(eventFile,JSON.stringify({repository,action:'synchronize',pull_request:pr}));
   const result=spawnSync(process.execPath,['--import',pathToFileURL(preload).href,path.join(control,'tools/verification/run-verification-shadow.mjs'),'plan',candidateRoot],{encoding:'utf8',env:{PATH:process.env.PATH,HOME:os.tmpdir(),GITHUB_RUN_ATTEMPT:'1',GITHUB_EVENT_NAME:'pull_request_target',GITHUB_EVENT_PATH:eventFile,GITHUB_SHA:base,GITHUB_RUN_ID:'19',GITHUB_OUTPUT:output,ATLAS_TEST_GITHUB_RESPONSES:responseFile}});
-  assert.equal(result.status,0,result.stderr);assert.equal(fs.readFileSync(output,'utf8'),`has_commands=${expected}\n`);
+  assert.equal(result.status,0,result.stderr);assert.equal(fs.readFileSync(output,'utf8'),`has_commands=${expected}\nrequires_review=false\n`);
   const summary=JSON.parse(result.stdout);assert.deepEqual(summary.groups,[]);assert.deepEqual(summary.candidateTestSubjects,expected?[subject]:[]);
   assert.equal(summary.status,expected?'UNRESOLVED':'NO_PRODUCT_WORK');if(!expected)assert.deepEqual(summary.commands,[]);
  }

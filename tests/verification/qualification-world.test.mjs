@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
+import { verifyQualificationGameplay } from '../../tools/verification/qualification-gameplay.mjs';
 import {
   buildQualificationWorld,
   qualificationTrustDescriptor,
@@ -26,6 +27,12 @@ test('qualification world is deterministic, complete for the 16-floor runtime co
     assert.match(first[field], /^sha256:[a-f0-9]{64}$/, `${field} must be content-addressed`);
   }
   assert.deepEqual(await verifyQualificationWorld(left), first);
+  const gameplay = await verifyQualificationGameplay(left);
+  assert.equal(gameplay.fixture_id, 'atlas-qualification-world-v2');
+  assert.equal(gameplay.capability, 'qualification-creature-gameplay-v1');
+  assert.deepEqual(gameplay.counts, { npc_profiles: 4, monster_profiles: 1, referenced_items: 0 });
+  assert.equal(gameplay.shards.length, 5);
+  assert.equal(fs.existsSync(path.join(left, 'web', 'creature-gameplay', 'qualification-unavailable.json')), false);
 
   fs.appendFileSync(path.join(left, 'publication', 'semantic', 'chunks', 'f-7-r1008-c1004.jsonl'), 'forged');
   await assert.rejects(() => verifyQualificationWorld(left), /digest|identity|byte/i);

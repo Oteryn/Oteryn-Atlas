@@ -123,6 +123,10 @@
       "path": "tools/verification/build-verification-plan.mjs"
     },
     {
+      "id": "tools-verification-collect-protected-visual-capture-mjs",
+      "path": "tools/verification/collect-protected-visual-capture.mjs"
+    },
+    {
       "id": "tools-verification-complete-product-proof-mjs",
       "path": "tools/verification/complete-product-proof.mjs"
     },
@@ -161,6 +165,14 @@
     {
       "id": "tools-verification-qualification-fixture-definition-mjs",
       "path": "tools/verification/qualification-fixture-definition.mjs"
+    },
+    {
+      "id": "tools-verification-qualification-gameplay-mjs",
+      "path": "tools/verification/qualification-gameplay.mjs"
+    },
+    {
+      "id": "tools-verification-qualification-scenario-bindings-mjs",
+      "path": "tools/verification/qualification-scenario-bindings.mjs"
     },
     {
       "id": "tools-verification-qualification-world-mjs",
@@ -205,6 +217,10 @@
     {
       "id": "tools-verification-verification-plan-schema-mjs",
       "path": "tools/verification/verification-plan-schema.mjs"
+    },
+    {
+      "id": "tools-verification-verification-shadow-review-mjs",
+      "path": "tools/verification/verification-shadow-review.mjs"
     },
     {
       "id": "tools-verification-verify-complete-product-artifacts-mjs",
