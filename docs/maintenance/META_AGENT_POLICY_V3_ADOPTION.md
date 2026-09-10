@@ -8,17 +8,23 @@ This is the final app-free META 3.1 authority produced by Oteryn/Oteryn#187. The
 
 ## Atlas lifecycle truth
 
-The Atlas verification simplification / legacy-retirement programme Oteryn/Oteryn-Atlas#315 is CLOSED. LR4 retirement PR #444 is protected on current Atlas `main`; the historical R5/#457 prerequisite is superseded and is not part of this adoption.
+The Atlas verification simplification / legacy-retirement programme Oteryn/Oteryn-Atlas#315 is CLOSED. LR4 retirement PR #444 is protected on current Atlas `main`; historical #315/#457 restoration topology is not standing authority for this adoption.
 
-This repin changes only provider policy authority. It does not reactivate retired recovery topology, create a new verification executor, change product/runtime/publication/deployment behavior, alter rulesets or required checks, or authorize a bypass. Atlas continues to use its current protected verification and Merge Queue authority as they exist on the integration candidate.
+This repin changes provider policy authority. It does not reactivate retired recovery topology, create a new verification executor, change product/runtime/publication/deployment behavior, alter rulesets or required checks, or authorize a bypass. Atlas continues to use its current protected verification and Merge Queue authority as they exist on the integration candidate.
 
 ## Verification-authority effect
 
-`docs/agents/META_AGENT_POLICY_BINDING.json` is a verification-authority input. Changing its immutable META commit changes verification-authority identity, so evidence from a different binding must not be treated as proof for this candidate. The repository's current protected classifier/gates decide the required qualification from the actual candidate; historical verification-shadow/R5 blockers are not carried forward as current authority.
+`docs/agents/META_AGENT_POLICY_BINDING.json` is an explicit component of the protected Atlas verification-authority identity. Repinning its immutable META commit therefore changes the verification-authority digest even though this PR authors no verification code, workflow, ruleset, required-check or activation change.
+
+That authority-identity movement invalidates reuse of verification evidence bound to the previous authority. Under the current protected base-advance contract, `classifyBaseAdvance` must classify this authority movement as `FULL_RERUN`; prior-base verification evidence is not terminal proof for this adoption. The exact candidate must be qualified afresh by the protected Atlas gates after every protected-base advance that changes this authority identity.
+
+This is an evidence-reuse/authority-identity effect, not a reactivation of the completed #315 restoration programme and not an authorization to require `real_fullworld` unless the current protected plan independently requires that capability.
 
 ## Delivery contract
 
 The authenticated Atlas consumer must resolve the exact bound META commit, validate policy identity/version and canonical human surfaces, and fail closed if the binding cannot be authenticated as protected-META ancestry. Root/reusable prompt validation remains provider-owned; binding success does not itself grant merge, production or cross-repository authority.
+
+The fail-closed provider consumer must be coherently updated to policy `3.1.0` before this binding can integrate. That consumer migration is a separately protected prerequisite so this provider repin cannot self-authorize its own verification routing or validator behavior.
 
 ## Integration
 
