@@ -121,10 +121,10 @@ function filesystemFetcher(root) {
   return async (url) => {
     const relative = decodeURIComponent(new URL(url).pathname).split('/creature-gameplay/')[1];
     const target = relative ? path.resolve(base, ...relative.split('/')) : base;
-    if (!relative || !target.startsWith(`${base}${path.sep}`)) return new Response('', { status: 404 });
+    if (!relative || !target.startsWith(`${base}${path.sep}`)) return new Response('{}', { status: 404 });
     let bytes;
     try { bytes = fs.readFileSync(target); }
-    catch { return new Response('', { status: 404 }); }
+    catch { return new Response('{}', { status: 404 }); }
     return new Response(bytes, { status: 200, headers: { 'content-length': String(bytes.length) } });
   };
 }

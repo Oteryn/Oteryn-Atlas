@@ -4097,7 +4097,7 @@
           "imports": [],
           "subprocessTests": [],
           "qualification": "local-contract",
-          "sourceSha256": "0f26cae7714b22270e305cfbdc48bed9997a76636e31048f1cf1e120b2847453",
+          "sourceSha256": "f86f3840edf176fcf6eeb856a9b7c4e360bf5127ae917d052f6775e36814f42a",
           "contract": {
             "status": "active-semantic",
             "retainedInvariant": "protected hosted product identities pin qualification and bounded-real products",
@@ -4284,10 +4284,10 @@
           "imports": [],
           "subprocessTests": [],
           "qualification": "local-contract",
-          "sourceSha256": "c8c7250d1c1fd5ecae5b722ff9988af4515e5cb824ff416e49a3b8bc73157168",
+          "sourceSha256": "eff3389177e6cc03c3212eb1b965dd48a7369f864e39be0fb4e40decb931fcec",
           "contract": {
             "status": "active-semantic",
-            "retainedInvariant": "protected oracle preserves the existing verifier and trust descriptor for an exact valid product; protected oracle rejects lower-bound and source-oracle substitution even when the product is rehashed; mutable world, trust and semantic modules cannot become future protected verifier authority",
+            "retainedInvariant": "protected oracle preserves the existing verifier and trust descriptor for an exact valid product; protected oracle independently pins mounted qualification gameplay bytes after outer rehash; protected oracle rejects lower-bound and source-oracle substitution even when the product is rehashed; mutable world, trust and semantic modules cannot become future protected verifier authority; generated oracle source-pin inventory matches exact Git blobs used for reproducible payload review",
             "requiredRewrite": null
           }
         },
@@ -4709,7 +4709,7 @@
           "imports": [],
           "subprocessTests": [],
           "qualification": "local-contract",
-          "sourceSha256": "3c27b9a4c72b6d8d48c4f38f5dd81203af2daba4a3c6df5e754b0e94970e1dce",
+          "sourceSha256": "2d547311502e212c14e475291bedff3abae9ddab96af9fa88b6b3278ad423047",
           "contract": {
             "status": "active-semantic",
             "retainedInvariant": "qualification world is deterministic, complete for the 16-floor runtime contract, and rejects byte mutation; qualification trust descriptor is the exact browser trust subset of the verified product manifest",
@@ -5046,7 +5046,7 @@
             "--test",
             "tests/verification/verification-execution-contract.test.mjs"
           ],
-          "sourceSha256": "655f7b144c161c592fed1ff823605554bee4a5bdee7d6127b3efd12061edeb0d",
+          "sourceSha256": "1632f4f2d7e408a307fdeabd8ae7548add24d95bc14628a0ffe572b0dcbb680e",
           "imports": [],
           "subprocessTests": [],
           "qualification": "local-contract",

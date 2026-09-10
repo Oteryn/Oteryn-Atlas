@@ -18,11 +18,11 @@ import { PIXEL_HASH_DOMAIN, PIXEL_PROFILE, PIXEL_ROOT_DOMAIN } from '../../src/b
 import { RUNTIME_PIXEL_BUCKET_DOMAIN, RUNTIME_PIXEL_BUCKET_PROFILE } from '../../src/browser/fullworld-pixel-buckets.mjs';
 import { minimapDomains, minimapProfiles } from '../../src/layers/minimap.mjs';
 import { computeOverviewRoot, overviewDomains, overviewProfiles } from '../../src/layers/overview.mjs';
+import { buildQualificationGameplay, verifyQualificationGameplay } from './qualification-gameplay.mjs';
 import {
   QUALIFICATION_ACTIVE_FLOOR, QUALIFICATION_CENTER, QUALIFICATION_CREATURES, QUALIFICATION_FIXTURE_ID,
   QUALIFICATION_SEMANTIC_RECORD, QUALIFICATION_SOURCE_CONTRACT,
 } from './qualification-fixture-definition.mjs';
-import { buildQualificationGameplay } from './qualification-gameplay.mjs';
 
 const FIXTURE_ID = QUALIFICATION_FIXTURE_ID;
 const QUALIFICATION_TRUST_MARKER = 'oteryn-atlas-qualification-trust-v1';
@@ -611,5 +611,7 @@ export async function verifyQualificationWorld(root) {
   const semanticIndex = JSON.parse(fs.readFileSync(path.join(root, 'web/semantic-search/index.json'), 'utf8'));
   validateSemanticSearchIndex(semanticIndex, ancillary.semanticSearch);
   const semanticCreatures = JSON.parse(fs.readFileSync(path.join(root, 'web/semantic-search/creatures.json'), 'utf8'));
-  validateCreatureSearchCatalog(semanticCreatures, ancillary.semanticSearch);  return Object.freeze(manifest);
+  validateCreatureSearchCatalog(semanticCreatures, ancillary.semanticSearch);
+  await verifyQualificationGameplay(root);
+  return Object.freeze(manifest);
 }
