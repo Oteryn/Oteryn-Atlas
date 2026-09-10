@@ -218,7 +218,7 @@ test('candidate execution metadata cannot replace protected interpreter or hashe
 });
 
 import {authenticateR5SemanticSource,buildR5SemanticPublication,resolveShadowEvent,planShadow,deterministicDockerArgs,fixtureBrowserArgs} from '../../tools/verification/run-verification-shadow.mjs';
-import {assertShadowExecutorCoverage} from '../../tools/verification/verification-shadow-review.mjs';
+import {assertShadowExecutorCoverage,assertShadowReviewCaptureCensus,shadowReviewPlanDigest} from '../../tools/verification/verification-shadow-review.mjs';
 test('fixture browser preserves runner ownership of report artifacts',()=>{
  const compose=['compose','-p','protected-fixture','-f','/protected/compose.yml'];
  assert.deepEqual(fixtureBrowserArgs(compose,{uid:1001,gid:1002}),[...compose,'run','--user','1001:1002','--rm','--no-deps','e2e']);
@@ -438,7 +438,17 @@ test('R5 broad executor accepts hosted fixture machine/review groups but still r
  const specialist={...hosted,id:'fullworld.animation-census',capabilities:{...hosted.capabilities,hosted:false,dataCapability:'real_fullworld',specialistReason:'real-fullworld-product'}};
  assert.throws(()=>assertShadowExecutorCoverage({groups:[specialist]}),/executor unavailable/);
 });
-test('deterministic runner has exact command and readonly credential-free mounts with bounded isolation',()=>{
+test('R5 review binding is exact-tree portable from PR head to MQ and requires a complete frame census',()=>{
+ const changedFiles=[{path:'web/fullworld.html',status:'modified'}],baseSha=sha('b'),treeSha=sha('c');
+ const pr={repository:'Oteryn/Oteryn-Atlas',prNumber:344,headSha:sha('a'),baseSha,treeSha,changedFiles};
+ const mq={...pr,prNumber:null,headSha:sha('d')};
+ const contract={commands:[{id:'sha256:'+'1'.repeat(64),engine:'playwright',spec:'e2e/tests/visual-desktop.spec.mjs',projects:['desktop-chromium'],expectedTestIds:['desktop-chromium::e2e/tests/visual-desktop.spec.mjs::frame'],dataCapability:'qualification_fixture'}],groups:[{id:'e2e.visual-presentation'},{id:'review.visual-desktop'}],reviews:[{groupId:'review.visual-desktop',commandIds:['sha256:'+'1'.repeat(64)],frames:[{frameId:'desktop.initial',stableTestId:'desktop-chromium::e2e/tests/visual-desktop.spec.mjs::frame'}]}]};
+ assert.equal(shadowReviewPlanDigest(pr,contract),shadowReviewPlanDigest(mq,contract));
+ assert.notEqual(shadowReviewPlanDigest(pr,contract),shadowReviewPlanDigest({...mq,treeSha:sha('e')},contract));
+ const results=[{reviewCapture:{frames:[{frameId:'desktop.initial',scenarioId:'desktop-chromium::e2e/tests/visual-desktop.spec.mjs::frame'}]}}];
+ assert.equal(assertShadowReviewCaptureCensus(contract,results),true);
+ assert.throws(()=>assertShadowReviewCaptureCensus(contract,[]),/incomplete/);
+});test('deterministic runner has exact command and readonly credential-free mounts with bounded isolation',()=>{
  const command={id:'sha256:'+'a'.repeat(64),engine:'deterministic',cwd:'.',argv:['node','--test','tests/example.mjs']};
  const input={command,candidateRoot:'/candidate-source',dependencyRoot:'/protected-deps',shimRoot:'/python-shim',containerName:'atlas-r4-example',image:'image@sha256:'+'b'.repeat(64)};
  const args=deterministicDockerArgs(input);
