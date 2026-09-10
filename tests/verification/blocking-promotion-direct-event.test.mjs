@@ -56,7 +56,7 @@ test('direct merge_group rejects stale base, wrong branch/action/head and synthe
   for(const mutate of mutations){const f=fixture();mutate(f);await assert.rejects(resolveDirectMergeGroup(f.input));}
 });
 
-test('protected workflow uses direct merge_group only and keeps no-work-compatible conditional execute',()=>{
+test('protected workflow keeps direct PR/MQ authority and adds an exact review gate without a status bus',()=>{
   const root=fileURLToPath(new URL('../../',import.meta.url));
   const active=fs.readFileSync(`${root}/.github/workflows/verification-shadow.yml`,'utf8');
   const template=fs.readFileSync(`${root}/tools/maintenance/verification-shadow.yml`,'utf8');
@@ -66,6 +66,9 @@ test('protected workflow uses direct merge_group only and keeps no-work-compatib
   assert.match(active,/github\.event\.merge_group\.base_sha/);
   assert.match(active,/github\.event\.merge_group\.head_sha/);
   assert.match(active,/if: needs\.plan\.outputs\.has_commands == 'true'/);
-  assert.equal((active.match(/persist-credentials: false/g)??[]).length,4);
+  assert.match(active,/requires_review: \$\{\{ steps\.plan\.outputs\.requires_review \}\}/);
+  assert.match(active,/actions\/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02/);
+  assert.match(active,/run: node protected\/tools\/verification\/run-verification-shadow\.mjs review/);
+  assert.equal((active.match(/persist-credentials: false/g)??[]).length,6);
   assert.doesNotMatch(active,/statuses:\s*write|checks:\s*write/);
 });

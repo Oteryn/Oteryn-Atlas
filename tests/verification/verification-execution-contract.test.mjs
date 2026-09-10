@@ -218,6 +218,7 @@ test('candidate execution metadata cannot replace protected interpreter or hashe
 });
 
 import {authenticateR5SemanticSource,buildR5SemanticPublication,resolveShadowEvent,planShadow,deterministicDockerArgs,fixtureBrowserArgs} from '../../tools/verification/run-verification-shadow.mjs';
+import {assertShadowExecutorCoverage} from '../../tools/verification/verification-shadow-review.mjs';
 test('fixture browser preserves runner ownership of report artifacts',()=>{
  const compose=['compose','-p','protected-fixture','-f','/protected/compose.yml'];
  assert.deepEqual(fixtureBrowserArgs(compose,{uid:1001,gid:1002}),[...compose,'run','--user','1001:1002','--rm','--no-deps','e2e']);
@@ -424,7 +425,18 @@ test('S0 plans zero groups and S2/S3 select only their narrow protected owners',
  assert.deepEqual(plan('docs/ordinary.md').groups,[]);
  assert.deepEqual(plan('e2e/tests/layer-audit-desktop.spec.mjs').groups.map(g=>g.id),['e2e.layer-availability']);
  assert.deepEqual(plan('e2e/tests/creature-gameplay-source-contract-desktop.spec.mjs').groups.map(g=>g.id),['integration.source-contract-http']);
- assert.throws(()=>plan('e2e/tests/soak-desktop.spec.mjs'),/bounded executor unavailable/);
+ const soak=plan('e2e/tests/soak-desktop.spec.mjs');
+ assert.deepEqual(soak.groups.map(g=>g.id),['e2e.bounded-soak']);
+ assert.equal(soak.groups[0].capabilities.dataCapability,'qualification_fixture');
+ assert.equal(soak.groups[0].capabilities.hosted,true);
+ assert.equal(soak.requiresRealFullWorld,false);
+});
+test('R5 broad executor accepts hosted fixture machine/review groups but still rejects specialist Real-FullWorld',()=>{
+ const hosted={id:'e2e.bounded-soak',executionRole:'canonical-machine',executionEngine:'playwright',evidence:'machine-summary',capabilities:{browser:true,hosted:true,requiresPublication:true,dataCapability:'qualification_fixture',visualReview:false,specialistReason:null}};
+ const review={id:'review.visual-desktop',executionRole:'canonical-review',executionEngine:'playwright',evidence:'restricted-visual-review',capabilities:{browser:true,hosted:true,requiresPublication:true,dataCapability:'qualification_fixture',visualReview:true,specialistReason:null}};
+ assert.equal(assertShadowExecutorCoverage({groups:[hosted,review]}),true);
+ const specialist={...hosted,id:'fullworld.animation-census',capabilities:{...hosted.capabilities,hosted:false,dataCapability:'real_fullworld',specialistReason:'real-fullworld-product'}};
+ assert.throws(()=>assertShadowExecutorCoverage({groups:[specialist]}),/executor unavailable/);
 });
 test('deterministic runner has exact command and readonly credential-free mounts with bounded isolation',()=>{
  const command={id:'sha256:'+'a'.repeat(64),engine:'deterministic',cwd:'.',argv:['node','--test','tests/example.mjs']};
@@ -547,7 +559,7 @@ test('real protected shadow plan CLI schedules subject-only work and keeps docs-
   const responseFile=path.join(temporary,'responses.json'),eventFile=path.join(temporary,'event.json'),output=path.join(temporary,expected?'subject-output':'docs-output');
   fs.writeFileSync(responseFile,JSON.stringify(responses));fs.writeFileSync(eventFile,JSON.stringify({repository,action:'synchronize',pull_request:pr}));
   const result=spawnSync(process.execPath,['--import',pathToFileURL(preload).href,path.join(control,'tools/verification/run-verification-shadow.mjs'),'plan',candidateRoot],{encoding:'utf8',env:{PATH:process.env.PATH,HOME:os.tmpdir(),GITHUB_RUN_ATTEMPT:'1',GITHUB_EVENT_NAME:'pull_request_target',GITHUB_EVENT_PATH:eventFile,GITHUB_SHA:base,GITHUB_RUN_ID:'19',GITHUB_OUTPUT:output,ATLAS_TEST_GITHUB_RESPONSES:responseFile}});
-  assert.equal(result.status,0,result.stderr);assert.equal(fs.readFileSync(output,'utf8'),`has_commands=${expected}\n`);
+  assert.equal(result.status,0,result.stderr);assert.equal(fs.readFileSync(output,'utf8'),`has_commands=${expected}\nrequires_review=false\n`);
   const summary=JSON.parse(result.stdout);assert.deepEqual(summary.groups,[]);assert.deepEqual(summary.candidateTestSubjects,expected?[subject]:[]);
   assert.equal(summary.status,expected?'UNRESOLVED':'NO_PRODUCT_WORK');if(!expected)assert.deepEqual(summary.commands,[]);
  }

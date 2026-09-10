@@ -94,6 +94,24 @@ test('latest exact review supersedes older approval, including revocation',()=>{
   assert.equal(module.selectLatestProtectedReview([input.review,newer],input.currentCandidate).id,46);
   assert.throws(()=>module.validateProtectedReviewEvidence({...input,review:module.selectLatestProtectedReview([input.review,newer],input.currentCandidate)}));
 });
+test('a failed selective run is reviewable only when the sole failure is the protected review gate',()=>{
+  const input=fixture();
+  input.authority.allowFailedReviewGate=true;
+  input.authority.reviewGateJobName='review';
+  input.captureRun.conclusion='failure';
+  const gate={id:99,run_id:42,run_attempt:1,head_sha:input.captureRun.head_sha,name:'review',status:'completed',conclusion:'failure',runner_group_id:0,labels:['ubuntu-24.04'],started_at:'2026-09-06T10:04:10Z',completed_at:'2026-09-06T10:04:50Z'};
+  input.captureJobs.jobs.push(gate);
+  assert.equal(module.validateProtectedReviewEvidence(input).accepted,true);
+  for(const mutate of [
+    x=>x.captureJobs.jobs.find(j=>j.name==='review').conclusion='success',
+    x=>x.captureJobs.jobs.push({...gate,id:100,name:'unrelated',conclusion:'failure'}),
+    x=>x.captureJobs.jobs.find(j=>j.name==='review').head_sha=sha('d'),
+    x=>x.captureJobs.jobs.push({...gate,id:101}),
+  ]) {
+    const changed=fixture();changed.authority.allowFailedReviewGate=true;changed.authority.reviewGateJobName='review';changed.captureRun.conclusion='failure';changed.captureJobs.jobs.push({...gate});mutate(changed);
+    assert.throws(()=>module.validateProtectedReviewEvidence(changed));
+  }
+});
 test('protected fixture frames may be captured by the configured GitHub-hosted job',()=>{
   const input=fixture();input.authority.dataCapability='qualification_fixture';input.authority.runnerKind='github-hosted';input.authority.runnerLabels=['ubuntu-24.04'];input.captureJobs.jobs[0].labels=['ubuntu-24.04'];
   changeCapture(input,c=>c.dataCapability='qualification_fixture');changeDecision(input,d=>d.captureDigest=digest(input.captureBytes));
