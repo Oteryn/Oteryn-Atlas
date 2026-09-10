@@ -33,6 +33,22 @@ test('R5 shadow plans hosted bounded depth groups instead of rejecting them by g
   }
 });
 
+test('R5 shadow resolves the full verification control-plane hosted safety net', () => {
+  const { plan } = planShadow({
+    candidate: candidate('tools/verification/impact-manifest.json'),
+    root,
+    protectedRoot: root,
+  });
+  for (const id of ['e2e.bounded-performance', 'e2e.bounded-soak', 'e2e.bounded-stress', 'e2e.common-smoke']) {
+    assert.ok(plan.groups.some((group) => group.id === id), `full safety net must contain ${id}`);
+  }
+  assert.equal(
+    plan.groups.some((group) => group.capabilities?.dataCapability === 'real_fullworld'),
+    false,
+    'full hosted safety net must not acquire real_fullworld execution',
+  );
+});
+
 test('R5 shadow remains fail-closed for specialist real-fullworld execution', () => {
   assert.throws(
     () => planShadow({
