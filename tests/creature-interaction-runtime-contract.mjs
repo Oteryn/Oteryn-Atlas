@@ -32,7 +32,7 @@ test('quick card actions are truthful and mobile inspector opens through an even
   assert.match(creatures, /creature-card-link-fallback/);
   assert.match(creatures, /oteryn-atlas-open-inspector/);
   assert.match(mobile, /oteryn-atlas-open-inspector/);
-  assert.match(mobile, /openDrawer\('inspector'\)/);
+  assert.match(mobile, /openPanel\('inspector'/);
 });
 
 test('card escape respects a mobile drawer layered above it', () => {
