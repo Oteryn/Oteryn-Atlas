@@ -65,6 +65,14 @@ function fixturePixels() {
   }
   return bytes;
 }
+function fixtureAnimationPixels(base) {
+  const bytes = Buffer.from(base);
+  for (let offset = 0; offset < bytes.length; offset += 4) {
+    bytes[offset] = 255 - bytes[offset];
+    bytes[offset + 1] = Math.min(255, bytes[offset + 1] + 32);
+  }
+  return bytes;
+}
 function productEntries(root) {
   const out = [];
   const walk = (dir) => { for (const entry of fs.readdirSync(dir, { withFileTypes: true })) { const full = path.join(dir, entry.name); const relative = path.relative(root, full).replaceAll(path.sep, '/'); if (entry.isDirectory()) walk(full); else if (relative !== 'fixture-manifest.json') { const bytes = fs.readFileSync(full); out.push({ path: relative, bytes: bytes.length, digest: sha(bytes) }); } } };
@@ -73,43 +81,84 @@ function productEntries(root) {
 
 async function buildPixelPublication(root) {
   const pixels = fixturePixels();
+  const animatedPixels = fixtureAnimationPixels(pixels);
   const pixelContentId = await sha256ContentId(pixels);
-  const packSha = sha(pixels).slice('sha256:'.length);
+  const animatedContentId = await sha256ContentId(animatedPixels);
+  const pack = Buffer.concat([pixels, animatedPixels]);
+  const packSha = sha(pack).slice('sha256:'.length);
   const core = {
     profile: PIXEL_PROFILE,
     pixelHashDomain: PIXEL_HASH_DOMAIN,
     runtimePlacement: { identityAuthority: false },
-    packs: [{ path: 'packs/p0.rgba', bytes: pixels.length, sha256: packSha, identityAuthority: false }],
-    blobs: [{ contentId: pixelContentId, pack: 0, width: 32, height: 32, offset: 0, bytes: pixels.length }],
-    spriteIndex: { '1': { contentId: pixelContentId, width: 32, height: 32 } },
-    counts: { spriteRefs: 1, uniquePixelBlobs: 1, rawBytesAfterDedupe: pixels.length },
+    packs: [{ path: 'packs/p0.rgba', bytes: pack.length, sha256: packSha, identityAuthority: false }],
+    blobs: [
+      { contentId: pixelContentId, pack: 0, width: 32, height: 32, offset: 0, bytes: pixels.length },
+      { contentId: animatedContentId, pack: 0, width: 32, height: 32, offset: pixels.length, bytes: animatedPixels.length },
+    ],
+    spriteIndex: {
+      '1': { contentId: pixelContentId, width: 32, height: 32 },
+      '2': { contentId: animatedContentId, width: 32, height: 32 },
+    },
+    counts: { spriteRefs: 2, uniquePixelBlobs: 2, rawBytesAfterDedupe: pack.length },
   };
   const manifest = { ...core, rootContentId: await domainRoot(PIXEL_ROOT_DOMAIN, core) };
   writeJson(root, 'publication/pixels/manifest.json', manifest);
-  writeBytes(root, 'publication/pixels/packs/p0.rgba', pixels);
-  return { manifest, pixelContentId, pixels };
+  writeBytes(root, 'publication/pixels/packs/p0.rgba', pack);
+  return { manifest, pixelContentId, animatedContentId, pixels, animatedPixels };
 }
 
-async function buildRuntimePixelBuckets(root, publicationRoot, pixelRoot, pixelContentId, pixels) {
-  const bucket = pixelContentId.slice('sha256:'.length, 'sha256:'.length + 1);
-  const bucketPath = `buckets/${bucket}.rgba`;
+async function buildRuntimePixelBuckets(root, publicationRoot, pixelRoot, pixelProduct) {
+  const sources = [
+    { contentId: pixelProduct.pixelContentId, bytes: pixelProduct.pixels },
+    { contentId: pixelProduct.animatedContentId, bytes: pixelProduct.animatedPixels },
+  ].sort((a, b) => a.contentId.localeCompare(b.contentId));
+  const grouped = new Map();
+  for (const source of sources) {
+    const bucket = source.contentId.slice('sha256:'.length, 'sha256:'.length + 1);
+    if (!grouped.has(bucket)) grouped.set(bucket, []);
+    grouped.get(bucket).push(source);
+  }
+  const buckets = [];
+  const blobIndex = {};
+  const bundleParts = [];
+  const bucketOffsets = [];
+  let bundleOffset = 0;
+  for (const [bucket, entries] of [...grouped.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+    const parts = [];
+    let offset = 0;
+    for (const entry of entries) {
+      parts.push(entry.bytes);
+      blobIndex[entry.contentId] = { bucket, offset, bytes: entry.bytes.length, width: 32, height: 32 };
+      offset += entry.bytes.length;
+    }
+    const bytes = Buffer.concat(parts);
+    const contentId = await sha256ContentId(bytes);
+    const path = `buckets/${bucket}.rgba`;
+    writeBytes(root, `pixel-buckets/${path}`, bytes);
+    buckets.push({ bucket, path, identityAuthority: false, bytes: bytes.length, contentId, sha256: contentId.slice('sha256:'.length) });
+    bundleParts.push(bytes);
+    bucketOffsets.push({ bucket, offset: bundleOffset, bytes: bytes.length });
+    bundleOffset += bytes.length;
+  }
+  const bundle = Buffer.concat(bundleParts);
+  const bundleContentId = await sha256ContentId(bundle);
   const bundlePath = 'local-max.rgba';
-  const contentId = await sha256ContentId(pixels);
-  const sha256 = contentId.slice('sha256:'.length);
+  writeBytes(root, `pixel-buckets/${bundlePath}`, bundle);
   const core = {
     profile: RUNTIME_PIXEL_BUCKET_PROFILE,
     identityAuthority: false,
     source: { authority: 'Oteryn/Oteryn-Game', publicationRoot, pixelRoot },
     bucketNibbles: 1,
-    buckets: [{ bucket, path: bucketPath, identityAuthority: false, bytes: pixels.length, contentId, sha256 }],
-    localMaxBundle: { path: bundlePath, identityAuthority: false, bytes: pixels.length, contentId, sha256, bucketOffsets: [{ bucket, offset: 0, bytes: pixels.length }] },
-    blobIndex: { [pixelContentId]: { bucket, offset: 0, bytes: pixels.length, width: 32, height: 32 } },
-    counts: { buckets: 1, blobs: 1, bytes: pixels.length },
+    buckets,
+    localMaxBundle: {
+      path: bundlePath, identityAuthority: false, bytes: bundle.length,
+      contentId: bundleContentId, sha256: bundleContentId.slice('sha256:'.length), bucketOffsets,
+    },
+    blobIndex,
+    counts: { buckets: buckets.length, blobs: sources.length, bytes: bundle.length },
   };
   const manifest = { ...core, rootContentId: await domainRoot(RUNTIME_PIXEL_BUCKET_DOMAIN, core) };
   writeJson(root, 'pixel-buckets/manifest.json', manifest);
-  writeBytes(root, `pixel-buckets/${bucketPath}`, pixels);
-  writeBytes(root, `pixel-buckets/${bundlePath}`, pixels);
   return manifest;
 }
 
@@ -224,25 +273,55 @@ function creatureSearchRecord(record) {
   return value;
 }
 
-async function buildQualificationAnimation(root, semanticRoot, pixelRoot, contentId, pixels) {
+async function buildQualificationAnimation(root, semanticRoot, pixelRoot, contentId, pixels, animatedContentId, animatedPixels) {
   const bucketId = 'q0000';
   const bucketPath = `buckets/${bucketId}.rgba`;
+  const bucketBytes = Buffer.concat([pixels, animatedPixels]);
+  const animation = {
+    default_start_phase: 0,
+    loop_type: 'infinite',
+    loop_count: 0,
+    synchronized: true,
+    presentation_durations_ms: [100, 100],
+  };
+  const creatureProgram = (id) => ({
+    animation,
+    animation_program_id: `animation-program:${id}`,
+    displacement: { x: 0, y: 0 },
+    height: 32,
+    outfit_presentation_id: `outfit-presentation:${id}`,
+    phase_content_ids: [contentId, animatedContentId],
+    phase_count: 2,
+    selection_policy: 'qualification-two-phase-v1',
+    width: 32,
+  });
   const program = {
     profile: 'oteryn-atlas-animation-runtime-v1',
-    object_programs: [],
-    creature_programs: [{
-      animation: null,
-      animation_program_id: 'animation-program:qualification-sentinel',
+    object_programs: [{
+      animation,
+      animation_program_id: 'animation-program:qualification-ground',
+      appearance_source_id: 1,
       displacement: { x: 0, y: 0 },
       height: 32,
-      outfit_presentation_id: 'outfit-presentation:qualification-sentinel',
-      phase_content_ids: [contentId],
-      phase_count: 1,
-      selection_policy: 'qualification-static-phase-v1',
+      layers: 1,
+      patterns: { width: 1, height: 1, depth: 1 },
+      phase_count: 2,
+      selection_policy: 'qualification-two-phase-v1',
+      sprite_source_ids: [1, 2],
       width: 32,
     }],
-    sprite_index: {},
-    blob_index: { [contentId]: { bucket: bucketId, bytes: pixels.length, height: 32, offset: 0, width: 32 } },
+    creature_programs: [
+      creatureProgram('qualification-guide'),
+      creatureProgram('qualification-sentinel'),
+    ],
+    sprite_index: {
+      '1': { content_id: contentId, width: 32, height: 32 },
+      '2': { content_id: animatedContentId, width: 32, height: 32 },
+    },
+    blob_index: {
+      [contentId]: { bucket: bucketId, bytes: pixels.length, height: 32, offset: 0, width: 32 },
+      [animatedContentId]: { bucket: bucketId, bytes: animatedPixels.length, height: 32, offset: pixels.length, width: 32 },
+    },
   };
   const programBytes = canonicalJsonBytes(program);
   const manifestCore = {
@@ -255,13 +334,13 @@ async function buildQualificationAnimation(root, semanticRoot, pixelRoot, conten
       appearance_product_root: pixelRoot,
       outfit_spatial_product_root: semanticRoot,
     },
-    buckets: [{ id: bucketId, path: bucketPath, bytes: pixels.length, digest: sha(pixels) }],
+    buckets: [{ id: bucketId, path: bucketPath, bytes: bucketBytes.length, digest: sha(bucketBytes) }],
     programs: { path: 'programs.json', bytes: programBytes.length, digest: sha(programBytes) },
   };
   const manifest = { ...manifestCore, rootContentId: canonicalDigest(manifestCore) };
   writeJson(root, 'animation/manifest.json', manifest);
   writeBytes(root, 'animation/programs.json', programBytes);
-  writeBytes(root, `animation/${bucketPath}`, pixels);
+  writeBytes(root, `animation/${bucketPath}`, bucketBytes);
   return manifest;
 }
 
@@ -408,11 +487,11 @@ export async function buildQualificationWorld(destination) {
   writeJson(root, 'runtime-index/world.json', runtimeWorld);
   writeBytes(root, `publication/semantic/${CHUNK_PATH}`, chunkBytes);
 
-  const pixelBuckets = await buildRuntimePixelBuckets(root, publication.rootContentId, pixel.manifest.rootContentId, pixel.pixelContentId, pixel.pixels);
+  const pixelBuckets = await buildRuntimePixelBuckets(root, publication.rootContentId, pixel.manifest.rootContentId, pixel);
   const overview = await buildOverview(root, publication.rootContentId, semanticWorld, semanticFloors, chunkContentId);
   const minimap = await buildMinimap(root, publication.rootContentId, pixel.manifest.rootContentId, chunkContentId);
 
-  const animation = await buildQualificationAnimation(root, semanticWorld.rootContentId, pixel.manifest.rootContentId, pixel.pixelContentId, pixel.pixels);
+  const animation = await buildQualificationAnimation(root, semanticWorld.rootContentId, pixel.manifest.rootContentId, pixel.pixelContentId, pixel.pixels, pixel.animatedContentId, pixel.animatedPixels);
   const creatures = await buildQualificationCreatures(root, semanticWorld.rootContentId, animation);
   await buildQualificationSearch(root, semanticWorld.rootContentId, creatures.search);
   await buildQualificationGameplay(root);
