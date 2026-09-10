@@ -121,7 +121,7 @@ export function planShadow({candidate,root,protectedRoot}) {
   const protectedImpactManifest=readJson(path.join(protectedRoot,'tools/verification/impact-manifest.json'));
   const protectedStableTestIds=readJson(path.join(protectedRoot,'tools/verification/protected-scenario-inventory.json')).stableTestIds;
   const planInput={repository:REPOSITORY,headSha:candidate.headSha,integrationBaseSha:candidate.baseSha,
-    mergeBaseSha:candidate.baseSha,changedFiles:candidate.changedFiles};
+    mergeBaseSha:candidate.baseSha,changedFiles:candidate.changedFiles,allowControlPlaneMachineOnly:true};
   const unprivilegedDeterministicSubjects=[...new Set(candidate.changedFiles.flatMap(row=>row.status==='renamed'?[row.previousPath,row.path]:['added','modified'].includes(row.status)?[row.path]:[]).filter(name=>typeof name==='string'&&/^tests\/[A-Za-z0-9_./-]+\.(mjs|py)$/.test(name)))].sort();
   const plan=buildVerificationPlan({...planInput,trustedVerificationCatalog:protectedCatalog,candidateVerificationCatalog:protectedCatalog,
     trustedImpactManifest:protectedImpactManifest,candidateImpactManifest:protectedImpactManifest,
