@@ -4,6 +4,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import {fixture} from './fixtures/protected-review-fixture.mjs';
 import {evaluateProtectedRouting} from '../../tools/verification/protected-semantic-routing.mjs';
+import {shadowReviewArtifactName,shadowReviewPlanDigest,validateShadowReviewGate,waitForShadowReviewGate} from '../../tools/verification/verification-shadow-review.mjs';
 
 const module = await import('../../tools/verification/protected-review-evidence.mjs').catch(error => {
   if (error.code === 'ERR_MODULE_NOT_FOUND') return {};
@@ -93,6 +94,40 @@ test('latest exact review supersedes older approval, including revocation',()=>{
   const input=fixture(),newer={...input.review,id:46,state:'DISMISSED',submitted_at:'2026-09-06T10:11:00Z'};
   assert.equal(module.selectLatestProtectedReview([input.review,newer],input.currentCandidate).id,46);
   assert.throws(()=>module.validateProtectedReviewEvidence({...input,review:module.selectLatestProtectedReview([input.review,newer],input.currentCandidate)}));
+});
+test('an in-progress selective run is reviewable only while its sole live job is the protected review gate',()=>{
+  const input=fixture();
+  input.authority.allowInProgressReviewGate=true;input.authority.reviewGateJobName='review';
+  input.captureRun.status='in_progress';input.captureRun.conclusion=null;
+  const gate={id:99,run_id:42,run_attempt:1,head_sha:input.captureRun.head_sha,name:'review',status:'in_progress',conclusion:null,runner_group_id:0,labels:['ubuntu-24.04'],started_at:'2026-09-06T10:04:10Z',completed_at:null};
+  input.captureJobs.jobs.push(gate);
+  assert.equal(module.validateProtectedReviewEvidence(input).accepted,true);
+  for(const mutate of [
+    x=>{x.captureJobs.jobs.find(j=>j.name==='review').status='completed';x.captureJobs.jobs.find(j=>j.name==='review').conclusion='failure';},
+    x=>x.captureJobs.jobs.push({...gate,id:100,name:'unrelated'}),
+    x=>x.captureJobs.jobs.find(j=>j.name==='review').head_sha=sha('d'),
+    x=>x.captureJobs.jobs.push({...gate,id:101}),
+  ]) {
+    const changed=fixture();changed.authority.allowInProgressReviewGate=true;changed.authority.reviewGateJobName='review';changed.captureRun.status='in_progress';changed.captureRun.conclusion=null;changed.captureJobs.jobs.push({...gate});mutate(changed);
+    assert.throws(()=>module.validateProtectedReviewEvidence(changed));
+  }
+});
+test('completed failed capture is reusable only when the protected review gate is the sole failure',()=>{
+  const input=fixture();input.authority.allowCompletedReviewGateFailure=true;input.authority.reviewGateJobName='review';
+  input.captureRun.status='completed';input.captureRun.conclusion='failure';
+  const gate={id:99,run_id:42,run_attempt:1,head_sha:input.captureRun.head_sha,name:'review',status:'completed',conclusion:'failure'};
+  input.captureJobs.jobs.push(gate);
+  assert.equal(module.validateProtectedReviewEvidence(input).accepted,true);
+  for(const mutate of [
+    x=>x.captureJobs.jobs.find(j=>j.name==='review').conclusion='success',
+    x=>x.captureJobs.jobs[0].conclusion='failure',
+    x=>x.captureJobs.jobs.push({...gate,id:100,name:'unrelated',conclusion:'failure'}),
+    x=>x.captureJobs.jobs.find(j=>j.name==='review').head_sha=sha('d'),
+    x=>x.captureJobs.jobs.push({...gate,id:101}),
+  ]) {
+    const changed=fixture();changed.authority.allowCompletedReviewGateFailure=true;changed.authority.reviewGateJobName='review';changed.captureRun.status='completed';changed.captureRun.conclusion='failure';changed.captureJobs.jobs.push({...gate});mutate(changed);
+    assert.throws(()=>module.validateProtectedReviewEvidence(changed));
+  }
 });
 test('protected fixture frames may be captured by the configured GitHub-hosted job',()=>{
   const input=fixture();input.authority.dataCapability='qualification_fixture';input.authority.runnerKind='github-hosted';input.authority.runnerLabels=['ubuntu-24.04'];input.captureJobs.jobs[0].labels=['ubuntu-24.04'];
@@ -211,4 +246,82 @@ test('review scenarios without frame ownership still require passing summary evi
   summary.scenarios=summary.scenarios.filter(row=>row.stableTestId!==id);
   input.files[0].bytes=Buffer.from(JSON.stringify(summary));changeCapture(input,c=>c.summary.digest=digest(input.files[0].bytes));
   assert.throws(()=>module.validateProtectedVisualCapture(input));
+});
+test('R5 review gate consumes the current successful machine capture before the protected run completes',async()=>{
+  const candidate={repository:'Oteryn/Oteryn-Atlas',prNumber:344,headSha:sha('a'),baseSha:sha('b'),treeSha:sha('c'),changedFiles:[{path:'web/fullworld.html',status:'modified'}]};
+  const stable='desktop-chromium::e2e/tests/visual-desktop.spec.mjs::full frame',commandId=hash('1');
+  const contract={commands:[{id:commandId,engine:'playwright',expectedTestIds:[stable],dataCapability:'qualification_fixture'}],groups:[{id:'e2e.visual-presentation'},{id:'review.visual-desktop'}],reviews:[{groupId:'review.visual-desktop',commandIds:[commandId],frames:[{frameId:'desktop.initial',stableTestId:stable}]}]};
+  const productDigest=hash('f'),oracleDigest=hash('e'),planDigest=shadowReviewPlanDigest(candidate,contract),summaryDigest=hash('9'),frameDigest=hash('8');
+  const capture={schemaVersion:1,kind:'protected-visual-capture',candidate,producer:{workflowPath:'.github/workflows/verification-shadow.yml',sourceSha:candidate.baseSha,runId:100,jobId:102,runAttempt:1},planDigest,oracleDigest,productDigest,dataCapability:'qualification_fixture',scenarioIds:[stable],summary:{path:'summary.json',digest:summaryDigest},frames:[{frameId:'desktop.initial',scenarioId:stable,path:'user-visual-evidence/desktop-chromium/desktop.initial/viewport.png',digest:frameDigest}]};
+  const captureBytes=Buffer.from(JSON.stringify(capture)),captureDigest=digest(captureBytes),reviewer={id:5,login:'maintainer'};
+  const decision={schemaVersion:1,kind:'protected-visual-review',candidate,captureDigest,planDigest,summaryDigest,reviewer,reviewedAllFrames:true,result:'PASS',frames:capture.frames.map(row=>({...row,result:'PASS'}))};
+  const review={id:44,user:reviewer,state:'COMMENTED',commit_id:candidate.headSha,pull_request_url:`https://api.github.com/repos/${candidate.repository}/pulls/${candidate.prNumber}`,submitted_at:'2026-09-06T10:10:00Z',body:JSON.stringify({schemaVersion:1,kind:'protected-visual-review-bundle',candidate,captures:[decision]})};
+  const currentRun={id:100,run_attempt:1,path:'.github/workflows/verification-shadow.yml',event:'pull_request_target',head_sha:candidate.headSha,status:'in_progress',conclusion:null,repository:{id:99,full_name:candidate.repository},created_at:'2026-09-06T10:00:00Z',updated_at:'2026-09-06T10:05:00Z',pull_requests:[{number:344,head:{sha:candidate.headSha,repo:{id:99}},base:{sha:candidate.baseSha,repo:{id:99}}}]};
+  const currentJobs={total_count:3,jobs:[{id:101,run_id:100,run_attempt:1,head_sha:candidate.headSha,name:'plan',status:'completed',conclusion:'success'},{id:102,run_id:100,run_attempt:1,head_sha:candidate.headSha,name:'execute',status:'completed',conclusion:'success',runner_group_id:0,labels:['ubuntu-24.04'],started_at:'2026-09-06T10:01:00Z',completed_at:'2026-09-06T10:04:00Z'},{id:103,run_id:100,run_attempt:1,head_sha:candidate.headSha,name:'review',status:'in_progress',conclusion:null}]};
+  const artifact={id:45,name:shadowReviewArtifactName(100),expired:false,size_in_bytes:4096,workflow_run:{id:100,repository_id:99,head_repository_id:99,head_sha:candidate.headSha}};
+  const reviewsEndpoint=`/repos/${candidate.repository}/pulls/344/reviews?per_page=100&page=1`;
+  const responses=new Map([
+    [`/repos/${candidate.repository}/actions/runs/100/attempts/1/jobs?per_page=100`,currentJobs],[`/repos/${candidate.repository}/actions/runs/100`,currentRun],
+    [reviewsEndpoint,[review]],[`/repos/${candidate.repository}/actions/workflows/verification-shadow.yml/runs?event=pull_request_target&head_sha=${candidate.headSha}&per_page=100&page=1`,{workflow_runs:[]}],
+    [`/repos/${candidate.repository}/actions/runs/100/artifacts?per_page=100&page=1`,{artifacts:[artifact]}],[`/repos/${candidate.repository}`,{id:99,full_name:candidate.repository}],
+    [`/repos/${candidate.repository}/collaborators/maintainer/permission`,{permission:'admin',role_name:'admin',user:reviewer}],
+  ]);
+  const request=async endpoint=>{if(!responses.has(endpoint))throw new Error(`unexpected endpoint ${endpoint}`);return structuredClone(responses.get(endpoint));};
+  const options={candidate,currentRunId:100,contract,productDigest,oracleDigest,request,downloadArtifact:()=>[captureBytes],now:'2026-09-06T10:15:00Z'};
+  const result=await validateShadowReviewGate(options);assert.equal(result.accepted,true);assert.equal(result.captureRunId,100);assert.deepEqual(result.captureDigests,[captureDigest]);
+  let reviewReads=0,tick=0;
+  const delayed=async endpoint=>endpoint===reviewsEndpoint&&reviewReads++===0?[]:request(endpoint);
+  const waited=await waitForShadowReviewGate({...options,request:delayed},{maxWaitMs:10,pollMs:5,sleepFn:async ms=>{tick+=ms;},clock:()=>tick});
+  assert.equal(waited.accepted,true);assert.equal(tick,5);
+  const badJobs=structuredClone(currentJobs);badJobs.jobs.find(job=>job.name==='review').status='completed';badJobs.jobs.find(job=>job.name==='review').conclusion='failure';responses.set(`/repos/${candidate.repository}/actions/runs/100/attempts/1/jobs?per_page=100`,badJobs);
+  await assert.rejects(validateShadowReviewGate(options));
+
+  review.submitted_at='2026-09-06T10:35:00Z';
+  const priorRun={...currentRun,status:'completed',conclusion:'failure',updated_at:'2026-09-06T10:31:00Z'};
+  const priorJobs=structuredClone(badJobs);
+  const laterRun={...currentRun,id:200,status:'in_progress',conclusion:null,created_at:'2026-09-06T10:40:00Z',updated_at:'2026-09-06T10:45:00Z'};
+  const laterJobs={total_count:3,jobs:[{id:201,run_id:200,run_attempt:1,head_sha:candidate.headSha,name:'plan',status:'completed',conclusion:'success'},{id:202,run_id:200,run_attempt:1,head_sha:candidate.headSha,name:'execute',status:'completed',conclusion:'success'},{id:203,run_id:200,run_attempt:1,head_sha:candidate.headSha,name:'review',status:'in_progress',conclusion:null}]};
+  responses.set(`/repos/${candidate.repository}/actions/runs/100`,priorRun);
+  responses.set(`/repos/${candidate.repository}/actions/runs/100/attempts/1/jobs?per_page=100`,priorJobs);
+  responses.set(`/repos/${candidate.repository}/actions/runs/200`,laterRun);
+  responses.set(`/repos/${candidate.repository}/actions/runs/200/attempts/1/jobs?per_page=100`,laterJobs);
+  responses.set(`/repos/${candidate.repository}/actions/runs/200/artifacts?per_page=100&page=1`,{artifacts:[]});
+  responses.set(`/repos/${candidate.repository}/actions/workflows/verification-shadow.yml/runs?event=pull_request_target&head_sha=${candidate.headSha}&per_page=100&page=1`,{workflow_runs:[priorRun]});
+  const later=await validateShadowReviewGate({...options,currentRunId:200,now:'2026-09-06T10:45:00Z'});
+  assert.equal(later.accepted,true);assert.equal(later.captureRunId,100);
+  priorJobs.jobs.find(job=>job.name==='execute').conclusion='failure';
+  await assert.rejects(validateShadowReviewGate({...options,currentRunId:200}),/capture run failed outside review gate/);
+});
+test('R5 Merge Queue consumes a successful reviewed PR capture across rename normalization',async()=>{
+  const repository='Oteryn/Oteryn-Atlas',baseSha=sha('b'),prHead=sha('a'),mqHead=sha('d'),treeSha=sha('c');
+  const prCandidate={repository,prNumber:344,headSha:prHead,baseSha,treeSha,changedFiles:[{path:'web/new.mjs',status:'renamed',previousPath:'web/old.mjs'}]};
+  const mqCandidate={repository,prNumber:null,headSha:mqHead,baseSha,treeSha,changedFiles:[{path:'web/new.mjs',status:'added'},{path:'web/old.mjs',status:'removed'}]};
+  const stable='desktop-chromium::e2e/tests/visual-desktop.spec.mjs::full frame',commandId=hash('1');
+  const contract={commands:[{id:commandId,engine:'playwright',expectedTestIds:[stable],dataCapability:'qualification_fixture'}],groups:[{id:'e2e.visual-presentation'},{id:'review.visual-desktop'}],reviews:[{groupId:'review.visual-desktop',commandIds:[commandId],frames:[{frameId:'desktop.initial',stableTestId:stable}]}]};
+  const productDigest=hash('f'),oracleDigest=hash('e'),planDigest=shadowReviewPlanDigest(prCandidate,contract),summaryDigest=hash('9'),frameDigest=hash('8');
+  const capture={schemaVersion:1,kind:'protected-visual-capture',candidate:prCandidate,producer:{workflowPath:'.github/workflows/verification-shadow.yml',sourceSha:baseSha,runId:42,jobId:43,runAttempt:1},planDigest,oracleDigest,productDigest,dataCapability:'qualification_fixture',scenarioIds:[stable],summary:{path:'summary.json',digest:summaryDigest},frames:[{frameId:'desktop.initial',scenarioId:stable,path:'user-visual-evidence/desktop/viewport.png',digest:frameDigest}]};
+  const captureBytes=Buffer.from(JSON.stringify(capture)),captureDigest=digest(captureBytes),reviewer={id:5,login:'maintainer'};
+  const decision={schemaVersion:1,kind:'protected-visual-review',candidate:prCandidate,captureDigest,planDigest,summaryDigest,reviewer,reviewedAllFrames:true,result:'PASS',frames:capture.frames.map(row=>({...row,result:'PASS'}))};
+  const review={id:44,user:reviewer,state:'COMMENTED',commit_id:prHead,pull_request_url:`https://api.github.com/repos/${repository}/pulls/344`,submitted_at:'2026-09-06T10:10:00Z',body:JSON.stringify({schemaVersion:1,kind:'protected-visual-review-bundle',candidate:prCandidate,captures:[decision]})};
+  const priorRun={id:42,run_attempt:1,path:'.github/workflows/verification-shadow.yml',event:'pull_request_target',head_sha:prHead,status:'completed',conclusion:'success',repository:{id:99,full_name:repository},created_at:'2026-09-06T10:00:00Z',updated_at:'2026-09-06T10:05:00Z',pull_requests:[{number:344,head:{sha:prHead,repo:{id:99}},base:{sha:baseSha,repo:{id:99}}}]};
+  const priorJobs={total_count:3,jobs:[{id:41,run_id:42,run_attempt:1,head_sha:prHead,name:'plan',status:'completed',conclusion:'success'},{id:43,run_id:42,run_attempt:1,head_sha:prHead,name:'execute',status:'completed',conclusion:'success',runner_group_id:0,labels:['ubuntu-24.04'],started_at:'2026-09-06T10:01:00Z',completed_at:'2026-09-06T10:04:00Z'},{id:44,run_id:42,run_attempt:1,head_sha:prHead,name:'review',status:'completed',conclusion:'success'}]};
+  const currentRun={id:100,run_attempt:1,path:'.github/workflows/verification-shadow.yml',event:'merge_group',head_sha:mqHead,status:'in_progress',conclusion:null,repository:{id:99,full_name:repository}};
+  const currentJobs={total_count:3,jobs:[{id:101,run_id:100,run_attempt:1,head_sha:mqHead,name:'plan',status:'completed',conclusion:'success'},{id:102,run_id:100,run_attempt:1,head_sha:mqHead,name:'execute',status:'completed',conclusion:'success'},{id:103,run_id:100,run_attempt:1,head_sha:mqHead,name:'review',status:'in_progress',conclusion:null}]};
+  const artifact={id:45,name:shadowReviewArtifactName(42),expired:false,size_in_bytes:4096,workflow_run:{id:42,repository_id:99,head_repository_id:99,head_sha:prHead}};
+  const repo={id:99,full_name:repository,default_branch:'main'},pr={number:344,state:'open',merged:false,changed_files:1,base:{sha:baseSha,ref:'main',repo:{full_name:repository}},head:{sha:prHead,repo:{full_name:repository}}};
+  const responses=new Map([[`/repos/${repository}/actions/runs/100/attempts/1/jobs?per_page=100`,currentJobs],[`/repos/${repository}/actions/runs/100`,currentRun],[`/repos/${repository}/pulls?state=open&per_page=100&page=1`,[pr]],[`/repos/${repository}`,repo],[`/repos/${repository}/git/ref/heads/main`,{object:{sha:baseSha}}],[`/repos/${repository}/pulls/344`,pr],[`/repos/${repository}/pulls/344/files?per_page=100&page=1`,[{filename:'web/new.mjs',previous_filename:'web/old.mjs',status:'renamed'}]],[`/repos/${repository}/git/commits/${prHead}`,{sha:prHead,tree:{sha:treeSha}}],[`/repos/${repository}/pulls/344/reviews?per_page=100&page=1`,[review]],[`/repos/${repository}/actions/workflows/verification-shadow.yml/runs?event=pull_request_target&head_sha=${prHead}&per_page=100&page=1`,{workflow_runs:[priorRun]}],[`/repos/${repository}/actions/runs/42/artifacts?per_page=100&page=1`,{artifacts:[artifact]}],[`/repos/${repository}/actions/runs/42`,priorRun],[`/repos/${repository}/actions/runs/42/attempts/1/jobs?per_page=100`,priorJobs],[`/repos/${repository}/collaborators/maintainer/permission`,{permission:'admin',role_name:'admin',user:reviewer}]]);
+  const request=async endpoint=>{if(!responses.has(endpoint))throw new Error(`unexpected endpoint ${endpoint}`);return structuredClone(responses.get(endpoint));};
+  const result=await validateShadowReviewGate({candidate:mqCandidate,currentRunId:100,contract,productDigest,oracleDigest,request,downloadArtifact:()=>[captureBytes],now:'2026-09-06T10:15:00Z'});
+  assert.equal(result.accepted,true);assert.equal(result.reviewCandidate.prNumber,344);assert.equal(result.captureRunId,42);
+});
+test('R5 review wait is bounded and never waits in Merge Queue',async()=>{
+  const candidate={repository:'Oteryn/Oteryn-Atlas',prNumber:1,headSha:sha('a'),baseSha:sha('b'),treeSha:sha('c'),changedFiles:[{path:'web/a',status:'modified'}]},currentRunId=100;
+  const jobs={total_count:3,jobs:[{id:1,run_id:100,run_attempt:1,head_sha:candidate.headSha,name:'plan',status:'completed',conclusion:'success'},{id:2,run_id:100,run_attempt:1,head_sha:candidate.headSha,name:'execute',status:'completed',conclusion:'success'},{id:3,run_id:100,run_attempt:1,head_sha:candidate.headSha,name:'review',status:'in_progress',conclusion:null}]};
+  const run={id:100,run_attempt:1,path:'.github/workflows/verification-shadow.yml',head_sha:candidate.headSha,status:'in_progress',conclusion:null,repository:{full_name:candidate.repository}};
+  const reviews=`/repos/${candidate.repository}/pulls/1/reviews?per_page=100&page=1`,request=async endpoint=>endpoint.endsWith('/attempts/1/jobs?per_page=100')?structuredClone(jobs):endpoint.endsWith('/actions/runs/100')?structuredClone(run):endpoint===reviews?[]:(()=>{throw new Error(endpoint)})();
+  let tick=0;
+  await assert.rejects(waitForShadowReviewGate({candidate,currentRunId,contract:{},productDigest:hash('f'),oracleDigest:hash('e'),request},{maxWaitMs:10,pollMs:5,sleepFn:async ms=>{tick+=ms;},clock:()=>tick}),/independent visual review required/);
+  assert.equal(tick,10);
+  const mq={...candidate,prNumber:null};
+  await assert.rejects(waitForShadowReviewGate({candidate:mq,currentRunId,contract:{},productDigest:hash('f'),oracleDigest:hash('e'),request},{maxWaitMs:10,pollMs:5,sleepFn:async()=>{throw new Error('MQ must not sleep');},clock:()=>0}));
 });

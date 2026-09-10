@@ -15,6 +15,15 @@ import {buildBoundedRealWorld, verifyBoundedRealWorld, boundedRealTrustDescripto
 import {buildProtectedExpectedAuthority, PUBLICATION_AUTHORITY_ID} from './proof-provenance.mjs';
 import {SELECTED_GAMEPLAY_INPUTS, buildSelectedGameplaySource} from './shadow-gameplay-source.mjs';
 import {runSelectedGameplayHttp} from './shadow-gameplay-http.mjs';
+import {
+  assertShadowExecutorCoverage,
+  assertShadowReviewCaptureCensus,
+  currentShadowJobId,
+  persistShadowReviewCapture,
+  shadowOracleDigest,
+  shadowReviewFramesForCommand,
+  waitForShadowReviewGate,
+} from './verification-shadow-review.mjs';
 
 const REPOSITORY='Oteryn/Oteryn-Atlas';
 const TEMPLATE='tools/maintenance/verification-shadow.yml';
@@ -146,17 +155,6 @@ export function assertContainerStarted(container,result={}) {
   return true;
 }
 
-function shadowGroupSupported(group) {
-  const capabilities=group?.capabilities;
-  if(group?.executionRole==='canonical-review'||group?.evidence==='restricted-visual-review'||capabilities?.visualReview===true) return false;
-  if(group?.executionEngine==='deterministic') return true;
-  if(!capabilities||capabilities.hosted!==true||capabilities.specialistReason!==null) return false;
-  if(group.id==='integration.source-contract-http') return capabilities.dataCapability==='bounded_real_world';
-  if(group.executionEngine!=='playwright') return false;
-  if(capabilities.dataCapability==='qualification_fixture') return true;
-  return capabilities.dataCapability==='bounded_real_world'&&group.id==='integration.source-contract-browser';
-}
-
 export function planShadow({candidate,root,protectedRoot}) {
   const protectedCatalog=readJson(path.join(protectedRoot,'tools/verification/verification-catalog.json'));
   const protectedImpactManifest=readJson(path.join(protectedRoot,'tools/verification/impact-manifest.json'));
@@ -168,7 +166,7 @@ export function planShadow({candidate,root,protectedRoot}) {
     trustedImpactManifest:protectedImpactManifest,candidateImpactManifest:protectedImpactManifest,
     protectedStableTestIds,unprivilegedDeterministicSubjects});
   assertPlanExecutable(plan);
-  for(const group of plan.groups) if(!shadowGroupSupported(group)) fail(`R5 bounded executor unavailable for ${group.id}`);
+  assertShadowExecutorCoverage(plan);
   return {plan,input:{root,protectedRoot,candidate,planInput,protectedCatalog,protectedImpactManifest,protectedStableTestIds}};
 }
 
@@ -222,7 +220,6 @@ function executeDeterministic(command,root,image,dependencyRoot,shimRoot,protect
   let result,container;
   try {
     result=spawnSync('docker',argv,{encoding:'utf8',timeout:command.timeoutSeconds*1000,maxBuffer:16*1024*1024,env:{PATH:process.env.PATH,HOME:process.env.HOME}});
-    // Inspect the actual container, even for timeout/nonzero/daemon failures.
     try {container=JSON.parse(execFileSync('docker',['inspect',name],{encoding:'utf8'}))[0];} catch {assertContainerStarted(null,result);}
     assertContainerStarted(container,result);
     assertDeterministicContainer(container,{command,candidateRoot:root,dependencyRoot,shimRoot,protectedHarnessFile,protectedInputFile,image});
@@ -325,7 +322,7 @@ export function fixtureBrowserArgs(composeArgs,{uid=process.getuid(),gid=process
   return [...composeArgs,'run','--user',`${uid}:${gid}`,'--rm','--no-deps','e2e'];
 }
 
-function runPublicationBrowser(command,{candidate,contract,publication,directory,root}) {
+function runPublicationBrowser(command,{candidate,contract,publication,directory,root,producerJobId,evidenceRoot,oracleDigest}) {
   const suffix=command.id.slice('sha256:'.length,'sha256:'.length+12);
   const context=path.join(directory,`browser-context-${suffix}`);fs.mkdirSync(context);
   for(const relative of ['web','src']) fs.cpSync(path.join(root,relative),path.join(context,relative),{recursive:true});
@@ -339,12 +336,13 @@ function runPublicationBrowser(command,{candidate,contract,publication,directory
   const list=path.join(directory,`test-list-${suffix}.txt`);
   fs.writeFileSync(list,command.expectedTestIds.map(id=>{const [project,spec,...title]=id.split('::');return `[${project}] › ${spec.replace('e2e/tests/','')} › ${title.join('::')}`;}).join('\n')+'\n');
   const artifacts=path.join(directory,`artifacts-${suffix}`);fs.mkdirSync(artifacts);fs.chmodSync(artifacts,0o777);
+  const reviewFrames=shadowReviewFramesForCommand(contract,command);
   const project=`atlas-r5-${randomUUID()}`;
   const args=['compose','-p',project,'-f',path.join(controlRoot,'e2e/compose.protected-hosted-executor.yml'),'-f',path.join(controlRoot,'e2e/compose.github-hosted.yml')];
   const env={PATH:process.env.PATH,HOME:process.env.HOME,ATLAS_EXECUTION_CONTEXT:context,ATLAS_CODE_REVISION:candidate.headSha,
     ATLAS_QUALIFICATION_PUBLICATION_HOST:publication.root,ATLAS_QUALIFICATION_TRUST_JSON:JSON.stringify(publication.trustDescriptor),
     ATLAS_PROTECTED_TEST_LIST:list,ATLAS_E2E_ARTIFACTS_HOST:artifacts,ATLAS_E2E_SHARD:'1/1',ATLAS_E2E_WORKERS:'1',
-    ATLAS_E2E_DATA_CAPABILITY:command.dataCapability,...fixtureReadinessEnvironment(contract),
+    ATLAS_E2E_DATA_CAPABILITY:command.dataCapability,ATLAS_USER_VISUAL_EVIDENCE:reviewFrames.length?'1':'0',...fixtureReadinessEnvironment(contract),
     ATLAS_AUTHORITY_DIGEST:publication.authority.authorityDigest,
     GITHUB_RUN_ID:process.env.GITHUB_RUN_ID,GITHUB_REPOSITORY:REPOSITORY};
   try {
@@ -366,12 +364,18 @@ function runPublicationBrowser(command,{candidate,contract,publication,directory
     const walk=suites=>{for(const suite of suites??[]){for(const spec of suite.specs??[]){for(const test of spec.tests??[]){if(test.status!=='expected'||test.results?.length!==1||test.results[0].status!=='passed'||test.results[0].retry!==0)fail('fixture nonpass/retry');observed.push(`${test.projectName}::e2e/tests/${spec.file.replace(/^.*\/tests\//,'')}::${spec.title}`);}}walk(suite.suites);}};
     walk(report.suites);
     if(report.errors?.length||canonicalJson(observed.sort())!==canonicalJson([...command.expectedTestIds].sort())) fail('fixture actual test census');
-    return {commandId:command.id,passed:true,retry:0,workers:1,expectedTestIds:command.expectedTestIds,observedTestIds:observed,reportDigest:digest(report)};
+    const row={commandId:command.id,passed:true,retry:0,workers:1,expectedTestIds:command.expectedTestIds,observedTestIds:observed,reportDigest:digest(report)};
+    if(reviewFrames.length) {
+      if(!Number.isSafeInteger(producerJobId)||producerJobId<1||!path.isAbsolute(evidenceRoot??''))fail('review capture producer');
+      row.reviewCapture=persistShadowReviewCapture({artifactRoot:artifacts,evidenceRoot,currentCandidate:candidate,command,contract,publication,
+        producer:{workflowPath:ACTIVE,sourceSha:candidate.baseSha,runId:Number(process.env.GITHUB_RUN_ID),jobId:producerJobId,runAttempt:1},oracleDigest});
+    }
+    return row;
   } finally {spawnSync('docker',[...args,'down','--volumes','--remove-orphans'],{env,stdio:'ignore'});}
 }
 
 export async function runShadow(mode,root) {
-  if(!['plan','execute'].includes(mode)) fail('mode');
+  if(!['plan','execute','review'].includes(mode)) fail('mode');
   root=path.resolve(root);
   if(process.env.GITHUB_RUN_ATTEMPT!=='1') fail('reruns are not shadow evidence');
   const event=await resolveShadowEvent({eventName:process.env.GITHUB_EVENT_NAME,event:readJson(process.env.GITHUB_EVENT_PATH),githubSha:process.env.GITHUB_SHA,githubRef:process.env.GITHUB_REF});
@@ -393,13 +397,16 @@ export async function runShadow(mode,root) {
     runId:currentRunId,runAttempt:1,workflowSourceRevision:event.baseSha,apiRunHeadSha:currentRun.head_sha,planDigest:digest(plan),groups:plan.groups.map(g=>g.id),
     parentWorkflowDigest:null,workflowDigest:bytesDigest(fs.readFileSync(path.join(controlRoot,TEMPLATE))),results:[],status:'UNRESOLVED'};
   const hasWork=plan.groups.length>0||plan.candidateTestSubjects.length>0;
+  const requiresReview=plan.groups.some(group=>group.evidence==='restricted-visual-review');
   summary.candidateTestSubjects=plan.candidateTestSubjects;
+  summary.requiresReview=requiresReview;
   if(!hasWork) {summary.status='NO_PRODUCT_WORK';summary.commands=[];}
   if(mode==='plan') {
-    if(process.env.GITHUB_OUTPUT) fs.appendFileSync(process.env.GITHUB_OUTPUT,`has_commands=${hasWork}\n`);
+    if(process.env.GITHUB_OUTPUT) fs.appendFileSync(process.env.GITHUB_OUTPUT,`has_commands=${hasWork}\nrequires_review=${requiresReview}\n`);
     return summary;
   }
   if(!hasWork) fail('S0 must not start product job');
+  if(mode==='review'&&!requiresReview)fail('review job without protected review obligations');
   const directory=fs.mkdtempSync(path.join(os.tmpdir(),'atlas-r5-'));
   try {
     const config=readJson(path.join(controlRoot,'tools/verification/protected-execution-environment.json'));
@@ -414,6 +421,16 @@ export async function runShadow(mode,root) {
       protectedExpectedAuthorities:publications.length?Object.fromEntries(publications.map(([id,value])=>[id,value.authority])):undefined,
       selectedGameplayFiles:selected?.productFiles,selectedSemanticFiles:bounded?.selectedFiles});
     summary.contractDigest=contract.contractDigest;summary.environmentDigest=environmentDigest;summary.commands=contract.commands;
+    const oracleDigest=requiresReview?shadowOracleDigest(controlRoot):null;
+    if(mode==='review') {
+      if(!fixture)fail('review qualification fixture missing');
+      summary.review=await waitForShadowReviewGate({candidate,currentRunId,contract,productDigest:fixture.manifest.productDigest,oracleDigest});
+      const current=await readCandidateSnapshot({...event,changedFiles:gitChangedFiles(root,event.baseSha,event.headSha)});
+      assertCandidateReadback({planned:candidate,current,sourceRepository:REPOSITORY,sourceRef:'refs/heads/main',sourceRevision:event.baseSha});
+      assertCheckout(root,event.headSha);
+      summary.status='PASS';
+      return summary;
+    }
     const executionRoot=contract.commands.some(command=>command.engine==='deterministic')?prepareExecutionView({sourceRoot:root,revision:candidate.headSha,destination:path.join(directory,'candidate-view')}):null;
     const hasSemanticOracle=contract.commands.some(command=>command.executionScope==='protected-harness');
     const protectedHarnessFile=hasSemanticOracle?path.join(directory,'r5-semantic-builder-oracle.mjs'):null;
@@ -421,6 +438,15 @@ export async function runShadow(mode,root) {
     if(hasSemanticOracle) {
       fs.writeFileSync(protectedHarnessFile,R5_SEMANTIC_BUILDER_ORACLE,{flag:'wx',mode:0o444});
       if(bytesDigest(fs.readFileSync(protectedHarnessFile))!==R5_SEMANTIC_BUILDER_ORACLE_DIGEST) fail('protected semantic harness materialization');
+    }
+    let producerJobId=null,evidenceRoot=null;
+    if(requiresReview) {
+      producerJobId=await currentShadowJobId(currentRunId,'execute');
+      const requested=process.env.ATLAS_SHADOW_EVIDENCE_DIR;
+      if(typeof requested!=='string'||!path.isAbsolute(requested))fail('review evidence directory required');
+      evidenceRoot=path.resolve(requested);
+      if(fs.existsSync(evidenceRoot)&&fs.readdirSync(evidenceRoot).length)fail('review evidence directory must be fresh');
+      fs.mkdirSync(evidenceRoot,{recursive:true});
     }
     for(const command of contract.commands) {
       if(command.engine==='deterministic') {verifyExecutionView({viewRoot:executionRoot,sourceRoot:root,revision:candidate.headSha});summary.results.push(executeDeterministic(command,executionRoot,config.container.image,path.join(controlRoot,'e2e/node_modules'),shimRoot,protectedHarnessFile,protectedInputFile));}
@@ -432,13 +458,18 @@ export async function runShadow(mode,root) {
       } else if(command.engine==='playwright') {
         const product=command.dataCapability==='qualification_fixture'?fixture:command.dataCapability==='bounded_real_world'?bounded:null;
         if(!product)fail(`missing ${command.dataCapability} browser publication`);
-        summary.results.push(runPublicationBrowser(command,{candidate,contract,publication:{...product,root:command.dataCapability==='qualification_fixture'?path.join(directory,'fixture'):path.join(directory,'bounded'),trustDescriptor:command.dataCapability==='qualification_fixture'?qualificationTrustDescriptor(product.manifest):boundedRealTrustDescriptor(product.manifest)},directory,root}));
+        summary.results.push(runPublicationBrowser(command,{candidate,contract,publication:{...product,root:command.dataCapability==='qualification_fixture'?path.join(directory,'fixture'):path.join(directory,'bounded'),trustDescriptor:command.dataCapability==='qualification_fixture'?qualificationTrustDescriptor(product.manifest):boundedRealTrustDescriptor(product.manifest)},directory,root,producerJobId,evidenceRoot,oracleDigest}));
       } else fail('unsupported command');
     }
+    if(requiresReview)assertShadowReviewCaptureCensus(contract,summary.results);
     const current=await readCandidateSnapshot({...event,changedFiles:gitChangedFiles(root,event.baseSha,event.headSha)});
     assertCandidateReadback({planned:candidate,current,sourceRepository:REPOSITORY,sourceRef:'refs/heads/main',sourceRevision:event.baseSha});
     assertCheckout(root,event.headSha);
     summary.status=summary.results.length===contract.commands.length&&summary.results.every(row=>row.passed)?'PASS':'FAIL';
+    if(requiresReview) {
+      summary.reviewCaptures=summary.results.filter(row=>row.reviewCapture).map(row=>row.reviewCapture);
+      fs.writeFileSync(path.join(evidenceRoot,'machine-summary.json'),canonicalJson({candidate,contractDigest:contract.contractDigest,reviewPlanDigest:summary.reviewCaptures.length?JSON.parse(fs.readFileSync(path.join(evidenceRoot,summary.reviewCaptures[0].relativeRoot,'capture.json'),'utf8')).planDigest:null,reviewCaptures:summary.reviewCaptures})+'\n',{flag:'wx',mode:0o444});
+    }
     return summary;
   } finally {
     fs.rmSync(directory,{recursive:true,force:true});
