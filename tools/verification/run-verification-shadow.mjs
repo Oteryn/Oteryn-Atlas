@@ -94,7 +94,7 @@ export function prepareExecutionView({sourceRoot,revision,destination}) {
   viewGit('checkout','--quiet','--detach',revision);
   viewGit('remote','remove','origin');
   fs.mkdirSync(path.join(destination,'e2e/node_modules'),{recursive:true});
-  verifyExecutionView({viewRoot:destination,sourceRoot,revision});
+  verifyExecutionView({viewRoot:destination,sourceRoot:revision?sourceRoot:sourceRoot,revision});
   assertCheckout(sourceRoot,revision);
   return destination;
 }
@@ -108,8 +108,9 @@ export function assertContainerStarted(container,result={}) {
 }
 
 function shadowGroupSupported(group) {
-  if(group?.executionEngine==='deterministic') return true;
   const capabilities=group?.capabilities;
+  if(group?.executionRole==='canonical-review'||group?.evidence==='restricted-visual-review'||capabilities?.visualReview===true) return false;
+  if(group?.executionEngine==='deterministic') return true;
   if(!capabilities||capabilities.hosted!==true||capabilities.specialistReason!==null) return false;
   if(group.id==='integration.source-contract-http') return capabilities.dataCapability==='bounded_real_world';
   if(group.executionEngine!=='playwright') return false;
@@ -122,7 +123,7 @@ export function planShadow({candidate,root,protectedRoot}) {
   const protectedImpactManifest=readJson(path.join(protectedRoot,'tools/verification/impact-manifest.json'));
   const protectedStableTestIds=readJson(path.join(protectedRoot,'tools/verification/protected-scenario-inventory.json')).stableTestIds;
   const planInput={repository:REPOSITORY,headSha:candidate.headSha,integrationBaseSha:candidate.baseSha,
-    mergeBaseSha:candidate.baseSha,changedFiles:candidate.changedFiles};
+    mergeBaseSha:candidate.baseSha,changedFiles:candidate.changedFiles,allowControlPlaneMachineOnly:true};
   const unprivilegedDeterministicSubjects=[...new Set(candidate.changedFiles.flatMap(row=>row.status==='renamed'?[row.previousPath,row.path]:['added','modified'].includes(row.status)?[row.path]:[]).filter(name=>typeof name==='string'&&/^tests\/[A-Za-z0-9_./-]+\.(mjs|py)$/.test(name)))].sort();
   const plan=buildVerificationPlan({...planInput,trustedVerificationCatalog:protectedCatalog,candidateVerificationCatalog:protectedCatalog,
     trustedImpactManifest:protectedImpactManifest,candidateImpactManifest:protectedImpactManifest,
