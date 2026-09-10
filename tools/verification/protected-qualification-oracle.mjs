@@ -7,6 +7,7 @@
 //   node tests/verification/protected-qualification-oracle.test.mjs --finalize-bundle
 // Finalization removes only the exact unused FULLWORLD_TRUST browser-global initializer.
 // Generator: esbuild 0.25.9. No minification or dependency execution at proof time.
+// Gameplay subproduct pins are embedded by the reviewed generator; no gameplay builder is imported at proof time.
 // Regeneration requires independent authority review; admission cannot change this file.
 // Source blob 0c26b4f7fbfe3eed258cd14b893646015da09476 src/browser/animation-runtime.mjs
 // Source blob 0f44da17c30a61089b0cec1c110d8411fedc8f94 src/browser/creature-publication-source.mjs
@@ -16,8 +17,8 @@
 // Source blob 152b79dfe3f8fd92dd4159c236db55ef2a86d904 src/browser/semantic-search.mjs
 // Source blob 61df75f257812eea13ddaddb7b771ac3c722ad97 src/browser/semantic.mjs
 // Source blob 88fe5302a799c02f46c57154623d721435f9599a tools/verification/qualification-fixture-definition.mjs
-// Source blob eaf0c278570233c3ac0de8c51c18f6d579392d71 tools/verification/qualification-world.mjs
-// Payload sha256 7d1f8ff5ae8efc96501a35052859900eeae588ef9e584cda78c2e3791ccd88f2
+// Source blob 0d02ac81c9892b642b94e13bf002c316bcb9f016 tools/verification/qualification-world.mjs
+// Payload sha256 76e8a5260be5c71d4312adfca5990d896118115fc4ae508344c8d558bfaa0d55
 // BEGIN GENERATED ORACLE
 // <stdin>
 import crypto from "node:crypto";
@@ -41,19 +42,33 @@ var CAMERA_ITINERARY = Object.freeze([
 // src/browser/loader.mjs
 var MAX_MANIFEST_BYTES = 256 * 1024;
 var MAX_CHUNK_BYTES = 2 * 1024 * 1024;
-function sortCanonical(value) {
-  if (Array.isArray(value)) return value.map(sortCanonical);
-  if (value && typeof value === "object") {
-    const result = {};
-    for (const key of Object.keys(value).sort()) result[key] = sortCanonical(value[key]);
-    return result;
+function compareUnicodeCodePoints(left, right) {
+  let leftIndex = 0;
+  let rightIndex = 0;
+  while (leftIndex < left.length && rightIndex < right.length) {
+    const leftPoint = left.codePointAt(leftIndex);
+    const rightPoint = right.codePointAt(rightIndex);
+    if (leftPoint !== rightPoint) return leftPoint < rightPoint ? -1 : 1;
+    leftIndex += leftPoint > 65535 ? 2 : 1;
+    rightIndex += rightPoint > 65535 ? 2 : 1;
   }
-  return value;
+  if (leftIndex < left.length) return 1;
+  if (rightIndex < right.length) return -1;
+  return 0;
+}
+function canonicalJsonText(value) {
+  if (Array.isArray(value)) return `[${value.map(canonicalJsonText).join(",")}]`;
+  if (value && typeof value === "object") {
+    const entries = Object.keys(value).sort(compareUnicodeCodePoints).map((key) => `${JSON.stringify(key)}:${canonicalJsonText(value[key])}`);
+    return `{${entries.join(",")}}`;
+  }
+  const text = JSON.stringify(value);
+  if (text === void 0) throw new TypeError("unsupported canonical JSON value");
+  return text;
 }
 function canonicalJsonBytes(value) {
-  const text = `${JSON.stringify(sortCanonical(value))}
-`;
-  return new TextEncoder().encode(text);
+  return new TextEncoder().encode(`${canonicalJsonText(value)}
+`);
 }
 var SHA256_K = Object.freeze([
   1116352408,
@@ -740,6 +755,29 @@ function productEntries(root) {
   walk(root);
   return out.sort((a, b) => a.path.localeCompare(b.path));
 }
+var QUALIFICATION_GAMEPLAY_PINS = Object.freeze([{ "path": "web/creature-gameplay/manifest.json", "bytes": 1837, "digest": "sha256:577b40fb5c6dff901f1c3c9e76a1a401bc54f5771affebc0bbe98c9982262202" }, { "path": "web/creature-gameplay/shards/monster-aa.json", "bytes": 648, "digest": "sha256:6167651f21b543888d4b1df962bf2ae94813c7823210b472874bbe9f66d4efa2" }, { "path": "web/creature-gameplay/shards/npc-11.json", "bytes": 663, "digest": "sha256:28c2205766e898c62740acd1092e437ef15b152a4aceac22ea98423880960db9" }, { "path": "web/creature-gameplay/shards/npc-22.json", "bytes": 557, "digest": "sha256:eddad6d57951750f71ca9d44abbc15c4b65c044785ae890f7501363cbe9c9a94" }, { "path": "web/creature-gameplay/shards/npc-44.json", "bytes": 15577, "digest": "sha256:2839ded43ef67c3098fa9a8465127754364c3feded0a935964522a7d9ba537c8" }, { "path": "web/creature-gameplay/shards/npc-55.json", "bytes": 353, "digest": "sha256:6e843dbbfdd4cb96de3a8ab63b7568699dacad19079f245f9a042e660aaf6176" }].map(Object.freeze));
+function verifyQualificationGameplayPins(root) {
+  const base = path.join(root, "web", "creature-gameplay");
+  const actual = [];
+  const walk = (directory) => {
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      const full = path.join(directory, entry.name), stat = fs.lstatSync(full);
+      if (stat.isSymbolicLink() || !stat.isFile() && !stat.isDirectory()) throw new TypeError("qualification gameplay contains nonregular input");
+      if (stat.isDirectory()) walk(full);
+      else actual.push(path.relative(root, full).replaceAll(path.sep, "/"));
+    }
+  };
+  walk(base);
+  actual.sort();
+  const expected = QUALIFICATION_GAMEPLAY_PINS.map((pin) => pin.path).sort();
+  if (JSON.stringify(actual) !== JSON.stringify(expected)) throw new TypeError("qualification gameplay file inventory mismatch");
+  for (const pin of QUALIFICATION_GAMEPLAY_PINS) {
+    const bytes = fs.readFileSync(path.join(root, pin.path));
+    if (bytes.length !== pin.bytes || sha(bytes) !== pin.digest) throw new TypeError("qualification gameplay pinned byte mismatch: " + pin.path);
+  }
+  const manifest = JSON.parse(fs.readFileSync(path.join(root, "web/creature-gameplay/manifest.json"), "utf8"));
+  if (manifest.contract_id !== "oteryn-atlas-qualification-fixture-v1" || manifest.capability !== "qualification-creature-gameplay-v1" || manifest.fixture_id !== FIXTURE_ID || manifest.semantic_digest !== "sha256:79e5814b4b6e1e8b794b90210411687598e21ea33ffffb4ce78ad2ca0cfdd158") throw new TypeError("qualification gameplay identity mismatch");
+}
 function qualificationTrustDescriptor(manifest) {
   resolveQualificationManifestTrust(manifest);
   return Object.freeze({
@@ -797,6 +835,7 @@ async function verifyQualificationWorld(root) {
   validateSemanticSearchIndex(semanticIndex, ancillary.semanticSearch);
   const semanticCreatures = JSON.parse(fs.readFileSync(path.join(root, "web/semantic-search/creatures.json"), "utf8"));
   validateCreatureSearchCatalog(semanticCreatures, ancillary.semanticSearch);
+  verifyQualificationGameplayPins(root);
   return Object.freeze(manifest);
 }
 export {
