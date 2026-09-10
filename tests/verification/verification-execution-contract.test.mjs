@@ -74,6 +74,11 @@ test('review frames remain additional obligations after exact browser command re
  Object.assign(input,createPublicationProofFixtures());
  const contract=resolveExecutionContract(input);
  assert.equal(contract.commands.length,2);assert.equal(contract.reviews.length,2);
+ const plan=buildVerificationPlan({...input.planInput,trustedVerificationCatalog:input.protectedCatalog,
+  candidateVerificationCatalog:input.protectedCatalog,trustedImpactManifest:input.protectedImpactManifest,
+  candidateImpactManifest:input.protectedImpactManifest,protectedStableTestIds:input.protectedStableTestIds});
+ assert.deepEqual(contract.reviews.map(({groupId})=>groupId).sort(),plan.requiredVisualGroupIds);
+ assert(contract.reviews.every(review=>review.frames.length&&review.commandIds.length));
  assert.equal(contract.reviews.flatMap(r=>r.frames).length,13);
  assert(contract.commands.every(c=>c.dataCapability==='qualification_fixture'));
 });
@@ -303,6 +308,14 @@ test('R5 protected shadow planner accepts exact canary routes plus hosted depth/
   assert.deepEqual(full.requiredVisualGroupIds, []);
   assert.equal(full.groups.some((group) => group.executionRole === 'canonical-review' || group.evidence === 'restricted-visual-review' || group.capabilities?.visualReview === true), false);
   assert.equal(full.groups.some((group) => group.capabilities?.dataCapability === 'real_fullworld'), false);
+  const fixture = createPublicationProofFixtures(['qualification_fixture']);
+  const contract = resolveExecutionContract({ ...planShadow({ candidate: r5Candidate('tools/verification/impact-manifest.json'), root, protectedRoot: root }).input,
+    environmentDigest: 'd'.repeat(64), ...fixture });
+  assert.deepEqual(contract.reviews, []);
+  for (const id of ['e2e.bounded-performance', 'e2e.bounded-soak', 'e2e.bounded-stress', 'e2e.common-smoke']) {
+    assert.ok(contract.groups.some((group) => group.id === id), `sealed machine safety net must contain ${id}`);
+  }
+  assert(contract.commands.every((command) => command.dataCapability === 'qualification_fixture'));
   assert.throws(
     () => planShadow({ candidate: r5Candidate('e2e/tests/fullworld-animation-census-desktop.spec.mjs'), root, protectedRoot: root }),
     /executor unavailable|real[_ -]?fullworld|specialist/i,
