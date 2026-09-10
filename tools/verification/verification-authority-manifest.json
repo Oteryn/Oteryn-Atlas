@@ -123,6 +123,10 @@
       "path": "tools/verification/build-verification-plan.mjs"
     },
     {
+      "id": "tools-verification-collect-protected-visual-capture-mjs",
+      "path": "tools/verification/collect-protected-visual-capture.mjs"
+    },
+    {
       "id": "tools-verification-complete-product-proof-mjs",
       "path": "tools/verification/complete-product-proof.mjs"
     },
