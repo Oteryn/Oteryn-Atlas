@@ -63,11 +63,13 @@ test('protected workflow keeps direct PR/MQ authority and adds an exact review g
   assert.equal(active,template);
   assert.match(active,/\n  merge_group:\n    types: \[checks_requested\]/);
   assert.doesNotMatch(active,/\n  workflow_run:/);
+  assert.doesNotMatch(active,/\n  pull_request_review:/);
   assert.match(active,/github\.event\.merge_group\.base_sha/);
   assert.match(active,/github\.event\.merge_group\.head_sha/);
   assert.match(active,/if: needs\.plan\.outputs\.has_commands == 'true'/);
   assert.match(active,/requires_review: \$\{\{ steps\.plan\.outputs\.requires_review \}\}/);
   assert.match(active,/actions\/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02/);
+  assert.match(active,/review:[\s\S]*?timeout-minutes: 30/);
   assert.match(active,/run: node protected\/tools\/verification\/run-verification-shadow\.mjs review/);
   assert.equal((active.match(/persist-credentials: false/g)??[]).length,6);
   assert.doesNotMatch(active,/statuses:\s*write|checks:\s*write/);

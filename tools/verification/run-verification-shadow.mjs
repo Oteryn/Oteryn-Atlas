@@ -21,7 +21,7 @@ import {
   persistShadowReviewCapture,
   shadowOracleDigest,
   shadowReviewFramesForCommand,
-  validateShadowReviewGate,
+  waitForShadowReviewGate,
 } from './verification-shadow-review.mjs';
 
 const REPOSITORY='Oteryn/Oteryn-Atlas';
@@ -380,7 +380,7 @@ export async function runShadow(mode,root) {
     const oracleDigest=requiresReview?shadowOracleDigest(controlRoot):null;
     if(mode==='review') {
       if(!fixture)fail('review qualification fixture missing');
-      summary.review=await validateShadowReviewGate({candidate,currentRunId,contract,productDigest:fixture.manifest.productDigest,oracleDigest});
+      summary.review=await waitForShadowReviewGate({candidate,currentRunId,contract,productDigest:fixture.manifest.productDigest,oracleDigest});
       const current=await readCandidateSnapshot({...event,changedFiles:gitChangedFiles(root,event.baseSha,event.headSha)});
       assertCandidateReadback({planned:candidate,current,sourceRepository:REPOSITORY,sourceRef:'refs/heads/main',sourceRevision:event.baseSha});
       assertCheckout(root,event.headSha);

@@ -11,6 +11,8 @@ const ACTIVE='.github/workflows/verification-shadow.yml';
 const REVIEW_ARTIFACT_PREFIX='atlas-verification-review';
 const REVIEW_MAX_AGE_MS=72*60*60*1000;
 const REVIEW_ARTIFACT_MAX_BYTES=96*1024*1024;
+const REVIEW_WAIT_MS=25*60*1000;
+const REVIEW_POLL_MS=15*1000;
 const fail=message=>{throw new TypeError(`verification shadow review: ${message}`);};
 const digest=value=>'sha256:'+createHash('sha256').update(canonicalJson(value)).digest('hex');
 const same=(left,right)=>canonicalJson(left)===canonicalJson(right);
@@ -53,6 +55,23 @@ function safeRelative(relative) {
   if(typeof relative!=='string'||relative.startsWith('/')||relative.includes('\\')||relative.split('/').some(part=>!part||part==='.'||part==='..'))fail('unsafe evidence path');
   return relative;
 }
+export function normalizeShadowReviewChangedFiles(rows) {
+  if(!Array.isArray(rows)||!rows.length)fail('review changed files');
+  const normalized=[];
+  for(const row of rows) {
+    if(!row||typeof row!=='object'||Array.isArray(row))fail('review changed file shape');
+    safeRelative(row.path);
+    if(row.status==='renamed') {
+      safeRelative(row.previousPath);
+      normalized.push({path:row.previousPath,status:'removed'},{path:row.path,status:'added'});
+    } else {
+      if(!['added','modified','removed'].includes(row.status))fail('review changed file status');
+      normalized.push({path:row.path,status:row.status});
+    }
+  }
+  if(new Set(normalized.map(row=>row.path)).size!==normalized.length)fail('review changed file collision');
+  return normalized.sort((a,b)=>a.path.localeCompare(b.path));
+}
 function copyEvidenceFile(root,relative,bytes) {
   safeRelative(relative);
   const target=path.join(root,...relative.split('/'));
@@ -78,7 +97,7 @@ export function shadowReviewFramesForCommand(contract,command) {
 export function shadowReviewPlanDigest(candidate,contract) {
   if(!candidate||!exactSha(candidate.baseSha)||!exactSha(candidate.treeSha)||!Array.isArray(candidate.changedFiles))fail('review candidate identity');
   return digest({schemaVersion:1,repository:candidate.repository,baseSha:candidate.baseSha,treeSha:candidate.treeSha,
-    changedFiles:candidate.changedFiles,
+    changedFiles:normalizeShadowReviewChangedFiles(candidate.changedFiles),
     commands:(contract.commands??[]).map(({id,...command})=>command),
     reviews:(contract.reviews??[]).map(review=>({groupId:review.groupId,frames:review.frames})),
     groups:(contract.groups??[]).map(group=>group.id)});
@@ -185,7 +204,7 @@ async function exactReviewCandidate(candidate,request) {
   const matches=[];
   for(const pr of candidates) {
     const current=await readCandidateSnapshot({request,repository:candidate.repository,baseSha:candidate.baseSha,headSha:pr.head.sha,prNumber:pr.number,changedFiles:[]});
-    if(current.treeSha===candidate.treeSha&&same(current.changedFiles,candidate.changedFiles))matches.push(current);
+    if(current.treeSha===candidate.treeSha&&same(normalizeShadowReviewChangedFiles(current.changedFiles),normalizeShadowReviewChangedFiles(candidate.changedFiles)))matches.push(current);
   }
   if(matches.length!==1)fail('Merge Queue requires unique exact-tree PR association');
   return matches[0];
@@ -210,7 +229,7 @@ export function downloadShadowCaptureArtifact(repository,artifactId) {
   return rows.map(value=>Buffer.from(value,'base64'));
 }
 
-function expectedCaptureAuthorities({candidate,contract,productDigest,oracleDigest,repositoryId,artifactName}) {
+function expectedCaptureAuthorities({candidate,contract,productDigest,oracleDigest,repositoryId,artifactName,liveReview=false}) {
   const values=[];
   const planDigest=shadowReviewPlanDigest(candidate,contract);
   for(const command of contract.commands??[]) {
@@ -220,7 +239,7 @@ function expectedCaptureAuthorities({candidate,contract,productDigest,oracleDige
     const requiredFrames=frames.map(({frameId,stableTestId})=>({frameId,scenarioId:stableTestId}));
     values.push({match:{dataCapability:command.dataCapability,frameIds:requiredFrames.map(row=>row.frameId).sort()},authority:{repositoryId,
       protectedBaseSha:candidate.baseSha,workflowPath:ACTIVE,jobName:'execute',artifactName,runnerKind:'github-hosted',runnerGroupId:0,runnerLabels:['ubuntu-24.04'],
-      maxAgeMs:REVIEW_MAX_AGE_MS,allowFailedReviewGate:true,reviewGateJobName:'review',planDigest,oracleDigest,productDigest,
+      maxAgeMs:REVIEW_MAX_AGE_MS,...(liveReview?{allowInProgressReviewGate:true,reviewGateJobName:'review'}:{}),planDigest,oracleDigest,productDigest,
       dataCapability:command.dataCapability,scenarioIds:[...new Set(requiredFrames.map(row=>row.scenarioId))].sort(),summaryScenarioIds:command.expectedTestIds,requiredFrames}});
   }
   return values;
@@ -242,18 +261,23 @@ function pairCaptures(captureBytesList,expected) {
 
 export async function validateShadowReviewGate({candidate,currentRunId,contract,productDigest,oracleDigest,request=githubRequest,downloadArtifact=downloadShadowCaptureArtifact,now=new Date().toISOString()}) {
   await assertCurrentMachineRun(request,currentRunId);
+  const currentRun=await request(`/repos/${candidate.repository}/actions/runs/${currentRunId}`);
+  if(currentRun?.id!==currentRunId||currentRun.run_attempt!==1||currentRun.path!==ACTIVE||currentRun.status!=='in_progress'||currentRun.conclusion!==null
+    ||currentRun.head_sha!==candidate.headSha||currentRun.repository?.full_name!==candidate.repository)fail('current review run identity');
   const reviewCandidate=await exactReviewCandidate(candidate,request);
-  if(reviewCandidate.baseSha!==candidate.baseSha||reviewCandidate.treeSha!==candidate.treeSha||!same(reviewCandidate.changedFiles,candidate.changedFiles))fail('review candidate tree/base drift');
+  if(reviewCandidate.baseSha!==candidate.baseSha||reviewCandidate.treeSha!==candidate.treeSha
+    ||!same(normalizeShadowReviewChangedFiles(reviewCandidate.changedFiles),normalizeShadowReviewChangedFiles(candidate.changedFiles)))fail('review candidate tree/base drift');
   const reviews=await pages(request,`/repos/${candidate.repository}/pulls/${reviewCandidate.prNumber}/reviews`);
   const review=selectLatestProtectedReview(reviews,reviewCandidate);
   if(!review)fail('independent visual review required');
   const wanted=reviewCaptureDigests(review,reviewCandidate);
   const runs=await pages(request,`/repos/${candidate.repository}/actions/workflows/verification-shadow.yml/runs?event=pull_request_target&head_sha=${reviewCandidate.headSha}`,'workflow_runs');
-  const eligible=runs.filter(run=>run.id<currentRunId&&run.path===ACTIVE&&run.event==='pull_request_target'&&run.run_attempt===1&&run.status==='completed'
+  const prior=runs.filter(run=>run.id<currentRunId&&run.path===ACTIVE&&run.event==='pull_request_target'&&run.run_attempt===1&&run.status==='completed'&&run.conclusion==='success'
     &&run.head_sha===reviewCandidate.headSha&&Array.isArray(run.pull_requests)&&run.pull_requests.some(pr=>pr.number===reviewCandidate.prNumber&&pr.head?.sha===reviewCandidate.headSha&&pr.base?.sha===reviewCandidate.baseSha))
     .sort((a,b)=>b.id-a.id).slice(0,20);
+  const candidates=candidate.prNumber===null?prior:[currentRun,...prior];
   let selected=null;
-  for(const run of eligible) {
+  for(const run of candidates) {
     const artifacts=await pages(request,`/repos/${candidate.repository}/actions/runs/${run.id}/artifacts`,'artifacts');
     const name=shadowReviewArtifactName(run.id),matches=artifacts.filter(artifact=>artifact.name===name&&!artifact.expired);
     if(matches.length>1)fail('duplicate review artifact');
@@ -269,8 +293,8 @@ export async function validateShadowReviewGate({candidate,currentRunId,contract,
   const jobs=await workflowJobs(request,selected.run.id);
   const repo=await request(`/repos/${candidate.repository}`);
   if(repo.full_name!==candidate.repository||!Number.isSafeInteger(repo.id))fail('review repository identity');
-  const artifactName=shadowReviewArtifactName(run.id);
-  const expected=expectedCaptureAuthorities({candidate:reviewCandidate,contract,productDigest,oracleDigest,repositoryId:repo.id,artifactName});
+  const artifactName=shadowReviewArtifactName(run.id),liveReview=run.id===currentRunId;
+  const expected=expectedCaptureAuthorities({candidate:reviewCandidate,contract,productDigest,oracleDigest,repositoryId:repo.id,artifactName,liveReview});
   const captures=pairCaptures(selected.captureBytesList,expected);
   if(captures.length!==wanted.length)fail('review bundle capture count');
   const login=review.user?.login;
@@ -278,12 +302,27 @@ export async function validateShadowReviewGate({candidate,currentRunId,contract,
   const permissionEndpoint=`/repos/${candidate.repository}/collaborators/${encodeURIComponent(login)}/permission`;
   const reviewerPermission=await request(permissionEndpoint);
   const independent=validateProtectedReviewBundle({currentCandidate:reviewCandidate,captures,captureRun:run,captureJobs:{jobs},captureArtifact:selected.artifact,review,reviewerPermission,now});
-  const [finalRun,finalReviews,finalPermission,finalArtifacts]=await Promise.all([
-    request(`/repos/${candidate.repository}/actions/runs/${run.id}`),
-    pages(request,`/repos/${candidate.repository}/pulls/${reviewCandidate.prNumber}/reviews`),
-    request(permissionEndpoint),
+  const [finalRun,finalJobs,finalReviews,finalPermission,finalArtifacts]=await Promise.all([
+    request(`/repos/${candidate.repository}/actions/runs/${run.id}`),workflowJobs(request,run.id),
+    pages(request,`/repos/${candidate.repository}/pulls/${reviewCandidate.prNumber}/reviews`),request(permissionEndpoint),
     pages(request,`/repos/${candidate.repository}/actions/runs/${run.id}/artifacts`,'artifacts'),
   ]);
-  if(!same(finalRun,run)||!same(finalReviews,reviews)||!same(finalPermission,reviewerPermission)||!same(finalArtifacts,selected.artifacts))fail('review evidence changed during validation');
+  const finalReview=selectLatestProtectedReview(finalReviews,reviewCandidate);
+  if(!finalReview||finalReview.id!==review.id)fail('review decision changed during validation');
+  const finalMatches=finalArtifacts.filter(artifact=>artifact.name===artifactName&&!artifact.expired);
+  if(finalMatches.length!==1||finalMatches[0].id!==selected.artifact.id)fail('review artifact changed during validation');
+  validateProtectedReviewBundle({currentCandidate:reviewCandidate,captures,captureRun:finalRun,captureJobs:{jobs:finalJobs},captureArtifact:finalMatches[0],review:finalReview,reviewerPermission:finalPermission,now});
   return {accepted:true,reviewCandidate,reviewId:independent.reviewId,captureRunId:run.id,captureArtifactId:selected.artifact.id,captureDigests:wanted};
+}
+
+const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+export async function waitForShadowReviewGate(options,{maxWaitMs=REVIEW_WAIT_MS,pollMs=REVIEW_POLL_MS,sleepFn=sleep,clock=Date.now}={}) {
+  if(!Number.isSafeInteger(maxWaitMs)||maxWaitMs<0||!Number.isSafeInteger(pollMs)||pollMs<1||typeof sleepFn!=='function'||typeof clock!=='function')fail('review wait policy');
+  const deadline=clock()+maxWaitMs;
+  for(;;) {
+    try{return await validateShadowReviewGate(options);}catch(error) {
+      if(options?.candidate?.prNumber===null||error?.message!=='verification shadow review: independent visual review required'||clock()>=deadline)throw error;
+      await sleepFn(Math.min(pollMs,Math.max(1,deadline-clock())));
+    }
+  }
 }

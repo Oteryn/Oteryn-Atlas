@@ -122,21 +122,21 @@ export function validateProtectedReviewEvidence(input) {
 }
 
 function validateCaptureRunOutcome(run,jobs,authority) {
-  if(run.conclusion==='success')return;
-  if(run.conclusion!=='failure'||authority.allowFailedReviewGate!==true||authority.reviewGateJobName!=='review')fail('current protected capture run required');
+  if(run.status==='completed'&&run.conclusion==='success')return;
+  if(run.status!=='in_progress'||run.conclusion!==null||authority.allowInProgressReviewGate!==true||authority.reviewGateJobName!=='review')fail('current protected capture run required');
   const gates=jobs.filter(job=>job.name===authority.reviewGateJobName);
-  if(gates.length!==1)fail('unique failed review gate required');
+  if(gates.length!==1)fail('unique live review gate required');
   const gate=gates[0];
-  if(gate.run_id!==run.id||gate.run_attempt!==1||gate.head_sha!==run.head_sha||gate.status!=='completed'||gate.conclusion!=='failure')fail('failed review gate identity');
+  if(gate.run_id!==run.id||gate.run_attempt!==1||gate.head_sha!==run.head_sha||gate.status!=='in_progress'||gate.conclusion!==null)fail('live review gate identity');
   for(const job of jobs) {
     if(job.id===gate.id)continue;
-    if(job.run_id!==run.id||job.run_attempt!==1||job.head_sha!==run.head_sha||job.status!=='completed'||!['success','skipped'].includes(job.conclusion))fail('capture run failed outside review gate');
+    if(job.run_id!==run.id||job.run_attempt!==1||job.head_sha!==run.head_sha||job.status!=='completed'||!['success','skipped'].includes(job.conclusion))fail('capture run incomplete outside review gate');
   }
 }
 
 function validateDecision(input,decision) {
   const capture=manifest(input),{authority:a,currentCandidate:c,captureRun:run,captureJobs,captureArtifact:artifact,review,reviewerPermission:permission}=input,p=capture.producer;
-  if(!isPlainObject(run)||run.id!==p.runId||run.run_attempt!==1||run.path!==a.workflowPath||!['workflow_dispatch','pull_request_target'].includes(run.event)||run.status!=='completed')fail('current protected capture run required');
+  if(!isPlainObject(run)||run.id!==p.runId||run.run_attempt!==1||run.path!==a.workflowPath||!['workflow_dispatch','pull_request_target'].includes(run.event)||!['completed','in_progress'].includes(run.status))fail('current protected capture run required');
   equal(run.repository?.full_name,c.repository,'capture repository drift');equal(run.repository?.id,integer(a.repositoryId),'capture repository ID drift');
   if(run.event==='workflow_dispatch')equal(run.head_sha,c.baseSha,'dispatch protected source drift');
   else {
@@ -162,9 +162,10 @@ function validateDecision(input,decision) {
   else fail('protected runner kind required');
   if(!isPlainObject(artifact)||!Number.isSafeInteger(artifact.id)||artifact.id<1||artifact.name!==text(a.artifactName)||artifact.expired!==false)fail('protected capture artifact required');
   for(const [key,value] of Object.entries({id:p.runId,repository_id:a.repositoryId,head_repository_id:a.repositoryId,head_sha:run.head_sha}))equal(artifact.workflow_run?.[key],value,'capture artifact association drift');
-  const clock=instant(input.now),started=instant(run.created_at),ended=instant(run.updated_at),jobStarted=instant(job.started_at),jobEnded=instant(job.completed_at);
+  const clock=instant(input.now),started=instant(run.created_at),jobStarted=instant(job.started_at),jobEnded=instant(job.completed_at);
+  const completed=run.status==='completed',ended=completed?instant(run.updated_at):jobEnded;
   integer(a.maxAgeMs);
-  if(started>jobStarted||jobStarted>jobEnded||jobEnded>ended||ended>clock||clock-started>a.maxAgeMs)fail('capture freshness');
+  if(started>jobStarted||jobStarted>jobEnded||(completed&&jobEnded>ended)||ended>clock||clock-started>a.maxAgeMs)fail('capture freshness');
   if(!isPlainObject(review)||!['COMMENTED','APPROVED'].includes(review.state)||review.commit_id!==c.headSha||review.pull_request_url!==`https://api.github.com/repos/${c.repository}/pulls/${c.prNumber}`)fail('current authenticated review required');
   integer(review.id);integer(review.user?.id);text(review.user?.login);
   const submitted=instant(review.submitted_at);
