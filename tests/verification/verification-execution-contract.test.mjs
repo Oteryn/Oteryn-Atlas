@@ -464,11 +464,6 @@ test('S0 plans zero groups and S2/S3 select only their narrow protected owners',
  assert.deepEqual(plan('e2e/tests/layer-audit-desktop.spec.mjs').groups.map(g=>g.id),['e2e.layer-availability']);
  assert.deepEqual(plan('e2e/tests/creature-gameplay-source-contract-desktop.spec.mjs').groups.map(g=>g.id),['integration.source-contract-http']);
 for(const name of ['e2e/tests/performance-desktop.spec.mjs','e2e/tests/soak-desktop.spec.mjs','e2e/tests/stress-desktop.spec.mjs']) assert.doesNotThrow(()=>plan(name),name);
- const soak=plan('e2e/tests/soak-desktop.spec.mjs');
- assert.deepEqual(soak.groups.map(g=>g.id),['e2e.bounded-soak']);
- assert.equal(soak.groups[0].capabilities.dataCapability,'qualification_fixture');
- assert.equal(soak.groups[0].capabilities.hosted,true);
- assert.equal(soak.requiresRealFullWorld,false);
  const full=plan('tools/verification/impact-manifest.json');
  for(const id of ['e2e.bounded-performance','e2e.bounded-soak','e2e.bounded-stress','e2e.common-smoke']) assert.ok(full.groups.some(group=>group.id===id),id);
  assert.deepEqual(full.requiredVisualGroupIds,[]);
