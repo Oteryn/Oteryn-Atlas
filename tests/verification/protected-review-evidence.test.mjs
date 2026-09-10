@@ -112,6 +112,23 @@ test('an in-progress selective run is reviewable only while its sole live job is
     assert.throws(()=>module.validateProtectedReviewEvidence(changed));
   }
 });
+test('completed failed capture is reusable only when the protected review gate is the sole failure',()=>{
+  const input=fixture();input.authority.allowCompletedReviewGateFailure=true;input.authority.reviewGateJobName='review';
+  input.captureRun.status='completed';input.captureRun.conclusion='failure';
+  const gate={id:99,run_id:42,run_attempt:1,head_sha:input.captureRun.head_sha,name:'review',status:'completed',conclusion:'failure'};
+  input.captureJobs.jobs.push(gate);
+  assert.equal(module.validateProtectedReviewEvidence(input).accepted,true);
+  for(const mutate of [
+    x=>x.captureJobs.jobs.find(j=>j.name==='review').conclusion='success',
+    x=>x.captureJobs.jobs[0].conclusion='failure',
+    x=>x.captureJobs.jobs.push({...gate,id:100,name:'unrelated',conclusion:'failure'}),
+    x=>x.captureJobs.jobs.find(j=>j.name==='review').head_sha=sha('d'),
+    x=>x.captureJobs.jobs.push({...gate,id:101}),
+  ]) {
+    const changed=fixture();changed.authority.allowCompletedReviewGateFailure=true;changed.authority.reviewGateJobName='review';changed.captureRun.status='completed';changed.captureRun.conclusion='failure';changed.captureJobs.jobs.push({...gate});mutate(changed);
+    assert.throws(()=>module.validateProtectedReviewEvidence(changed));
+  }
+});
 test('protected fixture frames may be captured by the configured GitHub-hosted job',()=>{
   const input=fixture();input.authority.dataCapability='qualification_fixture';input.authority.runnerKind='github-hosted';input.authority.runnerLabels=['ubuntu-24.04'];input.captureJobs.jobs[0].labels=['ubuntu-24.04'];
   changeCapture(input,c=>c.dataCapability='qualification_fixture');changeDecision(input,d=>d.captureDigest=digest(input.captureBytes));
@@ -258,6 +275,22 @@ test('R5 review gate consumes the current successful machine capture before the 
   assert.equal(waited.accepted,true);assert.equal(tick,5);
   const badJobs=structuredClone(currentJobs);badJobs.jobs.find(job=>job.name==='review').status='completed';badJobs.jobs.find(job=>job.name==='review').conclusion='failure';responses.set(`/repos/${candidate.repository}/actions/runs/100/attempts/1/jobs?per_page=100`,badJobs);
   await assert.rejects(validateShadowReviewGate(options));
+
+  review.submitted_at='2026-09-06T10:35:00Z';
+  const priorRun={...currentRun,status:'completed',conclusion:'failure',updated_at:'2026-09-06T10:31:00Z'};
+  const priorJobs=structuredClone(badJobs);
+  const laterRun={...currentRun,id:200,status:'in_progress',conclusion:null,created_at:'2026-09-06T10:40:00Z',updated_at:'2026-09-06T10:45:00Z'};
+  const laterJobs={total_count:3,jobs:[{id:201,run_id:200,run_attempt:1,head_sha:candidate.headSha,name:'plan',status:'completed',conclusion:'success'},{id:202,run_id:200,run_attempt:1,head_sha:candidate.headSha,name:'execute',status:'completed',conclusion:'success'},{id:203,run_id:200,run_attempt:1,head_sha:candidate.headSha,name:'review',status:'in_progress',conclusion:null}]};
+  responses.set(`/repos/${candidate.repository}/actions/runs/100`,priorRun);
+  responses.set(`/repos/${candidate.repository}/actions/runs/100/attempts/1/jobs?per_page=100`,priorJobs);
+  responses.set(`/repos/${candidate.repository}/actions/runs/200`,laterRun);
+  responses.set(`/repos/${candidate.repository}/actions/runs/200/attempts/1/jobs?per_page=100`,laterJobs);
+  responses.set(`/repos/${candidate.repository}/actions/runs/200/artifacts?per_page=100&page=1`,{artifacts:[]});
+  responses.set(`/repos/${candidate.repository}/actions/workflows/verification-shadow.yml/runs?event=pull_request_target&head_sha=${candidate.headSha}&per_page=100&page=1`,{workflow_runs:[priorRun]});
+  const later=await validateShadowReviewGate({...options,currentRunId:200,now:'2026-09-06T10:45:00Z'});
+  assert.equal(later.accepted,true);assert.equal(later.captureRunId,100);
+  priorJobs.jobs.find(job=>job.name==='execute').conclusion='failure';
+  await assert.rejects(validateShadowReviewGate({...options,currentRunId:200}),/capture run failed outside review gate/);
 });
 test('R5 Merge Queue consumes a successful reviewed PR capture across rename normalization',async()=>{
   const repository='Oteryn/Oteryn-Atlas',baseSha=sha('b'),prHead=sha('a'),mqHead=sha('d'),treeSha=sha('c');

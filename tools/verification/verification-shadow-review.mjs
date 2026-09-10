@@ -229,7 +229,7 @@ export function downloadShadowCaptureArtifact(repository,artifactId) {
   return rows.map(value=>Buffer.from(value,'base64'));
 }
 
-function expectedCaptureAuthorities({candidate,contract,productDigest,oracleDigest,repositoryId,artifactName,liveReview=false}) {
+function expectedCaptureAuthorities({candidate,contract,productDigest,oracleDigest,repositoryId,artifactName,liveReview=false,failedReviewGate=false}) {
   const values=[];
   const planDigest=shadowReviewPlanDigest(candidate,contract);
   for(const command of contract.commands??[]) {
@@ -239,7 +239,7 @@ function expectedCaptureAuthorities({candidate,contract,productDigest,oracleDige
     const requiredFrames=frames.map(({frameId,stableTestId})=>({frameId,scenarioId:stableTestId}));
     values.push({match:{dataCapability:command.dataCapability,frameIds:requiredFrames.map(row=>row.frameId).sort()},authority:{repositoryId,
       protectedBaseSha:candidate.baseSha,workflowPath:ACTIVE,jobName:'execute',artifactName,runnerKind:'github-hosted',runnerGroupId:0,runnerLabels:['ubuntu-24.04'],
-      maxAgeMs:REVIEW_MAX_AGE_MS,...(liveReview?{allowInProgressReviewGate:true,reviewGateJobName:'review'}:{}),planDigest,oracleDigest,productDigest,
+      maxAgeMs:REVIEW_MAX_AGE_MS,...(liveReview?{allowInProgressReviewGate:true,reviewGateJobName:'review'}:failedReviewGate?{allowCompletedReviewGateFailure:true,reviewGateJobName:'review'}:{}),planDigest,oracleDigest,productDigest,
       dataCapability:command.dataCapability,scenarioIds:[...new Set(requiredFrames.map(row=>row.scenarioId))].sort(),summaryScenarioIds:command.expectedTestIds,requiredFrames}});
   }
   return values;
@@ -272,7 +272,7 @@ export async function validateShadowReviewGate({candidate,currentRunId,contract,
   if(!review)fail('independent visual review required');
   const wanted=reviewCaptureDigests(review,reviewCandidate);
   const runs=await pages(request,`/repos/${candidate.repository}/actions/workflows/verification-shadow.yml/runs?event=pull_request_target&head_sha=${reviewCandidate.headSha}`,'workflow_runs');
-  const prior=runs.filter(run=>run.id<currentRunId&&run.path===ACTIVE&&run.event==='pull_request_target'&&run.run_attempt===1&&run.status==='completed'&&run.conclusion==='success'
+  const prior=runs.filter(run=>run.id<currentRunId&&run.path===ACTIVE&&run.event==='pull_request_target'&&run.run_attempt===1&&run.status==='completed'&&['success','failure'].includes(run.conclusion)
     &&run.head_sha===reviewCandidate.headSha&&Array.isArray(run.pull_requests)&&run.pull_requests.some(pr=>pr.number===reviewCandidate.prNumber&&pr.head?.sha===reviewCandidate.headSha&&pr.base?.sha===reviewCandidate.baseSha))
     .sort((a,b)=>b.id-a.id).slice(0,20);
   const candidates=candidate.prNumber===null?prior:[currentRun,...prior];
@@ -293,8 +293,8 @@ export async function validateShadowReviewGate({candidate,currentRunId,contract,
   const jobs=await workflowJobs(request,selected.run.id);
   const repo=await request(`/repos/${candidate.repository}`);
   if(repo.full_name!==candidate.repository||!Number.isSafeInteger(repo.id))fail('review repository identity');
-  const artifactName=shadowReviewArtifactName(run.id),liveReview=run.id===currentRunId;
-  const expected=expectedCaptureAuthorities({candidate:reviewCandidate,contract,productDigest,oracleDigest,repositoryId:repo.id,artifactName,liveReview});
+  const artifactName=shadowReviewArtifactName(run.id),liveReview=run.id===currentRunId,failedReviewGate=run.status==='completed'&&run.conclusion==='failure';
+  const expected=expectedCaptureAuthorities({candidate:reviewCandidate,contract,productDigest,oracleDigest,repositoryId:repo.id,artifactName,liveReview,failedReviewGate});
   const captures=pairCaptures(selected.captureBytesList,expected);
   if(captures.length!==wanted.length)fail('review bundle capture count');
   const login=review.user?.login;
@@ -321,7 +321,8 @@ export async function waitForShadowReviewGate(options,{maxWaitMs=REVIEW_WAIT_MS,
   const deadline=clock()+maxWaitMs;
   for(;;) {
     try{return await validateShadowReviewGate(options);}catch(error) {
-      if(options?.candidate?.prNumber===null||error?.message!=='verification shadow review: independent visual review required'||clock()>=deadline)throw error;
+      const retryable=new Set(['verification shadow review: independent visual review required','verification shadow review: reviewed protected capture artifact not found']);
+      if(options?.candidate?.prNumber===null||!retryable.has(error?.message)||clock()>=deadline)throw error;
       await sleepFn(Math.min(pollMs,Math.max(1,deadline-clock())));
     }
   }

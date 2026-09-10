@@ -123,6 +123,17 @@ export function validateProtectedReviewEvidence(input) {
 
 function validateCaptureRunOutcome(run,jobs,authority) {
   if(run.status==='completed'&&run.conclusion==='success')return;
+  if(run.status==='completed'&&run.conclusion==='failure'&&authority.allowCompletedReviewGateFailure===true&&authority.reviewGateJobName==='review') {
+    const gates=jobs.filter(job=>job.name===authority.reviewGateJobName);
+    if(gates.length!==1)fail('unique failed review gate required');
+    const gate=gates[0];
+    if(gate.run_id!==run.id||gate.run_attempt!==1||gate.head_sha!==run.head_sha||gate.status!=='completed'||gate.conclusion!=='failure')fail('failed review gate identity');
+    for(const job of jobs) {
+      if(job.id===gate.id)continue;
+      if(job.run_id!==run.id||job.run_attempt!==1||job.head_sha!==run.head_sha||job.status!=='completed'||!['success','skipped'].includes(job.conclusion))fail('capture run failed outside review gate');
+    }
+    return;
+  }
   if(run.status!=='in_progress'||run.conclusion!==null||authority.allowInProgressReviewGate!==true||authority.reviewGateJobName!=='review')fail('current protected capture run required');
   const gates=jobs.filter(job=>job.name===authority.reviewGateJobName);
   if(gates.length!==1)fail('unique live review gate required');
