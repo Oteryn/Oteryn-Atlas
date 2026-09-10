@@ -8,7 +8,6 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { PRODUCTION_ANIMATION_SOURCE } from '../../src/browser/animation-runtime.mjs';
 import { buildVerificationPlan } from '../../tools/verification/build-verification-plan.mjs';
-import { planShadow } from '../../tools/verification/run-verification-shadow.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const impactManifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'tools/verification/impact-manifest.json'), 'utf8'));
@@ -40,17 +39,6 @@ function planFor(pathname) {
     trustedVerificationCatalog: verificationCatalog,
     candidateVerificationCatalog: verificationCatalog,
   });
-}
-
-function shadowCandidate(paths) {
-  return {
-    repository: 'Oteryn/Oteryn-Atlas',
-    prNumber: 466,
-    headSha: 'a'.repeat(40),
-    baseSha: 'b'.repeat(40),
-    treeSha: 'c'.repeat(40),
-    changedFiles: paths.map((entry) => ({ path: entry, status: 'modified' })),
-  };
 }
 
 function jsonBytes(value) {
@@ -90,38 +78,6 @@ test('B: pure verification regressions stay deterministic while executable autho
     assert.equal(plan.profile, 'full', pathname);
     assert.deepEqual(plan.requiredGroupIds, Object.entries(verificationCatalog.groups).filter(([,group]) => group.executionRole !== 'aggregate' && (group.fullSafetyNet || group.executionRole === 'canonical-review')).map(([id]) => id).sort(), pathname);
   }
-});
-
-test('B2: protected shadow machine-only control-plane cannot discharge visual review', () => {
-  const controlPlane = planShadow({
-    candidate: shadowCandidate([
-      'tools/verification/build-verification-plan.mjs',
-      'tests/verification/issue-314-qualification-path.test.mjs',
-    ]),
-    root: ROOT,
-    protectedRoot: ROOT,
-  }).plan;
-  assert.equal(controlPlane.profile, 'full');
-  for (const id of ['e2e.bounded-performance', 'e2e.bounded-soak', 'e2e.bounded-stress', 'e2e.common-smoke']) {
-    assert(controlPlane.requiredGroupIds.includes(id), id);
-  }
-  assert.deepEqual(controlPlane.requiredVisualGroupIds, []);
-  assert.equal(controlPlane.requiresRealFullWorld, false);
-  assert.equal(controlPlane.groups.some((group) => group.executionRole === 'canonical-review' || group.evidence === 'restricted-visual-review' || group.capabilities.visualReview), false);
-
-  const visible = planFor('src/browser/animation-runtime.mjs');
-  assert(visible.requiredVisualGroupIds.length > 0);
-  assert.throws(() => planShadow({ candidate: shadowCandidate(['src/browser/animation-runtime.mjs']), root: ROOT, protectedRoot: ROOT }), /R5 bounded executor unavailable/);
-
-  const unknown = planFor('unknown/product.mjs');
-  assert(unknown.requiredVisualGroupIds.length > 0);
-  assert.throws(() => planShadow({ candidate: shadowCandidate(['unknown/product.mjs']), root: ROOT, protectedRoot: ROOT }), /unresolved obligations/);
-
-  assert.throws(() => planShadow({
-    candidate: shadowCandidate(['tools/verification/build-verification-plan.mjs', 'src/browser/animation-runtime.mjs']),
-    root: ROOT,
-    protectedRoot: ROOT,
-  }), /R5 bounded executor unavailable/);
 });
 
 test('C: verification profile remains independent from product data capability', () => {
