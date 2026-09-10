@@ -22,7 +22,7 @@ function executionInput(path='tests/semantic-search.mjs') {
 }
 test('final candidate readback rejects head/base/tree/repository/file drift',()=>{
  const planned=snapshot();assert.equal(assertCandidateReadback({planned,current:snapshot(),...source}),true);
- for(const key of ['headSha','baseSha','treeSha','repository']) {const current=snapshot();current[key]=key==='repository'?'Other/Atlas':sha('d');assert.throws(()=>assertCandidateReadback({planned,current,...source}),/readback/);}
+ for(const key of ['headSha','baseSha','treeSha','repository']) {const current=snapshot();current[key]=key==='repository'?'Other/Atlas':sha('d');assert.throws(()=>assertCandidateReadback({planned,current:snapshot(),...source,...{}}));}
  const current=snapshot();current.changedFiles[0].path='README.md';assert.throws(()=>assertCandidateReadback({planned,current,...source}),/readback/);
 });
 
@@ -300,11 +300,21 @@ test('R5 protected shadow planner accepts exact canary routes plus hosted depth/
   for (const id of ['e2e.bounded-performance', 'e2e.bounded-soak', 'e2e.bounded-stress', 'e2e.common-smoke']) {
     assert.ok(full.groups.some((group) => group.id === id), `full safety net must contain ${id}`);
   }
+  assert.deepEqual(full.requiredVisualGroupIds, []);
+  assert.equal(full.groups.some((group) => group.executionRole === 'canonical-review' || group.evidence === 'restricted-visual-review' || group.capabilities?.visualReview === true), false);
   assert.equal(full.groups.some((group) => group.capabilities?.dataCapability === 'real_fullworld'), false);
   assert.throws(
     () => planShadow({ candidate: r5Candidate('e2e/tests/fullworld-animation-census-desktop.spec.mjs'), root, protectedRoot: root }),
     /executor unavailable|real[_ -]?fullworld|specialist/i,
   );
+  for (const changedPath of ['src/browser/animation-runtime.mjs', 'unknown/product.mjs']) {
+    assert.throws(() => planShadow({ candidate: r5Candidate(changedPath), root, protectedRoot: root }), /executor unavailable|unresolved obligations/i, changedPath);
+  }
+  const mixed = {...r5Candidate('tools/verification/impact-manifest.json'), changedFiles:[
+    {path:'tools/verification/impact-manifest.json',status:'modified'},
+    {path:'src/browser/animation-runtime.mjs',status:'modified'},
+  ]};
+  assert.throws(() => planShadow({candidate:mixed,root,protectedRoot:root}), /executor unavailable|unresolved obligations/i);
 });
 
 test('R5 bounded semantic publication derives from one exact authenticated Game source byte', async (t) => {
@@ -438,8 +448,11 @@ test('S0 plans zero groups and S2/S3 select only their narrow protected owners',
  for(const name of ['e2e/tests/performance-desktop.spec.mjs','e2e/tests/soak-desktop.spec.mjs','e2e/tests/stress-desktop.spec.mjs']) assert.doesNotThrow(()=>plan(name),name);
  const full=plan('tools/verification/impact-manifest.json');
  for(const id of ['e2e.bounded-performance','e2e.bounded-soak','e2e.bounded-stress','e2e.common-smoke']) assert.ok(full.groups.some(group=>group.id===id),id);
+ assert.deepEqual(full.requiredVisualGroupIds,[]);
+ assert.equal(full.groups.some(group=>group.executionRole==='canonical-review'||group.evidence==='restricted-visual-review'||group.capabilities?.visualReview===true),false);
  assert.equal(full.groups.some(group=>group.capabilities?.dataCapability==='real_fullworld'),false);
  assert.throws(()=>plan('e2e/tests/fullworld-animation-census-desktop.spec.mjs'),/executor unavailable|real[_ -]?fullworld|specialist/i);
+ assert.throws(()=>plan('src/browser/animation-runtime.mjs'),/bounded executor unavailable/);
 });
 test('deterministic runner has exact command and readonly credential-free mounts with bounded isolation',()=>{
  const command={id:'sha256:'+'a'.repeat(64),engine:'deterministic',cwd:'.',argv:['node','--test','tests/example.mjs']};
