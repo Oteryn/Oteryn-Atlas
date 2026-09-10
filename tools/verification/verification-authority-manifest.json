@@ -207,6 +207,10 @@
       "path": "tools/verification/verification-plan-schema.mjs"
     },
     {
+      "id": "tools-verification-verification-shadow-review-mjs",
+      "path": "tools/verification/verification-shadow-review.mjs"
+    },
+    {
       "id": "tools-verification-verify-complete-product-artifacts-mjs",
       "path": "tools/verification/verify-complete-product-artifacts.mjs"
     }
