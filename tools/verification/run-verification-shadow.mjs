@@ -94,7 +94,7 @@ export function prepareExecutionView({sourceRoot,revision,destination}) {
   viewGit('checkout','--quiet','--detach',revision);
   viewGit('remote','remove','origin');
   fs.mkdirSync(path.join(destination,'e2e/node_modules'),{recursive:true});
-  verifyExecutionView({viewRoot:destination,sourceRoot:revision?sourceRoot:sourceRoot,revision});
+  verifyExecutionView({viewRoot:destination,sourceRoot,revision});
   assertCheckout(sourceRoot,revision);
   return destination;
 }
