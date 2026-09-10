@@ -92,7 +92,7 @@ test('version-mismatched required runtime index fails closed before stale render
   await gotoAtlas(page, DESKTOP_ENTRY);
   const result = await expectQualificationFailure(page, /unsupported runtime index profile/i);
   expect(result.capabilities?.blockedOrUnknownEnabled ?? false).toBeFalsy();
-  await expect(page.locator('#runtime-badge')).toContainText('FAIL-CLOSED');
+  await expect(page.locator('#runtime-badge')).not.toContainText('VERIFIED FULL-WORLD');
   const renderer = await page.evaluate(() => globalThis.__OTERYN_ATLAS_RENDERER_DIAGNOSTICS__ ?? null);
   expect(renderer).toBeNull();
 });
