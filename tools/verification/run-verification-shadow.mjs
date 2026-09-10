@@ -107,6 +107,16 @@ export function assertContainerStarted(container,result={}) {
   return true;
 }
 
+function shadowGroupSupported(group) {
+  if(group?.executionEngine==='deterministic') return true;
+  const capabilities=group?.capabilities;
+  if(!capabilities||capabilities.hosted!==true||capabilities.specialistReason!==null) return false;
+  if(group.id==='integration.source-contract-http') return capabilities.dataCapability==='bounded_real_world';
+  if(group.executionEngine!=='playwright') return false;
+  if(capabilities.dataCapability==='qualification_fixture') return true;
+  return capabilities.dataCapability==='bounded_real_world'&&group.id==='integration.source-contract-browser';
+}
+
 export function planShadow({candidate,root,protectedRoot}) {
   const protectedCatalog=readJson(path.join(protectedRoot,'tools/verification/verification-catalog.json'));
   const protectedImpactManifest=readJson(path.join(protectedRoot,'tools/verification/impact-manifest.json'));
@@ -118,8 +128,7 @@ export function planShadow({candidate,root,protectedRoot}) {
     trustedImpactManifest:protectedImpactManifest,candidateImpactManifest:protectedImpactManifest,
     protectedStableTestIds,unprivilegedDeterministicSubjects});
   assertPlanExecutable(plan);
-  const supported=new Set(['e2e.layer-availability','e2e.farm-explorer','e2e.search-navigation','integration.source-contract-browser','integration.source-contract-http']);
-  for(const group of plan.groups) if(group.executionEngine!=='deterministic'&&!supported.has(group.id)) fail(`R5 bounded executor unavailable for ${group.id}`);
+  for(const group of plan.groups) if(!shadowGroupSupported(group)) fail(`R5 bounded executor unavailable for ${group.id}`);
   return {plan,input:{root,protectedRoot,candidate,planInput,protectedCatalog,protectedImpactManifest,protectedStableTestIds}};
 }
 
