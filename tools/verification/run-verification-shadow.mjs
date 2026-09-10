@@ -10,6 +10,7 @@ import {readCandidateSnapshot, gitChangedFiles, githubRequest, resolveDirectMerg
 import {buildProtectedExecutionEnvironmentIdentity} from './protected-execution-environment.mjs';
 import {canonicalJson} from './verification-plan-schema.mjs';
 import {buildQualificationWorld, verifyQualificationWorld, qualificationTrustDescriptor} from './qualification-world.mjs';
+import {resolveQualificationScenarioBindings, renderQualificationHarnessBindings} from './qualification-scenario-bindings.mjs';
 import {buildBoundedRealWorld, verifyBoundedRealWorld, boundedRealTrustDescriptor} from './bounded-real-world.mjs';
 import {buildProtectedExpectedAuthority, PUBLICATION_AUTHORITY_ID} from './proof-provenance.mjs';
 import {SELECTED_GAMEPLAY_INPUTS, buildSelectedGameplaySource} from './shadow-gameplay-source.mjs';
@@ -107,6 +108,44 @@ export function prepareExecutionView({sourceRoot,revision,destination}) {
   assertCheckout(sourceRoot,revision);
   return destination;
 }
+function protectedHarnessSources(e2eRoot) {
+  const result={};
+  const walk=(relative='')=>{
+    const directory=path.join(e2eRoot,...relative.split('/').filter(Boolean));
+    for(const name of fs.readdirSync(directory).sort()) {
+      if(name==='node_modules') continue;
+      const key=path.posix.join(relative,name), absolute=path.join(directory,name), stat=fs.lstatSync(absolute);
+      if(stat.isSymbolicLink()) fail('protected harness symlink');
+      if(stat.isDirectory()) {walk(key);continue;}
+      if(!stat.isFile()) fail('protected harness specialfile');
+      const bytes=fs.readFileSync(absolute);
+      if(key.endsWith('.mjs')) {
+        const text=bytes.toString('utf8');
+        if(!Buffer.from(text,'utf8').equals(bytes)) fail('protected harness invalid UTF-8');
+        result[key]=text;
+      } else result[key]=bytes.toString('base64');
+    }
+  };
+  walk();
+  return result;
+}
+
+export function prepareProtectedBrowserHarness({protectedRoot,destination,qualificationBindings=null}={}) {
+  const sourceRoot=path.join(path.resolve(protectedRoot),'e2e'), target=path.resolve(destination);
+  if(!fs.existsSync(sourceRoot)||fs.existsSync(target)||target===sourceRoot||target.startsWith(sourceRoot+path.sep)) fail('protected harness destination');
+  const protectedSources=protectedHarnessSources(sourceRoot);
+  fs.cpSync(sourceRoot,target,{recursive:true,filter:file=>!file.split(path.sep).includes('node_modules')});
+  const expected=qualificationBindings===null?protectedSources:renderQualificationHarnessBindings({protectedSources,bindings:qualificationBindings});
+  if(qualificationBindings!==null) for(const [relative,source] of Object.entries(expected)) {
+    if(!relative.endsWith('.mjs')) continue;
+    const targetFile=path.join(target,...relative.split('/'));
+    fs.writeFileSync(targetFile,source,'utf8');
+  }
+  const actual=protectedHarnessSources(target);
+  if(canonicalJson(actual)!==canonicalJson(expected)) fail('protected harness materialization mismatch');
+  return {bound:qualificationBindings!==null,sourceDigest:digest(expected),files:Object.keys(expected).sort()};
+}
+
 export function assertContainerStarted(container,result={}) {
   const state=container?.State;
   if(!state||state.Error||!state.StartedAt||/^0001-/.test(state.StartedAt)||!Number.isFinite(Date.parse(state.StartedAt))||result.status===125) {
@@ -201,13 +240,14 @@ async function fixtureProof(destination) {
   await buildQualificationWorld(destination);
   await verifyQualificationWorld(destination);
   const manifest=readJson(path.join(destination,'fixture-manifest.json'));
+  const bindings=resolveQualificationScenarioBindings({productRoot:destination,expectedProductDigest:manifest.productDigest});
   const publicationManifestBytes=fs.readFileSync(path.join(destination,'publication/publication.json'));
   const productFiles=manifest.files.map(row=>({path:row.path,bytes:fs.readFileSync(path.join(destination,row.path))}));
   const authority=buildProtectedExpectedAuthority({schemaVersion:1,authorityId:PUBLICATION_AUTHORITY_ID,
     dataCapability:'qualification_fixture',product:{id:manifest.fixtureId,manifestPath:'fixture-manifest.json',digest:manifest.productDigest},
     publication:{manifestPath:'publication/publication.json',digest:bytesDigest(publicationManifestBytes)},
     source:{kind:'atlas-owned-fixture',repository:null,revision:null,selectedBytes:[]},completeProductContractDigest:null});
-  return {manifest,authority,proof:{dataCapability:'qualification_fixture',productManifestBytes:fs.readFileSync(path.join(destination,'fixture-manifest.json')),
+  return {manifest,bindings,authority,proof:{dataCapability:'qualification_fixture',productManifestBytes:fs.readFileSync(path.join(destination,'fixture-manifest.json')),
     publicationManifestBytes,productFiles,source:null,completeProduct:null}};
 }
 
@@ -286,7 +326,11 @@ function runPublicationBrowser(command,{candidate,contract,publication,directory
   const suffix=command.id.slice('sha256:'.length,'sha256:'.length+12);
   const context=path.join(directory,`browser-context-${suffix}`);fs.mkdirSync(context);
   for(const relative of ['web','src']) fs.cpSync(path.join(root,relative),path.join(context,relative),{recursive:true});
-  fs.cpSync(path.join(controlRoot,'e2e'),path.join(context,'e2e'),{recursive:true,filter:p=>!p.split(path.sep).includes('node_modules')});
+  // Candidate web/source bytes are inert inputs. Every executable harness byte
+  // comes from the authenticated protected checkout. Qualification data expressions
+  // are rendered only from the independently verified protected fixture bindings.
+  prepareProtectedBrowserHarness({protectedRoot:controlRoot,destination:path.join(context,'e2e'),
+    qualificationBindings:command.dataCapability==='qualification_fixture'?publication.bindings:null});
   fs.mkdirSync(path.join(context,'tools','verification'),{recursive:true});
   fs.copyFileSync(path.join(controlRoot,'tools/verification/stable-id.mjs'),path.join(context,'tools/verification/stable-id.mjs'));
   const list=path.join(directory,`test-list-${suffix}.txt`);
