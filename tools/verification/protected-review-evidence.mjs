@@ -121,9 +121,22 @@ export function validateProtectedReviewEvidence(input) {
   return validateDecision(input,JSON.parse(text(input.review?.body)));
 }
 
+function validateCaptureRunOutcome(run,jobs,authority) {
+  if(run.conclusion==='success')return;
+  if(run.conclusion!=='failure'||authority.allowFailedReviewGate!==true||authority.reviewGateJobName!=='review')fail('current protected capture run required');
+  const gates=jobs.filter(job=>job.name===authority.reviewGateJobName);
+  if(gates.length!==1)fail('unique failed review gate required');
+  const gate=gates[0];
+  if(gate.run_id!==run.id||gate.run_attempt!==1||gate.head_sha!==run.head_sha||gate.status!=='completed'||gate.conclusion!=='failure')fail('failed review gate identity');
+  for(const job of jobs) {
+    if(job.id===gate.id)continue;
+    if(job.run_id!==run.id||job.run_attempt!==1||job.head_sha!==run.head_sha||job.status!=='completed'||!['success','skipped'].includes(job.conclusion))fail('capture run failed outside review gate');
+  }
+}
+
 function validateDecision(input,decision) {
   const capture=manifest(input),{authority:a,currentCandidate:c,captureRun:run,captureJobs,captureArtifact:artifact,review,reviewerPermission:permission}=input,p=capture.producer;
-  if(!isPlainObject(run)||run.id!==p.runId||run.run_attempt!==1||run.path!==a.workflowPath||!['workflow_dispatch','pull_request_target'].includes(run.event)||run.status!=='completed'||run.conclusion!=='success')fail('current protected capture run required');
+  if(!isPlainObject(run)||run.id!==p.runId||run.run_attempt!==1||run.path!==a.workflowPath||!['workflow_dispatch','pull_request_target'].includes(run.event)||run.status!=='completed')fail('current protected capture run required');
   equal(run.repository?.full_name,c.repository,'capture repository drift');equal(run.repository?.id,integer(a.repositoryId),'capture repository ID drift');
   if(run.event==='workflow_dispatch')equal(run.head_sha,c.baseSha,'dispatch protected source drift');
   else {
@@ -135,6 +148,7 @@ function validateDecision(input,decision) {
     for(const side of ['head','base'])equal(association[side]?.repo?.id,a.repositoryId,'capture associated repository drift');
   }
   const jobs=captureJobs?.jobs;if(!Array.isArray(jobs))fail('capture jobs missing');
+  validateCaptureRunOutcome(run,jobs,a);
   const matching=jobs.filter(job=>job.name===a.jobName);
   if(matching.length!==1)fail('unique protected capture job required');
   const job=matching[0];
