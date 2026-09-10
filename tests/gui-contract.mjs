@@ -60,14 +60,19 @@ test('full-world browser modules parse as JavaScript', () => {
   }
 });
 test('full-world GUI is a separate verified runtime entry while bounded proof remains regression fixture', () => {
-  assert.match(fullworldIndex, /FULL-WORLD VERIFIED RUNTIME/);
+  assert.match(fullworldIndex, /<title>Oteryn Atlas[^<]*World explorer<\/title>/);
+  assert.match(fullworldIndex, /id="runtime-badge">VERIFYING ROOTS<\/div>/);
+  assert.match(fullworldIndex, /<summary>Map status &amp; technical details<\/summary>/);
   assert.match(fullworldIndex, /Technical overview/);
   assert.match(fullworldIndex, /id="minimap-layer"/);
   assert.match(fullworldIndex, /data-mode="auto"/);
   assert.match(fullworldIndex, /data-mode="classic"[^>]*>CLASSIC<\/button>/);
-  assert.match(fullworldCss, /grid-template-columns: repeat\(4, 1fr\)/);
+  assert.match(fullworldCss, /grid-template-columns: repeat\(4, minmax\(0, 1fr\)\)/);
   assert.match(fullworldIndex, /id="floor-select"/);
   assert.match(fullworldIndex, /id="animation-toggle"[^>]*type="checkbox"/);
+  assert.match(fullworldIndex, /id="desktop-inspector-toggle"[^>]*aria-expanded="false"[^>]*aria-label="Open inspector"/);
+  assert.match(fullworldIndex, /<div class="workspace inspector-collapsed">/);
+  assert.match(fullworldIndex, /id="mobile-inspector-panel"[^>]*aria-hidden="true"[^>]*\sinert(?:\s|>)/);
   assert.doesNotMatch(fullworldIndex, /id="animation-toggle"[^>]*disabled/);
   assert.match(fullworldApp, /SemanticRangeStore/);
   assert.match(fullworldApp, /loadOverviewWorld/);
@@ -139,12 +144,14 @@ test('full-world mobile layout keeps the map full-width and moves controls into 
   ]) assert.match(fullworldIndex, new RegExp(`id="${id}"`));
   assert.match(fullworldIndex, /fullworld-mobile\.mjs/);
   assert.match(fullworldCss, /@media \(max-width: 980px\)/);
-  assert.match(fullworldCss, /\.fullworld-shell \.workspace \{ grid-template-columns: minmax\(0, 1fr\); position: relative; overflow: hidden; \}/);
-  assert.match(fullworldCss, /\.fullworld-shell \.left-rail, \.fullworld-shell \.inspector \{[\s\S]*position: absolute/);
-  assert.match(fullworldCss, /\.fullworld-diagnostics \{ display: none; \}/);
+  assert.match(fullworldCss, /@media \(max-width: 980px\)[\s\S]*?\.fullworld-shell \.workspace \{[^}]*grid-template-columns: minmax\(0, 1fr\);[^}]*\}/);
+  assert.match(fullworldCss, /@media \(max-width: 980px\)[\s\S]*?\.fullworld-shell :is\(\.left-rail, \.inspector\) \{[^}]*position: absolute/);
+  assert.match(fullworldIndex, /<details class="runtime-details" id="runtime-details">/);
+  assert.doesNotMatch(fullworldIndex, /<details class="runtime-details" id="runtime-details"[^>]*\sopen(?:\s|>)/);
   assert.match(fullworldCss, /#atlas \{ touch-action: none; \}/);
-  assert.match(fullworldMobile, /function setMobileDrawer/);
-  assert.match(fullworldMobile, /desktopForm\.requestSubmit\(\)/);
+  assert.match(fullworldMobile, /function openPanel/);
+  assert.match(fullworldMobile, /function closeDrawer/);
+  assert.match(fullworldMobile, /form\.requestSubmit\(\)/);
   assert.doesNotMatch(fullworldMobile, /\.otbm|Legacy IR|world\.otbm/);
 });
 

@@ -45,14 +45,14 @@
       <div class="panel-actions" aria-label="Atlas workspace">
         <button id="mobile-find-toggle" class="panel-toggle mobile-only" type="button" aria-controls="mobile-controls-panel" aria-expanded="false" aria-label="Find in Oteryn"><svg class="atlas-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#atlas-icon-search"></use></svg></button>
         <button id="desktop-controls-toggle" class="panel-toggle desktop-only" type="button" aria-controls="mobile-controls-panel" aria-expanded="true" aria-label="Hide Atlas controls" title="Hide Atlas controls"><svg class="atlas-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#atlas-icon-controls"></use></svg></button>
-        <button id="desktop-inspector-toggle" class="panel-toggle desktop-only" type="button" aria-controls="mobile-inspector-panel" aria-expanded="true" aria-label="Hide inspector" title="Hide inspector"><svg class="atlas-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#atlas-icon-inspect"></use></svg></button>
+        <button id="desktop-inspector-toggle" class="panel-toggle desktop-only" type="button" aria-controls="mobile-inspector-panel" aria-expanded="false" aria-label="Open inspector" title="Open inspector"><svg class="atlas-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#atlas-icon-inspect"></use></svg></button>
         <button id="mobile-controls-toggle" class="panel-toggle mobile-only" type="button" aria-controls="mobile-controls-panel" aria-expanded="false" aria-label="Open Atlas controls"><svg class="atlas-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#atlas-icon-controls"></use></svg></button>
         <button id="mobile-inspector-toggle" class="panel-toggle mobile-only" type="button" aria-controls="mobile-inspector-panel" aria-expanded="false" aria-label="Open inspector"><svg class="atlas-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#atlas-icon-inspect"></use></svg></button>
         <button id="map-focus-toggle" class="panel-toggle desktop-only" type="button" aria-pressed="false" aria-label="Focus on the map" title="Focus on the map"><svg class="atlas-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#atlas-icon-focus"></use></svg></button>
       </div>
     </header>
 
-    <div class="workspace">
+    <div class="workspace inspector-collapsed">
       <button class="mobile-drawer-backdrop" id="mobile-drawer-backdrop" type="button" aria-label="Close mobile panel" hidden></button>
       <aside class="panel left-rail" id="mobile-controls-panel" aria-label="Atlas controls">
         <div class="panel-heading mobile-drawer-heading">
@@ -193,7 +193,7 @@
         </details>
       </section>
 
-      <aside class="panel inspector" id="mobile-inspector-panel" aria-label="Inspector and provenance">
+      <aside class="panel inspector" id="mobile-inspector-panel" aria-label="Inspector and provenance" aria-hidden="true" inert>
         <div class="inspector-heading">
           <div><span class="eyebrow">SELECTED IN THE WORLD</span><h2>Inspector</h2></div>
           <span class="pill" id="inspector-pill">ROOTS</span>
