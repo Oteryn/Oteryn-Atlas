@@ -35,7 +35,7 @@ test('mobile Farm Explorer remains reachable and truthful in the existing contro
   await page.locator('#farm-time-base').selectOption('trip_wall');
   await page.locator('#farm-estimate-button').click();
   await expect(page.locator('#farm-estimate-output')).toContainText('2.00 h');
-  await expect(page.locator('#farm-explorer')).toContainText('PRESENTATION DEPENDENCY');
+  await expect(page.locator('#farm-explorer')).toContainText('No external database is substituted.');
   expect(new URL(page.url()).searchParams.get('farmTimeBase')).toBe('trip_wall');
   await expect(page.locator('#farm-explorer')).toHaveCSS('overflow-x', /visible|hidden|clip|auto/);
   assertNoRuntimeFailures(runtime);

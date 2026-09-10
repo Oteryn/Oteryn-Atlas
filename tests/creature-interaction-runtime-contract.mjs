@@ -35,6 +35,11 @@ test('quick card actions are truthful and mobile inspector opens through an even
   assert.match(mobile, /openPanel\('inspector'/);
 });
 
+test('creature search controls remain outside the collapsed Areas disclosure', () => {
+  assert.match(creatures, /region\.closest\('#area-tools-disclosure'\) \?\? region/);
+  assert.match(creatures, /insertionAnchor\.after\(section\)/);
+});
+
 test('card escape respects a mobile drawer layered above it', () => {
   assert.match(creatures, /mobile-drawer-backdrop/);
   assert.match(creatures, /event\.key === 'Escape'/);

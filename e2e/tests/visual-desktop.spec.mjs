@@ -1,11 +1,8 @@
 import { expect, test } from '@playwright/test';
-import { assertNoRuntimeFailures, captureRuntimeFailures, gotoAtlas, waitForAtlas } from './runtime.mjs';
+import { DESKTOP_ENTRY, assertNoRuntimeFailures, captureRuntimeFailures, gotoAtlas, waitForAtlas } from './runtime.mjs';
+import { creatureEntry, discoverCreatureTarget, discoverSemanticTarget } from '../support/user-journey-browser.mjs';
 import { canvasAlphaCount, comparePngOutsideRects } from '../support/visual-oracle.mjs';
 import { assertUserVisibleSurface, captureUserVisualEvidence } from '../support/user-acceptance.mjs';
-const ENTRY = '/web/fullworld.html?x=32361&y=32198&floor=-7&zoom=2&mode=map&creatures=npc,monster&animation=off';
-const VISUAL_ENTRY = '/web/fullworld.html?x=32369&y=32241&floor=-7&zoom=2&mode=map&animation=off';
-const CREATURE_ONLY_PLAYBACK_ENTRY = '/web/fullworld.html?x=32831&y=32596&floor=-12&zoom=2&mode=map&animation=off&creatures=monster';
-const NPC_ONLY_PLAYBACK_ENTRY = '/web/fullworld.html?x=32209&y=31924&floor=-12&zoom=2&mode=map&animation=off&creatures=npc';
 
 async function overlayOpaquePixels(page) {
   return page.locator('#creature-overlay').evaluate((canvas) => {
@@ -46,9 +43,10 @@ async function animationRectangles(page) {
   });
 }
 
-async function assertCreatureFamilyPlaybackChangesPixels(page, entry, kind) {
+async function assertCreatureFamilyPlaybackChangesPixels(page, kind) {
   const runtime = captureRuntimeFailures(page);
-  await gotoAtlas(page, entry);
+  const record = await discoverCreatureTarget(page, kind);
+  await gotoAtlas(page, creatureEntry(record));
   await waitForAtlas(page);
   await page.waitForFunction((expectedKind) => {
     const value = globalThis.__OTERYN_ATLAS_CREATURES__;
@@ -75,8 +73,9 @@ async function assertCreatureFamilyPlaybackChangesPixels(page, entry, kind) {
 
 test('desktop Atlas-owned chrome and user journey retain reviewed visual contracts', async ({ page }, testInfo) => {
   const runtime = captureRuntimeFailures(page);
-  await gotoAtlas(page, `${VISUAL_ENTRY}&creatures=npc,monster`);
+  await gotoAtlas(page, `${DESKTOP_ENTRY}&creatures=npc,monster&animation=off`);
   await waitForAtlas(page);
+  const target = await discoverSemanticTarget(page);
 
   const initialMetrics = await assertUserVisibleSurface(page, {
     label: 'desktop initial Atlas',
@@ -88,7 +87,7 @@ test('desktop Atlas-owned chrome and user journey retain reviewed visual contrac
       { selector: '#zoom-in', label: 'zoom in', interactive: true },
       { selector: '#mobile-controls-panel', label: 'desktop controls rail' },
       { selector: '#map-frame', label: 'world map' },
-      { selector: '#mobile-inspector-panel', label: 'desktop inspector' },
+      { selector: '#desktop-inspector-toggle', label: 'open contextual inspector', interactive: true },
     ],
   });
   await expect(page.locator('.topbar')).toHaveScreenshot('desktop-topbar.png', {
@@ -99,21 +98,21 @@ test('desktop Atlas-owned chrome and user journey retain reviewed visual contrac
   });
   await captureUserVisualEvidence(page, testInfo, 'desktop.initial', {
     surfaceMetrics: initialMetrics,
-    note: 'Initial desktop map, controls, inspector and chrome as seen by the user.',
+    note: 'Initial desktop map-first layout with controls visible and the contextual inspector collapsed.',
   });
 
   const search = page.locator('#search-input');
-  await search.fill('Thais');
+  await search.fill(target.label);
   const results = page.locator('#semantic-search-results-desktop');
   await expect(results).toBeVisible();
-  const thais = results.getByRole('option').filter({ hasText: 'Thais' }).first();
-  await expect(thais).toBeVisible();
+  const option = results.getByRole('option').filter({ hasText: target.label }).first();
+  await expect(option).toBeVisible();
   await Promise.all([
     page.waitForURL((url) => Boolean(url.searchParams.get('semantic'))),
-    thais.click(),
+    option.click(),
   ]);
   await waitForAtlas(page);
-  await expect(page.locator('#inspector-content')).toContainText('Thais');
+  await expect(page.locator('#inspector-content')).toContainText(target.label);
   const inspectorMetrics = await assertUserVisibleSurface(page, {
     label: 'desktop search and inspector',
     minimumMapAreaRatio: 0.28,
@@ -143,7 +142,7 @@ test('desktop Atlas-owned chrome and user journey retain reviewed visual contrac
 
 test('creature overlay never paints previous-floor records during a view event', async ({ page }) => {
   const runtime = captureRuntimeFailures(page);
-  await gotoAtlas(page, ENTRY);
+  await gotoAtlas(page, `${DESKTOP_ENTRY}&creatures=npc,monster&animation=off`);
   await waitForAtlas(page);
   await page.waitForFunction(() => globalThis.__OTERYN_ATLAS_CREATURES__?.status === 'PASS'
     && globalThis.__OTERYN_ATLAS_CREATURES__?.render?.anchors?.length > 0, null, { timeout: 30_000 });
@@ -166,7 +165,7 @@ test('creature overlay never paints previous-floor records during a view event',
 });
 
 test('NPC playback changes real outfit pixels and restores the deterministic static phase', async ({ page }) => {
-  await assertCreatureFamilyPlaybackChangesPixels(page, NPC_ONLY_PLAYBACK_ENTRY, 'npc');
+  await assertCreatureFamilyPlaybackChangesPixels(page, 'npc');
 });
 
 test('playback changes only verified animated presentation regions and restores static pixels', async ({ page }, testInfo) => {
@@ -189,7 +188,8 @@ test('playback changes only verified animated presentation regions and restores 
       return original.apply(this, args);
     };
   });
-  await gotoAtlas(page, CREATURE_ONLY_PLAYBACK_ENTRY);
+  const record = await discoverCreatureTarget(page, 'monster');
+  await gotoAtlas(page, creatureEntry(record));
   await waitForAtlas(page);
   await page.addStyleTag({ content: '#map-frame.visual-world-only #creature-overlay, #map-frame.visual-world-only #creature-presentation-overlay, #map-frame.visual-world-only #minimap-layer, #map-frame.visual-world-only #overview-overlay, #map-frame.visual-world-only #selection-box, #map-frame.visual-world-only #cursor-coordinate, #map-frame.visual-world-only #runtime-badge, #map-frame.visual-world-only #detail-badge { visibility: hidden !important; }' });
   await page.waitForFunction(() => globalThis.__OTERYN_ATLAS_CREATURES__?.status === 'PASS'
@@ -246,7 +246,7 @@ test('playback changes only verified animated presentation regions and restores 
       { selector: '#map-frame', label: 'animated world map' },
       { selector: 'label.layer:has(#animation-toggle)', label: 'playback toggle row', interactive: true },
       { selector: '#mobile-controls-panel', label: 'desktop controls rail' },
-      { selector: '#mobile-inspector-panel', label: 'desktop inspector' },
+      { selector: '#desktop-inspector-toggle', label: 'contextual inspector toggle', interactive: true },
     ],
   });
   await captureUserVisualEvidence(page, testInfo, 'desktop.playback', {

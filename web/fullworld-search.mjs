@@ -209,7 +209,7 @@ async function boot() {
   state.error = null;
   views.forEach(view => view.refresh());
   renderActiveInspector();
-  if (state.active) window.dispatchEvent(new CustomEvent('oteryn-atlas-open-inspector'));
+  if (state.active && !matchMedia('(max-width: 980px)').matches) window.dispatchEvent(new CustomEvent('oteryn-atlas-open-inspector'));
   window.addEventListener('oteryn-atlas-view', () => renderActiveInspector());
   window.addEventListener('oteryn-atlas-inspector-rendered', () => renderActiveInspector());
   publish();

@@ -24,7 +24,7 @@ test('desktop Farm Explorer fails closed for upstream facts and keeps custom kil
   expect(farm.presentationEnrichmentState).toBe('DEPENDENCY_BLOCKED');
   await page.locator('#farm-custom-disclosure > summary').click();
   await expect(page.locator('#farm-explorer')).toContainText('Monster drop sources');
-  await expect(page.locator('#farm-explorer')).toContainText('UPSTREAM_BLOCKED');
+  await expect(page.locator('#farm-explorer')).toContainText('No external database is substituted.');
   await page.locator('#farm-creature-search').fill(SENTINEL.label);
   const sentinel = page.locator('#farm-creature-results .farm-creature-result').filter({ hasText: new RegExp(`^${SENTINEL.label}$`) }).first();
   await expect(sentinel).toBeVisible();

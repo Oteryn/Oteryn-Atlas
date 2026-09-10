@@ -90,3 +90,20 @@ test('mobile core controls are touch-reachable in portrait and landscape', async
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBeTruthy();
   assertNoRuntimeFailures(runtime);
 });
+
+test('layout crossing redirects focus from controls that become hidden', async ({ page }) => {
+  const runtime = captureRuntimeFailures(page);
+  await gotoAtlas(page, MOBILE_ENTRY);
+  await waitForAtlas(page);
+  await page.locator('#mobile-find-toggle').tap();
+  await expect(page.locator('#mobile-controls-panel')).toHaveClass(/find-mode/);
+  await page.locator('#mobile-search-input').focus();
+  await expect(page.locator('#mobile-search-input')).toBeFocused();
+  await page.setViewportSize({ width: 1200, height: 800 });
+  await expect(page.locator('#search-input')).toBeFocused();
+  await page.locator('#desktop-inspector-toggle').focus();
+  await expect(page.locator('#desktop-inspector-toggle')).toBeFocused();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.locator('#mobile-inspector-toggle')).toBeFocused();
+  assertNoRuntimeFailures(runtime);
+});

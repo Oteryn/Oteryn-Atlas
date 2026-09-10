@@ -8,6 +8,8 @@ let drawer = null;
 let returnFocus = null;
 let savedPanels = null;
 let findMode = false;
+let lastFocused = null;
+document.addEventListener('focusin', event => { if (event.target instanceof HTMLElement) lastFocused = event.target; });
 
 function applyShellPolish() {
   const sectionTitle = (anchorSelector, title) => {
@@ -35,9 +37,8 @@ function applyShellPolish() {
   }
 }
 
-function focusOpenedPanel(name) {
+function focusOpenedPanel(name, target = $(`#mobile-${name}-close`)) {
   const panel = panels[name];
-  const target = $(`#mobile-${name}-close`);
   if (!panel || !target) return;
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
     focus(target);
@@ -191,7 +192,7 @@ function openFind() {
   if (mobileQuery.matches) {
     findMode = true;
     openPanel('controls', { moveFocus: false });
-    focus($('#mobile-search-input'));
+    focusOpenedPanel('controls', $('#mobile-search-input'));
   } else focus($('#search-input'));
 }
 $('#mobile-find-toggle')?.addEventListener('click', openFind);
@@ -209,12 +210,30 @@ $('#skip-to-map')?.addEventListener('click', () => focus($('#map-frame')));
 
 // Keyboard/visual-viewport resizes must not dismiss search. Only a layout crossing
 // ends the modal; desktop panel choices survive a mobile round trip.
+function responsiveFocusTarget(active, mobile) {
+  if (!(active instanceof HTMLElement)) return null;
+  if (mobile) {
+    if (active.matches('#search-input')) return $('#mobile-find-toggle');
+    if (active.matches('#desktop-controls-toggle')) return $('#mobile-controls-toggle');
+    if (active.matches('#desktop-inspector-toggle')) return $('#mobile-inspector-toggle');
+    if (active.matches('#map-focus-toggle')) return $('#mobile-controls-toggle');
+    return null;
+  }
+  if (active.matches('#mobile-search-input, #mobile-find-toggle') || active.closest('.mobile-search')) return $('#search-input');
+  if (active.matches('#mobile-controls-toggle') || active.closest('#mobile-controls-panel .mobile-drawer-heading')) return $('#desktop-controls-toggle');
+  if (active.matches('#mobile-inspector-toggle') || active.matches('#mobile-inspector-close')) return $('#desktop-inspector-toggle');
+  return null;
+}
+
 mobileQuery.addEventListener('change', () => {
-  const active = document.activeElement;
+  const current = document.activeElement;
+  const active = current instanceof HTMLElement && current !== document.body ? current : lastFocused;
   const owner = Object.entries(panels).find(([, panel]) => panel.contains(active))?.[0];
+  const target = responsiveFocusTarget(active, mobileQuery.matches);
   const priorDrawer = drawer;
   closeDrawer({ restore: false });
-  if (mobileQuery.matches && owner) focus($(`#mobile-${owner}-toggle`));
+  if (target) focus(target);
+  else if (mobileQuery.matches && owner) focus($(`#mobile-${owner}-toggle`));
   else if (!mobileQuery.matches && (priorDrawer || owner)) {
     const name = priorDrawer || owner;
     if (!desktopOpen[name]) focus($(`#desktop-${name}-toggle`));
