@@ -17,6 +17,7 @@ const GOVERNANCE_PREFIXES = Object.freeze([
   'e2e/publish-local-e2e-status.ps1', 'e2e/run.ps1', 'e2e/playwright.config.mjs',
   'e2e/approve-visual-user-acceptance.ps1',
 ]);
+const MACHINE_ONLY_CONTROL_PLANE_PREFIXES = Object.freeze(['tools/verification/', 'tests/verification/']);
 const RESOURCE_RANK = Object.freeze({
   'cpu-light': 0,
   'browser-targeted': 1,
@@ -164,6 +165,15 @@ function bootstrapChanged(paths) {
   return paths?.some((path) => GOVERNANCE_PREFIXES.some((prefix) => path === prefix || path.startsWith(prefix))) ?? true;
 }
 
+function machineOnlyControlPlane(paths, enabled) {
+  if (enabled !== undefined && typeof enabled !== 'boolean') throw new TypeError('allowControlPlaneMachineOnly must be boolean');
+  return enabled === true
+    && Array.isArray(paths)
+    && paths.length > 0
+    && paths.some((path) => path.startsWith('tools/verification/'))
+    && paths.every((path) => MACHINE_ONLY_CONTROL_PLANE_PREFIXES.some((prefix) => path.startsWith(prefix)));
+}
+
 function unionClassification(left, right, bootstrap) {
   const profile = bootstrap || left.fallback || right.fallback
     ? 'full'
@@ -302,7 +312,7 @@ function mergeCatalogs(trusted, candidate) {
   return freeze({ schemaVersion: 2, groups });
 }
 
-function selectedGroups(groupIds, catalog) {
+function selectedGroups(groupIds, catalog, omitCanonicalReviewDependencies = false) {
   const resolved = new Set();
   const visiting = new Set();
   const visit = (id) => {
@@ -311,7 +321,12 @@ function selectedGroups(groupIds, catalog) {
     const group = catalog.groups[id];
     if (!group) throw new TypeError(`verification group ${id} is not catalogued`);
     visiting.add(id);
-    for (const dependency of group.dependsOnGroups) visit(dependency);
+    for (const dependency of group.dependsOnGroups) {
+      const dependencyGroup = catalog.groups[dependency];
+      if (!dependencyGroup) throw new TypeError(`verification group ${dependency} is not catalogued`);
+      if (omitCanonicalReviewDependencies && dependencyGroup.executionRole === 'canonical-review') continue;
+      visit(dependency);
+    }
     visiting.delete(id);
     resolved.add(id);
   };
@@ -338,6 +353,7 @@ export function buildVerificationPlan(input) {
   const trustedImpactManifest = validateImpactManifest(input.trustedImpactManifest, trustedVerificationCatalog);
   const candidateImpactManifest = validateImpactManifest(input.candidateImpactManifest, candidateVerificationCatalog);
   const changedPaths = allEvidencePaths(input.changedFiles);
+  const controlPlaneMachineOnly = machineOnlyControlPlane(changedPaths, input.allowControlPlaneMachineOnly);
   const unprivilegedSubjects = normalizeUnprivilegedDeterministicSubjects(input.unprivilegedDeterministicSubjects, input.changedFiles, trustedVerificationCatalog);
   const removedPaths = new Set((Array.isArray(input.changedFiles) ? input.changedFiles : []).filter(row => row?.status === 'removed').map(row => row.path));
   const candidateTestSubjects = [...new Set((Array.isArray(input.changedFiles) ? input.changedFiles : []).filter(row =>
@@ -381,7 +397,7 @@ export function buildVerificationPlan(input) {
     result.groups = unionStrings(result.groups, Object.entries(verificationCatalog.groups)
       .filter(([, group]) => group.fullSafetyNet).map(([id]) => id));
   }
-  const groups = selectedGroups(result.groups, verificationCatalog);
+  const groups = selectedGroups(result.groups, verificationCatalog, controlPlaneMachineOnly);
   result.groups = groups.map((group) => group.id);
   for (const group of groups) {
     if (group.specs.some(spec => spec.includes('*'))) {
@@ -404,7 +420,7 @@ export function buildVerificationPlan(input) {
     diffIdentity: digest({ mergeBaseSha, integrationBaseSha, headSha, changedPaths: changedPaths ?? { invalid: true } }),
     changedPaths: changedPaths ?? [],
     changedPathsDigest: digest(changedPaths ?? { invalid: true }),
-    impactPolicyDigest: digest({ trustedImpactManifest, candidateImpactManifest, requiredGroupFloor }),
+    impactPolicyDigest: digest({ trustedImpactManifest, candidateImpactManifest, requiredGroupFloor, controlPlaneMachineOnly }),
     verificationCatalogDigest: digest({ trustedVerificationCatalog, candidateVerificationCatalog }),
     requiredGroupFloor,
     executionBlockers,

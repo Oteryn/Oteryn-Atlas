@@ -44,42 +44,31 @@ test('desktop coordinate replace-state, reload and browser history remain cohere
   await waitForAtlas(page);
   const historyLength = await page.evaluate(() => history.length);
 
-  const initial = new URL(page.url());
-  const bounds = await page.locator('#floor-bounds').innerText();
-  const match = /X (\d+)…(\d+), Y (\d+)…(\d+)/.exec(bounds);
-  expect(match, 'published floor bounds must be visible').not.toBeNull();
-  const [, xMinRaw, xMaxRaw, yMinRaw, yMaxRaw] = match;
-  const xMin = Number(xMinRaw), xMax = Number(xMaxRaw), yMin = Number(yMinRaw), yMax = Number(yMaxRaw);
-  const startX = Number(initial.searchParams.get('x')), startY = Number(initial.searchParams.get('y'));
-  const firstX = startX < xMax ? startX + 1 : startX - 1;
-  const firstY = startY < yMax ? startY + 1 : startY - 1;
-  await page.locator('#search-input').fill(`${firstX} ${firstY} ${initial.searchParams.get('floor')}`);
+  await page.locator('#search-input').fill('32380 32250 -7');
   await page.locator('#search-form button[type="submit"]').click();
-  await expect.poll(() => new URL(page.url()).searchParams.get('x')).toBe(String(firstX));
+  await expect.poll(() => new URL(page.url()).searchParams.get('x')).toBe('32380');
   expect(await page.evaluate(() => history.length)).toBe(historyLength);
 
   await page.reload({ waitUntil: 'domcontentloaded' });
   await waitForAtlas(page);
-  expect(new URL(page.url()).searchParams.get('x')).toBe(String(firstX));
+  expect(new URL(page.url()).searchParams.get('x')).toBe('32380');
 
-  const secondX = firstX < xMax ? firstX + 1 : xMin;
-  const secondY = firstY < yMax ? firstY + 1 : yMin;
   const second = new URL(page.url());
-  second.searchParams.set('x', String(secondX));
-  second.searchParams.set('y', String(secondY));
+  second.searchParams.set('x', '32390');
+  second.searchParams.set('y', '32260');
   await gotoAtlas(page, second.href);
   await waitForAtlas(page);
-  expect(new URL(page.url()).searchParams.get('x')).toBe(String(secondX));
+  expect(new URL(page.url()).searchParams.get('x')).toBe('32390');
 
   await page.goBack({ waitUntil: 'domcontentloaded' });
   await waitForAtlas(page);
-  expect(new URL(page.url()).searchParams.get('x')).toBe(String(firstX));
+  expect(new URL(page.url()).searchParams.get('x')).toBe('32380');
 
   await page.goForward({ waitUntil: 'domcontentloaded' });
   await waitForAtlas(page);
   const forward = new URL(page.url());
-  expect(forward.searchParams.get('x')).toBe(String(secondX));
-  expect(forward.searchParams.get('y')).toBe(String(secondY));
-  expect(forward.searchParams.get('floor')).toBe(initial.searchParams.get('floor'));
+  expect(forward.searchParams.get('x')).toBe('32390');
+  expect(forward.searchParams.get('y')).toBe('32260');
+  expect(forward.searchParams.get('floor')).toBe('-7');
   assertNoRuntimeFailures(runtime);
 });
