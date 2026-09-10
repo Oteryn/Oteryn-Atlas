@@ -36,7 +36,7 @@ test('R5 shadow plans hosted bounded depth groups instead of rejecting them by g
 test('R5 shadow remains fail-closed for specialist real-fullworld execution', () => {
   assert.throws(
     () => planShadow({
-      candidate: candidate('e2e/tests/animation-fullworld-desktop.spec.mjs'),
+      candidate: candidate('e2e/tests/fullworld-animation-census-desktop.spec.mjs'),
       root,
       protectedRoot: root,
     }),
