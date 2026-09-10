@@ -13,6 +13,7 @@ import {
   RUNTIME_WORLD_DOMAIN, RUNTIME_WORLD_PROFILE, RUNTIME_FLOOR_PROFILE,
   SEMANTIC_DOMAIN, SEMANTIC_PROFILE, rootedContentId,
 } from '../../src/browser/fullworld.mjs';
+import { canonicalGameplayJsonBytes, GAMEPLAY_LIMITS, QUALIFICATION_GAMEPLAY_EXPECTATIONS, validateCreatureGameplayManifest } from '../../src/browser/creature-gameplay-profiles.mjs';
 import { PIXEL_HASH_DOMAIN, PIXEL_PROFILE, PIXEL_ROOT_DOMAIN } from '../../src/browser/fullworld-pixels.mjs';
 import { RUNTIME_PIXEL_BUCKET_DOMAIN, RUNTIME_PIXEL_BUCKET_PROFILE } from '../../src/browser/fullworld-pixel-buckets.mjs';
 import { minimapDomains, minimapProfiles } from '../../src/layers/minimap.mjs';
@@ -367,6 +368,61 @@ async function buildQualificationSearch(root, semanticRoot, creatureSearch) {
   return { index, catalog };
 }
 
+
+function qualificationGameplayProfile(record) {
+  const reason = ['qualification-fixture'];
+  if (record.kind === 'npc') return {
+    entity_id: record.entity_id, kind: 'npc', name: record.name,
+    shop: { state: 'UNRESOLVED', sells: [], buys: [], reason_codes: reason },
+    services: { state: 'UNRESOLVED', values: [], reason_codes: reason },
+    travel: { state: 'UNRESOLVED', destinations: [], reason_codes: reason },
+  };
+  return {
+    entity_id: record.entity_id, kind: 'monster', name: record.name,
+    loot: { state: 'UNRESOLVED', entries: [], reason_codes: reason },
+    stats: { state: 'UNRESOLVED', health: null, experience: null, armor: null, defense: null, speed: null, reason_codes: reason },
+    resistances: { state: 'UNRESOLVED', elements: [], immunities: [], reason_codes: reason },
+  };
+}
+
+async function buildQualificationGameplay(root) {
+  const groups = new Map();
+  for (const record of QUALIFICATION_CREATURES) {
+    const key = record.entity_id.split(':')[1].slice(0, 2);
+    const slot = `${record.kind}:${key}`;
+    if (!groups.has(slot)) groups.set(slot, { kind: record.kind, key, profiles: [] });
+    groups.get(slot).profiles.push(qualificationGameplayProfile(record));
+  }
+  const shards = [];
+  for (const group of [...groups.values()].sort((a, b) => a.kind.localeCompare(b.kind) || a.key.localeCompare(b.key))) {
+    const shard = { kind: group.kind, key: group.key, profiles: group.profiles.sort((a, b) => a.entity_id.localeCompare(b.entity_id)) };
+    const bytes = canonicalGameplayJsonBytes(shard);
+    const relative = `shards/${group.kind}-${group.key}.json`;
+    writeBytes(root, `web/creature-gameplay/${relative}`, bytes);
+    shards.push({ kind: group.kind, key: group.key, path: relative, bytes: bytes.byteLength, digest: await sha256ContentId(bytes), records: shard.profiles.length });
+  }
+  const unsigned = {
+    contract_id: QUALIFICATION_GAMEPLAY_EXPECTATIONS.contractId,
+    semantic_revision: QUALIFICATION_GAMEPLAY_EXPECTATIONS.semanticRevision,
+    capability: QUALIFICATION_GAMEPLAY_EXPECTATIONS.capability,
+    profile_schema_version: QUALIFICATION_GAMEPLAY_EXPECTATIONS.profileSchemaVersion,
+    fixture_id: QUALIFICATION_GAMEPLAY_EXPECTATIONS.fixtureId,
+    shard_key_rule: QUALIFICATION_GAMEPLAY_EXPECTATIONS.shardKeyRule,
+    limit_profile: QUALIFICATION_GAMEPLAY_EXPECTATIONS.limitProfile,
+    limits: GAMEPLAY_LIMITS.producer,
+    counts: {
+      npc_profiles: QUALIFICATION_CREATURES.filter((record) => record.kind === 'npc').length,
+      monster_profiles: QUALIFICATION_CREATURES.filter((record) => record.kind === 'monster').length,
+      referenced_items: 0,
+    },
+    shards,
+  };
+  const manifest = { ...unsigned, semantic_digest: await sha256ContentId(canonicalGameplayJsonBytes(unsigned)) };
+  await validateCreatureGameplayManifest(manifest, { expectations: QUALIFICATION_GAMEPLAY_EXPECTATIONS, expectedSemanticDigest: null });
+  writeBytes(root, 'web/creature-gameplay/manifest.json', canonicalGameplayJsonBytes(manifest));
+  return manifest;
+}
+
 export async function buildQualificationWorld(destination) {
   const root = path.resolve(destination);
   if (fs.existsSync(root)) throw new TypeError('qualification world destination already exists');
@@ -413,7 +469,7 @@ export async function buildQualificationWorld(destination) {
   const animation = await buildQualificationAnimation(root, semanticWorld.rootContentId, pixel.manifest.rootContentId, pixel.pixelContentId, pixel.pixels);
   const creatures = await buildQualificationCreatures(root, semanticWorld.rootContentId, animation);
   await buildQualificationSearch(root, semanticWorld.rootContentId, creatures.search);
-  writeJson(root, 'web/creature-gameplay/qualification-unavailable.json', { fixtureId: FIXTURE_ID, dataCapability: 'qualification_fixture', profileStatus: 'intentionally-unavailable' });
+  await buildQualificationGameplay(root);
 
   const files = productEntries(root);
   const result = Object.freeze({

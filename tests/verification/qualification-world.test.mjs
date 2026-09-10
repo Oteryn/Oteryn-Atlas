@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
+import { createCreatureGameplayProfileService, QUALIFICATION_GAMEPLAY_EXPECTATIONS } from '../../src/browser/creature-gameplay-profiles.mjs';
 import {
   buildQualificationWorld,
   qualificationTrustDescriptor,
@@ -26,6 +27,29 @@ test('qualification world is deterministic, complete for the 16-floor runtime co
     assert.match(first[field], /^sha256:[a-f0-9]{64}$/, `${field} must be content-addressed`);
   }
   assert.deepEqual(await verifyQualificationWorld(left), first);
+  const gameplay = JSON.parse(fs.readFileSync(path.join(left, 'web', 'creature-gameplay', 'manifest.json'), 'utf8'));
+  assert.equal(gameplay.fixture_id, 'atlas-qualification-world-v2');
+  assert.equal(gameplay.capability, 'qualification-creature-gameplay-v1');
+  assert.deepEqual(gameplay.counts, { npc_profiles: 6, monster_profiles: 6, referenced_items: 0 });
+  assert.equal(gameplay.shards.length, 12);
+  assert.equal(fs.existsSync(path.join(left, 'web', 'creature-gameplay', 'qualification-unavailable.json')), false);
+  const searchRecords = JSON.parse(fs.readFileSync(path.join(left, 'data', 'creatures', 'search.json'), 'utf8')).records;
+  const fixtureFetch = async (url) => {
+    const relative = decodeURIComponent(new URL(url).pathname).replace(/^\/+/, '');
+    const bytes = fs.readFileSync(path.join(left, ...relative.split('/')));
+    return new Response(bytes, { status: 200, headers: { 'content-length': String(bytes.length) } });
+  };
+  const service = createCreatureGameplayProfileService({
+    baseUrl: 'https://qualification.invalid/web/creature-gameplay/', fetchImpl: fixtureFetch,
+    expectations: QUALIFICATION_GAMEPLAY_EXPECTATIONS, expectedSemanticDigest: null,
+  });
+  for (const kind of ['npc', 'monster']) {
+    const record = searchRecords.find((entry) => entry.kind === kind);
+    assert.ok(record, `qualification fixture needs a ${kind}`);
+    const profile = await service.get(record.entity_id);
+    assert.equal(profile.status, 'ready');
+    assert.equal(profile.profile.name, record.label);
+  }
 
   fs.appendFileSync(path.join(left, 'publication', 'semantic', 'chunks', 'f-7-r1008-c1004.jsonl'), 'forged');
   await assert.rejects(() => verifyQualificationWorld(left), /digest|identity|byte/i);
