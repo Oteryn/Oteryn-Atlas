@@ -4099,7 +4099,7 @@
           "imports": [],
           "subprocessTests": [],
           "qualification": "local-contract",
-          "sourceSha256": "66aeded8cb624677f2dbaafdce8aa8c4338d0208215c3363b1f0d702706d7c22",
+          "sourceSha256": "f86f3840edf176fcf6eeb856a9b7c4e360bf5127ae917d052f6775e36814f42a",
           "contract": {
             "status": "active-semantic",
             "retainedInvariant": "protected hosted product identities pin qualification and bounded-real products",

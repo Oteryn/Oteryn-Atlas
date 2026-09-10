@@ -13,7 +13,7 @@ const identities = JSON.parse(fs.readFileSync(
 test('protected hosted product identities pin qualification and bounded-real products', () => {
   assert.deepEqual(identities.qualification_fixture, {
     id: 'atlas-qualification-world-v2',
-    digest: 'sha256:32369a30dbae0a464ad8091889a4d74eb343fff093619d0cfe68ef8af8d0b0a5',
+    digest: 'sha256:678adadd2d307685815c1982447d06b5ca4c9ec9659eb93f43ae7a4d6dc6eed7',
   });
   assert.deepEqual(identities.bounded_real_world, {
     id: 'atlas-bounded-real-world-v1',
