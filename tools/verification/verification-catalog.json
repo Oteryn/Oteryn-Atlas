@@ -126,6 +126,7 @@
         "tests/verification/qualification-render-probe-binding.test.mjs",
         "tests/verification/qualification-scenario-bindings.test.mjs",
         "tests/verification/qualification-semantic-source-trust.test.mjs",
+        "tests/verification/qualification-world-animation.test.mjs",
         "tests/verification/qualification-world.test.mjs",
         "tests/verification/renderer-diagnostics.test.mjs",
         "tests/verification/restoration-contract-ownership.test.mjs",
@@ -134,6 +135,7 @@
         "tests/verification/selfhosted-compose-contract.test.mjs",
         "tests/verification/semantic-experiment-identity.test.mjs",
         "tests/verification/semantic-routing-closure.test.mjs",
+        "tests/verification/shadow-qualification-harness.test.mjs",
         "tests/verification/stable-id-census.test.mjs",
         "tests/verification/stable-id.test.mjs",
         "tests/verification/summary-reporter.test.mjs",
@@ -4095,7 +4097,7 @@
           "imports": [],
           "subprocessTests": [],
           "qualification": "local-contract",
-          "sourceSha256": "0f26cae7714b22270e305cfbdc48bed9997a76636e31048f1cf1e120b2847453",
+          "sourceSha256": "f86f3840edf176fcf6eeb856a9b7c4e360bf5127ae917d052f6775e36814f42a",
           "contract": {
             "status": "active-semantic",
             "retainedInvariant": "protected hosted product identities pin qualification and bounded-real products",
@@ -4681,6 +4683,23 @@
           }
         },
         {
+          "spec": "tests/verification/qualification-world-animation.test.mjs",
+          "interpreter": "node",
+          "argv": [
+            "--test",
+            "tests/verification/qualification-world-animation.test.mjs"
+          ],
+          "imports": [],
+          "subprocessTests": [],
+          "qualification": "local-contract",
+          "sourceSha256": "138392224aea50c40af06dc91b52f0ee1bfaf9ffa154b0c0f01dfa080c5dab70",
+          "contract": {
+            "status": "active-semantic",
+            "retainedInvariant": "published qualification world objects play distinct real phases and restore their published static pixels",
+            "requiredRewrite": null
+          }
+        },
+        {
           "spec": "tests/verification/qualification-world.test.mjs",
           "interpreter": "node",
           "argv": [
@@ -4690,7 +4709,7 @@
           "imports": [],
           "subprocessTests": [],
           "qualification": "local-contract",
-          "sourceSha256": "3c27b9a4c72b6d8d48c4f38f5dd81203af2daba4a3c6df5e754b0e94970e1dce",
+          "sourceSha256": "2d547311502e212c14e475291bedff3abae9ddab96af9fa88b6b3278ad423047",
           "contract": {
             "status": "active-semantic",
             "retainedInvariant": "qualification world is deterministic, complete for the 16-floor runtime contract, and rejects byte mutation; qualification trust descriptor is the exact browser trust subset of the verified product manifest",
@@ -4796,6 +4815,23 @@
           "contract": {
             "status": "active-semantic",
             "retainedInvariant": "Phase E repetitions retain semantic identity across unrelated main SHAs; Phase E semantic experiment identity changes for harness, authority, environment, product, policy or workload; Phase F evidence cannot bypass newly required stable IDs or specialist obligations",
+            "requiredRewrite": null
+          }
+        },
+        {
+          "spec": "tests/verification/shadow-qualification-harness.test.mjs",
+          "interpreter": "node",
+          "argv": [
+            "--test",
+            "tests/verification/shadow-qualification-harness.test.mjs"
+          ],
+          "imports": [],
+          "subprocessTests": [],
+          "qualification": "local-contract",
+          "sourceSha256": "332980aaacc5fd48db8c84f55b4bf59c4b2b5085ac0d78c6769e76d60670e671",
+          "contract": {
+            "status": "active-semantic",
+            "retainedInvariant": "shadow binds protected qualification harness without weakening production assertions; shadow keeps non-qualification protected harness byte-identical",
             "requiredRewrite": null
           }
         },
@@ -5010,7 +5046,7 @@
             "--test",
             "tests/verification/verification-execution-contract.test.mjs"
           ],
-          "sourceSha256": "655f7b144c161c592fed1ff823605554bee4a5bdee7d6127b3efd12061edeb0d",
+          "sourceSha256": "1632f4f2d7e408a307fdeabd8ae7548add24d95bc14628a0ffe572b0dcbb680e",
           "imports": [],
           "subprocessTests": [],
           "qualification": "local-contract",
