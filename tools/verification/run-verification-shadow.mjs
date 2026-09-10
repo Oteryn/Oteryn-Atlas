@@ -107,19 +107,29 @@ export function assertContainerStarted(container,result={}) {
   return true;
 }
 
+function shadowGroupSupported(group) {
+  const capabilities=group?.capabilities;
+  if(group?.executionRole==='canonical-review'||group?.evidence==='restricted-visual-review'||capabilities?.visualReview===true) return false;
+  if(group?.executionEngine==='deterministic') return true;
+  if(!capabilities||capabilities.hosted!==true||capabilities.specialistReason!==null) return false;
+  if(group.id==='integration.source-contract-http') return capabilities.dataCapability==='bounded_real_world';
+  if(group.executionEngine!=='playwright') return false;
+  if(capabilities.dataCapability==='qualification_fixture') return true;
+  return capabilities.dataCapability==='bounded_real_world'&&group.id==='integration.source-contract-browser';
+}
+
 export function planShadow({candidate,root,protectedRoot}) {
   const protectedCatalog=readJson(path.join(protectedRoot,'tools/verification/verification-catalog.json'));
   const protectedImpactManifest=readJson(path.join(protectedRoot,'tools/verification/impact-manifest.json'));
   const protectedStableTestIds=readJson(path.join(protectedRoot,'tools/verification/protected-scenario-inventory.json')).stableTestIds;
   const planInput={repository:REPOSITORY,headSha:candidate.headSha,integrationBaseSha:candidate.baseSha,
-    mergeBaseSha:candidate.baseSha,changedFiles:candidate.changedFiles};
+    mergeBaseSha:candidate.baseSha,changedFiles:candidate.changedFiles,allowControlPlaneMachineOnly:true};
   const unprivilegedDeterministicSubjects=[...new Set(candidate.changedFiles.flatMap(row=>row.status==='renamed'?[row.previousPath,row.path]:['added','modified'].includes(row.status)?[row.path]:[]).filter(name=>typeof name==='string'&&/^tests\/[A-Za-z0-9_./-]+\.(mjs|py)$/.test(name)))].sort();
   const plan=buildVerificationPlan({...planInput,trustedVerificationCatalog:protectedCatalog,candidateVerificationCatalog:protectedCatalog,
     trustedImpactManifest:protectedImpactManifest,candidateImpactManifest:protectedImpactManifest,
     protectedStableTestIds,unprivilegedDeterministicSubjects});
   assertPlanExecutable(plan);
-  const supported=new Set(['e2e.layer-availability','e2e.farm-explorer','e2e.search-navigation','integration.source-contract-browser','integration.source-contract-http']);
-  for(const group of plan.groups) if(group.executionEngine!=='deterministic'&&!supported.has(group.id)) fail(`R5 bounded executor unavailable for ${group.id}`);
+  for(const group of plan.groups) if(!shadowGroupSupported(group)) fail(`R5 bounded executor unavailable for ${group.id}`);
   return {plan,input:{root,protectedRoot,candidate,planInput,protectedCatalog,protectedImpactManifest,protectedStableTestIds}};
 }
 
