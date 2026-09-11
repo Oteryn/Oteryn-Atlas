@@ -11,9 +11,6 @@ import {
 } from '../src/browser/creature-search.mjs';
 import { ancillarySourceExpectations, FULLWORLD_TRUST } from '../src/browser/fullworld-trust.mjs';
 
-import { createSearchView, renderEntitySummary } from './fullworld-search-view.mjs';
-
-const views = [];
 const INDEX_URL = new URL('./semantic-search/index.json', import.meta.url);
 const CREATURE_SEARCH_URL = new URL('./semantic-search/creatures.json', import.meta.url);
 const MAX_INDEX_BYTES = 2 * 1024 * 1024;
@@ -48,6 +45,33 @@ function publish(error = state.error) {
   });
 }
 
+function injectStyle() {
+  const style = document.createElement('style');
+  style.textContent = `
+    .search,.mobile-search{position:relative}
+    .semantic-search-results{position:absolute;top:calc(100% + 6px);left:0;right:0;z-index:40;display:grid;gap:2px;max-height:min(440px,60vh);overflow:auto;padding:6px;background:#111923;border:1px solid #34475a;border-radius:8px;box-shadow:0 16px 40px #000a}
+    .semantic-search-results[hidden]{display:none}
+    .semantic-search-result{display:grid;grid-template-columns:1fr auto;gap:2px 12px;width:100%;padding:9px 10px;text-align:left;background:transparent;border:0;border-radius:5px;color:inherit;cursor:pointer}
+    .semantic-search-result:hover,.semantic-search-result:focus-visible{background:#ffffff12;outline:1px solid #ffffff22}
+    .semantic-search-result strong{font-size:13px}.semantic-search-result .kind{font-size:10px;letter-spacing:.08em;text-transform:uppercase;opacity:.72}
+    .semantic-search-result small{grid-column:1/-1;opacity:.68;font-variant-numeric:tabular-nums}
+    .semantic-search-unavailable{display:block;padding:9px 10px;color:#e7ba78;line-height:1.4}
+    .semantic-active-layer{outline:1px solid #ffffff20}
+    @media(max-width:760px){.semantic-search-results{position:static;margin-top:6px;max-height:36vh}}
+  `;
+  document.head.append(style);
+}
+
+function resultHost(form, suffix) {
+  const host = document.createElement('div');
+  host.className = 'semantic-search-results';
+  host.id = `semantic-search-results-${suffix}`;
+  host.hidden = true;
+  host.setAttribute('role', 'listbox');
+  form.append(host);
+  return host;
+}
+
 function currentFloor() {
   const params = new URLSearchParams(location.search);
   if (params.has('floor')) {
@@ -67,11 +91,7 @@ function resultIdentity(record) {
 }
 
 function queryAll(raw) {
-  const primary = searchSemanticIndex(state.index, raw, {
-    limit: MAX_RESULTS,
-    currentFloor: currentFloor(),
-    expectedSource: SOURCE_EXPECTATIONS.semanticSearch,
-  });
+  const primary = searchSemanticIndex(state.index, raw, { limit: MAX_RESULTS, currentFloor: currentFloor(), expectedSource: SOURCE_EXPECTATIONS.semanticSearch });
   if (primary.mode === 'coordinate') return primary.results;
   const existing = new Set(primary.results.map(resultIdentity));
   const supplement = searchCreatureRecords(state.creatureSearch, raw, { limit: MAX_RESULTS })
@@ -88,29 +108,72 @@ function navigate(record, rawQuery) {
   location.search = params.toString();
 }
 
-function hideResults(view) {
-  view.close();
+function hideResults(host) {
+  host.replaceChildren();
+  host.hidden = true;
   state.lastResults = 0;
   publish();
 }
 
-function renderResults(view, raw) {
+function renderUnavailable(host) {
+  host.replaceChildren();
+  const note = document.createElement('small');
+  note.className = 'semantic-search-unavailable';
+  note.setAttribute('role', 'status');
+  note.textContent = `Search unavailable: ${state.error?.message ?? 'verified search data unavailable.'}`;
+  host.append(note);
+  host.hidden = false;
+  state.lastResults = 0;
+  publish();
+}
+
+function renderResults(host, raw) {
+  host.replaceChildren();
   const query = String(raw).trim();
   state.lastQuery = query;
-  state.lastResults = 0;
-  if (!query) view.show({ phase: 'idle' });
-  else if (state.status === 'LOADING') view.show({ phase: 'loading', query });
-  else if (state.status === 'FAIL' || !state.index) {
-    view.show({ phase: 'unavailable', query, detail: String(state.error?.message ?? 'Verified search data unavailable.') });
-  } else {
-    try {
-      const results = queryAll(query);
-      state.lastResults = results.length;
-      view.show({ phase: results.length ? 'results' : 'empty', query, results });
-    } catch (error) {
-      view.show({ phase: 'invalid', query, detail: String(error.message ?? error) });
-    }
+  if (!query) {
+    hideResults(host);
+    return;
   }
+  if (state.status === 'FAIL' || !state.index) {
+    renderUnavailable(host);
+    return;
+  }
+  let results;
+  try {
+    results = queryAll(query);
+  } catch (error) {
+    const note = document.createElement('small');
+    note.textContent = error.message ?? String(error);
+    host.append(note);
+    host.hidden = false;
+    state.lastResults = 0;
+    publish();
+    return;
+  }
+  state.lastResults = results.length;
+  if (!results.length) {
+    const note = document.createElement('small');
+    note.textContent = 'No published semantic result.';
+    host.append(note);
+  }
+  for (const record of results) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'semantic-search-result';
+    button.setAttribute('role', 'option');
+    const label = document.createElement('strong');
+    label.textContent = record.label;
+    const kind = document.createElement('span');
+    kind.className = 'kind';
+    kind.textContent = kindLabel(record.kind);
+    const coords = document.createElement('small');
+    coords.textContent = `${record.position.x}, ${record.position.y}, ${displayFloor(record.position.floor, state.index)}`;
+    button.append(label, kind, coords);
+    button.addEventListener('click', () => navigate(record, query));
+    host.append(button);
+  }
+  host.hidden = false;
   publish();
 }
 
@@ -118,35 +181,26 @@ function wireForm(formId, inputId, suffix) {
   const form = document.querySelector(formId);
   const input = document.querySelector(inputId);
   if (!form || !input) return;
-  const view = createSearchView({
-    form, input, id: suffix,
-    describe: record => ({
-      type: kindLabel(record.kind),
-      position: `${record.position.x}, ${record.position.y} · ${displayFloor(record.position.floor, state.index)}`,
-    }),
-    onQuery: raw => renderResults(view, raw),
-    onChoose: navigate,
-    onClose: () => { state.lastResults = 0; publish(); },
-  });
-  views.push(view);
+  const host = resultHost(form, suffix);
+  input.placeholder = suffix === 'mobile' ? 'Search city, NPC, monster, ID or coordinates' : 'Search city, NPC, monster, ID or coordinates';
+  input.setAttribute('aria-label', 'Global semantic Atlas search');
+  if (suffix === 'desktop') input.setAttribute('role', 'combobox');
+  input.addEventListener('input', () => renderResults(host, input.value));
+  input.addEventListener('focus', () => { if (input.value.trim()) renderResults(host, input.value); });
   form.addEventListener('submit', (event) => {
     const query = input.value;
     if (state.index) {
       try {
-        const primary = searchSemanticIndex(state.index, query, {
-          limit: MAX_RESULTS,
-          currentFloor: currentFloor(),
-          expectedSource: SOURCE_EXPECTATIONS.semanticSearch,
-        });
+        const primary = searchSemanticIndex(state.index, query, { limit: MAX_RESULTS, currentFloor: currentFloor(), expectedSource: SOURCE_EXPECTATIONS.semanticSearch });
         if (primary.mode === 'coordinate') {
-          hideResults(view);
+          hideResults(host);
           return;
         }
       } catch {}
     }
     event.preventDefault();
     event.stopImmediatePropagation();
-    renderResults(view, query);
+    renderResults(host, query);
   }, true);
 }
 
@@ -169,16 +223,25 @@ function renderActiveInspector() {
   const inspector = document.querySelector('#inspector-content');
   const pill = document.querySelector('#inspector-pill');
   if (!record || !inspector || !pill) return;
-  if (document.querySelector('#inspector-tab-semantic')?.getAttribute('aria-selected') === 'false') return;
   pill.textContent = kindLabel(record.kind).toUpperCase();
   pill.className = 'pill ok';
-  const source = record.provenance?.source_capability === 'static-creatures-v1'
-    ? 'Oteryn/Oteryn-Game · static-creatures-v1'
-    : `Oteryn/Oteryn-Game@${state.index.source.game_revision.slice(0, 12)} · ${state.index.source.profile_id}`;
-  renderEntitySummary({
-    host: inspector, record, type: kindLabel(record.kind), source,
-    position: `${record.position.x}, ${record.position.y} · ${displayFloor(record.position.floor, state.index)}`,
-  });
+  const card = document.createElement('div'); card.className = 'position-card';
+  const title = document.createElement('strong'); title.textContent = record.label;
+  const type = document.createElement('span'); type.textContent = kindLabel(record.kind);
+  card.append(title, type);
+  const position = document.createElement('p'); position.textContent = `Position: ${record.position.x}, ${record.position.y}, ${displayFloor(record.position.floor, state.index)} (native floor ${record.position.floor})`;
+  const id = document.createElement('p'); id.textContent = `Stable public id: ${record.id}`;
+  const recordId = record.record_id && record.record_id !== record.id ? document.createElement('p') : null;
+  if (recordId) recordId.textContent = `Placement record id: ${record.record_id}`;
+  const caps = document.createElement('p'); caps.textContent = `Public capabilities: ${record.capabilities.length ? record.capabilities.join(', ') : 'none published'}`;
+  const source = document.createElement('p');
+  source.textContent = record.provenance?.source_capability === 'static-creatures-v1'
+    ? 'Source: Oteryn/Oteryn-Game · static-creatures-v1'
+    : `Source: Oteryn/Oteryn-Game@${state.index.source.game_revision.slice(0, 12)} · ${state.index.source.profile_id}`;
+  const bounds = document.createElement('p'); bounds.textContent = record.bounds ? 'Authoritative bounds published.' : 'Authoritative bounds: not published by Game.';
+  inspector.replaceChildren(card, position, id);
+  if (recordId) inspector.append(recordId);
+  inspector.append(caps, bounds, source);
   addActiveLayer(record);
 }
 
@@ -195,6 +258,7 @@ async function loadCreatureSearch() {
 }
 
 async function boot() {
+  injectStyle();
   wireForm('#search-form', '#search-input', 'desktop');
   wireForm('#mobile-search-form', '#mobile-search-input', 'mobile');
   const raw = await boundedJson(INDEX_URL, MAX_INDEX_BYTES);
@@ -207,9 +271,7 @@ async function boot() {
   if (!state.active && creatureId) state.active = findCreatureById(state.creatureSearch, creatureId);
   state.status = 'PASS';
   state.error = null;
-  views.forEach(view => view.refresh());
   renderActiveInspector();
-  if (state.active && !matchMedia('(max-width: 980px)').matches) window.dispatchEvent(new CustomEvent('oteryn-atlas-open-inspector'));
   window.addEventListener('oteryn-atlas-view', () => renderActiveInspector());
   window.addEventListener('oteryn-atlas-inspector-rendered', () => renderActiveInspector());
   publish();
@@ -218,7 +280,6 @@ async function boot() {
 boot().catch((error) => {
   state.status = 'FAIL';
   state.error = error;
-  views.forEach(view => view.refresh());
   publish();
   console.error(error);
 });
