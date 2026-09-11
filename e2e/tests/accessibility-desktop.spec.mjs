@@ -5,7 +5,6 @@ async function expectInspectorMigrationState(page) {
   const inspectorPanel = page.locator('#mobile-inspector-panel');
   const desktopToggle = page.locator('#desktop-inspector-toggle');
   if (await desktopToggle.count()) {
-    await expect(inspectorPanel).toHaveAccessibleName('Inspector and provenance');
     await expect(desktopToggle).toBeVisible();
     await expect(desktopToggle).toHaveAccessibleName('Open inspector');
     await expect(desktopToggle).toHaveAttribute('aria-expanded', 'false');
@@ -18,6 +17,7 @@ async function expectInspectorMigrationState(page) {
     await expect(desktopToggle).toHaveAttribute('aria-expanded', 'true');
     expect(await inspectorPanel.getAttribute('aria-hidden'), 'expanded Inspector must remove aria-hidden').toBeNull();
     await expect(inspectorPanel).toBeVisible();
+    await expect(inspectorPanel).toHaveAccessibleName('Inspector and provenance');
     expect(await inspectorPanel.evaluate((element) => element.inert), 'expanded Inspector must be interactive').toBeFalsy();
 
     await desktopToggle.click();
