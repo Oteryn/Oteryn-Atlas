@@ -387,9 +387,9 @@ async function runPublicationBrowser(command,{candidate,contract,publication,dir
   const suffix=command.id.slice('sha256:'.length,'sha256:'.length+12);
   const context=path.join(directory,`browser-context-${suffix}`);fs.mkdirSync(context);
   for(const relative of ['web','src']) fs.cpSync(path.join(root,relative),path.join(context,relative),{recursive:true});
-  // Candidate web/source bytes are inert inputs. Every executable harness byte
-  // comes from the authenticated protected checkout. Qualification data expressions
-  // are rendered only from the independently verified protected fixture bindings.
+  // Protected control and execution authority come from the authenticated protected
+  // checkout; ordinary browser payload comes from the candidate. Qualification data
+  // expressions are rendered only from independently verified protected fixture bindings.
   prepareProtectedBrowserHarness({protectedRoot:controlRoot,candidateRoot:root,destination:path.join(context,'e2e'),
     qualificationBindings:command.dataCapability==='qualification_fixture'?publication.bindings:null});
   fs.mkdirSync(path.join(context,'tools','verification'),{recursive:true});
