@@ -163,6 +163,10 @@
       "path": "tools/verification/protected-review-evidence.mjs"
     },
     {
+      "id": "tools-verification-protected-visual-reference-mjs",
+      "path": "tools/verification/protected-visual-reference.mjs"
+    },
+    {
       "id": "tools-verification-qualification-fixture-definition-mjs",
       "path": "tools/verification/qualification-fixture-definition.mjs"
     },
@@ -181,6 +185,10 @@
     {
       "id": "tools-verification-restoration-contract-ownership-json",
       "path": "tools/verification/restoration-contract-ownership.json"
+    },
+    {
+      "id": "tools-verification-run-protected-visual-reference-mjs",
+      "path": "tools/verification/run-protected-visual-reference.mjs"
     },
     {
       "id": "tools-verification-run-verification-shadow-mjs",
