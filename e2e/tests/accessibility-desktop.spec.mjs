@@ -5,12 +5,27 @@ async function expectInspectorMigrationState(page) {
   const inspectorPanel = page.locator('#mobile-inspector-panel');
   const desktopToggle = page.locator('#desktop-inspector-toggle');
   if (await desktopToggle.count()) {
+    await expect(inspectorPanel).toHaveAccessibleName('Inspector and provenance');
     await expect(desktopToggle).toBeVisible();
     await expect(desktopToggle).toHaveAccessibleName('Open inspector');
     await expect(desktopToggle).toHaveAttribute('aria-expanded', 'false');
     await expect(inspectorPanel).toHaveAttribute('aria-hidden', 'true');
     await expect(inspectorPanel).toBeHidden();
     expect(await inspectorPanel.evaluate((element) => element.inert), 'collapsed Inspector must be inert').toBeTruthy();
+
+    await desktopToggle.click();
+    await expect(desktopToggle).toHaveAccessibleName('Hide inspector');
+    await expect(desktopToggle).toHaveAttribute('aria-expanded', 'true');
+    expect(await inspectorPanel.getAttribute('aria-hidden'), 'expanded Inspector must remove aria-hidden').toBeNull();
+    await expect(inspectorPanel).toBeVisible();
+    expect(await inspectorPanel.evaluate((element) => element.inert), 'expanded Inspector must be interactive').toBeFalsy();
+
+    await desktopToggle.click();
+    await expect(desktopToggle).toHaveAccessibleName('Open inspector');
+    await expect(desktopToggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(inspectorPanel).toHaveAttribute('aria-hidden', 'true');
+    await expect(inspectorPanel).toBeHidden();
+    expect(await inspectorPanel.evaluate((element) => element.inert), 're-collapsed Inspector must be inert').toBeTruthy();
     return;
   }
   await expect(page.getByRole('complementary', { name: 'Inspector and provenance' })).toBeVisible();
@@ -20,9 +35,9 @@ async function expectInspectorMigrationState(page) {
 
 async function expectAreaToolsMigrationState(page) {
   const disclosure = page.locator('#area-tools-disclosure');
-  const search = page.locator('#region-search');
-  const family = page.locator('#region-family');
-  const zoom = page.locator('#region-zoom');
+  const search = page.getByRole('searchbox', { name: 'Search Areas and Subareas', includeHidden: true });
+  const family = page.getByRole('combobox', { name: 'Region family', includeHidden: true });
+  const zoom = page.getByRole('button', { name: 'Zoom to area', includeHidden: true });
   await expect(search).toBeDisabled();
   await expect(family).toBeDisabled();
   await expect(zoom).toBeDisabled();
@@ -66,6 +81,7 @@ test('desktop critical controls expose truthful accessible names and disabled st
   const desktopControlsToggle = page.locator('#desktop-controls-toggle');
   if (await desktopControlsToggle.count()) {
     await expect(desktopControlsToggle).toBeVisible();
+    await expect(desktopControlsToggle).toHaveAccessibleName('Hide Atlas controls');
     await expect(desktopControlsToggle).toHaveAttribute('aria-expanded', 'true');
   } else {
     await expect(page.getByRole('button', { name: 'Open Atlas controls' })).toBeHidden();
