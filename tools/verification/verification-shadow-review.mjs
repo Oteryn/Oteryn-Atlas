@@ -271,7 +271,7 @@ export async function validateShadowReviewGate({candidate,currentRunId,contract,
   const review=selectLatestProtectedReview(reviews,reviewCandidate);
   if(!review)fail('independent visual review required');
   const wanted=reviewCaptureDigests(review,reviewCandidate);
-  const runs=await pages(request,`/repos/${candidate.repository}/actions/workflows/verification-shadow.yml/runs?event=pull_request_target&head_sha=${reviewCandidate.headSha}`,'workflow_runs');
+  const runs=await pages(request,`/repos/${candidate.repository}/actions/runs?event=pull_request_target&head_sha=${reviewCandidate.headSha}`,'workflow_runs');
   const prior=runs.filter(run=>run.id<currentRunId&&run.path===ACTIVE&&run.event==='pull_request_target'&&run.run_attempt===1&&run.status==='completed'&&['success','failure'].includes(run.conclusion)
     &&run.head_sha===reviewCandidate.headSha&&Array.isArray(run.pull_requests)&&run.pull_requests.some(pr=>pr.number===reviewCandidate.prNumber&&pr.head?.sha===reviewCandidate.headSha&&pr.base?.sha===reviewCandidate.baseSha))
     .sort((a,b)=>b.id-a.id).slice(0,20);
