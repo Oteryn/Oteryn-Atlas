@@ -22,8 +22,8 @@ function executionInput(path='tests/semantic-search.mjs') {
 }
 test('final candidate readback rejects head/base/tree/repository/file drift',()=>{
  const planned=snapshot();assert.equal(assertCandidateReadback({planned,current:snapshot(),...source}),true);
- for(const key of ['headSha','baseSha','treeSha','repository']) {const current=snapshot();current[key]=key==='repository'?'Other/Atlas':sha('d');assert.throws(()=>assertCandidateReadback({planned,current,...source}),/readback/);}
- const current=snapshot();current.changedFiles[0].path='README.md';assert.throws(()=>assertCandidateReadback({planned,current,...source}),/readback/);
+ for(const key of ['headSha','baseSha','treeSha','repository']) {const current=snapshot();current[key]=key==='repository'?'Other/Atlas':sha('d');assert.throws(()=>assertCandidateReadback({planned:snapshot(),current,...source}),/readback/);}
+ const current=snapshot();current.changedFiles[0].path='README.md';assert.throws(()=>assertCandidateReadback({planned:snapshot(),current,...source}),/readback/);
 });
 
 test('candidate branches cannot impersonate protected execution source',()=>{
@@ -221,7 +221,7 @@ test('candidate execution metadata cannot replace protected interpreter or hashe
  assert(!JSON.stringify(contract).includes('candidate-policy'));
 });
 
-import {authenticateR5SemanticSource,buildR5SemanticPublication,resolveShadowEvent,planShadow,deterministicDockerArgs,fixtureBrowserArgs} from '../../tools/verification/run-verification-shadow.mjs';
+import {authenticateR5SemanticSource,buildR5SemanticPublication,resolveShadowEvent,planShadow,deterministicDockerArgs,fixtureBrowserArgs,requiresProtectedVisualReference,bindProtectedVisualReferenceConsumer} from '../../tools/verification/run-verification-shadow.mjs';
 import {assertShadowExecutorCoverage,assertShadowReviewCaptureCensus,normalizeShadowReviewChangedFiles,shadowReviewPlanDigest} from '../../tools/verification/verification-shadow-review.mjs';
 test('fixture browser preserves runner ownership of report artifacts',()=>{
  const compose=['compose','-p','protected-fixture','-f','/protected/compose.yml'];
@@ -231,6 +231,26 @@ test('fixture browser preserves runner ownership of report artifacts',()=>{
   assert.throws(()=>fixtureBrowserArgs(compose,{uid:bad,gid:1002}),/fixture host identity/);
   assert.throws(()=>fixtureBrowserArgs(compose,{uid:1001,gid:bad}),/fixture host identity/);
  }
+});
+
+test('hosted shadow mounts independent protected visual references only for qualification visual specs',()=>{
+ const command=({spec='visual-desktop.spec.mjs',capability='qualification_fixture',engine='playwright'}={})=>({engine,dataCapability:capability,expectedTestIds:[`desktop-chromium::e2e/tests/${spec}::visual acceptance`]});
+ assert.equal(requiresProtectedVisualReference(command()),true);
+ assert.equal(requiresProtectedVisualReference(command({spec:'visual-mobile.spec.mjs'})),true);
+ assert.equal(requiresProtectedVisualReference(command({spec:'state-desktop.spec.mjs'})),false);
+ assert.equal(requiresProtectedVisualReference(command({capability:'bounded_real_world'})),false);
+ assert.equal(requiresProtectedVisualReference(command({engine:'deterministic'})),false);
+ const composeArgs=['compose','-p','atlas-r5-test','-f','/protected/base.yml'];
+ const env={ATLAS_CODE_REVISION:'a'.repeat(40)};
+ const snapshots=path.join(root,'.protected-reference-test');
+ const wired=bindProtectedVisualReferenceConsumer({composeArgs,env,protectedRoot:root,referenceSnapshots:snapshots});
+ assert.deepEqual(composeArgs,['compose','-p','atlas-r5-test','-f','/protected/base.yml']);
+ assert.deepEqual(env,{ATLAS_CODE_REVISION:'a'.repeat(40)});
+ assert.deepEqual(wired.composeArgs,[...composeArgs,'-f',path.join(root,'e2e/compose.protected-visual-consumer.yml')]);
+ assert.equal(wired.env.ATLAS_REFERENCE_SNAPSHOTS,snapshots);
+ const overlay=fs.readFileSync(path.join(root,'e2e/compose.protected-visual-consumer.yml'),'utf8');
+ assert.match(overlay,/visual-desktop\.spec\.mjs-snapshots\/protected-reference:ro/);
+ assert.match(overlay,/visual-mobile\.spec\.mjs-snapshots\/protected-reference:ro/);
 });
 
 const r5Read = (name) => JSON.parse(fs.readFileSync(path.join(root, 'tools/verification', `${name}.json`), 'utf8'));
