@@ -191,7 +191,7 @@ export function renderEntitySummary({ host, record, type, position, source }) {
   const facts = element('dl', 'entity-facts');
   const entries = [
     ['Source', source],
-    ['Public ID', record.id || 'Not published'],
+    ['Stable public id', record.id || 'Not published'],
     ...(record.record_id && record.record_id !== record.id ? [['Placement ID', record.record_id]] : []),
     ['Native floor', String(record.position.floor)],
     ['Public capabilities', record.capabilities?.length ? record.capabilities.join(', ') : 'None published'],
