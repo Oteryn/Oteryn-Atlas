@@ -264,7 +264,7 @@ test('candidate execution metadata cannot replace protected interpreter or hashe
  assert(!JSON.stringify(contract).includes('candidate-policy'));
 });
 
-import {authenticateR5SemanticSource,buildR5SemanticPublication,resolveShadowEvent,planShadow,deterministicDockerArgs,fixtureBrowserArgs,requiresProtectedVisualReference,bindProtectedVisualReferenceConsumer,prepareProtectedBrowserHarness,writeProtectedBrowserContainment} from '../../tools/verification/run-verification-shadow.mjs';
+import {authenticateR5SemanticSource,buildR5SemanticPublication,resolveShadowEvent,planShadow,deterministicDockerArgs,fixtureBrowserArgs,requiresProtectedVisualReference,bindProtectedVisualReferenceConsumer,prepareProtectedBrowserHarness,prepareProtectedBrowserCaptureHarness,writeProtectedBrowserContainment} from '../../tools/verification/run-verification-shadow.mjs';
 import {assertShadowExecutorCoverage,assertShadowReviewCaptureCensus,normalizeShadowReviewChangedFiles,shadowReviewPlanDigest} from '../../tools/verification/verification-shadow-review.mjs';
 test('shadow materializes candidate browser tests, support and snapshots while protected executor control stays protected',t=>{
  const {scratch,candidateRoot}=copyCandidateBrowserPayload(t);
@@ -306,6 +306,32 @@ test('hosted browser machine and protected visual capture use isolated producers
  assert.match(source,/ATLAS_USER_VISUAL_EVIDENCE:'1'/);
  assert.match(source,/persistShadowReviewCapture\(\{artifactRoot:captureArtifacts/);
  assert.doesNotMatch(source,/persistShadowReviewCapture\(\{artifactRoot:artifacts/);
+});
+
+test('protected visual capture overlays only authenticated candidate PNG snapshot oracle data',t=>{
+ const {scratch,candidateRoot}=copyCandidateBrowserPayload(t);
+ const e2e=path.join(candidateRoot,'e2e'), snapshot=firstBrowserSnapshot(e2e);
+ const protectedSnapshot=fs.readFileSync(path.join(root,'e2e',snapshot));
+ fs.writeFileSync(path.join(e2e,snapshot),Buffer.concat([protectedSnapshot,Buffer.from('candidate-capture-snapshot-marker')]));
+ fs.appendFileSync(path.join(e2e,'tests/visual-desktop.spec.mjs'),'\n// candidate capture spec must stay inert\n');
+ fs.appendFileSync(path.join(e2e,'support/user-acceptance.mjs'),'\n// candidate capture support must stay inert\n');
+ const destination=path.join(scratch,'protected-capture');
+ prepareProtectedBrowserCaptureHarness({protectedRoot:root,candidateRoot,destination});
+ assert.equal(fs.readFileSync(path.join(destination,snapshot)).includes(Buffer.from('candidate-capture-snapshot-marker')),true);
+ assert.deepEqual(fs.readFileSync(path.join(destination,'tests/visual-desktop.spec.mjs')),fs.readFileSync(path.join(root,'e2e/tests/visual-desktop.spec.mjs')));
+ assert.deepEqual(fs.readFileSync(path.join(destination,'support/user-acceptance.mjs')),fs.readFileSync(path.join(root,'e2e/support/user-acceptance.mjs')));
+
+ fs.rmSync(path.join(e2e,snapshot));
+ const deletedDestination=path.join(scratch,'protected-capture-deleted');
+ prepareProtectedBrowserCaptureHarness({protectedRoot:root,candidateRoot,destination:deletedDestination});
+ assert.equal(fs.existsSync(path.join(deletedDestination,snapshot)),false);
+
+ const snapshotDirectory=path.dirname(path.join(e2e,snapshot));
+ fs.writeFileSync(path.join(snapshotDirectory,'invalid.txt'),'not snapshot oracle data');
+ assert.throws(()=>prepareProtectedBrowserCaptureHarness({protectedRoot:root,candidateRoot,destination:path.join(scratch,'protected-capture-invalid')}),/non-PNG data/);
+ fs.rmSync(path.join(snapshotDirectory,'invalid.txt'));
+ fs.symlinkSync(path.join(root,'e2e',snapshot),path.join(snapshotDirectory,'linked.png'));
+ assert.throws(()=>prepareProtectedBrowserCaptureHarness({protectedRoot:root,candidateRoot,destination:path.join(scratch,'protected-capture-symlink')}),/snapshot symlink/);
 });
 
 test('qualification binding is rendered onto candidate test payload without replacing candidate assertions',async t=>{

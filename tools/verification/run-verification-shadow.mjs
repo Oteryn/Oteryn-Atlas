@@ -133,6 +133,40 @@ function protectedHarnessSources(e2eRoot) {
 }
 
 const CANDIDATE_BROWSER_PAYLOAD=['tests','support'];
+const SNAPSHOT_DIRECTORY=/(?:^|\/)[^/]+\.spec\.mjs-snapshots$/;
+function candidateSnapshotSources(e2eRoot) {
+  const testsRoot=path.join(e2eRoot,'tests'), result={};
+  if(!fs.existsSync(testsRoot)) fail('candidate snapshot tests missing');
+  const testsStat=fs.lstatSync(testsRoot);
+  if(testsStat.isSymbolicLink()||!testsStat.isDirectory()) fail('candidate snapshot tests root');
+  const walkForSnapshotDirectories=(directory,relative='tests')=>{
+    for(const name of fs.readdirSync(directory).sort()) {
+      if(!name||name==='.'||name==='..') fail('candidate snapshot unsafe path');
+      const absolute=path.join(directory,name), key=path.posix.join(relative,name), stat=fs.lstatSync(absolute);
+      if(stat.isSymbolicLink()) {
+        if(SNAPSHOT_DIRECTORY.test(key)||SNAPSHOT_DIRECTORY.test(relative)) fail('candidate snapshot symlink');
+        continue;
+      }
+      if(!stat.isDirectory()) continue;
+      if(SNAPSHOT_DIRECTORY.test(key)) {walkSnapshotDirectory(absolute,key);continue;}
+      walkForSnapshotDirectories(absolute,key);
+    }
+  };
+  const walkSnapshotDirectory=(directory,relative)=>{
+    for(const name of fs.readdirSync(directory).sort()) {
+      if(!name||name==='.'||name==='..') fail('candidate snapshot unsafe path');
+      const absolute=path.join(directory,name), key=path.posix.join(relative,name), stat=fs.lstatSync(absolute);
+      if(stat.isSymbolicLink()) fail('candidate snapshot symlink');
+      if(stat.isDirectory()) {walkSnapshotDirectory(absolute,key);continue;}
+      if(!stat.isFile()) fail('candidate snapshot specialfile');
+      if(!name.endsWith('.png')) fail('candidate snapshot non-PNG data');
+      result[key]=fs.readFileSync(absolute).toString('base64');
+    }
+  };
+  walkForSnapshotDirectories(testsRoot);
+  return result;
+}
+
 function candidateHarnessSources(e2eRoot) {
   const result={};
   for(const root of CANDIDATE_BROWSER_PAYLOAD) {
@@ -183,6 +217,32 @@ export function prepareProtectedBrowserHarness({protectedRoot,candidateRoot=prot
   }
   const actual=protectedHarnessSources(target);
   if(canonicalJson(actual)!==canonicalJson(expected)) fail('protected harness materialization mismatch');
+  return {bound:qualificationBindings!==null,sourceDigest:digest(expected),files:Object.keys(expected).sort()};
+}
+
+export function prepareProtectedBrowserCaptureHarness({protectedRoot,candidateRoot,destination,qualificationBindings=null}={}) {
+  prepareProtectedBrowserHarness({protectedRoot,destination,qualificationBindings});
+  const target=path.resolve(destination), snapshotSources=candidateSnapshotSources(path.join(path.resolve(candidateRoot),'e2e'));
+  const removeSnapshotDirectories=directory=>{
+    for(const name of fs.readdirSync(directory).sort()) {
+      const absolute=path.join(directory,name), relative=path.posix.relative(target,absolute), stat=fs.lstatSync(absolute);
+      if(!stat.isDirectory()) continue;
+      if(SNAPSHOT_DIRECTORY.test(relative)) {fs.rmSync(absolute,{recursive:true,force:true});continue;}
+      removeSnapshotDirectories(absolute);
+    }
+  };
+  removeSnapshotDirectories(path.join(target,'tests'));
+  for(const [relative,encoded] of Object.entries(snapshotSources)) {
+    const output=path.join(target,...relative.split('/'));
+    fs.mkdirSync(path.dirname(output),{recursive:true});
+    fs.writeFileSync(output,Buffer.from(encoded,'base64'));
+  }
+  const protectedSources=protectedHarnessSources(path.join(path.resolve(protectedRoot),'e2e'));
+  const expected=qualificationBindings===null?protectedSources:renderQualificationHarnessBindings({protectedSources,bindings:qualificationBindings});
+  for(const key of Object.keys(expected)) if(key.split('/').some((_,index,parts)=>SNAPSHOT_DIRECTORY.test(parts.slice(0,index+1).join('/')))) delete expected[key];
+  Object.assign(expected,snapshotSources);
+  const actual=protectedHarnessSources(target);
+  if(canonicalJson(actual)!==canonicalJson(expected)) fail('protected capture snapshot materialization mismatch');
   return {bound:qualificationBindings!==null,sourceDigest:digest(expected),files:Object.keys(expected).sort()};
 }
 
@@ -408,7 +468,9 @@ async function runPublicationBrowser(command,{candidate,contract,publication,dir
   if(captureContext) {
     fs.mkdirSync(captureContext);
     for(const relative of ['web','src']) fs.cpSync(path.join(root,relative),path.join(captureContext,relative),{recursive:true});
-    prepareProtectedBrowserHarness({protectedRoot:controlRoot,destination:path.join(captureContext,'e2e'),
+    // Protected executable capture code stays protected; authenticated candidate
+    // Playwright PNG snapshots are overlaid solely as reviewable oracle data.
+    prepareProtectedBrowserCaptureHarness({protectedRoot:controlRoot,candidateRoot:root,destination:path.join(captureContext,'e2e'),
       qualificationBindings:command.dataCapability==='qualification_fixture'?publication.bindings:null});
     fs.mkdirSync(path.join(captureContext,'tools','verification'),{recursive:true});
     fs.copyFileSync(path.join(controlRoot,'tools/verification/stable-id.mjs'),path.join(captureContext,'tools/verification/stable-id.mjs'));
