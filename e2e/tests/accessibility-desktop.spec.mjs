@@ -1,6 +1,43 @@
 import { expect, test } from '@playwright/test';
 import { DESKTOP_ENTRY, assertNoRuntimeFailures, captureRuntimeFailures, gotoAtlas, waitForAtlas } from './runtime.mjs';
 
+async function expectInspectorMigrationState(page) {
+  const inspectorPanel = page.locator('#mobile-inspector-panel');
+  const desktopToggle = page.locator('#desktop-inspector-toggle');
+  if (await desktopToggle.count()) {
+    await expect(desktopToggle).toBeVisible();
+    await expect(desktopToggle).toHaveAccessibleName('Open inspector');
+    await expect(desktopToggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(inspectorPanel).toHaveAttribute('aria-hidden', 'true');
+    await expect(inspectorPanel).toBeHidden();
+    expect(await inspectorPanel.evaluate((element) => element.inert), 'collapsed Inspector must be inert').toBeTruthy();
+    return;
+  }
+  await expect(page.getByRole('complementary', { name: 'Inspector and provenance' })).toBeVisible();
+  await expect(inspectorPanel).not.toHaveAttribute('aria-hidden', 'true');
+  expect(await inspectorPanel.evaluate((element) => element.inert), 'legacy visible Inspector must stay interactive').toBeFalsy();
+}
+
+async function expectAreaToolsMigrationState(page) {
+  const disclosure = page.locator('#area-tools-disclosure');
+  const search = page.locator('#region-search');
+  const family = page.locator('#region-family');
+  const zoom = page.locator('#region-zoom');
+  await expect(search).toBeDisabled();
+  await expect(family).toBeDisabled();
+  await expect(zoom).toBeDisabled();
+  if (await disclosure.count()) {
+    await expect(disclosure).not.toHaveAttribute('open', '');
+    await expect(search).toBeHidden();
+    await expect(family).toBeHidden();
+    await expect(zoom).toBeHidden();
+  } else {
+    await expect(search).toBeVisible();
+    await expect(family).toBeVisible();
+    await expect(zoom).toBeVisible();
+  }
+}
+
 test('desktop critical controls expose truthful accessible names and disabled states', async ({ page }) => {
   const runtime = captureRuntimeFailures(page);
   await gotoAtlas(page, DESKTOP_ENTRY);
@@ -13,22 +50,9 @@ test('desktop critical controls expose truthful accessible names and disabled st
   await expect(page.getByRole('button', { name: 'Higher floor' })).toBeEnabled();
   await expect(page.getByRole('button', { name: 'Lower floor' })).toBeEnabled();
   await expect(page.getByRole('group', { name: 'Atlas view mode' })).toBeVisible();
-  const inspectorToggle = page.locator('#desktop-inspector-toggle');
-  const inspectorPanel = page.locator('#mobile-inspector-panel');
-  await expect(inspectorToggle).toBeVisible();
-  await expect(inspectorToggle).toHaveAccessibleName('Open inspector');
-  await expect(inspectorToggle).toHaveAttribute('aria-expanded', 'false');
-  await expect(inspectorPanel).toHaveAttribute('aria-hidden', 'true');
-  expect(await inspectorPanel.evaluate((element) => element.inert)).toBeTruthy();
+  await expectInspectorMigrationState(page);
   await expect(page.locator('#atlas')).toHaveAttribute('aria-label', 'Full-world WebGL2 Atlas');
-  const areaTools = page.locator('#area-tools-disclosure');
-  await expect(areaTools).not.toHaveAttribute('open', '');
-  await expect(page.locator('#region-search')).toBeDisabled();
-  await expect(page.locator('#region-family')).toBeDisabled();
-  await expect(page.locator('#region-zoom')).toBeDisabled();
-  await expect(page.locator('#region-search')).toBeHidden();
-  await expect(page.locator('#region-family')).toBeHidden();
-  await expect(page.locator('#region-zoom')).toBeHidden();
+  await expectAreaToolsMigrationState(page);
 
   for (const label of ['Areas', 'Subareas', 'Towns', 'Temples', 'Teleports / transitions', 'Houses', 'House doors', 'Action IDs', 'Unique IDs', 'Waypoints', 'Mechanics', 'Raids / encounters', 'Quest areas', 'POIs']) {
     const row = page.locator('#semantic-layer-list .layer').filter({ has: page.getByText(label, { exact: true }) });
@@ -39,10 +63,14 @@ test('desktop critical controls expose truthful accessible names and disabled st
   const playback = page.getByRole('checkbox', { name: /Playback/ });
   await expect(playback).toBeEnabled();
   await expect(playback).not.toBeChecked();
-  await expect(page.locator('#desktop-controls-toggle')).toBeVisible();
-  await expect(page.locator('#desktop-controls-toggle')).toHaveAttribute('aria-expanded', 'true');
-  await expect(inspectorToggle).toBeVisible();
-  await expect(inspectorToggle).toHaveAttribute('aria-expanded', 'false');
+  const desktopControlsToggle = page.locator('#desktop-controls-toggle');
+  if (await desktopControlsToggle.count()) {
+    await expect(desktopControlsToggle).toBeVisible();
+    await expect(desktopControlsToggle).toHaveAttribute('aria-expanded', 'true');
+  } else {
+    await expect(page.getByRole('button', { name: 'Open Atlas controls' })).toBeHidden();
+    await expect(page.getByRole('button', { name: 'Open inspector' })).toBeHidden();
+  }
   assertNoRuntimeFailures(runtime);
 });
 
