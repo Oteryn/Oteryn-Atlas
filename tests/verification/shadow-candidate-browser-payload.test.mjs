@@ -55,7 +55,7 @@ test('shadow materializes candidate browser tests, support and snapshots while p
   prepareProtectedBrowserHarness({protectedRoot:root,candidateRoot,destination});
   assert.match(fs.readFileSync(path.join(destination,changed.spec),'utf8'),/candidate-browser-spec-marker/);
   assert.match(fs.readFileSync(path.join(destination,changed.support),'utf8'),/candidate-browser-support-marker/);
-  assert.match(fs.readFileSync(path.join(destination,changed.snapshot)),/candidate-snapshot-marker/);
+  assert.equal(fs.readFileSync(path.join(destination,changed.snapshot)).includes(Buffer.from('candidate-snapshot-marker')),true);
   assert.deepEqual(fs.readFileSync(path.join(destination,'Dockerfile')),fs.readFileSync(path.join(root,'e2e/Dockerfile')));
   assert.doesNotMatch(fs.readFileSync(path.join(destination,'Dockerfile'),'utf8'),/candidate Dockerfile/);
 });

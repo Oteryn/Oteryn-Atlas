@@ -132,12 +132,52 @@ function protectedHarnessSources(e2eRoot) {
   return result;
 }
 
-export function prepareProtectedBrowserHarness({protectedRoot,destination,qualificationBindings=null}={}) {
-  const sourceRoot=path.join(path.resolve(protectedRoot),'e2e'), target=path.resolve(destination);
-  if(!fs.existsSync(sourceRoot)||fs.existsSync(target)||target===sourceRoot||target.startsWith(sourceRoot+path.sep)) fail('protected harness destination');
+const CANDIDATE_BROWSER_PAYLOAD=['tests','support','baselines'];
+function candidateHarnessSources(e2eRoot) {
+  const result={};
+  for(const root of CANDIDATE_BROWSER_PAYLOAD) {
+    const directory=path.join(e2eRoot,root);
+    if(!fs.existsSync(directory)) {
+      if(root!=='baselines') fail(`candidate browser payload missing ${root}`);
+      continue;
+    }
+    const rootStat=fs.lstatSync(directory);
+    if(rootStat.isSymbolicLink()||!rootStat.isDirectory()) fail('candidate browser payload root');
+    const walk=(current,relative)=>{
+      for(const name of fs.readdirSync(current).sort()) {
+        if(name==='node_modules'||!name||name==='.'||name==='..') fail('candidate browser payload unsafe path');
+        const key=path.posix.join(relative,name), absolute=path.join(current,name), stat=fs.lstatSync(absolute);
+        if(stat.isSymbolicLink()) fail('candidate browser payload symlink');
+        if(stat.isDirectory()) {walk(absolute,key);continue;}
+        if(!stat.isFile()) fail('candidate browser payload specialfile');
+        const bytes=fs.readFileSync(absolute);
+        if(key.endsWith('.mjs')) {
+          const source=bytes.toString('utf8');
+          if(!Buffer.from(source,'utf8').equals(bytes)) fail('candidate browser payload invalid UTF-8');
+          result[key]=source;
+        } else result[key]=bytes.toString('base64');
+      }
+    };
+    walk(directory,root);
+  }
+  return result;
+}
+
+export function prepareProtectedBrowserHarness({protectedRoot,candidateRoot=protectedRoot,destination,qualificationBindings=null}={}) {
+  const sourceRoot=path.join(path.resolve(protectedRoot),'e2e'), candidateE2e=path.join(path.resolve(candidateRoot),'e2e'), target=path.resolve(destination);
+  if(!fs.existsSync(sourceRoot)||fs.existsSync(target)||target===sourceRoot||target.startsWith(sourceRoot+path.sep)
+    ||target===candidateE2e||target.startsWith(candidateE2e+path.sep)) fail('protected harness destination');
   const protectedSources=protectedHarnessSources(sourceRoot);
+  const candidateSources=candidateHarnessSources(candidateE2e);
   fs.cpSync(sourceRoot,target,{recursive:true,filter:file=>!file.split(path.sep).includes('node_modules')});
-  const expected=qualificationBindings===null?protectedSources:renderQualificationHarnessBindings({protectedSources,bindings:qualificationBindings});
+  for(const root of CANDIDATE_BROWSER_PAYLOAD) {
+    const destinationRoot=path.join(target,root), candidatePayloadRoot=path.join(candidateE2e,root);
+    fs.rmSync(destinationRoot,{recursive:true,force:true});
+    if(fs.existsSync(candidatePayloadRoot)) fs.cpSync(candidatePayloadRoot,destinationRoot,{recursive:true});
+  }
+  const combined=Object.fromEntries(Object.entries(protectedSources).filter(([name])=>!CANDIDATE_BROWSER_PAYLOAD.some(root=>name===root||name.startsWith(`${root}/`))));
+  Object.assign(combined,candidateSources);
+  const expected=qualificationBindings===null?combined:renderQualificationHarnessBindings({protectedSources:combined,bindings:qualificationBindings});
   if(qualificationBindings!==null) for(const [relative,source] of Object.entries(expected)) {
     if(!relative.endsWith('.mjs')) continue;
     const targetFile=path.join(target,...relative.split('/'));
@@ -350,7 +390,7 @@ async function runPublicationBrowser(command,{candidate,contract,publication,dir
   // Candidate web/source bytes are inert inputs. Every executable harness byte
   // comes from the authenticated protected checkout. Qualification data expressions
   // are rendered only from the independently verified protected fixture bindings.
-  prepareProtectedBrowserHarness({protectedRoot:controlRoot,destination:path.join(context,'e2e'),
+  prepareProtectedBrowserHarness({protectedRoot:controlRoot,candidateRoot:root,destination:path.join(context,'e2e'),
     qualificationBindings:command.dataCapability==='qualification_fixture'?publication.bindings:null});
   fs.mkdirSync(path.join(context,'tools','verification'),{recursive:true});
   fs.copyFileSync(path.join(controlRoot,'tools/verification/stable-id.mjs'),path.join(context,'tools/verification/stable-id.mjs'));
