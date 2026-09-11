@@ -6,7 +6,7 @@ test('desktop critical controls expose truthful accessible names and disabled st
   await gotoAtlas(page, DESKTOP_ENTRY);
   await waitForAtlas(page);
 
-  await expect(page.getByRole('textbox', { name: 'Global semantic Atlas search' }).first()).toBeVisible();
+  await expect(page.getByRole('combobox', { name: 'Global semantic Atlas search' }).first()).toBeVisible();
   await expect(page.getByRole('button', { name: 'Zoom in' })).toBeEnabled();
   await expect(page.getByRole('button', { name: 'Zoom out' })).toBeEnabled();
   await expect(page.getByRole('combobox', { name: 'Exported floor' })).toBeEnabled();
