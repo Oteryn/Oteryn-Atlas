@@ -15,6 +15,8 @@ import {buildBoundedRealWorld, verifyBoundedRealWorld, boundedRealTrustDescripto
 import {buildProtectedExpectedAuthority, PUBLICATION_AUTHORITY_ID} from './proof-provenance.mjs';
 import {SELECTED_GAMEPLAY_INPUTS, buildSelectedGameplaySource} from './shadow-gameplay-source.mjs';
 import {runSelectedGameplayHttp} from './shadow-gameplay-http.mjs';
+import {runProtectedVisualReference} from './run-protected-visual-reference.mjs';
+import {PROTECTED_VISUAL_BROWSER} from './protected-visual-reference.mjs';
 import {
   assertShadowExecutorCoverage,
   assertShadowReviewCaptureCensus,
@@ -322,7 +324,26 @@ export function fixtureBrowserArgs(composeArgs,{uid=process.getuid(),gid=process
   return [...composeArgs,'run','--user',`${uid}:${gid}`,'--rm','--no-deps','e2e'];
 }
 
-function runPublicationBrowser(command,{candidate,contract,publication,directory,root,producerJobId,evidenceRoot,oracleDigest}) {
+const VISUAL_REFERENCE_SPECS=new Set(['e2e/tests/visual-desktop.spec.mjs','e2e/tests/visual-mobile.spec.mjs']);
+export function requiresProtectedVisualReference(command) {
+  if(command?.engine!=='playwright'||command.dataCapability!=='qualification_fixture'||!Array.isArray(command.expectedTestIds)) return false;
+  return command.expectedTestIds.some(id=>{
+    if(typeof id!=='string') return false;
+    const parts=id.split('::');
+    return parts.length>=3&&VISUAL_REFERENCE_SPECS.has(parts[1]);
+  });
+}
+
+export function bindProtectedVisualReferenceConsumer({composeArgs,env,protectedRoot,referenceSnapshots}={}) {
+  if(!Array.isArray(composeArgs)||composeArgs.some(value=>typeof value!=='string')||!env||typeof env!=='object'||Array.isArray(env)
+    ||typeof protectedRoot!=='string'||!path.isAbsolute(protectedRoot)||typeof referenceSnapshots!=='string'||!path.isAbsolute(referenceSnapshots)) fail('protected visual reference consumer');
+  const overlay=path.join(protectedRoot,'e2e/compose.protected-visual-consumer.yml');
+  const stat=fs.lstatSync(overlay);
+  if(!stat.isFile()||stat.isSymbolicLink()) fail('protected visual reference consumer overlay');
+  return {composeArgs:[...composeArgs,'-f',overlay],env:{...env,ATLAS_REFERENCE_SNAPSHOTS:referenceSnapshots}};
+}
+
+async function runPublicationBrowser(command,{candidate,contract,publication,directory,root,producerJobId,evidenceRoot,oracleDigest,freshSnapshot}) {
   const suffix=command.id.slice('sha256:'.length,'sha256:'.length+12);
   const context=path.join(directory,`browser-context-${suffix}`);fs.mkdirSync(context);
   for(const relative of ['web','src']) fs.cpSync(path.join(root,relative),path.join(context,relative),{recursive:true});
@@ -338,13 +359,31 @@ function runPublicationBrowser(command,{candidate,contract,publication,directory
   const artifacts=path.join(directory,`artifacts-${suffix}`);fs.mkdirSync(artifacts);fs.chmodSync(artifacts,0o777);
   const reviewFrames=shadowReviewFramesForCommand(contract,command);
   const project=`atlas-r5-${randomUUID()}`;
-  const args=['compose','-p',project,'-f',path.join(controlRoot,'e2e/compose.protected-hosted-executor.yml'),'-f',path.join(controlRoot,'e2e/compose.github-hosted.yml')];
-  const env={PATH:process.env.PATH,HOME:process.env.HOME,ATLAS_EXECUTION_CONTEXT:context,ATLAS_CODE_REVISION:candidate.headSha,
+  let args=['compose','-p',project,'-f',path.join(controlRoot,'e2e/compose.protected-hosted-executor.yml'),'-f',path.join(controlRoot,'e2e/compose.github-hosted.yml')];
+  let env={PATH:process.env.PATH,HOME:process.env.HOME,COMPOSE_PROJECT_NAME:project,ATLAS_EXECUTION_CONTEXT:context,ATLAS_CODE_REVISION:candidate.headSha,
     ATLAS_QUALIFICATION_PUBLICATION_HOST:publication.root,ATLAS_QUALIFICATION_TRUST_JSON:JSON.stringify(publication.trustDescriptor),
     ATLAS_PROTECTED_TEST_LIST:list,ATLAS_E2E_ARTIFACTS_HOST:artifacts,ATLAS_E2E_SHARD:'1/1',ATLAS_E2E_WORKERS:'1',
     ATLAS_E2E_DATA_CAPABILITY:command.dataCapability,ATLAS_USER_VISUAL_EVIDENCE:reviewFrames.length?'1':'0',...fixtureReadinessEnvironment(contract),
     ATLAS_AUTHORITY_DIGEST:publication.authority.authorityDigest,
     GITHUB_RUN_ID:process.env.GITHUB_RUN_ID,GITHUB_REPOSITORY:REPOSITORY};
+  let revalidateVisualReference=null;
+  if(requiresProtectedVisualReference(command)) {
+    if(!Number.isSafeInteger(producerJobId)||producerJobId<1||typeof freshSnapshot!=='function'||!publication.bindings?.navigation
+      ||!/^sha256:[a-f0-9]{64}$/.test(publication.manifest?.productDigest??'')) fail('protected visual reference producer');
+    const referenceTree=git(controlRoot,'rev-parse',`${candidate.baseSha}^{tree}`);
+    const identity={repository:candidate.repository,pr:candidate.prNumber,headSha:candidate.headSha,baseSha:candidate.baseSha,candidateTree:candidate.treeSha,
+      referenceTree,productDigest:publication.manifest.productDigest,workflow:ACTIVE,runId:Number(process.env.GITHUB_RUN_ID),jobId:producerJobId,attempt:1,browserImage:PROTECTED_VISUAL_BROWSER};
+    const freshReadback=async()=>{
+      await freshSnapshot();
+      resolveQualificationScenarioBindings({productRoot:publication.root,expectedProductDigest:publication.manifest.productDigest});
+    };
+    const reference=await runProtectedVisualReference({protectedRoot:controlRoot,referenceRoot:controlRoot,
+      outputRoot:path.join(directory,`private-visual-reference-${suffix}`),identity,navigation:publication.bindings.navigation,composeEnv:env,freshReadback,
+      candidateWritablePaths:[artifacts]});
+    revalidateVisualReference=reference.revalidate;
+    const wired=bindProtectedVisualReferenceConsumer({composeArgs:args,env,protectedRoot:controlRoot,referenceSnapshots:reference.snapshots});
+    args=wired.composeArgs;env=wired.env;
+  }
   try {
     for(const setup of [['build','e2e'],['up','-d','--wait','--wait-timeout','180','atlas-web']]) {
       const result=spawnSync('docker',[...args,...setup],{env,encoding:'utf8',timeout:300000,maxBuffer:16*1024*1024});
@@ -371,7 +410,10 @@ function runPublicationBrowser(command,{candidate,contract,publication,directory
         producer:{workflowPath:ACTIVE,sourceSha:candidate.baseSha,runId:Number(process.env.GITHUB_RUN_ID),jobId:producerJobId,runAttempt:1},oracleDigest});
     }
     return row;
-  } finally {spawnSync('docker',[...args,'down','--volumes','--remove-orphans'],{env,stdio:'ignore'});}
+  } finally {
+    spawnSync('docker',[...args,'down','--volumes','--remove-orphans'],{env,stdio:'ignore'});
+    if(revalidateVisualReference) await revalidateVisualReference();
+  }
 }
 
 export async function runShadow(mode,root) {
@@ -422,12 +464,16 @@ export async function runShadow(mode,root) {
       selectedGameplayFiles:selected?.productFiles,selectedSemanticFiles:bounded?.selectedFiles});
     summary.contractDigest=contract.contractDigest;summary.environmentDigest=environmentDigest;summary.commands=contract.commands;
     const oracleDigest=requiresReview?shadowOracleDigest(controlRoot):null;
-    if(mode==='review') {
-      if(!fixture)fail('review qualification fixture missing');
-      summary.review=await waitForShadowReviewGate({candidate,currentRunId,contract,productDigest:fixture.manifest.productDigest,oracleDigest});
+    const freshSnapshot=async()=>{
       const current=await readCandidateSnapshot({...event,changedFiles:gitChangedFiles(root,event.baseSha,event.headSha)});
       assertCandidateReadback({planned:candidate,current,sourceRepository:REPOSITORY,sourceRef:'refs/heads/main',sourceRevision:event.baseSha});
       assertCheckout(root,event.headSha);
+      return current;
+    };
+    if(mode==='review') {
+      if(!fixture)fail('review qualification fixture missing');
+      summary.review=await waitForShadowReviewGate({candidate,currentRunId,contract,productDigest:fixture.manifest.productDigest,oracleDigest});
+      await freshSnapshot();
       summary.status='PASS';
       return summary;
     }
@@ -439,9 +485,10 @@ export async function runShadow(mode,root) {
       fs.writeFileSync(protectedHarnessFile,R5_SEMANTIC_BUILDER_ORACLE,{flag:'wx',mode:0o444});
       if(bytesDigest(fs.readFileSync(protectedHarnessFile))!==R5_SEMANTIC_BUILDER_ORACLE_DIGEST) fail('protected semantic harness materialization');
     }
+    const requiresVisualReference=contract.commands.some(requiresProtectedVisualReference);
     let producerJobId=null,evidenceRoot=null;
+    if(requiresReview||requiresVisualReference) producerJobId=await currentShadowJobId(currentRunId,'execute');
     if(requiresReview) {
-      producerJobId=await currentShadowJobId(currentRunId,'execute');
       const requested=process.env.ATLAS_SHADOW_EVIDENCE_DIR;
       if(typeof requested!=='string'||!path.isAbsolute(requested))fail('review evidence directory required');
       evidenceRoot=path.resolve(requested);
@@ -458,13 +505,11 @@ export async function runShadow(mode,root) {
       } else if(command.engine==='playwright') {
         const product=command.dataCapability==='qualification_fixture'?fixture:command.dataCapability==='bounded_real_world'?bounded:null;
         if(!product)fail(`missing ${command.dataCapability} browser publication`);
-        summary.results.push(runPublicationBrowser(command,{candidate,contract,publication:{...product,root:command.dataCapability==='qualification_fixture'?path.join(directory,'fixture'):path.join(directory,'bounded'),trustDescriptor:command.dataCapability==='qualification_fixture'?qualificationTrustDescriptor(product.manifest):boundedRealTrustDescriptor(product.manifest)},directory,root,producerJobId,evidenceRoot,oracleDigest}));
+        summary.results.push(await runPublicationBrowser(command,{candidate,contract,publication:{...product,root:command.dataCapability==='qualification_fixture'?path.join(directory,'fixture'):path.join(directory,'bounded'),trustDescriptor:command.dataCapability==='qualification_fixture'?qualificationTrustDescriptor(product.manifest):boundedRealTrustDescriptor(product.manifest)},directory,root,producerJobId,evidenceRoot,oracleDigest,freshSnapshot}));
       } else fail('unsupported command');
     }
     if(requiresReview)assertShadowReviewCaptureCensus(contract,summary.results);
-    const current=await readCandidateSnapshot({...event,changedFiles:gitChangedFiles(root,event.baseSha,event.headSha)});
-    assertCandidateReadback({planned:candidate,current,sourceRepository:REPOSITORY,sourceRef:'refs/heads/main',sourceRevision:event.baseSha});
-    assertCheckout(root,event.headSha);
+    await freshSnapshot();
     summary.status=summary.results.length===contract.commands.length&&summary.results.every(row=>row.passed)?'PASS':'FAIL';
     if(requiresReview) {
       summary.reviewCaptures=summary.results.filter(row=>row.reviewCapture).map(row=>row.reviewCapture);
