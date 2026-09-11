@@ -108,14 +108,21 @@ function navigate(record, rawQuery) {
   location.search = params.toString();
 }
 
-function hideResults(host) {
+function syncComboboxState(input, host, expanded) {
+  if (input?.getAttribute('role') !== 'combobox') return;
+  input.setAttribute('aria-expanded', String(expanded));
+  input.setAttribute('aria-controls', host.id);
+}
+
+function hideResults(host, input) {
   host.replaceChildren();
   host.hidden = true;
+  syncComboboxState(input, host, false);
   state.lastResults = 0;
   publish();
 }
 
-function renderUnavailable(host) {
+function renderUnavailable(host, input) {
   host.replaceChildren();
   const note = document.createElement('small');
   note.className = 'semantic-search-unavailable';
@@ -123,20 +130,21 @@ function renderUnavailable(host) {
   note.textContent = `Search unavailable: ${state.error?.message ?? 'verified search data unavailable.'}`;
   host.append(note);
   host.hidden = false;
+  syncComboboxState(input, host, true);
   state.lastResults = 0;
   publish();
 }
 
-function renderResults(host, raw) {
+function renderResults(host, input, raw) {
   host.replaceChildren();
   const query = String(raw).trim();
   state.lastQuery = query;
   if (!query) {
-    hideResults(host);
+    hideResults(host, input);
     return;
   }
   if (state.status === 'FAIL' || !state.index) {
-    renderUnavailable(host);
+    renderUnavailable(host, input);
     return;
   }
   let results;
@@ -147,6 +155,7 @@ function renderResults(host, raw) {
     note.textContent = error.message ?? String(error);
     host.append(note);
     host.hidden = false;
+    syncComboboxState(input, host, true);
     state.lastResults = 0;
     publish();
     return;
@@ -174,6 +183,7 @@ function renderResults(host, raw) {
     host.append(button);
   }
   host.hidden = false;
+  syncComboboxState(input, host, true);
   publish();
 }
 
@@ -184,22 +194,28 @@ function wireForm(formId, inputId, suffix) {
   const host = resultHost(form, suffix);
   input.placeholder = suffix === 'mobile' ? 'Search city, NPC, monster, ID or coordinates' : 'Search city, NPC, monster, ID or coordinates';
   input.setAttribute('aria-label', 'Global semantic Atlas search');
-  input.addEventListener('input', () => renderResults(host, input.value));
-  input.addEventListener('focus', () => { if (input.value.trim()) renderResults(host, input.value); });
+  if (suffix === 'desktop') {
+    input.setAttribute('role', 'combobox');
+    input.setAttribute('aria-autocomplete', 'list');
+    input.setAttribute('aria-controls', host.id);
+    input.setAttribute('aria-expanded', 'false');
+  }
+  input.addEventListener('input', () => renderResults(host, input, input.value));
+  input.addEventListener('focus', () => { if (input.value.trim()) renderResults(host, input, input.value); });
   form.addEventListener('submit', (event) => {
     const query = input.value;
     if (state.index) {
       try {
         const primary = searchSemanticIndex(state.index, query, { limit: MAX_RESULTS, currentFloor: currentFloor(), expectedSource: SOURCE_EXPECTATIONS.semanticSearch });
         if (primary.mode === 'coordinate') {
-          hideResults(host);
+          hideResults(host, input);
           return;
         }
       } catch {}
     }
     event.preventDefault();
     event.stopImmediatePropagation();
-    renderResults(host, query);
+    renderResults(host, input, query);
   }, true);
 }
 
