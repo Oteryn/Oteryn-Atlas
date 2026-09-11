@@ -132,15 +132,12 @@ function protectedHarnessSources(e2eRoot) {
   return result;
 }
 
-const CANDIDATE_BROWSER_PAYLOAD=['tests','support','baselines'];
+const CANDIDATE_BROWSER_PAYLOAD=['tests','support'];
 function candidateHarnessSources(e2eRoot) {
   const result={};
   for(const root of CANDIDATE_BROWSER_PAYLOAD) {
     const directory=path.join(e2eRoot,root);
-    if(!fs.existsSync(directory)) {
-      if(root!=='baselines') fail(`candidate browser payload missing ${root}`);
-      continue;
-    }
+    if(!fs.existsSync(directory)) fail(`candidate browser payload missing ${root}`);
     const rootStat=fs.lstatSync(directory);
     if(rootStat.isSymbolicLink()||!rootStat.isDirectory()) fail('candidate browser payload root');
     const walk=(current,relative)=>{
@@ -154,6 +151,7 @@ function candidateHarnessSources(e2eRoot) {
         if(key.endsWith('.mjs')) {
           const source=bytes.toString('utf8');
           if(!Buffer.from(source,'utf8').equals(bytes)) fail('candidate browser payload invalid UTF-8');
+          if(source.includes('__atlasQualification')) fail('candidate browser payload uses reserved qualification syntax');
           result[key]=source;
         } else result[key]=bytes.toString('base64');
       }
@@ -364,6 +362,13 @@ export function fixtureBrowserArgs(composeArgs,{uid=process.getuid(),gid=process
   return [...composeArgs,'run','--user',`${uid}:${gid}`,'--rm','--no-deps','e2e'];
 }
 
+export function writeProtectedBrowserContainment(file) {
+  if(typeof file!=='string'||!path.isAbsolute(file)||fs.existsSync(file)) fail('protected browser containment destination');
+  const source=`services:\n  e2e:\n    read_only: true\n    cap_drop:\n      - ALL\n    security_opt:\n      - no-new-privileges:true\n    pids_limit: 192\n    mem_limit: 1610612736\n    cpus: 2\n    tmpfs:\n      - /tmp:rw,nodev,nosuid,size=256m\n`;
+  fs.writeFileSync(file,source,{encoding:'utf8',mode:0o444});
+  return file;
+}
+
 const VISUAL_REFERENCE_SPECS=new Set(['e2e/tests/visual-desktop.spec.mjs','e2e/tests/visual-mobile.spec.mjs']);
 export function requiresProtectedVisualReference(command) {
   if(command?.engine!=='playwright'||command.dataCapability!=='qualification_fixture'||!Array.isArray(command.expectedTestIds)) return false;
@@ -398,12 +403,24 @@ async function runPublicationBrowser(command,{candidate,contract,publication,dir
   fs.writeFileSync(list,command.expectedTestIds.map(id=>{const [project,spec,...title]=id.split('::');return `[${project}] › ${spec.replace('e2e/tests/','')} › ${title.join('::')}`;}).join('\n')+'\n');
   const artifacts=path.join(directory,`artifacts-${suffix}`);fs.mkdirSync(artifacts);fs.chmodSync(artifacts,0o777);
   const reviewFrames=shadowReviewFramesForCommand(contract,command);
+  const captureContext=reviewFrames.length?path.join(directory,`protected-capture-context-${suffix}`):null;
+  const captureArtifacts=reviewFrames.length?path.join(directory,`protected-capture-artifacts-${suffix}`):null;
+  if(captureContext) {
+    fs.mkdirSync(captureContext);
+    for(const relative of ['web','src']) fs.cpSync(path.join(root,relative),path.join(captureContext,relative),{recursive:true});
+    prepareProtectedBrowserHarness({protectedRoot:controlRoot,destination:path.join(captureContext,'e2e'),
+      qualificationBindings:command.dataCapability==='qualification_fixture'?publication.bindings:null});
+    fs.mkdirSync(path.join(captureContext,'tools','verification'),{recursive:true});
+    fs.copyFileSync(path.join(controlRoot,'tools/verification/stable-id.mjs'),path.join(captureContext,'tools/verification/stable-id.mjs'));
+    fs.mkdirSync(captureArtifacts);fs.chmodSync(captureArtifacts,0o777);
+  }
   const project=`atlas-r5-${randomUUID()}`;
-  let args=['compose','-p',project,'-f',path.join(controlRoot,'e2e/compose.protected-hosted-executor.yml'),'-f',path.join(controlRoot,'e2e/compose.github-hosted.yml')];
+  const containment=writeProtectedBrowserContainment(path.join(directory,`browser-containment-${suffix}.yml`));
+  let args=['compose','-p',project,'-f',path.join(controlRoot,'e2e/compose.protected-hosted-executor.yml'),'-f',path.join(controlRoot,'e2e/compose.github-hosted.yml'),'-f',containment];
   let env={PATH:process.env.PATH,HOME:process.env.HOME,COMPOSE_PROJECT_NAME:project,ATLAS_EXECUTION_CONTEXT:context,ATLAS_CODE_REVISION:candidate.headSha,
     ATLAS_QUALIFICATION_PUBLICATION_HOST:publication.root,ATLAS_QUALIFICATION_TRUST_JSON:JSON.stringify(publication.trustDescriptor),
     ATLAS_PROTECTED_TEST_LIST:list,ATLAS_E2E_ARTIFACTS_HOST:artifacts,ATLAS_E2E_SHARD:'1/1',ATLAS_E2E_WORKERS:'1',
-    ATLAS_E2E_DATA_CAPABILITY:command.dataCapability,ATLAS_USER_VISUAL_EVIDENCE:reviewFrames.length?'1':'0',...fixtureReadinessEnvironment(contract),
+    ATLAS_E2E_DATA_CAPABILITY:command.dataCapability,ATLAS_USER_VISUAL_EVIDENCE:'0',...fixtureReadinessEnvironment(contract),
     ATLAS_AUTHORITY_DIGEST:publication.authority.authorityDigest,
     GITHUB_RUN_ID:process.env.GITHUB_RUN_ID,GITHUB_REPOSITORY:REPOSITORY};
   let revalidateVisualReference=null;
@@ -438,15 +455,26 @@ async function runPublicationBrowser(command,{candidate,contract,publication,dir
     }
     const result=spawnSync('docker',fixtureBrowserArgs(args),{env,encoding:'utf8',timeout:command.timeoutSeconds*1000,maxBuffer:16*1024*1024});
     if(result.error||result.status!==0||result.signal) {console.error(JSON.stringify({phase:'browser-execution',dataCapability:command.dataCapability,exitCode:result.status,signal:result.signal,error:result.error?.message??null,stdout:String(result.stdout??'').slice(-12288),stderr:String(result.stderr??'').slice(-4096)}));fail('protected browser execution failed');}
-    const report=readJson(path.join(artifacts,'results.json'));
-    const observed=[];
-    const walk=suites=>{for(const suite of suites??[]){for(const spec of suite.specs??[]){for(const test of spec.tests??[]){if(test.status!=='expected'||test.results?.length!==1||test.results[0].status!=='passed'||test.results[0].retry!==0)fail('fixture nonpass/retry');observed.push(`${test.projectName}::e2e/tests/${spec.file.replace(/^.*\/tests\//,'')}::${spec.title}`);}}walk(suite.suites);}};
-    walk(report.suites);
-    if(report.errors?.length||canonicalJson(observed.sort())!==canonicalJson([...command.expectedTestIds].sort())) fail('fixture actual test census');
+    const readCensus=artifactRoot=>{
+      const report=readJson(path.join(artifactRoot,'results.json')),observed=[];
+      const walk=suites=>{for(const suite of suites??[]){for(const spec of suite.specs??[]){for(const test of spec.tests??[]){if(test.status!=='expected'||test.results?.length!==1||test.results[0].status!=='passed'||test.results[0].retry!==0)fail('fixture nonpass/retry');observed.push(`${test.projectName}::e2e/tests/${spec.file.replace(/^.*\/tests\//,'')}::${spec.title}`);}}walk(suite.suites);}};
+      walk(report.suites);
+      if(report.errors?.length||canonicalJson(observed.sort())!==canonicalJson([...command.expectedTestIds].sort())) fail('fixture actual test census');
+      return {report,observed};
+    };
+    const {report,observed}=readCensus(artifacts);
     const row={commandId:command.id,passed:true,retry:0,workers:1,expectedTestIds:command.expectedTestIds,observedTestIds:observed,reportDigest:digest(report)};
     if(reviewFrames.length) {
       if(!Number.isSafeInteger(producerJobId)||producerJobId<1||!path.isAbsolute(evidenceRoot??''))fail('review capture producer');
-      row.reviewCapture=persistShadowReviewCapture({artifactRoot:artifacts,evidenceRoot,currentCandidate:candidate,command,contract,publication,
+      const captureEnv={...env,ATLAS_EXECUTION_CONTEXT:captureContext,ATLAS_E2E_ARTIFACTS_HOST:captureArtifacts,ATLAS_USER_VISUAL_EVIDENCE:'1'};
+      for(const setup of [['build','e2e'],['up','-d','--wait','--wait-timeout','180','atlas-web']]) {
+        const captureSetup=spawnSync('docker',[...args,...setup],{env:captureEnv,encoding:'utf8',timeout:300000,maxBuffer:16*1024*1024});
+        if(captureSetup.error||captureSetup.status!==0||captureSetup.signal) fail('protected browser capture setup failed');
+      }
+      const captureResult=spawnSync('docker',fixtureBrowserArgs(args),{env:captureEnv,encoding:'utf8',timeout:command.timeoutSeconds*1000,maxBuffer:16*1024*1024});
+      if(captureResult.error||captureResult.status!==0||captureResult.signal) fail('protected browser capture failed');
+      readCensus(captureArtifacts);
+      row.reviewCapture=persistShadowReviewCapture({artifactRoot:captureArtifacts,evidenceRoot,currentCandidate:candidate,command,contract,publication,
         producer:{workflowPath:ACTIVE,sourceSha:candidate.baseSha,runId:Number(process.env.GITHUB_RUN_ID),jobId:producerJobId,runAttempt:1},oracleDigest});
     }
     return row;

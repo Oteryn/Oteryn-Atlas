@@ -56,6 +56,9 @@ function mutateCandidateBrowserPayload(candidateRoot) {
  fs.appendFileSync(path.join(e2e,spec),'\n// candidate-browser-spec-marker\n');
  fs.appendFileSync(path.join(e2e,support),'\n// candidate-browser-support-marker\n');
  fs.writeFileSync(path.join(e2e,'Dockerfile'),'candidate Dockerfile must remain inert\n');
+ fs.writeFileSync(path.join(e2e,'playwright.config.mjs'),'candidate config must remain inert\n');
+ fs.mkdirSync(path.join(e2e,'baselines'),{recursive:true});
+ fs.writeFileSync(path.join(e2e,'baselines/candidate.txt'),'candidate baseline must remain inert\n');
  const snapshot=firstBrowserSnapshot(e2e);
  fs.appendFileSync(path.join(e2e,snapshot),Buffer.from('candidate-snapshot-marker'));
  return {spec,support,snapshot};
@@ -261,7 +264,7 @@ test('candidate execution metadata cannot replace protected interpreter or hashe
  assert(!JSON.stringify(contract).includes('candidate-policy'));
 });
 
-import {authenticateR5SemanticSource,buildR5SemanticPublication,resolveShadowEvent,planShadow,deterministicDockerArgs,fixtureBrowserArgs,requiresProtectedVisualReference,bindProtectedVisualReferenceConsumer,prepareProtectedBrowserHarness} from '../../tools/verification/run-verification-shadow.mjs';
+import {authenticateR5SemanticSource,buildR5SemanticPublication,resolveShadowEvent,planShadow,deterministicDockerArgs,fixtureBrowserArgs,requiresProtectedVisualReference,bindProtectedVisualReferenceConsumer,prepareProtectedBrowserHarness,writeProtectedBrowserContainment} from '../../tools/verification/run-verification-shadow.mjs';
 import {assertShadowExecutorCoverage,assertShadowReviewCaptureCensus,normalizeShadowReviewChangedFiles,shadowReviewPlanDigest} from '../../tools/verification/verification-shadow-review.mjs';
 test('shadow materializes candidate browser tests, support and snapshots while protected executor control stays protected',t=>{
  const {scratch,candidateRoot}=copyCandidateBrowserPayload(t);
@@ -273,6 +276,36 @@ test('shadow materializes candidate browser tests, support and snapshots while p
  assert.equal(fs.readFileSync(path.join(destination,changed.snapshot)).includes(Buffer.from('candidate-snapshot-marker')),true);
  assert.deepEqual(fs.readFileSync(path.join(destination,'Dockerfile')),fs.readFileSync(path.join(root,'e2e/Dockerfile')));
  assert.doesNotMatch(fs.readFileSync(path.join(destination,'Dockerfile'),'utf8'),/candidate Dockerfile/);
+ assert.deepEqual(fs.readFileSync(path.join(destination,'playwright.config.mjs')),fs.readFileSync(path.join(root,'e2e/playwright.config.mjs')));
+ assert.equal(fs.existsSync(path.join(destination,'baselines/candidate.txt')),false);
+});
+
+test('candidate raw source cannot use protected qualification rehydration syntax',t=>{
+ const {scratch,candidateRoot}=copyCandidateBrowserPayload(t);
+ const visual=path.join(candidateRoot,'e2e/tests/visual-desktop.spec.mjs');
+ fs.writeFileSync(visual,"const __atlasQualification = true;\n(__atlasQualification ? (()=>{throw new Error('candidate failing assertion')})() : undefined);\n");
+ assert.throws(()=>prepareProtectedBrowserHarness({protectedRoot:root,candidateRoot,destination:path.join(scratch,'browser-harness')}),/reserved qualification syntax/);
+});
+
+test('protected browser containment bounds candidate and capture passes',t=>{
+ const scratch=fs.mkdtempSync(path.join(os.tmpdir(),'atlas-browser-containment-'));
+ t.after(()=>fs.rmSync(scratch,{recursive:true,force:true}));
+ const file=writeProtectedBrowserContainment(path.join(scratch,'containment.yml'));
+ const source=fs.readFileSync(file,'utf8');
+ assert.match(source,/read_only: true/);assert.match(source,/cap_drop:\n\s+- ALL/);
+ assert.match(source,/no-new-privileges:true/);assert.match(source,/pids_limit: 192/);
+ assert.match(source,/mem_limit: 1610612736/);assert.match(source,/cpus: 2/);
+ assert.match(source,/\/tmp:rw,nodev,nosuid,size=256m/);assert.doesNotMatch(source,/network_mode/);
+});
+
+test('hosted browser machine and protected visual capture use isolated producers',()=>{
+ const source=fs.readFileSync(path.join(root,'tools/verification/run-verification-shadow.mjs'),'utf8');
+ assert.match(source,/ATLAS_USER_VISUAL_EVIDENCE:'0'/);
+ assert.match(source,/candidateRoot:root/);
+ assert.match(source,/protected-capture-context-/);
+ assert.match(source,/ATLAS_USER_VISUAL_EVIDENCE:'1'/);
+ assert.match(source,/persistShadowReviewCapture\(\{artifactRoot:captureArtifacts/);
+ assert.doesNotMatch(source,/persistShadowReviewCapture\(\{artifactRoot:artifacts/);
 });
 
 test('qualification binding is rendered onto candidate test payload without replacing candidate assertions',async t=>{
