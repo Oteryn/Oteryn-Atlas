@@ -98,7 +98,7 @@ function renderResults(view, raw) {
   const query = String(raw).trim();
   state.lastQuery = query;
   state.lastResults = 0;
-  if (!query) view.show({ phase: 'idle' });
+  if (!query) view.close();
   else if (state.status === 'LOADING') view.show({ phase: 'loading', query });
   else if (state.status === 'FAIL' || !state.index) {
     view.show({ phase: 'unavailable', query, detail: String(state.error?.message ?? 'Verified search data unavailable.') });

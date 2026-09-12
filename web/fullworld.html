@@ -89,7 +89,7 @@
         <section>
           <h2>Published layers</h2>
           <p class="rail-note">Choose which published world information appears on the map. Unverified layers remain unavailable.</p>
-          <label class="layer active"><input type="checkbox" checked disabled><span class="layer-name">World map</span><span>BASE</span></label>
+          <label class="layer active"><input type="checkbox" checked disabled><span class="layer-name">Base semantic pixels</span><span>BASE</span></label>
           <label class="layer" id="overview-layer"><input id="overview-toggle" type="checkbox"><span class="layer-name">Technical overview</span><span>DIAGNOSTIC</span></label>
           <div id="semantic-layer-list"></div>
         </section>
@@ -102,13 +102,14 @@
           </details>
         </section>
 
-        <details class="rail-disclosure" id="farm-custom-disclosure">
+        <details class="rail-disclosure" id="farm-custom-disclosure" open>
           <summary>Item &amp; task explorer</summary>
         <section class="farm-explorer" id="farm-explorer">
-          <div class="farm-heading"><h2>Item &amp; Task Explorer</h2><span class="pill warn">Not published</span></div>
+          <div class="farm-heading"><h2>Item &amp; Task Explorer</h2><span class="pill warn">UPSTREAM_BLOCKED</span></div>
           <div class="farm-trust-block"><strong>VERIFIED FACTS</strong><p>Monster drop sources and authoritative tasks are unavailable until Oteryn-Game publishes an accepted farm-intelligence product.</p></div>
+          <div class="farm-trust-block"><strong>MAP INTERACTION AVAILABLE</strong><p>Selected map creatures reuse the merged canonical creature-interaction-v1 geometry and creature= state; Farm Explorer does not create competing hit testing.</p></div>
+          <div class="farm-trust-block"><strong>PRESENTATION DEPENDENCY</strong><p>Creature label/badge enrichment remains owned by #115 and stays dependency-blocked here rather than being duplicated.</p></div>
           <div class="farm-trust-block"><strong>YOUR OWN ESTIMATE</strong><p>Select a published monster and enter your own kill rate. Estimates below are not official Oteryn performance metrics.</p></div>
-          
           <details class="farm-custom" open><summary>Custom kill target <span>ESTIMATE</span></summary>
             <input id="farm-creature-search" type="search" placeholder="Search verified monsters" aria-label="Search verified monsters for a custom kill target">
             <div id="farm-creature-results" class="farm-creature-results" hidden></div>
@@ -119,7 +120,7 @@
             <button id="farm-estimate-button" type="button">Update estimate</button>
             <div id="farm-estimate-output" class="farm-estimate-output" aria-live="polite"></div>
           </details>
-          <p class="rail-note"><strong>Monster drop sources</strong>: not yet published by Oteryn-Game. No external database is substituted.</p>
+          <p class="rail-note"><strong>Monster drop sources</strong>: UPSTREAM_BLOCKED · no external/wiki fallback is used.</p>
         </section>
         </details>
 
@@ -136,8 +137,6 @@
           <p class="rail-note">Consumer supports labels, hierarchy, floor geometry, filtering, highlight and zoom-to-area once Game publishes authenticated records.</p>
         </section>
         </details>
-
-
 
         <section>
           <h2>Technical overview</h2>

@@ -87,7 +87,7 @@ export function createSearchView({ form, input, id, describe, onQuery, onChoose,
     const messages = {
       idle: ['Find your next destination', 'Search a place, NPC, monster, public ID or coordinates.'],
       loading: ['Loading search', 'Checking published world information…'],
-      empty: ['No matching published places or creatures', 'Try a different name or a public ID. Missing world data is never guessed.'],
+      empty: ['No published semantic result.', 'No matching published places or creatures. Try a different name or a public ID. Missing world data is never guessed.'],
       invalid: ['Check your search', detail],
       unavailable: ['Search unavailable', 'Verified search data could not be loaded. Map controls remain available.'],
     };

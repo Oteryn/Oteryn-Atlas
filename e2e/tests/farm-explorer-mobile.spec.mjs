@@ -24,7 +24,6 @@ test('mobile Farm Explorer remains reachable and truthful in the existing contro
   expect(farm.presentationEnrichmentState).toBe('DEPENDENCY_BLOCKED');
   await page.locator('#mobile-controls-toggle').click();
   await expect(page.locator('#mobile-controls-panel')).toHaveClass(/mobile-open/);
-  await page.locator('#farm-custom-disclosure > summary').click();
   await expect(page.locator('#farm-explorer')).toBeVisible();
   await page.locator('#farm-creature-search').fill(SENTINEL.label);
   const sentinel = page.locator('#farm-creature-results .farm-creature-result').filter({ hasText: new RegExp(`^${SENTINEL.label}$`) }).first();
@@ -35,7 +34,7 @@ test('mobile Farm Explorer remains reachable and truthful in the existing contro
   await page.locator('#farm-time-base').selectOption('trip_wall');
   await page.locator('#farm-estimate-button').click();
   await expect(page.locator('#farm-estimate-output')).toContainText('2.00 h');
-  await expect(page.locator('#farm-explorer')).toContainText('No external database is substituted.');
+  await expect(page.locator('#farm-explorer')).toContainText('PRESENTATION DEPENDENCY');
   expect(new URL(page.url()).searchParams.get('farmTimeBase')).toBe('trip_wall');
   await expect(page.locator('#farm-explorer')).toHaveCSS('overflow-x', /visible|hidden|clip|auto/);
   assertNoRuntimeFailures(runtime);

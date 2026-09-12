@@ -27,13 +27,14 @@ test('repeated searches over published corpus stay bounded without DOM growth', 
   await gotoAtlas(page, DESKTOP_ENTRY);
   await waitForAtlas(page);
   const corpus = await publishedSearchCorpus(page);
-  expect(corpus.length).toBeGreaterThan(0);
+  expect(corpus.length).toBeGreaterThan(50);
 
   const input = page.locator('#search-input');
   const results = page.locator('#semantic-search-results-desktop');
-  const sampleCount = 60;
-  const sample = Array.from({ length: sampleCount }, (_, index) => corpus[index % corpus.length]);
-  expect(sample).toHaveLength(sampleCount);
+  const sampleCount = Math.min(60, corpus.length);
+  const stride = Math.max(1, Math.floor(corpus.length / sampleCount));
+  const sample = corpus.filter((_, index) => index % stride === 0).slice(0, sampleCount);
+  expect(sample.length).toBeGreaterThanOrEqual(Math.min(25, sampleCount));
 
   for (const record of sample) {
     await input.fill(record.label);
@@ -50,9 +51,7 @@ test('repeated searches over published corpus stay bounded without DOM growth', 
   expect(await results.getByRole('option').count()).toBe(0);
 
   await input.fill('');
-  await expect(results).toBeVisible();
-  await expect(results).toHaveAttribute('data-state', 'idle');
-  await expect(results).toContainText('Find your next destination');
+  await expect(results).toBeHidden();
   expect(await results.getByRole('option').count()).toBe(0);
   assertNoRuntimeFailures(runtime);
 });

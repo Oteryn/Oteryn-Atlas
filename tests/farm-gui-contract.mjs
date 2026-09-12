@@ -67,12 +67,11 @@ test('FullWorld HTML exposes truthful Farm Explorer copy and no fabricated farm 
   assert.match(html, /id="farm-explorer"/);
   assert.match(html, /Item &amp; Task Explorer/);
   assert.match(html, /Monster drop sources/);
-  assert.match(html, /<span class="pill warn">Not published<\/span>/);
-  assert.match(html, /Monster drop sources and authoritative tasks are unavailable until Oteryn-Game publishes an accepted farm-intelligence product\./);
+  assert.match(html, /UPSTREAM_BLOCKED/);
   assert.match(html, /Custom kill target/);
   assert.match(html, /VERIFIED FACTS/);
-  assert.match(html, /No external database is substituted\./);
-  assert.match(html, /Estimates below are not official Oteryn performance metrics\./);
+  assert.match(html, /MAP INTERACTION AVAILABLE/);
+  assert.match(html, /PRESENTATION DEPENDENCY/);
   assert.match(html, /ESTIMATE/);
   for (const mockValue of ['14.47%', '154 spawns', '~35s', 'Best places to farm']) assert.equal(html.includes(mockValue), false);
 });
