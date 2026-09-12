@@ -4,6 +4,7 @@ const mobileQuery = matchMedia('(max-width: 980px)');
 const workspace = $('.workspace');
 const panels = { controls: $('#mobile-controls-panel'), inspector: $('#mobile-inspector-panel') };
 const desktopOpen = { controls: true, inspector: false };
+const creatureCardEscapeEvents = new WeakSet();
 let drawer = null;
 let returnFocus = null;
 let savedPanels = null;
@@ -117,6 +118,18 @@ function openPanel(name, { moveFocus = true } = {}) {
   if (moveFocus) focusOpenedPanel(name);
 }
 
+function exposeFailClosedInspector() {
+  const content = $('#inspector-content');
+  if (mobileQuery.matches || !content?.querySelector('.error-box') || desktopOpen.inspector) return;
+  openPanel('inspector', { moveFocus: false });
+}
+
+const inspectorContent = $('#inspector-content');
+if (inspectorContent) {
+  new MutationObserver(exposeFailClosedInspector).observe(inspectorContent, { childList: true, subtree: true });
+  exposeFailClosedInspector();
+}
+
 function togglePanel(name) {
   findMode = false;
   if (mobileQuery.matches) {
@@ -148,6 +161,10 @@ function tabbable(panel) {
 }
 
 document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && !$('#creature-quick-card')?.hidden) creatureCardEscapeEvents.add(event);
+}, true);
+
+document.addEventListener('keydown', event => {
   if (event.defaultPrevented) return;
   const editing = event.target.closest?.('input, textarea, select, [contenteditable]:not([contenteditable="false"])');
   if (event.key === '/' && !editing && !event.isComposing && !event.ctrlKey && !event.metaKey && !event.altKey) {
@@ -155,7 +172,7 @@ document.addEventListener('keydown', event => {
     openFind();
     return;
   }
-  if (event.key === 'Escape' && !mobileQuery.matches && savedPanels && $('#creature-quick-card')?.hidden) {
+  if (event.key === 'Escape' && !mobileQuery.matches && savedPanels && !creatureCardEscapeEvents.has(event) && $('#creature-quick-card')?.hidden) {
     event.preventDefault();
     toggleMapFocus();
     focus($('#map-focus-toggle'));
