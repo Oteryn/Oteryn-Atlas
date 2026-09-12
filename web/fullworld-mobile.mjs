@@ -275,6 +275,7 @@ if (frame) new ResizeObserver(entries => {
   if (pendingFrame !== null) cancelAnimationFrame(pendingFrame);
   pendingFrame = requestAnimationFrame(() => {
     pendingFrame = null;
+    if ($('#inspector-content .error-box')) return;
     window.dispatchEvent(new Event('resize'));
   });
 }).observe(frame);
