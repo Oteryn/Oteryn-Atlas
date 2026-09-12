@@ -3,43 +3,65 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Oteryn Atlas — Full-world verified runtime</title>
+  <title>Oteryn Atlas — World explorer</title>
   <link rel="stylesheet" href="./style.css">
   <link rel="stylesheet" href="./fullworld.css">
 </head>
 <body>
+  <svg class="atlas-symbols" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><defs>
+    <symbol id="atlas-icon-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4.5 4.5"/></symbol>
+    <symbol id="atlas-icon-pin" viewBox="0 0 24 24"><path d="M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 1 1 14 0Z"/><circle cx="12" cy="10" r="2.5"/></symbol>
+    <symbol id="atlas-icon-npc" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 21v-3a7 7 0 0 1 14 0v3M8 4l4-2 4 2"/></symbol>
+    <symbol id="atlas-icon-monster" viewBox="0 0 24 24"><path d="m4 4 4 3h8l4-3-1 10-7 7-7-7Z"/><path d="m8 11 2 1m6-1-2 1m-4 4h4"/></symbol>
+    <symbol id="atlas-icon-town" viewBox="0 0 24 24"><path d="M3 21h18M5 21V8l4-3v16m0-11 5-5 5 5v11m-6 0v-5h3v5M8 4V2m8 10h1"/></symbol>
+    <symbol id="atlas-icon-waypoint" viewBox="0 0 24 24"><path d="M12 22V3m0 1h7l3 4-3 4h-7M12 9H5l-3 4 3 4h7"/></symbol>
+    <symbol id="atlas-icon-controls" viewBox="0 0 24 24"><path d="M3 6h7m4 0h7M3 12h11m4 0h3M3 18h3m4 0h11"/><circle cx="12" cy="6" r="2"/><circle cx="16" cy="12" r="2"/><circle cx="8" cy="18" r="2"/></symbol>
+    <symbol id="atlas-icon-inspect" viewBox="0 0 24 24"><path d="M14 3H4v18h16V9Z M14 3v6h6M8 13h8m-8 4h5"/></symbol>
+    <symbol id="atlas-icon-focus" viewBox="0 0 24 24"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/><circle cx="12" cy="12" r="2"/></symbol>
+    <symbol id="atlas-icon-close" viewBox="0 0 24 24"><path d="m6 6 12 12M6 18 18 6"/></symbol>
+    <symbol id="atlas-icon-up" viewBox="0 0 24 24"><path d="m6 14 6-6 6 6"/></symbol>
+    <symbol id="atlas-icon-down" viewBox="0 0 24 24"><path d="m6 10 6 6 6-6"/></symbol>
+    <symbol id="atlas-icon-plus" viewBox="0 0 24 24"><path d="M5 12h14M12 5v14"/></symbol>
+    <symbol id="atlas-icon-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+    <symbol id="atlas-icon-compass" viewBox="0 0 24 24"><path d="m12 2 8 4 2 6-4 8-6 2-8-4-2-6 4-8Z"/><path d="m16 8-2 6-6 2 2-6Z"/></symbol>
+  </defs></svg>
+  <button class="skip-link" id="skip-to-map" type="button">Skip to map</button>
   <main class="app-shell fullworld-shell">
     <header class="topbar">
       <div class="brand">
-        <div class="brand-mark">OA</div>
-        <div><strong>OTERYN ATLAS</strong><small>FULL-WORLD VERIFIED RUNTIME · G5</small></div>
+        <div class="brand-mark" aria-hidden="true"><svg class="atlas-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#atlas-icon-compass"></use></svg></div>
+        <div><h1><span class="brand-prefix">Oteryn </span>Atlas</h1><small>WORLD EXPLORER</small></div>
       </div>
+      <form class="search" id="search-form">
+        <input id="search-input" type="search" enterkeyhint="search" autocomplete="off" aria-label="Global semantic Atlas search" placeholder="Search places, creatures or coordinates">
+        <button type="submit" aria-label="Search the world"><svg class="atlas-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#atlas-icon-search"></use></svg><span class="search-submit-label">Find</span></button>
+      </form>
       <div class="coordinate-strip" aria-label="Current world coordinates">
         <span>X <b id="coord-x">—</b></span><span>Y <b id="coord-y">—</b></span><span>FLOOR <b id="coord-floor">—</b></span>
       </div>
-      <form class="search" id="search-form">
-        <input id="search-input" autocomplete="off" aria-label="Global semantic Atlas search" placeholder="Search NPC, town, coordinates or type:query">
-        <button type="submit">Go</button>
-      </form>
       <div class="zoom-controls">
-        <button id="zoom-out" aria-label="Zoom out">−</button><output id="zoom-output">—</output><button id="zoom-in" aria-label="Zoom in">+</button>
+        <button id="zoom-out" aria-label="Zoom out"><svg class="atlas-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#atlas-icon-minus"></use></svg></button><output id="zoom-output">—</output><button id="zoom-in" aria-label="Zoom in"><svg class="atlas-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#atlas-icon-plus"></use></svg></button>
       </div>
-      <div class="mobile-actions" aria-label="Mobile Atlas panels">
-        <button id="mobile-controls-toggle" class="mobile-icon-button" type="button" aria-controls="mobile-controls-panel" aria-expanded="false" aria-label="Open Atlas controls">☰</button>
-        <button id="mobile-inspector-toggle" class="mobile-icon-button" type="button" aria-controls="mobile-inspector-panel" aria-expanded="false" aria-label="Open inspector">ⓘ</button>
+      <div class="panel-actions" aria-label="Atlas workspace">
+        <button id="mobile-find-toggle" class="panel-toggle mobile-only" type="button" aria-controls="mobile-controls-panel" aria-expanded="false" aria-label="Find in Oteryn"><svg class="atlas-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#atlas-icon-search"></use></svg></button>
+        <button id="desktop-controls-toggle" class="panel-toggle desktop-only" type="button" aria-controls="mobile-controls-panel" aria-expanded="true" aria-label="Hide Atlas controls" title="Hide Atlas controls"><svg class="atlas-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#atlas-icon-controls"></use></svg></button>
+        <button id="desktop-inspector-toggle" class="panel-toggle desktop-only" type="button" aria-controls="mobile-inspector-panel" aria-expanded="false" aria-label="Open inspector" title="Open inspector"><svg class="atlas-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#atlas-icon-inspect"></use></svg></button>
+        <button id="mobile-controls-toggle" class="panel-toggle mobile-only" type="button" aria-controls="mobile-controls-panel" aria-expanded="false" aria-label="Open Atlas controls"><svg class="atlas-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#atlas-icon-controls"></use></svg></button>
+        <button id="mobile-inspector-toggle" class="panel-toggle mobile-only" type="button" aria-controls="mobile-inspector-panel" aria-expanded="false" aria-label="Open inspector"><svg class="atlas-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#atlas-icon-inspect"></use></svg></button>
+        <button id="map-focus-toggle" class="panel-toggle desktop-only" type="button" aria-pressed="false" aria-label="Focus on the map" title="Focus on the map"><svg class="atlas-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#atlas-icon-focus"></use></svg></button>
       </div>
     </header>
 
-    <div class="workspace">
+    <div class="workspace inspector-collapsed">
       <button class="mobile-drawer-backdrop" id="mobile-drawer-backdrop" type="button" aria-label="Close mobile panel" hidden></button>
       <aside class="panel left-rail" id="mobile-controls-panel" aria-label="Atlas controls">
-        <div class="mobile-drawer-heading">
-          <strong>Atlas controls</strong>
-          <button id="mobile-controls-close" type="button" aria-label="Close Atlas controls">×</button>
+        <div class="panel-heading mobile-drawer-heading">
+          <strong id="controls-panel-title">Explore the world</strong>
+          <button id="mobile-controls-close" type="button" aria-label="Close Atlas controls"><svg class="atlas-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#atlas-icon-close"></use></svg></button>
         </div>
         <form class="mobile-search" id="mobile-search-form">
-          <input id="mobile-search-input" autocomplete="off" aria-label="Global semantic Atlas search" placeholder="Search NPC, town or coordinates">
-          <button type="submit">Go</button>
+          <input id="mobile-search-input" type="search" enterkeyhint="search" autocomplete="off" aria-label="Global semantic Atlas search" placeholder="Search Atlas">
+          <button type="submit" aria-label="Search the world"><svg class="atlas-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#atlas-icon-search"></use></svg><span class="search-submit-label">Find</span></button>
         </form>
         <section>
           <h2>View mode</h2>
@@ -49,22 +71,45 @@
             <button type="button" data-mode="classic">CLASSIC</button>
             <button type="button" data-mode="map">MAP</button>
           </div>
+          <details class="control-help"><summary>About map modes</summary>
           <p class="rail-note" id="lod-policy-note">AUTO uses the bounded visual minimap at world scale and authenticated detail when qualified. CLASSIC is a presentation-only palette preview of the same verified minimap tiles.</p>
+          </details>
+        </section>
+
+        <section>
+          <h2>Floor</h2>
+          <div class="floor-select-row">
+            <button id="floor-up" aria-label="Higher floor"><svg class="atlas-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#atlas-icon-up"></use></svg></button>
+            <select id="floor-select" aria-label="Exported floor"></select>
+            <button id="floor-down" aria-label="Lower floor"><svg class="atlas-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#atlas-icon-down"></use></svg></button>
+          </div>
+          <p class="rail-note" id="floor-bounds">Loading verified floor bounds…</p>
         </section>
 
         <section>
           <h2>Published layers</h2>
-          <p class="rail-note">Only G4 PROVEN data can be enabled. BLOCKED/UNKNOWN families stay fail-closed.</p>
-          <label class="layer active"><input type="checkbox" checked disabled><span class="layer-name">Base semantic pixels</span><span>G3</span></label>
+          <p class="rail-note">Choose which published world information appears on the map. Unverified layers remain unavailable.</p>
+          <label class="layer active"><input type="checkbox" checked disabled><span class="layer-name">Base semantic pixels</span><span>BASE</span></label>
           <label class="layer" id="overview-layer"><input id="overview-toggle" type="checkbox"><span class="layer-name">Technical overview</span><span>DIAGNOSTIC</span></label>
           <div id="semantic-layer-list"></div>
         </section>
 
+        <section>
+          <h2>Animation</h2>
+          <label class="layer"><input id="animation-toggle" type="checkbox"><span class="layer-name">Playback</span><span>VERIFIED</span></label>
+          <details class="control-help"><summary>Playback details</summary>
+          <p class="rail-note" id="animation-note">Verified Game-owned 15.32 timing is opt-in; disabling playback preserves the published static phase.</p>
+          </details>
+        </section>
+
+        <details class="rail-disclosure" id="farm-custom-disclosure" open>
+          <summary>Item &amp; task explorer</summary>
         <section class="farm-explorer" id="farm-explorer">
           <div class="farm-heading"><h2>Item &amp; Task Explorer</h2><span class="pill warn">UPSTREAM_BLOCKED</span></div>
           <div class="farm-trust-block"><strong>VERIFIED FACTS</strong><p>Monster drop sources and authoritative tasks are unavailable until Oteryn-Game publishes an accepted farm-intelligence product.</p></div>
           <div class="farm-trust-block"><strong>MAP INTERACTION AVAILABLE</strong><p>Selected map creatures reuse the merged canonical creature-interaction-v1 geometry and creature= state; Farm Explorer does not create competing hit testing.</p></div>
           <div class="farm-trust-block"><strong>PRESENTATION DEPENDENCY</strong><p>Creature label/badge enrichment remains owned by #115 and stays dependency-blocked here rather than being duplicated.</p></div>
+          <div class="farm-trust-block"><strong>YOUR OWN ESTIMATE</strong><p>Select a published monster and enter your own kill rate. Estimates below are not official Oteryn performance metrics.</p></div>
           <details class="farm-custom" open><summary>Custom kill target <span>ESTIMATE</span></summary>
             <input id="farm-creature-search" type="search" placeholder="Search verified monsters" aria-label="Search verified monsters for a custom kill target">
             <div id="farm-creature-results" class="farm-creature-results" hidden></div>
@@ -77,7 +122,10 @@
           </details>
           <p class="rail-note"><strong>Monster drop sources</strong>: UPSTREAM_BLOCKED · no external/wiki fallback is used.</p>
         </section>
+        </details>
 
+        <details class="rail-disclosure" id="area-tools-disclosure">
+          <summary>Areas &amp; subareas</summary>
         <section id="region-controls">
           <h2>Areas & Subareas</h2>
           <input id="region-search" type="search" placeholder="Search authenticated regions" disabled aria-label="Search Areas and Subareas">
@@ -88,22 +136,7 @@
           <div id="region-results" class="region-results" aria-live="polite">Unavailable: current Game export publishes no authenticated Area/Subarea records.</div>
           <p class="rail-note">Consumer supports labels, hierarchy, floor geometry, filtering, highlight and zoom-to-area once Game publishes authenticated records.</p>
         </section>
-
-        <section>
-          <h2>Animation</h2>
-          <label class="layer"><input id="animation-toggle" type="checkbox"><span class="layer-name">Playback</span><span>VERIFIED</span></label>
-          <p class="rail-note" id="animation-note">Verified Game-owned 15.32 timing is opt-in; disabling playback preserves the published static phase.</p>
-        </section>
-
-        <section>
-          <h2>Floor</h2>
-          <div class="floor-select-row">
-            <button id="floor-up" aria-label="Higher floor">↑</button>
-            <select id="floor-select" aria-label="Exported floor"></select>
-            <button id="floor-down" aria-label="Lower floor">↓</button>
-          </div>
-          <p class="rail-note" id="floor-bounds">Loading verified floor bounds…</p>
-        </section>
+        </details>
 
         <section>
           <h2>Technical overview</h2>
@@ -113,7 +146,7 @@
       </aside>
 
       <section class="map-stage fullworld-stage">
-        <div class="map-frame" id="map-frame">
+        <div class="map-frame" id="map-frame" tabindex="-1" aria-label="World map workspace">
           <canvas id="atlas" aria-label="Full-world WebGL2 Atlas"></canvas>
           <canvas id="animation-overlay" aria-label="Verified animated world presentations"></canvas>
           <canvas id="minimap-layer" aria-label="Verified visual minimap"></canvas>
@@ -125,7 +158,7 @@
           <section id="creature-quick-card" class="creature-quick-card" role="dialog" aria-labelledby="creature-card-title" hidden>
             <div class="creature-card-heading">
               <div><span id="creature-card-kind" class="creature-card-kind"></span><h3 id="creature-card-title"></h3></div>
-              <button id="creature-card-close" type="button" aria-label="Close creature card">×</button>
+              <button id="creature-card-close" type="button" aria-label="Close creature card"><svg class="atlas-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#atlas-icon-close"></use></svg></button>
             </div>
             <div id="creature-card-body" class="creature-card-body"></div>
             <div id="creature-card-choices" class="creature-card-choices" hidden></div>
@@ -142,6 +175,8 @@
           <span id="status-detail">Viewport ranges not loaded yet</span>
           <span id="status-layer">Overview: verifying…</span>
         </div>
+        <details class="runtime-details" id="runtime-details">
+          <summary>Map status &amp; technical details</summary>
         <div class="diagnostics fullworld-diagnostics">
           <div><span>Backend</span><strong id="diag-backend">—</strong></div>
           <div><span>Floor chunks</span><strong id="diag-chunks">—</strong></div>
@@ -154,17 +189,18 @@
           <div><span>Render</span><strong id="diag-render">—</strong></div>
           <div><span>JS heap</span><strong id="diag-heap">—</strong></div>
         </div>
+        </details>
       </section>
 
-      <aside class="panel inspector" id="mobile-inspector-panel" aria-label="Inspector and provenance">
+      <aside class="panel inspector" id="mobile-inspector-panel" aria-label="Inspector and provenance" aria-hidden="true" inert>
         <div class="inspector-heading">
-          <div><span class="eyebrow">VERIFIED FACTS</span><h2>Inspector & provenance</h2></div>
+          <div><span class="eyebrow">SELECTED IN THE WORLD</span><h2>Inspector</h2></div>
           <span class="pill" id="inspector-pill">ROOTS</span>
-          <button id="mobile-inspector-close" class="mobile-drawer-close" type="button" aria-label="Close inspector">×</button>
+          <button id="mobile-inspector-close" class="mobile-drawer-close" type="button" aria-label="Close inspector"><svg class="atlas-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#atlas-icon-close"></use></svg></button>
         </div>
         <div class="tabs creature-inspector-tabs" role="tablist" aria-label="Creature inspector view">
           <button class="tab" id="inspector-tab-gameplay" data-inspector-tab="gameplay" role="tab" aria-selected="false" type="button">Gameplay</button>
-          <button class="tab active" id="inspector-tab-semantic" data-inspector-tab="semantic" role="tab" aria-selected="true" type="button">Semantic</button>
+          <button class="tab active" id="inspector-tab-semantic" data-inspector-tab="semantic" role="tab" aria-selected="true" type="button">Location</button>
           <button class="tab" id="inspector-tab-live" data-inspector-tab="live" role="tab" aria-selected="false" type="button" disabled>Live state</button>
         </div>
         <div class="inspector-content" id="inspector-content"><p class="empty">Verifying full-world publication…</p></div>

@@ -642,7 +642,8 @@ function setup() {
   if (region) {
     const section = document.createElement('section');
     section.innerHTML = '<h2>Creature search</h2><label class="npc-role-control" for="npc-role-filter"><span>NPC category</span><select id="npc-role-filter" aria-label="Filter NPCs by map category"><option value="all">All NPCs</option></select></label><input id="creature-search" type="search" placeholder="Search NPCs or monsters" aria-label="Search verified creatures"><div id="creature-results" class="region-results" aria-live="polite"></div><p class="rail-note" id="creature-status">Loading Game-owned verified creature index…</p>';
-    region.after(section);
+    const insertionAnchor = region.closest('#area-tools-disclosure') ?? region;
+    insertionAnchor.after(section);
     section.querySelector('#creature-search').addEventListener('input', (event) => renderSearch(event.target.value));
     section.querySelector('#npc-role-filter').addEventListener('change', (event) => {
       state.npcRole = npcRoleFilter(event.target.value);
