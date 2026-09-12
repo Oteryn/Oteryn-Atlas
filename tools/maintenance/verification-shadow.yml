@@ -84,7 +84,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           ATLAS_SHADOW_EVIDENCE_DIR: ${{ runner.temp }}/atlas-shadow-review-evidence
-          ATLAS_SHADOW_FAILURE_DIAGNOSTICS_DIR: ${{ runner.temp }}/atlas-shadow-failure-diagnostics
         run: node protected/tools/verification/run-verification-shadow.mjs execute "$PWD/candidate"
       - name: Upload protected review evidence
         if: needs.plan.outputs.requires_review == 'true'
@@ -93,14 +92,6 @@ jobs:
           name: atlas-verification-review-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/atlas-shadow-review-evidence
           if-no-files-found: error
-          retention-days: 7
-      - name: Upload failed Playwright diagnostics
-        if: failure() && needs.plan.outputs.requires_review == 'true'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: atlas-verification-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/atlas-shadow-failure-diagnostics
-          if-no-files-found: ignore
           retention-days: 7
   review:
     needs: [plan, execute]
