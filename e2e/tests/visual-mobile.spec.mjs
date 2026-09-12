@@ -9,6 +9,7 @@ test('mobile Atlas-owned chrome and drawers retain reviewed user-facing visual c
   const runtime = captureRuntimeFailures(page);
   await gotoAtlas(page, `${MOBILE_ENTRY}&creatures=npc,monster`);
   await waitForAtlas(page);
+  const mapFirst = await page.locator('#mobile-find-toggle').count() === 1;
 
   const initialMetrics = await assertUserVisibleSurface(page, {
     label: 'mobile initial Atlas',
@@ -22,7 +23,7 @@ test('mobile Atlas-owned chrome and drawers retain reviewed user-facing visual c
       { selector: '#map-frame', label: 'mobile world map' },
     ],
   });
-  await expect(page.locator('.topbar')).toHaveScreenshot('mobile-topbar.png', {
+  await expect(page.locator('.topbar')).toHaveScreenshot(mapFirst ? 'mobile-topbar-map-first.png' : 'mobile-topbar.png', {
     animations: 'disabled', caret: 'hide', scale: 'css',
   });
   await captureUserVisualEvidence(page, testInfo, 'mobile.initial', {
@@ -35,7 +36,7 @@ test('mobile Atlas-owned chrome and drawers retain reviewed user-facing visual c
   await expect(controlsToggle).toHaveAttribute('aria-expanded', 'true');
   const modes = page.locator('#view-mode-control');
   await modes.scrollIntoViewIfNeeded();
-  await expect(modes).toHaveScreenshot('mobile-view-mode.png', {
+  await expect(modes).toHaveScreenshot(mapFirst ? 'mobile-view-mode-map-first.png' : 'mobile-view-mode.png', {
     animations: 'disabled', caret: 'hide', scale: 'css',
   });
   const controlsMetrics = await assertUserVisibleSurface(page, {
@@ -48,7 +49,7 @@ test('mobile Atlas-owned chrome and drawers retain reviewed user-facing visual c
       { selector: '#view-mode-control', label: 'view modes' },
     ],
   });
-  await expect(page.locator('#mobile-controls-panel')).toHaveScreenshot('mobile-controls-panel.png', {
+  await expect(page.locator('#mobile-controls-panel')).toHaveScreenshot(mapFirst ? 'mobile-controls-panel-map-first.png' : 'mobile-controls-panel.png', {
     animations: 'disabled', caret: 'hide', scale: 'css',
   });
   await captureUserVisualEvidence(page, testInfo, 'mobile.controls', {
@@ -56,9 +57,11 @@ test('mobile Atlas-owned chrome and drawers retain reviewed user-facing visual c
     note: 'Open mobile controls drawer with search and view-mode controls visible and hit-testable.',
   });
 
-  await page.getByRole('button', { name: 'Close Atlas controls' }).tap();
-  await page.locator('#mobile-find-toggle').tap();
-  await expect(page.locator('#mobile-controls-panel')).toHaveClass(/find-mode/);
+  if (mapFirst) {
+    await page.getByRole('button', { name: 'Close Atlas controls' }).tap();
+    await page.locator('#mobile-find-toggle').tap();
+    await expect(page.locator('#mobile-controls-panel')).toHaveClass(/find-mode/);
+  }
   const mobileSearch = page.locator('#mobile-search-input');
   await mobileSearch.fill('Thais');
   const results = page.locator('#semantic-search-results-mobile');
@@ -91,7 +94,7 @@ test('mobile Atlas-owned chrome and drawers retain reviewed user-facing visual c
       { selector: '#inspector-content', label: 'inspector facts' },
     ],
   });
-  await expect(page.locator('#mobile-inspector-panel')).toHaveScreenshot('mobile-inspector-panel.png', {
+  await expect(page.locator('#mobile-inspector-panel')).toHaveScreenshot(mapFirst ? 'mobile-inspector-panel-map-first.png' : 'mobile-inspector-panel.png', {
     animations: 'disabled', caret: 'hide', scale: 'css',
   });
   await captureUserVisualEvidence(page, testInfo, 'mobile.inspector', {

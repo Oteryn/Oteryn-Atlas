@@ -29,10 +29,7 @@ async function exerciseDrawer(page) {
 }
 
 async function searchPublishedPlace(page, record) {
-  const findToggle = page.locator('#mobile-find-toggle');
-  if ((await findToggle.getAttribute('aria-expanded')) !== 'true') await findToggle.tap();
-  await expect(findToggle).toHaveAttribute('aria-expanded', 'true');
-  await expect(page.locator('#mobile-controls-panel')).toHaveClass(/find-mode/);
+  await ensureMobileControls(page);
   const input = page.locator('#mobile-search-input');
   const results = page.locator('#semantic-search-results-mobile');
   await input.fill(record.label);

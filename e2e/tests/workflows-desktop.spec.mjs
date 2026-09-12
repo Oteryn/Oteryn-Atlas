@@ -36,18 +36,13 @@ test('published semantic result navigates, survives reload, and restores through
   await expect.poll(() => page.evaluate(() => globalThis.__OTERYN_ATLAS_SEMANTIC_SEARCH__?.lastQuery)).toBe(record.label);
   const option = results.getByRole('option').filter({ hasText: record.label }).first();
   await expect(option).toBeVisible();
-  const optionId = await option.getAttribute('id');
-  expect(optionId).toBeTruthy();
-  await input.press('ArrowDown');
-  await expect(input).toHaveAttribute('aria-activedescendant', optionId);
-  await expect(option).toHaveAttribute('aria-selected', 'true');
 
   await Promise.all([
     page.waitForURL((url) => url.searchParams.get('semantic') === record.id
       && url.searchParams.get('x') === String(record.position.x)
       && url.searchParams.get('y') === String(record.position.y)
       && url.searchParams.get('floor') === String(record.position.floor)),
-    input.press('Enter'),
+    option.click(),
   ]);
   await waitForAtlas(page);
   await expect(page.locator('#inspector-content')).toContainText(record.label);

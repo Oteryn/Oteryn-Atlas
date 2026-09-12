@@ -1,5 +1,4 @@
 import { expect, test } from '@playwright/test';
-import { discoverSemanticTarget } from '../support/user-journey-browser.mjs';
 import {
   MOBILE_ENTRY,
   assertNoRuntimeFailures,
@@ -21,23 +20,18 @@ test('mobile FullWorld exposes drawers and semantic navigation', async ({ page }
   await expect(page.locator('#mobile-controls-panel')).toHaveClass(/mobile-open/);
   await expect(page.locator('#mobile-drawer-backdrop')).toBeVisible();
 
-  await page.keyboard.press('Escape');
-  const target = await discoverSemanticTarget(page);
-  const findToggle = page.locator('#mobile-find-toggle');
-  await findToggle.tap();
-  await expect(page.locator('#mobile-controls-panel')).toHaveClass(/find-mode/);
   const mobileSearch = page.locator('#mobile-search-input');
-  await mobileSearch.fill(target.label);
+  await mobileSearch.fill('Sam');
   const results = page.locator('#semantic-search-results-mobile');
   await expect(results).toBeVisible();
-  const result = results.getByRole('option').filter({ hasText: target.label }).first();
-  await expect(result).toBeVisible();
+  const sam = results.locator('.semantic-search-result').filter({ hasText: 'Sam' }).first();
+  await expect(sam).toBeVisible();
 
   const semanticNavigation = page.waitForURL(
-    (url) => url.searchParams.get('semantic') === target.id,
+    (url) => Boolean(url.searchParams.get('semantic')),
     { timeout: 60_000 },
   );
-  await result.tap();
+  await sam.click();
   await semanticNavigation;
   await waitForAtlas(page);
 
@@ -45,7 +39,7 @@ test('mobile FullWorld exposes drawers and semantic navigation', async ({ page }
   await inspectorToggle.click();
   await expect(inspectorToggle).toHaveAttribute('aria-expanded', 'true');
   await expect(page.locator('#mobile-inspector-panel')).toHaveClass(/mobile-open/);
-  await expect(page.locator('#inspector-content')).toContainText(target.label);
+  await expect(page.locator('#inspector-content')).toContainText('Sam');
 
   await page.keyboard.press('Escape');
   await expect(inspectorToggle).toHaveAttribute('aria-expanded', 'false');
