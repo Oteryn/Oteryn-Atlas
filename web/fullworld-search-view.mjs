@@ -143,8 +143,9 @@ export function createSearchView({ form, input, id, describe, onQuery, onChoose,
     const restoreInputFocus = host.contains(document.activeElement);
     event.preventDefault();
     event.stopPropagation(); // First Escape dismisses results, not the containing drawer/panels.
-    close();
+    // Focus requests results synchronously; close after restoring focus.
     if (restoreInputFocus) input.focus({ preventScroll: true });
+    close();
   });
   input.addEventListener('keydown', event => {
     if (composing || event.isComposing || event.altKey || event.ctrlKey || event.metaKey) return;

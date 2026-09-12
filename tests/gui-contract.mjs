@@ -161,3 +161,87 @@ test('creature overlay cannot miss the current FullWorld view when it boots late
   assert.match(fullworldCreatures, /globalThis\.__OTERYN_ATLAS_VIEW__/);
   assert.match(fullworldCreatures, /waitForInitialView/);
 });
+
+// Focused candidate regressions for PR #344's current review findings.
+test('reopening mobile Find preserves an already-visible draft', async () => {
+  const { runInNewContext } = await import('node:vm');
+  const desktopInput = { value: 'committed query' };
+  const mobileInput = { value: '' };
+  let focused = null;
+  const context = {
+    mobileQuery: { matches: true }, drawer: null, returnFocus: null,
+    savedPanels: null, desktopOpen: {}, findMode: false,
+    document: { activeElement: {} }, HTMLElement: class {},
+    $: selector => selector === '#search-input' ? desktopInput : mobileInput,
+    sync() {}, focus: target => { focused = target; },
+    focusOpenedPanel() {}, queueMicrotask,
+  };
+  for (const name of ['openPanel', 'openFind']) {
+    const source = fullworldMobile.match(new RegExp(`^function ${name}\\([\\s\\S]*?^}`, 'm'))?.[0];
+    assert.ok(source, `${name} production seam must remain executable`);
+    runInNewContext(source, context);
+  }
+  context.openFind();
+  assert.equal(mobileInput.value, 'committed query', 'first opening still imports the desktop query');
+  mobileInput.value = 'unsubmitted mobile draft';
+  desktopInput.value = 'older URL query'; // syncViewUi() after a floor/mode change.
+  context.openFind();
+  await new Promise(resolve => queueMicrotask(resolve));
+  assert.equal(mobileInput.value, 'unsubmitted mobile draft');
+  assert.equal(focused, mobileInput, 'already-open Find focuses without waiting for a transition');
+  assert.equal(context.drawer, 'controls');
+});
+
+test('Escape restores combobox focus without reopening the dismissed popup', async () => {
+  const { runInNewContext } = await import('node:vm');
+  // A synchronous focus event is essential: the real input's focus listener
+  // requests results, so testing only focus identity misses the reopen bug.
+  const document = new EventTarget();
+  class Node extends EventTarget {
+    children = [];
+    dataset = {};
+    attributes = new Map();
+    append(...nodes) { this.children.push(...nodes); }
+    replaceChildren(...nodes) { this.children = nodes; }
+    setAttribute(name, value) { this.attributes.set(name, String(value)); }
+    getAttribute(name) { return this.attributes.get(name); }
+    removeAttribute(name) { this.attributes.delete(name); }
+    contains(node) { return this === node || this.children.some(child => child.contains(node)); }
+    closest() { return null; }
+    focus() {
+      if (document.activeElement === this) return;
+      document.activeElement = this;
+      this.dispatchEvent(new Event('focus'));
+    }
+  }
+  document.createElement = () => new Node();
+  document.querySelector = () => null;
+  const source = await readFile(new URL('../web/fullworld-search-view.mjs', import.meta.url), 'utf8');
+  const context = { document, matchMedia: () => ({ addEventListener() {} }) };
+  runInNewContext(source.replace(/^export /gm, ''), context);
+  const form = new Node(), input = new Node();
+  form.append(input);
+  input.value = 'query';
+  let closeCount = 0;
+  const view = context.createSearchView({
+    form, input, id: 'desktop', describe() {}, onChoose() {},
+    onQuery: query => view.show({ phase: 'unavailable', query, detail: 'Unavailable publication' }),
+    onClose: () => { closeCount++; },
+  });
+  input.focus();
+  const host = form.children.at(-1);
+  const summary = host.children[2].children[1].children[0];
+  summary.focus();
+  const escape = Object.assign(new Event('keydown', { cancelable: true }), { key: 'Escape' });
+  form.dispatchEvent(escape);
+  assert.equal(document.activeElement, input);
+  assert.equal(host.hidden, true, 'focus restoration must not leave the popup reopened');
+  assert.equal(input.getAttribute('aria-expanded'), 'false');
+  assert.equal(closeCount, 1);
+  assert.equal(escape.defaultPrevented, true);
+  const nextEscape = Object.assign(new Event('keydown', { cancelable: true }), { key: 'Escape' });
+  form.dispatchEvent(nextEscape);
+  assert.equal(nextEscape.defaultPrevented, false, 'the next Escape remains available to the containing layer');
+  input.dispatchEvent(new Event('input'));
+  assert.equal(host.hidden, false, 'subsequent typing still requests results');
+});

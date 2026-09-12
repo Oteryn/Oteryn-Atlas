@@ -111,7 +111,7 @@ function openPanel(name, { moveFocus = true } = {}) {
   if (mobileQuery.matches) {
     if (!drawer) returnFocus = document.activeElement;
     if (moveFocus && document.activeElement instanceof HTMLElement) document.activeElement.blur();
-    if (name === 'controls') $('#mobile-search-input').value = $('#search-input').value;
+    if (name === 'controls' && drawer !== 'controls') $('#mobile-search-input').value = $('#search-input').value;
     drawer = name;
   } else { savedPanels = null; desktopOpen[name] = true; }
   sync();
