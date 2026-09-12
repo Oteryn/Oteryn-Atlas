@@ -661,7 +661,7 @@ export async function runShadow(mode,root) {
   if(!git(controlRoot,'ls-tree',event.baseSha,'--',ACTIVE).startsWith('100644 blob ')
     ||!gitBlob(controlRoot,event.baseSha,ACTIVE).equals(fs.readFileSync(path.join(controlRoot,TEMPLATE)))) fail('protected workflow/template bytes');
   const candidate=await readCandidateSnapshot({...event,changedFiles:gitChangedFiles(root,event.baseSha,event.headSha)});
-  if(event.treeSha&&candidate.treeSha!==candidate.treeSha) fail('event candidate tree differs from API tree');
+  if(event.treeSha&&candidate.treeSha!==event.treeSha) fail('event candidate tree differs from API tree');
   if(git(root,'rev-parse','HEAD^{tree}')!==candidate.treeSha) fail('API tree differs from checkout');
   const currentRunId=Number(process.env.GITHUB_RUN_ID);
   if(!Number.isSafeInteger(currentRunId)||currentRunId<1) fail('current run id');
