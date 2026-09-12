@@ -343,6 +343,59 @@ export function bindProtectedVisualReferenceConsumer({composeArgs,env,protectedR
   return {composeArgs:[...composeArgs,'-f',overlay],env:{...env,ATLAS_REFERENCE_SNAPSHOTS:referenceSnapshots}};
 }
 
+export const PLAYWRIGHT_DIAGNOSTIC_LIMITS=Object.freeze({maxFiles:16,maxFileBytes:5*1024*1024,maxTotalBytes:20*1024*1024,rawChunkBytes:48*1024});
+export const PLAYWRIGHT_DIAGNOSTIC_PREFIX='ATLAS_SHADOW_PLAYWRIGHT_DIAGNOSTIC';
+
+export function emitFailedPlaywrightDiagnostics({artifactRoot,commandId,write=bytes=>fs.writeSync(2,bytes)}={}) {
+  if(typeof artifactRoot!=='string'||!path.isAbsolute(artifactRoot)||typeof commandId!=='string'||!/^sha256:[a-f0-9]{64}$/.test(commandId)) fail('failure diagnostics input');
+  const source=path.join(artifactRoot,'test-results');
+  if(!fs.existsSync(source)) return {eligible:0,emitted:0,omitted:0};
+  const sourceStat=fs.lstatSync(source);
+  if(sourceStat.isSymbolicLink()||!sourceStat.isDirectory()) fail('failure diagnostics test-results');
+  const eligible=[];
+  const walk=(directory,parts=[])=>{
+    for(const name of fs.readdirSync(directory).sort()) {
+      const absolute=path.join(directory,name),next=[...parts,name],stat=fs.lstatSync(absolute);
+      if(stat.isSymbolicLink()) continue;
+      if(stat.isDirectory()) {walk(absolute,next);continue;}
+      if(!stat.isFile()||(!name.endsWith('-actual.png')&&!name.endsWith('-diff.png'))) continue;
+      const relative=next.join('/');
+      if(next.some(part=>!part||part==='.'||part==='..'||part.includes('/')||part.includes('\\'))||path.resolve(source,...next)!==absolute) fail('failure diagnostics relative path');
+      eligible.push({absolute,relative,size:stat.size});
+    }
+  };
+  walk(source);
+  eligible.sort((left,right)=>left.relative<right.relative?-1:left.relative>right.relative?1:0);
+  let emitted=0,omitted=0,totalBytes=0;
+  const record=value=>write(`${PLAYWRIGHT_DIAGNOSTIC_PREFIX} ${JSON.stringify({schemaVersion:1,commandId,...value})}\n`);
+  for(const file of eligible) {
+    let reason=null;
+    if(emitted>=PLAYWRIGHT_DIAGNOSTIC_LIMITS.maxFiles) reason='max-files';
+    else if(file.size>PLAYWRIGHT_DIAGNOSTIC_LIMITS.maxFileBytes) reason='max-file-bytes';
+    else if(totalBytes+file.size>PLAYWRIGHT_DIAGNOSTIC_LIMITS.maxTotalBytes) reason='max-total-bytes';
+    if(reason) {record({type:'omission',path:file.relative,byteLength:file.size,reason});omitted++;continue;}
+    const bytes=fs.readFileSync(file.absolute);
+    if(bytes.length!==file.size) fail('failure diagnostics file changed');
+    const sha256=createHash('sha256').update(bytes).digest('hex');
+    const chunkCount=Math.ceil(bytes.length/PLAYWRIGHT_DIAGNOSTIC_LIMITS.rawChunkBytes);
+    record({type:'file',path:file.relative,byteLength:bytes.length,sha256,encoding:'base64',chunkCount});
+    for(let index=0;index<chunkCount;index++) record({type:'chunk',path:file.relative,index:index+1,chunkCount,data:bytes.subarray(index*PLAYWRIGHT_DIAGNOSTIC_LIMITS.rawChunkBytes,(index+1)*PLAYWRIGHT_DIAGNOSTIC_LIMITS.rawChunkBytes).toString('base64')});
+    record({type:'end',path:file.relative,byteLength:bytes.length,sha256,chunkCount});
+    emitted++;totalBytes+=bytes.length;
+  }
+  return {eligible:eligible.length,emitted,omitted};
+}
+
+export function failBrowserExecutionWithDiagnostics({artifactRoot,commandId,reviewBearing,emit=emitFailedPlaywrightDiagnostics,write=bytes=>fs.writeSync(2,bytes)}={}) {
+  if(reviewBearing) {
+    try {emit({artifactRoot,commandId,write});}
+    catch(error) {
+      try {write(`${PLAYWRIGHT_DIAGNOSTIC_PREFIX} ${JSON.stringify({schemaVersion:1,commandId,type:'error',error:error?.message??String(error)})}\n`);} catch {}
+    }
+  }
+  fail('protected browser execution failed');
+}
+
 async function runPublicationBrowser(command,{candidate,contract,publication,directory,root,producerJobId,evidenceRoot,oracleDigest,freshSnapshot}) {
   const suffix=command.id.slice('sha256:'.length,'sha256:'.length+12);
   const context=path.join(directory,`browser-context-${suffix}`);fs.mkdirSync(context);
@@ -397,7 +450,10 @@ async function runPublicationBrowser(command,{candidate,contract,publication,dir
       }
     }
     const result=spawnSync('docker',fixtureBrowserArgs(args),{env,encoding:'utf8',timeout:command.timeoutSeconds*1000,maxBuffer:16*1024*1024});
-    if(result.error||result.status!==0||result.signal) {console.error(JSON.stringify({phase:'browser-execution',dataCapability:command.dataCapability,exitCode:result.status,signal:result.signal,error:result.error?.message??null,stdout:String(result.stdout??'').slice(-12288),stderr:String(result.stderr??'').slice(-4096)}));fail('protected browser execution failed');}
+    if(result.error||result.status!==0||result.signal) {
+      console.error(JSON.stringify({phase:'browser-execution',dataCapability:command.dataCapability,exitCode:result.status,signal:result.signal,error:result.error?.message??null,stdout:String(result.stdout??'').slice(-12288),stderr:String(result.stderr??'').slice(-4096)}));
+      failBrowserExecutionWithDiagnostics({artifactRoot:artifacts,commandId:command.id,reviewBearing:Boolean(reviewFrames.length)});
+    }
     const report=readJson(path.join(artifacts,'results.json'));
     const observed=[];
     const walk=suites=>{for(const suite of suites??[]){for(const spec of suite.specs??[]){for(const test of spec.tests??[]){if(test.status!=='expected'||test.results?.length!==1||test.results[0].status!=='passed'||test.results[0].retry!==0)fail('fixture nonpass/retry');observed.push(`${test.projectName}::e2e/tests/${spec.file.replace(/^.*\/tests\//,'')}::${spec.title}`);}}walk(suite.suites);}};
