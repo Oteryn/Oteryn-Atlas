@@ -146,7 +146,9 @@
         "tests/verification/verification-metadata.test.mjs",
         "tests/verification/verification-plan.test.mjs",
         "tests/verification/verification-progress-state.test.mjs",
-        "tests/verification/visual-user-acceptance-contract.test.mjs"
+        "tests/verification/visual-user-acceptance-contract.test.mjs",
+        "tools/governance/test_agent_prompt_lifecycle.mjs",
+        "tools/governance/test_validate_meta_agent_policy.py"
       ],
       "projects": [],
       "resourceClass": "cpu-light",
@@ -3010,7 +3012,7 @@
           "imports": [],
           "subprocessTests": [],
           "qualification": "local-contract",
-          "sourceSha256": "3461eeabed6b82b63cd9d36bb64412aa63f6d0d0a9a33f917cedb9a91278c4a9",
+          "sourceSha256": "8181bc11a009ea496b7932622a44ad18434993871a6afead44bb2fcd54f665a9",
           "contract": {
             "status": "active-semantic",
             "retainedInvariant": "Exact Node/Python commands preserve declared test/import coverage and fail closed for missing ownership, files, invalid paths, stale import proof and opaque subprocess overlap.",
@@ -3349,7 +3351,7 @@
           "imports": [],
           "subprocessTests": [],
           "qualification": "local-contract",
-          "sourceSha256": "6a9b7864ef0f597609d8d6b857269bd3a57f613d4209d6956cf2d1f15325c2b3",
+          "sourceSha256": "8c4dc301d425f6c346971be91244cdc90d547af23075fc0a9fd6670418eafd46",
           "contract": {
             "status": "active-semantic",
             "retainedInvariant": "impact manifest accepts explicit cross-domain escalation rules with allowlisted groups; impact manifest rejects malformed path rules and cross-domain escalations; impact manifest rejects arbitrary legacy schema v1 rather than silently bypassing v2 escalation policy",
@@ -4947,7 +4949,7 @@
           "imports": [],
           "subprocessTests": [],
           "qualification": "local-contract",
-          "sourceSha256": "ab8f09ec633c9040d2a073de2f71ad13f902adb804195bd4a5a9c6571250a748",
+          "sourceSha256": "711cc4aa658154a68bcb41e3b3da53b059b99e2de6ce5e2e0c8de8d4a15e0583",
           "contract": {
             "status": "active-semantic",
             "retainedInvariant": "Canonical metadata projects complete unique ownership without duplicated execution facts; malformed or missing canonical ownership fails closed.",
@@ -5046,7 +5048,7 @@
             "--test",
             "tests/verification/verification-execution-contract.test.mjs"
           ],
-          "sourceSha256": "1632f4f2d7e408a307fdeabd8ae7548add24d95bc14628a0ffe572b0dcbb680e",
+          "sourceSha256": "a55acf79b7b716af5c10c4862c10b5bfb9d29e2b08eb2f42bff664b4a113633c",
           "imports": [],
           "subprocessTests": [],
           "qualification": "local-contract",
@@ -5135,6 +5137,29 @@
           "imports": [],
           "subprocessTests": [],
           "qualification": "unqualified"
+        },
+        {
+          "spec": "tools/governance/test_agent_prompt_lifecycle.mjs",
+          "interpreter": "node",
+          "argv": [
+            "--test",
+            "tools/governance/test_agent_prompt_lifecycle.mjs"
+          ],
+          "sourceSha256": "c2e0e26f7fb012c218074ddaf3422dabfcdd500b7f3344f31895dd5e6f2fefac",
+          "imports": [],
+          "subprocessTests": [],
+          "qualification": "active-semantic"
+        },
+        {
+          "spec": "tools/governance/test_validate_meta_agent_policy.py",
+          "interpreter": "python3",
+          "argv": [
+            "tools/governance/test_validate_meta_agent_policy.py"
+          ],
+          "sourceSha256": "562fbb8ac24d1f72bbd3bbca5c384542bc56f308ae93882761314f58abba670b",
+          "imports": [],
+          "subprocessTests": [],
+          "qualification": "active-semantic"
         }
       ]
     },
