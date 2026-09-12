@@ -169,7 +169,6 @@ function renderActiveInspector() {
   const inspector = document.querySelector('#inspector-content');
   const pill = document.querySelector('#inspector-pill');
   if (!record || !inspector || !pill) return;
-  if (document.querySelector('#inspector-tab-semantic')?.getAttribute('aria-selected') === 'false') return;
   pill.textContent = kindLabel(record.kind).toUpperCase();
   pill.className = 'pill ok';
   const source = record.provenance?.source_capability === 'static-creatures-v1'
