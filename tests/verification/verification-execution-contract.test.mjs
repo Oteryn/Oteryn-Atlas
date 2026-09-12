@@ -6,6 +6,8 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
 import {fileURLToPath,pathToFileURL} from 'node:url';
+import {buildQualificationWorld,verifyQualificationWorld} from '../../tools/verification/qualification-world.mjs';
+import {resolveQualificationScenarioBindings} from '../../tools/verification/qualification-scenario-bindings.mjs';
 import {R5_SEMANTIC_BUILDER_ORACLE, R5_SEMANTIC_BUILDER_ORACLE_DIGEST, R5_SEMANTIC_SOURCE, assertCandidateReadback, resolveExecutionContract, sealExecutionContract, verifyR5SemanticProduct} from '../../tools/verification/verification-execution-contract.mjs';
 import {createPublicationProofFixtures} from './helpers/publication-proof-fixture.mjs';
 const sha = c => c.repeat(40);
@@ -19,6 +21,47 @@ function executionInput(path='tests/semantic-search.mjs') {
  return {root,candidate,protectedCatalog,protectedImpactManifest,environmentDigest:'f'.repeat(64),
   planInput:{repository:candidate.repository,headSha:candidate.headSha,integrationBaseSha:candidate.baseSha,mergeBaseSha:candidate.baseSha,changedFiles:candidate.changedFiles,
    candidateVerificationCatalog:protectedCatalog,candidateImpactManifest:protectedImpactManifest}};
+}
+
+function copyCandidateBrowserPayload(t) {
+ const scratch=fs.mkdtempSync(path.join(os.tmpdir(),'atlas-shadow-candidate-payload-'));
+ t.after(()=>fs.rmSync(scratch,{recursive:true,force:true}));
+ const candidateRoot=path.join(scratch,'candidate');
+ fs.mkdirSync(candidateRoot,{recursive:true});
+ fs.cpSync(path.join(root,'e2e'),path.join(candidateRoot,'e2e'),{recursive:true,filter:source=>!source.split(path.sep).includes('node_modules')});
+ return {scratch,candidateRoot};
+}
+
+function firstBrowserSnapshot(e2eRoot) {
+ for(const directory of ['tests/visual-desktop.spec.mjs-snapshots','tests/visual-mobile.spec.mjs-snapshots']) {
+  const rootPath=path.join(e2eRoot,directory);
+  if(!fs.existsSync(rootPath)) continue;
+  const queue=[rootPath];
+  while(queue.length) {
+   const current=queue.shift();
+   for(const entry of fs.readdirSync(current,{withFileTypes:true})) {
+    const absolute=path.join(current,entry.name);
+    if(entry.isDirectory()) queue.push(absolute);
+    else if(entry.isFile()&&entry.name.endsWith('.png')) return path.relative(e2eRoot,absolute);
+   }
+  }
+ }
+ throw new Error('visual snapshot fixture missing');
+}
+
+function mutateCandidateBrowserPayload(candidateRoot) {
+ const e2e=path.join(candidateRoot,'e2e');
+ const spec='tests/resilience-desktop.spec.mjs';
+ const support='support/user-acceptance.mjs';
+ fs.appendFileSync(path.join(e2e,spec),'\n// candidate-browser-spec-marker\n');
+ fs.appendFileSync(path.join(e2e,support),'\n// candidate-browser-support-marker\n');
+ fs.writeFileSync(path.join(e2e,'Dockerfile'),'candidate Dockerfile must remain inert\n');
+ fs.writeFileSync(path.join(e2e,'playwright.config.mjs'),'candidate config must remain inert\n');
+ fs.mkdirSync(path.join(e2e,'baselines'),{recursive:true});
+ fs.writeFileSync(path.join(e2e,'baselines/candidate.txt'),'candidate baseline must remain inert\n');
+ const snapshot=firstBrowserSnapshot(e2e);
+ fs.appendFileSync(path.join(e2e,snapshot),Buffer.from('candidate-snapshot-marker'));
+ return {spec,support,snapshot};
 }
 test('final candidate readback rejects head/base/tree/repository/file drift',()=>{
  const planned=snapshot();assert.equal(assertCandidateReadback({planned,current:snapshot(),...source}),true);
@@ -221,8 +264,91 @@ test('candidate execution metadata cannot replace protected interpreter or hashe
  assert(!JSON.stringify(contract).includes('candidate-policy'));
 });
 
-import {authenticateR5SemanticSource,buildR5SemanticPublication,resolveShadowEvent,planShadow,deterministicDockerArgs,fixtureBrowserArgs,requiresProtectedVisualReference,bindProtectedVisualReferenceConsumer} from '../../tools/verification/run-verification-shadow.mjs';
+import {authenticateR5SemanticSource,buildR5SemanticPublication,resolveShadowEvent,planShadow,deterministicDockerArgs,fixtureBrowserArgs,requiresProtectedVisualReference,bindProtectedVisualReferenceConsumer,prepareProtectedBrowserHarness,prepareProtectedBrowserCaptureHarness,writeProtectedBrowserContainment} from '../../tools/verification/run-verification-shadow.mjs';
 import {assertShadowExecutorCoverage,assertShadowReviewCaptureCensus,normalizeShadowReviewChangedFiles,shadowReviewPlanDigest} from '../../tools/verification/verification-shadow-review.mjs';
+test('shadow materializes candidate browser tests, support and snapshots while protected executor control stays protected',t=>{
+ const {scratch,candidateRoot}=copyCandidateBrowserPayload(t);
+ const changed=mutateCandidateBrowserPayload(candidateRoot);
+ const destination=path.join(scratch,'browser-harness');
+ prepareProtectedBrowserHarness({protectedRoot:root,candidateRoot,destination});
+ assert.match(fs.readFileSync(path.join(destination,changed.spec),'utf8'),/candidate-browser-spec-marker/);
+ assert.match(fs.readFileSync(path.join(destination,changed.support),'utf8'),/candidate-browser-support-marker/);
+ assert.equal(fs.readFileSync(path.join(destination,changed.snapshot)).includes(Buffer.from('candidate-snapshot-marker')),true);
+ assert.deepEqual(fs.readFileSync(path.join(destination,'Dockerfile')),fs.readFileSync(path.join(root,'e2e/Dockerfile')));
+ assert.doesNotMatch(fs.readFileSync(path.join(destination,'Dockerfile'),'utf8'),/candidate Dockerfile/);
+ assert.deepEqual(fs.readFileSync(path.join(destination,'playwright.config.mjs')),fs.readFileSync(path.join(root,'e2e/playwright.config.mjs')));
+ assert.equal(fs.existsSync(path.join(destination,'baselines/candidate.txt')),false);
+});
+
+test('candidate raw source cannot use protected qualification rehydration syntax',t=>{
+ const {scratch,candidateRoot}=copyCandidateBrowserPayload(t);
+ const visual=path.join(candidateRoot,'e2e/tests/visual-desktop.spec.mjs');
+ fs.writeFileSync(visual,"const __atlasQualification = true;\n(__atlasQualification ? (()=>{throw new Error('candidate failing assertion')})() : undefined);\n");
+ assert.throws(()=>prepareProtectedBrowserHarness({protectedRoot:root,candidateRoot,destination:path.join(scratch,'browser-harness')}),/reserved qualification syntax/);
+});
+
+test('protected browser containment bounds candidate and capture passes',t=>{
+ const scratch=fs.mkdtempSync(path.join(os.tmpdir(),'atlas-browser-containment-'));
+ t.after(()=>fs.rmSync(scratch,{recursive:true,force:true}));
+ const file=writeProtectedBrowserContainment(path.join(scratch,'containment.yml'));
+ const source=fs.readFileSync(file,'utf8');
+ assert.match(source,/read_only: true/);assert.match(source,/cap_drop:\n\s+- ALL/);
+ assert.match(source,/no-new-privileges:true/);assert.match(source,/pids_limit: 192/);
+ assert.match(source,/mem_limit: 1610612736/);assert.match(source,/cpus: 2/);
+ assert.match(source,/\/tmp:rw,nodev,nosuid,size=256m/);assert.doesNotMatch(source,/network_mode/);
+});
+
+test('hosted browser machine and protected visual capture use isolated producers',()=>{
+ const source=fs.readFileSync(path.join(root,'tools/verification/run-verification-shadow.mjs'),'utf8');
+ assert.match(source,/ATLAS_USER_VISUAL_EVIDENCE:'0'/);
+ assert.match(source,/candidateRoot:root/);
+ assert.match(source,/protected-capture-context-/);
+ assert.match(source,/ATLAS_USER_VISUAL_EVIDENCE:'1'/);
+ assert.match(source,/persistShadowReviewCapture\(\{artifactRoot:captureArtifacts/);
+ assert.doesNotMatch(source,/persistShadowReviewCapture\(\{artifactRoot:artifacts/);
+});
+
+test('protected visual capture overlays only authenticated candidate PNG snapshot oracle data',t=>{
+ const {scratch,candidateRoot}=copyCandidateBrowserPayload(t);
+ const e2e=path.join(candidateRoot,'e2e'), snapshot=firstBrowserSnapshot(e2e);
+ const protectedSnapshot=fs.readFileSync(path.join(root,'e2e',snapshot));
+ fs.writeFileSync(path.join(e2e,snapshot),Buffer.concat([protectedSnapshot,Buffer.from('candidate-capture-snapshot-marker')]));
+ fs.appendFileSync(path.join(e2e,'tests/visual-desktop.spec.mjs'),'\n// candidate capture spec must stay inert\n');
+ fs.appendFileSync(path.join(e2e,'support/user-acceptance.mjs'),'\n// candidate capture support must stay inert\n');
+ const destination=path.join(scratch,'protected-capture');
+ prepareProtectedBrowserCaptureHarness({protectedRoot:root,candidateRoot,destination});
+ assert.equal(fs.readFileSync(path.join(destination,snapshot)).includes(Buffer.from('candidate-capture-snapshot-marker')),true);
+ assert.deepEqual(fs.readFileSync(path.join(destination,'tests/visual-desktop.spec.mjs')),fs.readFileSync(path.join(root,'e2e/tests/visual-desktop.spec.mjs')));
+ assert.deepEqual(fs.readFileSync(path.join(destination,'support/user-acceptance.mjs')),fs.readFileSync(path.join(root,'e2e/support/user-acceptance.mjs')));
+
+ fs.rmSync(path.join(e2e,snapshot));
+ const deletedDestination=path.join(scratch,'protected-capture-deleted');
+ prepareProtectedBrowserCaptureHarness({protectedRoot:root,candidateRoot,destination:deletedDestination});
+ assert.equal(fs.existsSync(path.join(deletedDestination,snapshot)),false);
+
+ const snapshotDirectory=path.dirname(path.join(e2e,snapshot));
+ fs.writeFileSync(path.join(snapshotDirectory,'invalid.txt'),'not snapshot oracle data');
+ assert.throws(()=>prepareProtectedBrowserCaptureHarness({protectedRoot:root,candidateRoot,destination:path.join(scratch,'protected-capture-invalid')}),/non-PNG data/);
+ fs.rmSync(path.join(snapshotDirectory,'invalid.txt'));
+ fs.symlinkSync(path.join(root,'e2e',snapshot),path.join(snapshotDirectory,'linked.png'));
+ assert.throws(()=>prepareProtectedBrowserCaptureHarness({protectedRoot:root,candidateRoot,destination:path.join(scratch,'protected-capture-symlink')}),/snapshot symlink/);
+});
+
+test('qualification binding is rendered onto candidate test payload without replacing candidate assertions',async t=>{
+ const {scratch,candidateRoot}=copyCandidateBrowserPayload(t);
+ const visual=path.join(candidateRoot,'e2e/tests/visual-desktop.spec.mjs');
+ fs.appendFileSync(visual,'\n// candidate-qualification-oracle-marker\n');
+ const productRoot=path.join(scratch,'product');
+ const manifest=await buildQualificationWorld(productRoot);
+ await verifyQualificationWorld(productRoot);
+ const bindings=resolveQualificationScenarioBindings({productRoot,expectedProductDigest:manifest.productDigest});
+ const destination=path.join(scratch,'qualified-browser-harness');
+ prepareProtectedBrowserHarness({protectedRoot:root,candidateRoot,destination,qualificationBindings:bindings});
+ const rendered=fs.readFileSync(path.join(destination,'tests/visual-desktop.spec.mjs'),'utf8');
+ assert.match(rendered,/candidate-qualification-oracle-marker/);
+ assert.match(rendered,/protected-reference/);
+ assert.deepEqual(fs.readFileSync(path.join(destination,'playwright.config.mjs')),fs.readFileSync(path.join(root,'e2e/playwright.config.mjs')));
+});
 test('fixture browser preserves runner ownership of report artifacts',()=>{
  const compose=['compose','-p','protected-fixture','-f','/protected/compose.yml'];
  assert.deepEqual(fixtureBrowserArgs(compose,{uid:1001,gid:1002}),[...compose,'run','--user','1001:1002','--rm','--no-deps','e2e']);
