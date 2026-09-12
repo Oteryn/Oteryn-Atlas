@@ -343,33 +343,60 @@ export function bindProtectedVisualReferenceConsumer({composeArgs,env,protectedR
   return {composeArgs:[...composeArgs,'-f',overlay],env:{...env,ATLAS_REFERENCE_SNAPSHOTS:referenceSnapshots}};
 }
 
-export function retainFailedPlaywrightDiagnostics({artifactRoot,diagnosticsRoot,commandId}={}) {
-  if(typeof artifactRoot!=='string'||!path.isAbsolute(artifactRoot)||typeof diagnosticsRoot!=='string'||!path.isAbsolute(diagnosticsRoot)
-    ||typeof commandId!=='string'||!/^sha256:[a-f0-9]{64}$/.test(commandId)) fail('failure diagnostics destination');
+export const PLAYWRIGHT_DIAGNOSTIC_LIMITS=Object.freeze({maxFiles:16,maxFileBytes:5*1024*1024,maxTotalBytes:20*1024*1024,rawChunkBytes:48*1024});
+export const PLAYWRIGHT_DIAGNOSTIC_PREFIX='ATLAS_SHADOW_PLAYWRIGHT_DIAGNOSTIC';
+
+export function emitFailedPlaywrightDiagnostics({artifactRoot,commandId,write=bytes=>fs.writeSync(2,bytes)}={}) {
+  if(typeof artifactRoot!=='string'||!path.isAbsolute(artifactRoot)||typeof commandId!=='string'||!/^sha256:[a-f0-9]{64}$/.test(commandId)) fail('failure diagnostics input');
   const source=path.join(artifactRoot,'test-results');
-  if(!fs.existsSync(source)) return [];
-  const retained=[];
-  const walk=(directory,prefix='')=>{
-    for(const name of fs.readdirSync(directory)) {
-      const absolute=path.join(directory,name),relative=path.join(prefix,name),stat=fs.lstatSync(absolute);
+  if(!fs.existsSync(source)) return {eligible:0,emitted:0,omitted:0};
+  const sourceStat=fs.lstatSync(source);
+  if(sourceStat.isSymbolicLink()||!sourceStat.isDirectory()) fail('failure diagnostics test-results');
+  const eligible=[];
+  const walk=(directory,parts=[])=>{
+    for(const name of fs.readdirSync(directory).sort()) {
+      const absolute=path.join(directory,name),next=[...parts,name],stat=fs.lstatSync(absolute);
       if(stat.isSymbolicLink()) continue;
-      if(stat.isDirectory()) {walk(absolute,relative);continue;}
+      if(stat.isDirectory()) {walk(absolute,next);continue;}
       if(!stat.isFile()||(!name.endsWith('-actual.png')&&!name.endsWith('-diff.png'))) continue;
-      retained.push({absolute,relative});
+      const relative=next.join('/');
+      if(next.some(part=>!part||part==='.'||part==='..'||part.includes('/')||part.includes('\\'))||path.resolve(source,...next)!==absolute) fail('failure diagnostics relative path');
+      eligible.push({absolute,relative,size:stat.size});
     }
   };
   walk(source);
-  if(!retained.length) return [];
-  const destination=path.join(diagnosticsRoot,commandId.slice('sha256:'.length));
-  for(const file of retained) {
-    const output=path.join(destination,file.relative);
-    fs.mkdirSync(path.dirname(output),{recursive:true});
-    fs.copyFileSync(file.absolute,output,fs.constants.COPYFILE_EXCL);
+  eligible.sort((left,right)=>left.relative<right.relative?-1:left.relative>right.relative?1:0);
+  let emitted=0,omitted=0,totalBytes=0;
+  const record=value=>write(`${PLAYWRIGHT_DIAGNOSTIC_PREFIX} ${JSON.stringify({schemaVersion:1,commandId,...value})}\n`);
+  for(const file of eligible) {
+    let reason=null;
+    if(emitted>=PLAYWRIGHT_DIAGNOSTIC_LIMITS.maxFiles) reason='max-files';
+    else if(file.size>PLAYWRIGHT_DIAGNOSTIC_LIMITS.maxFileBytes) reason='max-file-bytes';
+    else if(totalBytes+file.size>PLAYWRIGHT_DIAGNOSTIC_LIMITS.maxTotalBytes) reason='max-total-bytes';
+    if(reason) {record({type:'omission',path:file.relative,byteLength:file.size,reason});omitted++;continue;}
+    const bytes=fs.readFileSync(file.absolute);
+    if(bytes.length!==file.size) fail('failure diagnostics file changed');
+    const sha256=createHash('sha256').update(bytes).digest('hex');
+    const chunkCount=Math.ceil(bytes.length/PLAYWRIGHT_DIAGNOSTIC_LIMITS.rawChunkBytes);
+    record({type:'file',path:file.relative,byteLength:bytes.length,sha256,encoding:'base64',chunkCount});
+    for(let index=0;index<chunkCount;index++) record({type:'chunk',path:file.relative,index:index+1,chunkCount,data:bytes.subarray(index*PLAYWRIGHT_DIAGNOSTIC_LIMITS.rawChunkBytes,(index+1)*PLAYWRIGHT_DIAGNOSTIC_LIMITS.rawChunkBytes).toString('base64')});
+    record({type:'end',path:file.relative,byteLength:bytes.length,sha256,chunkCount});
+    emitted++;totalBytes+=bytes.length;
   }
-  return retained.map(file=>path.relative(source,file.absolute));
+  return {eligible:eligible.length,emitted,omitted};
 }
 
-async function runPublicationBrowser(command,{candidate,contract,publication,directory,root,producerJobId,evidenceRoot,diagnosticsRoot,oracleDigest,freshSnapshot}) {
+export function failBrowserExecutionWithDiagnostics({artifactRoot,commandId,reviewBearing,emit=emitFailedPlaywrightDiagnostics,write=bytes=>fs.writeSync(2,bytes)}={}) {
+  if(reviewBearing) {
+    try {emit({artifactRoot,commandId,write});}
+    catch(error) {
+      try {write(`${PLAYWRIGHT_DIAGNOSTIC_PREFIX} ${JSON.stringify({schemaVersion:1,commandId,type:'error',error:error?.message??String(error)})}\n`);} catch {}
+    }
+  }
+  fail('protected browser execution failed');
+}
+
+async function runPublicationBrowser(command,{candidate,contract,publication,directory,root,producerJobId,evidenceRoot,oracleDigest,freshSnapshot}) {
   const suffix=command.id.slice('sha256:'.length,'sha256:'.length+12);
   const context=path.join(directory,`browser-context-${suffix}`);fs.mkdirSync(context);
   for(const relative of ['web','src']) fs.cpSync(path.join(root,relative),path.join(context,relative),{recursive:true});
@@ -425,11 +452,7 @@ async function runPublicationBrowser(command,{candidate,contract,publication,dir
     const result=spawnSync('docker',fixtureBrowserArgs(args),{env,encoding:'utf8',timeout:command.timeoutSeconds*1000,maxBuffer:16*1024*1024});
     if(result.error||result.status!==0||result.signal) {
       console.error(JSON.stringify({phase:'browser-execution',dataCapability:command.dataCapability,exitCode:result.status,signal:result.signal,error:result.error?.message??null,stdout:String(result.stdout??'').slice(-12288),stderr:String(result.stderr??'').slice(-4096)}));
-      if(reviewFrames.length) {
-        try {retainFailedPlaywrightDiagnostics({artifactRoot:artifacts,diagnosticsRoot,commandId:command.id});}
-        catch(error) {console.error(JSON.stringify({phase:'browser-failure-diagnostics',error:error?.message??String(error)}));}
-      }
-      fail('protected browser execution failed');
+      failBrowserExecutionWithDiagnostics({artifactRoot:artifacts,commandId:command.id,reviewBearing:Boolean(reviewFrames.length)});
     }
     const report=readJson(path.join(artifacts,'results.json'));
     const observed=[];
@@ -519,7 +542,7 @@ export async function runShadow(mode,root) {
       if(bytesDigest(fs.readFileSync(protectedHarnessFile))!==R5_SEMANTIC_BUILDER_ORACLE_DIGEST) fail('protected semantic harness materialization');
     }
     const requiresVisualReference=contract.commands.some(requiresProtectedVisualReference);
-    let producerJobId=null,evidenceRoot=null,diagnosticsRoot=null;
+    let producerJobId=null,evidenceRoot=null;
     if(requiresReview||requiresVisualReference) producerJobId=await currentShadowJobId(currentRunId,'execute');
     if(requiresReview) {
       const requested=process.env.ATLAS_SHADOW_EVIDENCE_DIR;
@@ -527,12 +550,6 @@ export async function runShadow(mode,root) {
       evidenceRoot=path.resolve(requested);
       if(fs.existsSync(evidenceRoot)&&fs.readdirSync(evidenceRoot).length)fail('review evidence directory must be fresh');
       fs.mkdirSync(evidenceRoot,{recursive:true});
-      const requestedDiagnostics=process.env.ATLAS_SHADOW_FAILURE_DIAGNOSTICS_DIR;
-      if(typeof requestedDiagnostics!=='string'||!path.isAbsolute(requestedDiagnostics))fail('failure diagnostics directory required');
-      diagnosticsRoot=path.resolve(requestedDiagnostics);
-      if(diagnosticsRoot===evidenceRoot||diagnosticsRoot.startsWith(evidenceRoot+path.sep)||evidenceRoot.startsWith(diagnosticsRoot+path.sep)
-        ||diagnosticsRoot===directory||diagnosticsRoot.startsWith(directory+path.sep)||directory.startsWith(diagnosticsRoot+path.sep)) fail('failure diagnostics directory isolation');
-      if(fs.existsSync(diagnosticsRoot)) fail('failure diagnostics directory must be fresh');
     }
     for(const command of contract.commands) {
       if(command.engine==='deterministic') {verifyExecutionView({viewRoot:executionRoot,sourceRoot:root,revision:candidate.headSha});summary.results.push(executeDeterministic(command,executionRoot,config.container.image,path.join(controlRoot,'e2e/node_modules'),shimRoot,protectedHarnessFile,protectedInputFile));}
@@ -544,7 +561,7 @@ export async function runShadow(mode,root) {
       } else if(command.engine==='playwright') {
         const product=command.dataCapability==='qualification_fixture'?fixture:command.dataCapability==='bounded_real_world'?bounded:null;
         if(!product)fail(`missing ${command.dataCapability} browser publication`);
-        summary.results.push(await runPublicationBrowser(command,{candidate,contract,publication:{...product,root:command.dataCapability==='qualification_fixture'?path.join(directory,'fixture'):path.join(directory,'bounded'),trustDescriptor:command.dataCapability==='qualification_fixture'?qualificationTrustDescriptor(product.manifest):boundedRealTrustDescriptor(product.manifest)},directory,root,producerJobId,evidenceRoot,diagnosticsRoot,oracleDigest,freshSnapshot}));
+        summary.results.push(await runPublicationBrowser(command,{candidate,contract,publication:{...product,root:command.dataCapability==='qualification_fixture'?path.join(directory,'fixture'):path.join(directory,'bounded'),trustDescriptor:command.dataCapability==='qualification_fixture'?qualificationTrustDescriptor(product.manifest):boundedRealTrustDescriptor(product.manifest)},directory,root,producerJobId,evidenceRoot,oracleDigest,freshSnapshot}));
       } else fail('unsupported command');
     }
     if(requiresReview)assertShadowReviewCaptureCensus(contract,summary.results);

@@ -221,7 +221,7 @@ test('candidate execution metadata cannot replace protected interpreter or hashe
  assert(!JSON.stringify(contract).includes('candidate-policy'));
 });
 
-import {authenticateR5SemanticSource,buildR5SemanticPublication,resolveShadowEvent,planShadow,deterministicDockerArgs,fixtureBrowserArgs,requiresProtectedVisualReference,bindProtectedVisualReferenceConsumer} from '../../tools/verification/run-verification-shadow.mjs';
+import {PLAYWRIGHT_DIAGNOSTIC_LIMITS,PLAYWRIGHT_DIAGNOSTIC_PREFIX,authenticateR5SemanticSource,buildR5SemanticPublication,resolveShadowEvent,planShadow,deterministicDockerArgs,fixtureBrowserArgs,requiresProtectedVisualReference,bindProtectedVisualReferenceConsumer,emitFailedPlaywrightDiagnostics,failBrowserExecutionWithDiagnostics} from '../../tools/verification/run-verification-shadow.mjs';
 import {assertShadowExecutorCoverage,assertShadowReviewCaptureCensus,normalizeShadowReviewChangedFiles,shadowReviewPlanDigest} from '../../tools/verification/verification-shadow-review.mjs';
 test('fixture browser preserves runner ownership of report artifacts',()=>{
  const compose=['compose','-p','protected-fixture','-f','/protected/compose.yml'];
@@ -637,4 +637,59 @@ test('real protected shadow plan CLI schedules subject-only work and keeps docs-
   const summary=JSON.parse(result.stdout);assert.deepEqual(summary.groups,[]);assert.deepEqual(summary.candidateTestSubjects,expected?[subject]:[]);
   assert.equal(summary.status,expected?'UNRESOLVED':'NO_PRODUCT_WORK');if(!expected)assert.deepEqual(summary.commands,[]);
  }
+});
+
+const diagnosticCommandId=`sha256:${'d'.repeat(64)}`;
+function diagnosticRecords(artifactRoot) {
+ let output='';
+ const result=emitFailedPlaywrightDiagnostics({artifactRoot,commandId:diagnosticCommandId,write:value=>{output+=value;}});
+ const records=output?output.trimEnd().split('\n').map(line=>{assert.ok(line.startsWith(`${PLAYWRIGHT_DIAGNOSTIC_PREFIX} `));return JSON.parse(line.slice(PLAYWRIGHT_DIAGNOSTIC_PREFIX.length+1));}):[];
+ return {result,records};
+}
+
+test('failed Playwright diagnostics filter regular actual/diff images, exclude symlinks, and order safe POSIX paths',t=>{
+ const artifactRoot=fs.mkdtempSync(path.join(os.tmpdir(),'atlas-log-diagnostics-'));t.after(()=>fs.rmSync(artifactRoot,{recursive:true,force:true}));
+ const results=path.join(artifactRoot,'test-results');fs.mkdirSync(path.join(results,'z'),{recursive:true});fs.mkdirSync(path.join(results,'a'));
+ fs.writeFileSync(path.join(results,'z','second-diff.png'),'diff');fs.writeFileSync(path.join(results,'a','first-actual.png'),'actual');
+ for(const name of ['ignored.png','almost-actual.png.txt','upper-DIFF.PNG'])fs.writeFileSync(path.join(results,name),'ignored');
+ fs.mkdirSync(path.join(results,'folder-diff.png'));fs.symlinkSync(path.join(results,'a','first-actual.png'),path.join(results,'linked-actual.png'));
+ const {result,records}=diagnosticRecords(artifactRoot),files=records.filter(row=>row.type==='file');
+ assert.deepEqual(result,{eligible:2,emitted:2,omitted:0});assert.deepEqual(files.map(row=>row.path),['a/first-actual.png','z/second-diff.png']);
+ assert.ok(records.every(row=>row.schemaVersion===1&&row.commandId===diagnosticCommandId));
+});
+
+test('diagnostic framing reconstructs lossless bounded chunks with verified length and SHA-256',t=>{
+ const artifactRoot=fs.mkdtempSync(path.join(os.tmpdir(),'atlas-log-chunks-'));t.after(()=>fs.rmSync(artifactRoot,{recursive:true,force:true}));
+ const bytes=Buffer.alloc(PLAYWRIGHT_DIAGNOSTIC_LIMITS.rawChunkBytes*2+17);for(let index=0;index<bytes.length;index++)bytes[index]=index%251;
+ fs.mkdirSync(path.join(artifactRoot,'test-results'));fs.writeFileSync(path.join(artifactRoot,'test-results','frame-actual.png'),bytes);
+ const {records}=diagnosticRecords(artifactRoot),header=records.find(row=>row.type==='file'),chunks=records.filter(row=>row.type==='chunk'),end=records.find(row=>row.type==='end');
+ assert.equal(header.encoding,'base64');assert.equal(header.chunkCount,3);assert.deepEqual(chunks.map(row=>row.index),[1,2,3]);
+ assert.ok(chunks.every(row=>row.data.length<=Math.ceil(PLAYWRIGHT_DIAGNOSTIC_LIMITS.rawChunkBytes/3)*4));
+ const reconstructed=Buffer.concat(chunks.map(row=>Buffer.from(row.data,'base64'))),sha256=createHash('sha256').update(bytes).digest('hex');
+ assert.deepEqual(reconstructed,bytes);assert.equal(header.byteLength,bytes.length);assert.equal(header.sha256,sha256);assert.deepEqual(end,{schemaVersion:1,commandId:diagnosticCommandId,type:'end',path:'frame-actual.png',byteLength:bytes.length,sha256,chunkCount:3});
+});
+
+test('diagnostic input and relative paths fail closed without reading outside test-results',t=>{
+ const artifactRoot=fs.mkdtempSync(path.join(os.tmpdir(),'atlas-log-safety-'));t.after(()=>fs.rmSync(artifactRoot,{recursive:true,force:true}));
+ assert.throws(()=>emitFailedPlaywrightDiagnostics({artifactRoot:'relative',commandId:diagnosticCommandId}),/input/);
+ assert.throws(()=>emitFailedPlaywrightDiagnostics({artifactRoot,commandId:'unsafe'}),/input/);
+ const outside=fs.mkdtempSync(path.join(os.tmpdir(),'atlas-log-outside-'));t.after(()=>fs.rmSync(outside,{recursive:true,force:true}));fs.writeFileSync(path.join(outside,'secret-actual.png'),'secret');
+ fs.symlinkSync(outside,path.join(artifactRoot,'test-results'));assert.throws(()=>diagnosticRecords(artifactRoot),/test-results/);
+ fs.rmSync(path.join(artifactRoot,'test-results'));fs.mkdirSync(path.join(artifactRoot,'test-results','bad\\segment'),{recursive:true});fs.writeFileSync(path.join(artifactRoot,'test-results','bad\\segment','frame-diff.png'),'x');
+ assert.throws(()=>diagnosticRecords(artifactRoot),/relative path/);
+});
+
+test('diagnostic bounds produce explicit omissions and an empty eligible tree emits no payload',t=>{
+ const empty=fs.mkdtempSync(path.join(os.tmpdir(),'atlas-log-empty-')),bounded=fs.mkdtempSync(path.join(os.tmpdir(),'atlas-log-bounds-'));t.after(()=>{fs.rmSync(empty,{recursive:true,force:true});fs.rmSync(bounded,{recursive:true,force:true});});
+ fs.mkdirSync(path.join(empty,'test-results'));fs.writeFileSync(path.join(empty,'test-results','ordinary.png'),'x');assert.deepEqual(diagnosticRecords(empty),{result:{eligible:0,emitted:0,omitted:0},records:[]});
+ const results=path.join(bounded,'test-results');fs.mkdirSync(results);fs.writeFileSync(path.join(results,'00-too-large-actual.png'),Buffer.alloc(PLAYWRIGHT_DIAGNOSTIC_LIMITS.maxFileBytes+1));
+ for(let index=0;index<PLAYWRIGHT_DIAGNOSTIC_LIMITS.maxFiles+1;index++)fs.writeFileSync(path.join(results,`${String(index+1).padStart(2,'0')}-diff.png`),'x');
+ const {result,records}=diagnosticRecords(bounded),omissions=records.filter(row=>row.type==='omission');
+ assert.equal(result.eligible,PLAYWRIGHT_DIAGNOSTIC_LIMITS.maxFiles+2);assert.ok(omissions.some(row=>row.reason==='max-file-bytes'));assert.ok(omissions.some(row=>row.reason==='max-files'));assert.ok(omissions.every(row=>Number.isSafeInteger(row.byteLength)&&row.path));
+});
+
+test('diagnostic emission errors cannot replace the original protected browser failure',()=>{
+ let output='';
+ assert.throws(()=>failBrowserExecutionWithDiagnostics({artifactRoot:'/tmp/unused',commandId:diagnosticCommandId,reviewBearing:true,emit:()=>{throw new Error('diagnostic exploded');},write:value=>{output+=value;}}),/protected browser execution failed/);
+ const record=JSON.parse(output.trim().slice(PLAYWRIGHT_DIAGNOSTIC_PREFIX.length+1));assert.equal(record.type,'error');assert.match(record.error,/diagnostic exploded/);
 });
