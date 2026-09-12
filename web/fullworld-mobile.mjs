@@ -47,6 +47,8 @@ function focusOpenedPanel(name, target = $(`#mobile-${name}-close`)) {
   const onEnd = event => {
     if (event.target !== panel || event.propertyName !== 'transform') return;
     panel.removeEventListener('transitionend', onEnd);
+    const active = document.activeElement;
+    if (active instanceof HTMLElement && panel.contains(active)) return;
     focus(target);
   };
   panel.addEventListener('transitionend', onEnd);
@@ -190,9 +192,12 @@ $('#mobile-search-form')?.addEventListener('submit', event => {
 
 function openFind() {
   if (mobileQuery.matches) {
+    const controlsAlreadyOpen = drawer === 'controls';
     findMode = true;
     openPanel('controls', { moveFocus: false });
-    focusOpenedPanel('controls', $('#mobile-search-input'));
+    const target = $('#mobile-search-input');
+    if (controlsAlreadyOpen) queueMicrotask(() => focus(target));
+    else focusOpenedPanel('controls', target);
   } else focus($('#search-input'));
 }
 $('#mobile-find-toggle')?.addEventListener('click', openFind);
