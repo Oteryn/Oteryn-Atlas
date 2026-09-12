@@ -140,9 +140,11 @@ export function createSearchView({ form, input, id, describe, onQuery, onChoose,
   }, true);
   form.addEventListener('keydown', event => {
     if (event.key !== 'Escape' || host.hidden || composing || event.isComposing) return;
+    const restoreInputFocus = host.contains(document.activeElement);
     event.preventDefault();
     event.stopPropagation(); // First Escape dismisses results, not the containing drawer/panels.
     close();
+    if (restoreInputFocus) input.focus({ preventScroll: true });
   });
   input.addEventListener('keydown', event => {
     if (composing || event.isComposing || event.altKey || event.ctrlKey || event.metaKey) return;
@@ -182,9 +184,16 @@ function syncResponsiveQuery(mobile) {
   const source = document.querySelector(mobile ? '#search-input' : '#mobile-search-input');
   const target = document.querySelector(mobile ? '#mobile-search-input' : '#search-input');
   if (source && target) target.value = source.value;
+  return target;
 }
 responsiveQuery.addEventListener('change', () => {
-  syncResponsiveQuery(responsiveQuery.matches);
+  const target = syncResponsiveQuery(responsiveQuery.matches);
+  if (!responsiveQuery.matches && target) {
+    const desktopHost = document.querySelector('#semantic-search-results-desktop');
+    if (document.activeElement === target || (desktopHost && !desktopHost.hidden)) {
+      target.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+  }
   if (!responsiveQuery.matches && document.querySelector('#inspector-content .error-box')) {
     window.dispatchEvent(new CustomEvent('oteryn-atlas-open-inspector'));
   }
