@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 import { normalizeStableSpecPath, stableTestId } from '../tools/verification/stable-id.mjs';
 
 const CATEGORIES = new Set([
@@ -91,6 +92,38 @@ export function buildFailureManifest(summary) {
   });
 }
 
+function collectVisualFailureDiagnostics(root) {
+  const files = [];
+  const visit = (directory) => {
+    if (!fs.existsSync(directory)) return;
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      const absolute = path.join(directory, entry.name);
+      if (entry.isDirectory()) visit(absolute);
+      else if (entry.isFile() && /-(?:actual|diff)\.png$/.test(entry.name)) files.push(absolute);
+    }
+  };
+  visit(path.join(root, 'test-results'));
+  return files.sort().slice(0, 8);
+}
+
+function emitVisualFailureDiagnostics(artifactsDir) {
+  if (process.env.ATLAS_USER_VISUAL_EVIDENCE !== '1') return;
+  const maxBytes = 1024 * 1024;
+  const chunkChars = 48 * 1024;
+  for (const file of collectVisualFailureDiagnostics(artifactsDir)) {
+    const bytes = fs.readFileSync(file);
+    if (bytes.length > maxBytes) continue;
+    const encoded = bytes.toString('base64');
+    const sha256 = `sha256:${createHash('sha256').update(bytes).digest('hex')}`;
+    const relative = path.relative(artifactsDir, file).replaceAll('\\', '/');
+    const chunks = Math.max(1, Math.ceil(encoded.length / chunkChars));
+    for (let index = 0; index < chunks; index += 1) {
+      const data = encoded.slice(index * chunkChars, (index + 1) * chunkChars);
+      console.log(`ATLAS_VISUAL_FAILURE_PNG ${JSON.stringify({ path: relative, sha256, chunk: index + 1, chunks, data })}`);
+    }
+  }
+}
+
 export default class AtlasSummaryReporter {
   onBegin(config) {
     this.startedAt = new Date().toISOString();
@@ -135,6 +168,7 @@ export default class AtlasSummaryReporter {
     if (result.status !== 'passed') {
       const failure = buildFailureManifest(summary);
       fs.writeFileSync(path.join(artifactsDir, 'failure.json'), `${JSON.stringify(failure, null, 2)}\n`);
+      emitVisualFailureDiagnostics(artifactsDir);
     }
   }
 }
