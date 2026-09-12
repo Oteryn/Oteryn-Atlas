@@ -84,34 +84,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           ATLAS_SHADOW_EVIDENCE_DIR: ${{ runner.temp }}/atlas-shadow-review-evidence
-        run: |
-          mkdir -p "$ATLAS_SHADOW_EVIDENCE_DIR/failure-diagnostics"
-          (
-            while true; do
-              while IFS= read -r -d '' file; do
-                relative="${file#/tmp/}"
-                destination="$ATLAS_SHADOW_EVIDENCE_DIR/failure-diagnostics/$relative"
-                mkdir -p "$(dirname "$destination")"
-                cp "$file" "$destination" 2>/dev/null || true
-              done < <(find /tmp -type f -path '/tmp/atlas-r5-*/artifacts-*/test-results/*' \( -name '*-actual.png' -o -name '*-diff.png' \) -print0 2>/dev/null)
-              sleep 0.2
-            done
-          ) &
-          watcher_pid=$!
-          cleanup_watcher() {
-            kill "$watcher_pid" 2>/dev/null || true
-            wait "$watcher_pid" 2>/dev/null || true
-          }
-          trap cleanup_watcher EXIT
-          set +e
-          node protected/tools/verification/run-verification-shadow.mjs execute "$PWD/candidate"
-          status=$?
-          sleep 1
-          cleanup_watcher
-          trap - EXIT
-          exit "$status"
+        run: node protected/tools/verification/run-verification-shadow.mjs execute "$PWD/candidate"
       - name: Upload protected review evidence
-        if: always() && needs.plan.outputs.requires_review == 'true'
+        if: needs.plan.outputs.requires_review == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: atlas-verification-review-${{ github.run_id }}-${{ github.run_attempt }}
