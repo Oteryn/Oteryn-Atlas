@@ -343,7 +343,33 @@ export function bindProtectedVisualReferenceConsumer({composeArgs,env,protectedR
   return {composeArgs:[...composeArgs,'-f',overlay],env:{...env,ATLAS_REFERENCE_SNAPSHOTS:referenceSnapshots}};
 }
 
-async function runPublicationBrowser(command,{candidate,contract,publication,directory,root,producerJobId,evidenceRoot,oracleDigest,freshSnapshot}) {
+export function retainFailedPlaywrightDiagnostics({artifactRoot,diagnosticsRoot,commandId}={}) {
+  if(typeof artifactRoot!=='string'||!path.isAbsolute(artifactRoot)||typeof diagnosticsRoot!=='string'||!path.isAbsolute(diagnosticsRoot)
+    ||typeof commandId!=='string'||!/^sha256:[a-f0-9]{64}$/.test(commandId)) fail('failure diagnostics destination');
+  const source=path.join(artifactRoot,'test-results');
+  if(!fs.existsSync(source)) return [];
+  const retained=[];
+  const walk=(directory,prefix='')=>{
+    for(const name of fs.readdirSync(directory)) {
+      const absolute=path.join(directory,name),relative=path.join(prefix,name),stat=fs.lstatSync(absolute);
+      if(stat.isSymbolicLink()) continue;
+      if(stat.isDirectory()) {walk(absolute,relative);continue;}
+      if(!stat.isFile()||(!name.endsWith('-actual.png')&&!name.endsWith('-diff.png'))) continue;
+      retained.push({absolute,relative});
+    }
+  };
+  walk(source);
+  if(!retained.length) return [];
+  const destination=path.join(diagnosticsRoot,commandId.slice('sha256:'.length));
+  for(const file of retained) {
+    const output=path.join(destination,file.relative);
+    fs.mkdirSync(path.dirname(output),{recursive:true});
+    fs.copyFileSync(file.absolute,output,fs.constants.COPYFILE_EXCL);
+  }
+  return retained.map(file=>path.relative(source,file.absolute));
+}
+
+async function runPublicationBrowser(command,{candidate,contract,publication,directory,root,producerJobId,evidenceRoot,diagnosticsRoot,oracleDigest,freshSnapshot}) {
   const suffix=command.id.slice('sha256:'.length,'sha256:'.length+12);
   const context=path.join(directory,`browser-context-${suffix}`);fs.mkdirSync(context);
   for(const relative of ['web','src']) fs.cpSync(path.join(root,relative),path.join(context,relative),{recursive:true});
@@ -397,7 +423,14 @@ async function runPublicationBrowser(command,{candidate,contract,publication,dir
       }
     }
     const result=spawnSync('docker',fixtureBrowserArgs(args),{env,encoding:'utf8',timeout:command.timeoutSeconds*1000,maxBuffer:16*1024*1024});
-    if(result.error||result.status!==0||result.signal) {console.error(JSON.stringify({phase:'browser-execution',dataCapability:command.dataCapability,exitCode:result.status,signal:result.signal,error:result.error?.message??null,stdout:String(result.stdout??'').slice(-12288),stderr:String(result.stderr??'').slice(-4096)}));fail('protected browser execution failed');}
+    if(result.error||result.status!==0||result.signal) {
+      console.error(JSON.stringify({phase:'browser-execution',dataCapability:command.dataCapability,exitCode:result.status,signal:result.signal,error:result.error?.message??null,stdout:String(result.stdout??'').slice(-12288),stderr:String(result.stderr??'').slice(-4096)}));
+      if(reviewFrames.length) {
+        try {retainFailedPlaywrightDiagnostics({artifactRoot:artifacts,diagnosticsRoot,commandId:command.id});}
+        catch(error) {console.error(JSON.stringify({phase:'browser-failure-diagnostics',error:error?.message??String(error)}));}
+      }
+      fail('protected browser execution failed');
+    }
     const report=readJson(path.join(artifacts,'results.json'));
     const observed=[];
     const walk=suites=>{for(const suite of suites??[]){for(const spec of suite.specs??[]){for(const test of spec.tests??[]){if(test.status!=='expected'||test.results?.length!==1||test.results[0].status!=='passed'||test.results[0].retry!==0)fail('fixture nonpass/retry');observed.push(`${test.projectName}::e2e/tests/${spec.file.replace(/^.*\/tests\//,'')}::${spec.title}`);}}walk(suite.suites);}};
@@ -486,7 +519,7 @@ export async function runShadow(mode,root) {
       if(bytesDigest(fs.readFileSync(protectedHarnessFile))!==R5_SEMANTIC_BUILDER_ORACLE_DIGEST) fail('protected semantic harness materialization');
     }
     const requiresVisualReference=contract.commands.some(requiresProtectedVisualReference);
-    let producerJobId=null,evidenceRoot=null;
+    let producerJobId=null,evidenceRoot=null,diagnosticsRoot=null;
     if(requiresReview||requiresVisualReference) producerJobId=await currentShadowJobId(currentRunId,'execute');
     if(requiresReview) {
       const requested=process.env.ATLAS_SHADOW_EVIDENCE_DIR;
@@ -494,6 +527,12 @@ export async function runShadow(mode,root) {
       evidenceRoot=path.resolve(requested);
       if(fs.existsSync(evidenceRoot)&&fs.readdirSync(evidenceRoot).length)fail('review evidence directory must be fresh');
       fs.mkdirSync(evidenceRoot,{recursive:true});
+      const requestedDiagnostics=process.env.ATLAS_SHADOW_FAILURE_DIAGNOSTICS_DIR;
+      if(typeof requestedDiagnostics!=='string'||!path.isAbsolute(requestedDiagnostics))fail('failure diagnostics directory required');
+      diagnosticsRoot=path.resolve(requestedDiagnostics);
+      if(diagnosticsRoot===evidenceRoot||diagnosticsRoot.startsWith(evidenceRoot+path.sep)||evidenceRoot.startsWith(diagnosticsRoot+path.sep)
+        ||diagnosticsRoot===directory||diagnosticsRoot.startsWith(directory+path.sep)||directory.startsWith(diagnosticsRoot+path.sep)) fail('failure diagnostics directory isolation');
+      if(fs.existsSync(diagnosticsRoot)) fail('failure diagnostics directory must be fresh');
     }
     for(const command of contract.commands) {
       if(command.engine==='deterministic') {verifyExecutionView({viewRoot:executionRoot,sourceRoot:root,revision:candidate.headSha});summary.results.push(executeDeterministic(command,executionRoot,config.container.image,path.join(controlRoot,'e2e/node_modules'),shimRoot,protectedHarnessFile,protectedInputFile));}
@@ -505,7 +544,7 @@ export async function runShadow(mode,root) {
       } else if(command.engine==='playwright') {
         const product=command.dataCapability==='qualification_fixture'?fixture:command.dataCapability==='bounded_real_world'?bounded:null;
         if(!product)fail(`missing ${command.dataCapability} browser publication`);
-        summary.results.push(await runPublicationBrowser(command,{candidate,contract,publication:{...product,root:command.dataCapability==='qualification_fixture'?path.join(directory,'fixture'):path.join(directory,'bounded'),trustDescriptor:command.dataCapability==='qualification_fixture'?qualificationTrustDescriptor(product.manifest):boundedRealTrustDescriptor(product.manifest)},directory,root,producerJobId,evidenceRoot,oracleDigest,freshSnapshot}));
+        summary.results.push(await runPublicationBrowser(command,{candidate,contract,publication:{...product,root:command.dataCapability==='qualification_fixture'?path.join(directory,'fixture'):path.join(directory,'bounded'),trustDescriptor:command.dataCapability==='qualification_fixture'?qualificationTrustDescriptor(product.manifest):boundedRealTrustDescriptor(product.manifest)},directory,root,producerJobId,evidenceRoot,diagnosticsRoot,oracleDigest,freshSnapshot}));
       } else fail('unsupported command');
     }
     if(requiresReview)assertShadowReviewCaptureCensus(contract,summary.results);
