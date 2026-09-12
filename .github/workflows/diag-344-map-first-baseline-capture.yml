@@ -1,0 +1,108 @@
+name: Diagnostic #344 map-first baseline capture
+on:
+  push:
+    branches:
+      - diag/344-map-first-baseline-capture-20260912
+permissions: {}
+jobs:
+  capture:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      pull-requests: read
+      actions: read
+    steps:
+      - name: Checkout exact protected main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: deaaa0ef6052940a722bb07608b25a84b536fc34
+          path: protected
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Checkout exact #344 candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: 60f7616e8d03208433ccac19c8c9ac73d1907b44
+          path: candidate
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Install protected runtime dependencies
+        working-directory: protected/e2e
+        run: npm ci --ignore-scripts
+      - name: Prepare read-only diagnostic wrapper
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/atlas-diag-tmp" "$RUNNER_TEMP/atlas-diag-output"
+          cat > "$RUNNER_TEMP/atlas-diag-event.json" <<'JSON'
+          {"repository":{"full_name":"Oteryn/Oteryn-Atlas","default_branch":"main"},"action":"synchronize","pull_request":{"number":344,"base":{"ref":"main","sha":"deaaa0ef6052940a722bb07608b25a84b536fc34","repo":{"full_name":"Oteryn/Oteryn-Atlas"}},"head":{"sha":"60f7616e8d03208433ccac19c8c9ac73d1907b44","repo":{"full_name":"Oteryn/Oteryn-Atlas"}}}}
+          JSON
+          cat > "$RUNNER_TEMP/atlas-diag-preload.cjs" <<'NODE'
+          const fs = require('node:fs');
+          const path = require('node:path');
+          const original = fs.rmSync;
+          const root = path.resolve(process.env.ATLAS_DIAGNOSTIC_TMP_ROOT || '');
+          fs.rmSync = function(target, options) {
+            const resolved = path.resolve(String(target));
+            const primary = root && resolved.startsWith(`${root}${path.sep}`)
+              && path.basename(resolved).startsWith('atlas-r5-')
+              && fs.existsSync(path.join(resolved, 'python-bin'));
+            if (primary && options?.recursive === true && options?.force === true) {
+              console.error(`ATLAS_DIAGNOSTIC_KEEP ${resolved}`);
+              return;
+            }
+            return original.apply(this, arguments);
+          };
+          NODE
+      - name: Execute exact protected contract and preserve failed PNGs
+        id: execute
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ATLAS_DIAGNOSTIC_TMP_ROOT: ${{ runner.temp }}/atlas-diag-tmp
+          ATLAS_SHADOW_EVIDENCE_DIR: ${{ runner.temp }}/atlas-shadow-review-evidence
+        run: |
+          set +e
+          env \
+            TMPDIR="$ATLAS_DIAGNOSTIC_TMP_ROOT" \
+            GITHUB_EVENT_NAME=pull_request_target \
+            GITHUB_EVENT_PATH="$RUNNER_TEMP/atlas-diag-event.json" \
+            GITHUB_SHA=deaaa0ef6052940a722bb07608b25a84b536fc34 \
+            GITHUB_REF=refs/heads/main \
+            node --require "$RUNNER_TEMP/atlas-diag-preload.cjs" protected/tools/verification/run-verification-shadow.mjs execute "$PWD/candidate"
+          status=$?
+          set -e
+          echo "executor_status=$status" >> "$GITHUB_OUTPUT"
+          if [ "$status" -eq 0 ]; then
+            echo 'Exact protected executor unexpectedly passed; no failed visual capture to preserve.' >&2
+            exit 1
+          fi
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib, os, shutil
+          root = Path(os.environ['ATLAS_DIAGNOSTIC_TMP_ROOT'])
+          out = Path(os.environ['RUNNER_TEMP']) / 'atlas-diag-output'
+          wanted = []
+          for path in root.rglob('*'):
+              if not path.is_file():
+                  continue
+              name = path.name
+              if name.endswith('-actual.png') or name.endswith('-diff.png') or name.startswith('test-failed-') and name.endswith('.png') or name in {'error-context.md', 'failure.json'}:
+                  wanted.append(path)
+          if not wanted:
+              raise SystemExit('no failed visual diagnostic files found')
+          for source in sorted(wanted):
+              rel = source.relative_to(root)
+              target = out / rel
+              target.parent.mkdir(parents=True, exist_ok=True)
+              shutil.copy2(source, target)
+              digest = hashlib.sha256(target.read_bytes()).hexdigest()
+              print(f'{rel}\tsha256:{digest}\t{target.stat().st_size}')
+          PY
+      - name: Upload exact failed visual diagnostics
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: diag-344-map-first-baseline-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/atlas-diag-output
+          if-no-files-found: error
+          retention-days: 3
