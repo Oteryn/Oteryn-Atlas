@@ -64,6 +64,8 @@ export function createSearchView({ form, input, id, describe, onQuery, onChoose,
     host.hidden = true;
     input.setAttribute('aria-expanded', 'false');
     input.removeAttribute('aria-busy');
+    records = [];
+    list.replaceChildren();
     setActive(-1);
     if (wasOpen) onClose();
   }
@@ -136,16 +138,18 @@ export function createSearchView({ form, input, id, describe, onQuery, onChoose,
   form.addEventListener('submit', event => {
     if (composing) { event.preventDefault(); event.stopImmediatePropagation(); }
   }, true);
+  form.addEventListener('keydown', event => {
+    if (event.key !== 'Escape' || host.hidden || composing || event.isComposing) return;
+    event.preventDefault();
+    event.stopPropagation(); // First Escape dismisses results, not the containing drawer/panels.
+    close();
+  });
   input.addEventListener('keydown', event => {
     if (composing || event.isComposing || event.altKey || event.ctrlKey || event.metaKey) return;
     if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) { setActive(-1); return; }
-    if (event.key === 'Escape' && !host.hidden) {
-      event.preventDefault();
-      event.stopPropagation(); // First Escape dismisses results, not the containing drawer.
-      close();
-    } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       if (host.hidden) request();
-      if (!records.length) return;
+      if (host.hidden || !records.length) return;
       event.preventDefault();
       const next = event.key === 'ArrowDown'
         ? Math.min(active + 1, records.length - 1)
@@ -168,6 +172,23 @@ export function createSearchView({ form, input, id, describe, onQuery, onChoose,
     refresh() { if (!host.hidden && !form.closest('[inert]')) request(); },
   };
 }
+
+
+// Responsive view bridge: both search inputs represent one query. On a breakpoint
+// crossing, copy from the input that was visible before the crossing. Fatal
+// Inspector details are re-exposed through the existing presentation event.
+const responsiveQuery = matchMedia('(max-width: 980px)');
+function syncResponsiveQuery(mobile) {
+  const source = document.querySelector(mobile ? '#search-input' : '#mobile-search-input');
+  const target = document.querySelector(mobile ? '#mobile-search-input' : '#search-input');
+  if (source && target) target.value = source.value;
+}
+responsiveQuery.addEventListener('change', () => {
+  syncResponsiveQuery(responsiveQuery.matches);
+  if (!responsiveQuery.matches && document.querySelector('#inspector-content .error-box')) {
+    window.dispatchEvent(new CustomEvent('oteryn-atlas-open-inspector'));
+  }
+});
 
 /** The same identity hierarchy as a search result, with provenance disclosed on demand. */
 export function renderEntitySummary({ host, record, type, position, source }) {
