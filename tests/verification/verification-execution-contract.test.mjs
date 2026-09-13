@@ -264,7 +264,7 @@ test('candidate execution metadata cannot replace protected interpreter or hashe
  assert(!JSON.stringify(contract).includes('candidate-policy'));
 });
 
-import {authenticateR5SemanticSource,buildR5SemanticPublication,resolveShadowEvent,planShadow,deterministicDockerArgs,fixtureBrowserArgs,requiresProtectedVisualReference,bindProtectedVisualReferenceConsumer,prepareProtectedBrowserHarness,prepareProtectedBrowserCaptureHarness,writeProtectedBrowserContainment} from '../../tools/verification/run-verification-shadow.mjs';
+import {authenticateR5SemanticSource,buildR5SemanticPublication,resolveShadowEvent,planShadow,deterministicDockerArgs,fixtureBrowserArgs,machineFixtureBrowserArgs,requiresProtectedVisualReference,bindProtectedVisualReferenceConsumer,prepareProtectedBrowserHarness,prepareProtectedBrowserCaptureHarness,writeProtectedBrowserContainment,writeCandidateArtifactContainment,assertCandidateArtifactComposeConfig,emitPlaywrightFailureDiagnostics,collectVolumePlaywrightDiagnostics,resolveProtectedComposeServiceImage,reviewArtifactVolumeArgs,relayPlaywrightFailureDiagnostics,PLAYWRIGHT_DIAGNOSTIC_PREFIX,PLAYWRIGHT_DIAGNOSTIC_LIMITS,PLAYWRIGHT_DIAGNOSTIC_LOG_LINE_BYTES} from '../../tools/verification/run-verification-shadow.mjs';
 import {assertShadowExecutorCoverage,assertShadowReviewCaptureCensus,normalizeShadowReviewChangedFiles,shadowReviewPlanDigest} from '../../tools/verification/verification-shadow-review.mjs';
 test('shadow materializes candidate browser tests, support and snapshots while protected executor control stays protected',t=>{
  const {scratch,candidateRoot}=copyCandidateBrowserPayload(t);
@@ -306,6 +306,8 @@ test('hosted browser machine and protected visual capture use isolated producers
  assert.match(source,/ATLAS_USER_VISUAL_EVIDENCE:'1'/);
  assert.match(source,/persistShadowReviewCapture\(\{artifactRoot:captureArtifacts/);
  assert.doesNotMatch(source,/persistShadowReviewCapture\(\{artifactRoot:artifacts/);
+ assert.match(source,/if\(reviewBearing&&result\.status!==0&&!result\.signal\)[^]*collectVolumePlaywrightDiagnostics/);
+ assert.doesNotMatch(source,/relayPlaywrightFailureDiagnostics\(result\.stderr/);
 });
 
 test('protected visual capture overlays only authenticated candidate PNG snapshot oracle data',async t=>{
@@ -581,6 +583,117 @@ test('R5 protected harness executes only the candidate builder and enforces exac
 });
 
 import {assertDeterministicContainer} from '../../tools/verification/run-verification-shadow.mjs';
+const diagnosticRows=output=>output.trim().split('\n').filter(Boolean).map(line=>{assert.ok(line.startsWith(`${PLAYWRIGHT_DIAGNOSTIC_PREFIX} `));return JSON.parse(line.slice(PLAYWRIGHT_DIAGNOSTIC_PREFIX.length+1));});
+test('failed Playwright diagnostics are filtered, ordered, lossless and bounded',t=>{
+ const temporary=fs.mkdtempSync(path.join(os.tmpdir(),'atlas-diagnostic-test-'));t.after(()=>fs.rmSync(temporary,{recursive:true,force:true}));
+ const root=path.join(temporary,'test-results');fs.mkdirSync(path.join(root,'z'),{recursive:true});fs.mkdirSync(path.join(root,'a'));
+ const first=Buffer.alloc(PLAYWRIGHT_DIAGNOSTIC_LIMITS.maxChunkBytes,0xff),second=Buffer.from('second image');
+ fs.writeFileSync(path.join(root,'z/frame-diff.png'),second);fs.writeFileSync(path.join(root,'a/frame-actual.png'),first);
+ fs.writeFileSync(path.join(root,'a/frame-actual.png.txt'),'not eligible');fs.writeFileSync(path.join(root,'a/other.png'),'not eligible');
+ fs.symlinkSync(path.join(root,'z/frame-diff.png'),path.join(root,'a/link-diff.png'));
+ fs.writeFileSync(path.join(root,'unsafe\\-actual.png'),'unsafe path');
+ const commandId='sha256:'+'a'.repeat(64),output=emitPlaywrightFailureDiagnostics({commandId,testResultsRoot:root,write:()=>{}}),rows=diagnosticRows(output);
+ assert.ok(output.trimEnd().split('\n').every(line=>Buffer.byteLength(line)<64*1024&&Buffer.byteLength(line)<PLAYWRIGHT_DIAGNOSTIC_LOG_LINE_BYTES));
+ const headers=rows.filter(row=>row.type==='file');assert.deepEqual(headers.map(row=>row.path),['a/frame-actual.png','z/frame-diff.png']);
+ for(const [header,expected] of headers.map((row,index)=>[row,index?second:first])) {
+  const chunks=rows.filter(row=>row.type==='chunk'&&row.path===header.path).sort((a,b)=>a.index-b.index);
+  const reconstructed=Buffer.from(chunks.map(row=>row.data).join(''),'base64');assert.deepEqual(reconstructed,expected);
+  assert.equal(header.byteLength,expected.length);assert.equal(header.sha256,createHash('sha256').update(expected).digest('hex'));assert.equal(header.encoding,'base64');assert.equal(header.chunkCount,chunks.length);
+  assert.ok(chunks.every(row=>Buffer.from(row.data,'base64').length<=PLAYWRIGHT_DIAGNOSTIC_LIMITS.maxChunkBytes));
+  assert.equal(rows.find(row=>row.type==='end'&&row.path===header.path).complete,true);
+ }
+ assert.ok(rows.some(row=>row.type==='omission'&&row.reason==='unsafe-path'));assert.equal(rows.at(-1).type,'complete');assert.equal(rows.at(-1).complete,true);
+ const longestPath=`${'p'.repeat(1022)}/x`,maxChunk=Buffer.alloc(PLAYWRIGHT_DIAGNOSTIC_LIMITS.maxChunkBytes).toString('base64');
+ const longestChunkRecord=`${PLAYWRIGHT_DIAGNOSTIC_PREFIX} ${JSON.stringify({schema:'oteryn.atlas.playwright-diagnostic',version:1,type:'chunk',commandId,path:longestPath,index:Number.MAX_SAFE_INTEGER,chunkCount:Number.MAX_SAFE_INTEGER,data:maxChunk})}\n`;
+ assert.ok(Buffer.byteLength(longestChunkRecord)<=PLAYWRIGHT_DIAGNOSTIC_LOG_LINE_BYTES);assert.ok(PLAYWRIGHT_DIAGNOSTIC_LOG_LINE_BYTES<=64*1024-1024);
+ const relayed=[];assert.equal(relayPlaywrightFailureDiagnostics(`unrelated stderr\n${output}`,commandId,value=>relayed.push(value)),rows.length);assert.equal(relayed.join(''),output);
+ assert.throws(()=>emitPlaywrightFailureDiagnostics({commandId:'unsafe',testResultsRoot:root,write:()=>{}}),/unsafe diagnostic input/);
+ assert.throws(()=>emitPlaywrightFailureDiagnostics({commandId,testResultsRoot:'relative',write:()=>{}}),/unsafe diagnostic input/);
+ const empty=path.join(temporary,'empty');fs.mkdirSync(empty);const emptyRows=diagnosticRows(emitPlaywrightFailureDiagnostics({commandId,testResultsRoot:empty,write:()=>{}}));
+ assert.deepEqual(emptyRows.map(row=>row.type),['complete']);assert.equal(emptyRows[0].fileCount,0);
+ const depthLimited=diagnosticRows(emitPlaywrightFailureDiagnostics({commandId,testResultsRoot:root,write:()=>{},limits:{...PLAYWRIGHT_DIAGNOSTIC_LIMITS,maxDepth:0}}));
+ assert.ok(depthLimited.some(row=>row.type==='omission'&&row.reason==='max-depth'));
+ const entryLimited=diagnosticRows(emitPlaywrightFailureDiagnostics({commandId,testResultsRoot:root,write:()=>{},limits:{...PLAYWRIGHT_DIAGNOSTIC_LIMITS,maxEntries:1}}));
+ assert.ok(entryLimited.some(row=>row.type==='omission'&&row.reason==='max-entries'));
+ const nestedEntryRoot=path.join(temporary,'nested-entry-limit');fs.mkdirSync(path.join(nestedEntryRoot,'a'),{recursive:true});fs.writeFileSync(path.join(nestedEntryRoot,'a/child.txt'),'entry');fs.writeFileSync(path.join(nestedEntryRoot,'b-actual.png'),'must not be read');
+ const nestedEntryLimited=diagnosticRows(emitPlaywrightFailureDiagnostics({commandId,testResultsRoot:nestedEntryRoot,write:()=>{},limits:{...PLAYWRIGHT_DIAGNOSTIC_LIMITS,maxEntries:2}}));
+ assert.equal(nestedEntryLimited.some(row=>row.type==='file'&&row.path==='b-actual.png'),false);assert.ok(nestedEntryLimited.some(row=>row.type==='omission'&&row.reason==='max-entries'));
+ const boundsRoot=path.join(temporary,'bounds');fs.mkdirSync(boundsRoot);fs.writeFileSync(path.join(boundsRoot,'a-actual.png'),'12');fs.writeFileSync(path.join(boundsRoot,'b-diff.png'),'34');
+ for(const [override,reason] of [[{maxFiles:1},'max-files'],[{maxFileBytes:1},'max-file-bytes'],[{maxTotalRawBytes:3},'max-total-raw-bytes']]) {
+  const bounded=diagnosticRows(emitPlaywrightFailureDiagnostics({commandId,testResultsRoot:boundsRoot,write:()=>{},limits:{...PLAYWRIGHT_DIAGNOSTIC_LIMITS,...override}}));assert.ok(bounded.some(row=>row.type==='omission'&&row.reason===reason),reason);
+ }
+ assert.throws(()=>emitPlaywrightFailureDiagnostics({commandId,testResultsRoot:boundsRoot,write:()=>{},limits:{...PLAYWRIGHT_DIAGNOSTIC_LIMITS,maxOutputBytes:1}}),/output bound/);
+ const sparseRoot=path.join(temporary,'sparse');fs.mkdirSync(sparseRoot);const sparse=path.join(sparseRoot,'huge-actual.png');fs.closeSync(fs.openSync(sparse,'w'));fs.truncateSync(sparse,PLAYWRIGHT_DIAGNOSTIC_LIMITS.maxFileBytes+1);
+ const originalRead=fs.readFileSync;let descriptorReads=0;fs.readFileSync=function(file,...args){if(typeof file==='number')descriptorReads++;return originalRead.call(this,file,...args);};
+ try {const oversized=diagnosticRows(emitPlaywrightFailureDiagnostics({commandId,testResultsRoot:sparseRoot,write:()=>{}}));assert.equal(descriptorReads,0);assert.ok(oversized.some(row=>row.type==='omission'&&row.reason==='max-file-bytes'));} finally {fs.readFileSync=originalRead;}
+ const aggregateRoot=path.join(temporary,'aggregate');fs.mkdirSync(aggregateRoot);fs.writeFileSync(path.join(aggregateRoot,'a-actual.png'),'123');fs.writeFileSync(path.join(aggregateRoot,'b-diff.png'),'456');descriptorReads=0;fs.readFileSync=function(file,...args){if(typeof file==='number')descriptorReads++;return originalRead.call(this,file,...args);};
+ try {const aggregate=diagnosticRows(emitPlaywrightFailureDiagnostics({commandId,testResultsRoot:aggregateRoot,write:()=>{},limits:{...PLAYWRIGHT_DIAGNOSTIC_LIMITS,maxTotalRawBytes:3}}));assert.equal(descriptorReads,1);assert.ok(aggregate.some(row=>row.type==='omission'&&row.reason==='max-total-raw-bytes'));} finally {fs.readFileSync=originalRead;}
+});
+
+test('diagnostic relay accepts only a complete internally consistent expected-command frame',t=>{
+ const temporary=fs.mkdtempSync(path.join(os.tmpdir(),'atlas-diagnostic-relay-'));t.after(()=>fs.rmSync(temporary,{recursive:true,force:true}));
+ const resultRoot=path.join(temporary,'test-results');fs.mkdirSync(resultRoot);fs.writeFileSync(path.join(resultRoot,'frame-actual.png'),'protected bytes');
+ const id='sha256:'+'b'.repeat(64),valid=emitPlaywrightFailureDiagnostics({commandId:id,testResultsRoot:resultRoot,write:()=>{}}),lines=valid.trimEnd().split('\n');
+ const relay=value=>{const output=[];return [relayPlaywrightFailureDiagnostics(value,id,row=>output.push(row)),output.join('')];};
+ assert.deepEqual(relay(valid),[lines.length,valid]);assert.equal(relayPlaywrightFailureDiagnostics(valid,id,()=>{throw new Error('relay failed');}),0);
+ const mutations=[
+  lines.slice(0,-1),
+  lines.map((line,index)=>index===1?line.replace('"index":0','"index":1'):line),
+  lines.map((line,index)=>index===1?line.replace(/"data":"[^"]+"/,'"data":"***="'):line),
+  lines.map((line,index)=>index===2?line.replace(/[a-f0-9]{64}/,'0'.repeat(64)):line),
+  lines.map(line=>line.replace(id,'sha256:'+'c'.repeat(64))),
+  [lines[0],lines[2],lines[1],...lines.slice(3)],
+ ];
+ for(const malformed of mutations)assert.deepEqual(relay(malformed.join('\n')+'\n'),[0,'']);
+ assert.deepEqual(relay(`${PLAYWRIGHT_DIAGNOSTIC_PREFIX} not-json\n${valid}`),[0,'']);
+});
+
+test('diagnostic file reads fail closed when the discovered identity is race-swapped',t=>{
+ const temporary=fs.mkdtempSync(path.join(os.tmpdir(),'atlas-diagnostic-race-'));t.after(()=>fs.rmSync(temporary,{recursive:true,force:true}));
+ const resultRoot=path.join(temporary,'test-results');fs.mkdirSync(resultRoot);const image=path.join(resultRoot,'frame-actual.png'),outside=path.join(temporary,'outside');
+ fs.writeFileSync(outside,'secret!');const originalOpen=fs.openSync;
+ for(const replacement of ['symlink','regular','fifo']) {
+  fs.rmSync(image,{force:true});fs.rmSync(image+'.discovered',{force:true});fs.writeFileSync(image,'inside!');let swapped=false;
+  fs.openSync=function(file,...args){if(String(file).endsWith('/frame-actual.png')&&!swapped){swapped=true;fs.renameSync(image,image+'.discovered');if(replacement==='symlink')fs.symlinkSync(outside,image);else if(replacement==='fifo')spawnSync('mkfifo',[image]);else fs.writeFileSync(image,'secret!');}return originalOpen.call(this,file,...args);};
+  try {const rows=diagnosticRows(emitPlaywrightFailureDiagnostics({commandId:'sha256:'+'d'.repeat(64),testResultsRoot:resultRoot,write:()=>{}}));assert.equal(rows.some(row=>row.type==='file'),false,replacement);assert.ok(rows.some(row=>row.type==='omission'&&row.reason==='file-changed'),replacement);} finally {fs.openSync=originalOpen;}
+ }
+ const nested=path.join(resultRoot,'nested'),external=path.join(temporary,'external');fs.mkdirSync(nested);fs.mkdirSync(external);fs.writeFileSync(path.join(external,'forged-diff.png'),'secret!');let directorySwapped=false;
+ fs.openSync=function(file,...args){if(String(file).endsWith('/nested')&&!directorySwapped){directorySwapped=true;fs.renameSync(nested,nested+'.discovered');fs.symlinkSync(external,nested);}return originalOpen.call(this,file,...args);};
+ try {const rows=diagnosticRows(emitPlaywrightFailureDiagnostics({commandId:'sha256:'+'d'.repeat(64),testResultsRoot:resultRoot,write:()=>{}}));assert.equal(rows.some(row=>row.path==='nested/forged-diff.png'),false);assert.ok(rows.some(row=>row.type==='omission'&&row.reason==='directory-changed'));} finally {fs.openSync=originalOpen;}
+});
+
+test('review-bearing browser keeps qualified containment and uses an isolated bounded tmpfs volume collector',t=>{
+ const temporary=fs.mkdtempSync(path.join(os.tmpdir(),'atlas-volume-diagnostic-'));t.after(()=>fs.rmSync(temporary,{recursive:true,force:true}));
+ const id='sha256:'+'b'.repeat(64),compose=['compose'];
+ const candidateArgs=machineFixtureBrowserArgs(compose,{uid:1000,gid:1000});
+ for(const flag of ['--rm','--user'])assert.ok(candidateArgs.includes(flag));assert.equal(candidateArgs[candidateArgs.indexOf('--user')+1],'1000:1000');assert.equal(candidateArgs.includes('--cap-add'),false);
+ const volumeName='atlas-playwright-artifacts-1234-abcd',anchorName='atlas-playwright-anchor-1234-abcd',collectorName='atlas-playwright-collector-1234-abcd',image='sha256:'+'c'.repeat(64);
+ const volume=reviewArtifactVolumeArgs({volumeName,anchorName,image,uid:1000,gid:1000});
+ assert.deepEqual(volume.create.slice(0,6),['volume','create','--driver','local','--opt','type=tmpfs']);assert.ok(volume.create.includes('o=size=67108864,uid=1000,gid=1000,mode=0700,nodev,nosuid'));
+ for(const flag of ['--network=none','--read-only','--cap-drop=ALL','--security-opt=no-new-privileges'])assert.ok(volume.anchor.includes(flag));assert.equal(volume.anchor[volume.anchor.indexOf('--user')+1],'1000:1000');
+ const overlay=writeCandidateArtifactContainment(path.join(temporary,'volume.yml'),{volumeName});assert.match(fs.readFileSync(overlay,'utf8'),/external: true[^]*name: atlas-playwright-artifacts-1234-abcd/);
+ assertCandidateArtifactComposeConfig({services:{e2e:{read_only:true,cap_drop:['ALL'],security_opt:['no-new-privileges:true'],pids_limit:192,mem_limit:1610612736,cpus:2,volumes:[{type:'volume',source:'failure_artifacts',target:'/artifacts'}]}},volumes:{failure_artifacts:{name:volumeName,external:true}}},{volumeName});
+ const frameRoot=path.join(temporary,'test-results');fs.mkdirSync(frameRoot);fs.writeFileSync(path.join(frameRoot,'frame-actual.png'),'restricted image bytes',{mode:0o600});
+ const frame=emitPlaywrightFailureDiagnostics({commandId:id,testResultsRoot:frameRoot,write:()=>{}}),calls=[],written=[];
+ const run=(file,args)=>{calls.push([file,args]);return {status:0,signal:null,stderr:frame};};
+ assert.equal(collectVolumePlaywrightDiagnostics({volumeName,collectorName,commandId:id,image,uid:1000,gid:1000,protectedRoot:root,run,write:value=>written.push(value)}),true);
+ const collectorArgs=calls[0][1];for(const flag of ['--network=none','--read-only','--cap-drop=ALL','--security-opt=no-new-privileges'])assert.ok(collectorArgs.includes(flag));
+ assert.ok(collectorArgs.includes(`type=volume,src=${volumeName},dst=/artifacts,readonly`));assert.ok(collectorArgs.includes(`type=bind,src=${root},dst=/atlas-protected,readonly`));assert.equal(written.join(''),frame);assert.equal(calls.some(([,args])=>args[0]==='cp'),false);
+ const failed=[];assert.equal(collectVolumePlaywrightDiagnostics({volumeName,collectorName,commandId:id,image,protectedRoot:root,run:()=>({status:1}),write:value=>failed.push(value)}),false);assert.deepEqual(diagnosticRows(failed.join('')).map(row=>row.type),['error','complete']);
+ const source=fs.readFileSync(path.join(root,'tools/verification/run-verification-shadow.mjs'),'utf8');assert.doesNotMatch(source,/docker'?,?\['cp'|--cap-add|setpriv --reuid|pkill -KILL/);assert.match(source,/finally \{[^]*\['volume','rm','-f',volumeName\]/);
+});
+
+test('protected collector image is resolved from Compose config to an immutable local identity',()=>{
+ const composeArgs=['compose','--project-name','atlas'],image='atlas-e2e:local',identity='sha256:'+'e'.repeat(64),calls=[];
+ const run=(file,args)=>{calls.push([file,args]);return args[0]==='image'?{status:0,signal:null,stdout:`${identity}\n`}:{status:0,signal:null,stdout:`${image}\n`};};
+ assert.equal(resolveProtectedComposeServiceImage({composeArgs,service:'e2e',run}),identity);
+ assert.deepEqual(calls,[['docker',[...composeArgs,'config','--images','e2e']],['docker',['image','inspect','--format','{{.Id}}',image]]]);
+ for(const outputs of [['',identity],[`${image}\nsecond:tag\n`,identity],[image,'atlas-e2e:local'],[image,`${identity}\nsha256:${'f'.repeat(64)}\n`]]) {
+  let index=0;assert.throws(()=>resolveProtectedComposeServiceImage({composeArgs,service:'e2e',run:()=>({status:0,signal:null,stdout:outputs[index++]})}),/protected collector/);
+ }
+ const source=fs.readFileSync(path.join(root,'tools/verification/run-verification-shadow.mjs'),'utf8');assert.doesNotMatch(source,/['"]images['"],['"]-q['"],['"]e2e['"]/);assert.match(source,/['"]config['"],['"]--images['"],service/);
+});
+
 {
 const repository='Oteryn/Oteryn-Atlas',base='a'.repeat(40),head='b'.repeat(40),tree='c'.repeat(40);
 const root=fileURLToPath(new URL('../../',import.meta.url));

@@ -39,6 +39,131 @@ const git=(root,...args)=>execFileSync('git',['--no-replace-objects','-C',root,'
 const gitBlob=(root,revision,name)=>execFileSync('git',['--no-replace-objects','-C',root,'-c','core.hooksPath=/dev/null','show',`${revision}:${name}`],{maxBuffer:2*1024*1024});
 const controlRoot=path.resolve(fileURLToPath(new URL('../../',import.meta.url)));
 
+export const PLAYWRIGHT_DIAGNOSTIC_PREFIX='ATLAS_SHADOW_PLAYWRIGHT_DIAGNOSTIC';
+// Keep every complete prefixed JSON record below GitHub Actions' 64 KiB log-line limit,
+// including the longest accepted path and JSON metadata, with a deterministic 1 KiB margin.
+export const PLAYWRIGHT_DIAGNOSTIC_LOG_LINE_BYTES=63*1024;
+export const PLAYWRIGHT_DIAGNOSTIC_LIMITS=Object.freeze({maxDepth:8,maxEntries:2048,maxFiles:8,maxFileBytes:4*1024*1024,maxTotalRawBytes:8*1024*1024,maxChunkBytes:45*1024,maxOutputBytes:12*1024*1024});
+export const MACHINE_BROWSER_STDERR_BUFFER_BYTES=16*1024*1024;
+const diagnosticSafeCommand=id=>/^sha256:[a-f0-9]{64}$/.test(id??'');
+const diagnosticSafePath=value=>typeof value==='string'&&value.length>0&&value.length<=1024&&value===value.replaceAll('\\','/')&&!path.posix.isAbsolute(value)&&value.split('/').every(part=>part&&part!=='.'&&part!=='..');
+export function resolveProtectedComposeServiceImage({composeArgs,service,env=process.env,run=spawnSync}={}) {
+  if(!Array.isArray(composeArgs)||composeArgs.some(value=>typeof value!=='string')||!/^[-a-z0-9]+$/.test(service??''))throw new TypeError('protected collector image input');
+  const configured=run('docker',[...composeArgs,'config','--images',service],{env,encoding:'utf8',timeout:30000,maxBuffer:1024*1024});
+  const references=String(configured?.stdout??'').split(/\r?\n/).map(value=>value.trim()).filter(Boolean);
+  if(configured?.error||configured?.status!==0||configured?.signal||references.length!==1)throw new TypeError('protected collector service image reference');
+  const inspected=run('docker',['image','inspect','--format','{{.Id}}',references[0]],{env,encoding:'utf8',timeout:30000,maxBuffer:1024*1024});
+  const identities=String(inspected?.stdout??'').split(/\r?\n/).map(value=>value.trim()).filter(Boolean);
+  if(inspected?.error||inspected?.status!==0||inspected?.signal||identities.length!==1||!/^sha256:[a-f0-9]{64}$/.test(identities[0]))throw new TypeError('protected collector image identity');
+  return identities[0];
+}
+export function emitPlaywrightFailureDiagnostics({commandId,testResultsRoot,write=record=>fs.writeSync(2,record),limits=PLAYWRIGHT_DIAGNOSTIC_LIMITS}={}) {
+  if(!diagnosticSafeCommand(commandId)||typeof testResultsRoot!=='string'||!path.isAbsolute(testResultsRoot)) throw new TypeError('unsafe diagnostic input');
+  const rootStat=fs.lstatSync(testResultsRoot);
+  if(rootStat.isSymbolicLink()||!rootStat.isDirectory()) throw new TypeError('unsafe diagnostic root');
+  const records=[],omitted=new Map();let entries=0,totalCollected=0;
+  const record=(type,data={})=>{const line=`${PLAYWRIGHT_DIAGNOSTIC_PREFIX} ${JSON.stringify({schema:'oteryn.atlas.playwright-diagnostic',version:1,type,commandId,...data})}\n`;if(Buffer.byteLength(line)>PLAYWRIGHT_DIAGNOSTIC_LOG_LINE_BYTES)throw new TypeError('diagnostic log line bound');records.push(line);};
+  const omit=(reason,count=1)=>omitted.set(reason,(omitted.get(reason)??0)+count);
+  const files=[];
+  const walk=(directory,relative='',depth=0,expected=rootStat)=>{
+    if(depth>limits.maxDepth){omit('max-depth');return;}
+    let directoryDescriptor,handle;const names=[];
+    try {
+      directoryDescriptor=fs.openSync(directory,fs.constants.O_RDONLY|fs.constants.O_DIRECTORY|fs.constants.O_NOFOLLOW|fs.constants.O_NONBLOCK);
+      const opened=fs.fstatSync(directoryDescriptor);if(!opened.isDirectory()||opened.dev!==expected.dev||opened.ino!==expected.ino)throw new TypeError('directory changed');
+      handle=fs.opendirSync(`/proc/self/fd/${directoryDescriptor}`);
+      for(let entry;(entry=handle.readSync());){if(entries+names.length>=limits.maxEntries){omit('max-entries');return;}names.push(entry.name);}
+      handle.closeSync();handle=null;
+      for(const name of names.sort()) {
+        if(entries>=limits.maxEntries){omit('max-entries');return;}
+        entries++;const next=relative?`${relative}/${name}`:name;
+        if(!diagnosticSafePath(next)){omit('unsafe-path');continue;}
+        const absolute=`/proc/self/fd/${directoryDescriptor}/${name}`;let stat;try{stat=fs.lstatSync(absolute);}catch{omit('file-changed');continue;}
+        if(stat.isSymbolicLink())continue;
+        if(stat.isDirectory()){walk(absolute,next,depth+1,stat);continue;}
+        if(stat.isFile()&&(name.endsWith('-actual.png')||name.endsWith('-diff.png'))) {
+          if(files.length>=limits.maxFiles){omit('max-files');continue;}
+          if(stat.size>limits.maxFileBytes){omit('max-file-bytes');continue;}
+          if(totalCollected+stat.size>limits.maxTotalRawBytes){omit('max-total-raw-bytes');continue;}
+          let descriptor;try {descriptor=fs.openSync(absolute,fs.constants.O_RDONLY|fs.constants.O_NOFOLLOW|fs.constants.O_NONBLOCK);const opened=fs.fstatSync(descriptor);if(!opened.isFile()||opened.dev!==stat.dev||opened.ino!==stat.ino||opened.size!==stat.size)throw new TypeError('file changed');const bytes=fs.readFileSync(descriptor),finished=fs.fstatSync(descriptor);if(bytes.length!==stat.size||finished.dev!==stat.dev||finished.ino!==stat.ino||finished.size!==stat.size)throw new TypeError('file changed');files.push({path:next,bytes});totalCollected+=bytes.length;}catch{omit('file-changed');}finally{if(descriptor!==undefined)try{fs.closeSync(descriptor);}catch{}}
+        }
+      }
+    } catch {omit('directory-changed');} finally {if(handle)try{handle.closeSync();}catch{}if(directoryDescriptor!==undefined)try{fs.closeSync(directoryDescriptor);}catch{}}
+  };
+  walk(testResultsRoot);files.sort((a,b)=>a.path<b.path?-1:a.path>b.path?1:0);
+  let totalRaw=0,emittedFiles=0;
+  for(const file of files) {
+    const bytes=file.bytes;
+    const chunks=[];for(let offset=0;offset<bytes.length;offset+=limits.maxChunkBytes)chunks.push(bytes.subarray(offset,offset+limits.maxChunkBytes).toString('base64'));
+    const digest=createHash('sha256').update(bytes).digest('hex');
+    record('file',{path:file.path,byteLength:bytes.length,sha256:digest,encoding:'base64',chunkCount:chunks.length});
+    chunks.forEach((data,index)=>record('chunk',{path:file.path,index,chunkCount:chunks.length,data}));
+    record('end',{path:file.path,byteLength:bytes.length,sha256:digest,complete:true});totalRaw+=bytes.length;emittedFiles++;
+  }
+  for(const [reason,count] of [...omitted].sort(([a],[b])=>a<b?-1:a>b?1:0))record('omission',{reason,count});
+  record('complete',{fileCount:emittedFiles,totalRawBytes:totalRaw,omissionCount:[...omitted.values()].reduce((sum,count)=>sum+count,0),errorCount:0,complete:true});
+  const output=records.join('');if(Buffer.byteLength(output)>limits.maxOutputBytes)throw new TypeError('diagnostic output bound');write(output);return output;
+}
+
+export function collectVolumePlaywrightDiagnostics({volumeName,collectorName,commandId,image,uid=process.getuid(),gid=process.getgid(),protectedRoot=controlRoot,run=spawnSync,write=record=>fs.writeSync(2,record)}={}) {
+  if(!/^atlas-playwright-artifacts-[a-f0-9-]+$/.test(volumeName??'')||!/^atlas-playwright-collector-[a-f0-9-]+$/.test(collectorName??'')
+    ||!diagnosticSafeCommand(commandId)||!/^sha256:[a-f0-9]{64}$/.test(image??'')||!Number.isSafeInteger(uid)||uid<0||!Number.isSafeInteger(gid)||gid<0
+    ||typeof protectedRoot!=='string'||!path.isAbsolute(protectedRoot))return false;
+  try {
+    const script=`import {emitPlaywrightFailureDiagnostics} from '/atlas-protected/tools/verification/run-verification-shadow.mjs';emitPlaywrightFailureDiagnostics({commandId:${JSON.stringify(commandId)},testResultsRoot:'/artifacts/test-results'});`;
+    const collected=run('docker',['run','--rm','--name',collectorName,'--network=none','--read-only','--user',`${uid}:${gid}`,'--cap-drop=ALL','--security-opt=no-new-privileges',
+      '--pids-limit','64','--memory','268435456','--cpus','1','--tmpfs','/tmp:rw,nodev,nosuid,size=16m',
+      '--mount',`type=volume,src=${volumeName},dst=/artifacts,readonly`,'--mount',`type=bind,src=${protectedRoot},dst=/atlas-protected,readonly`,
+      image,'node','--input-type=module','--eval',script],{encoding:'utf8',timeout:30000,maxBuffer:MACHINE_BROWSER_STDERR_BUFFER_BYTES});
+    if(collected?.error||collected?.status!==0||collected?.signal)throw new TypeError('protected diagnostic collector failed');
+    if(relayPlaywrightFailureDiagnostics(collected.stderr,commandId,write)<1)throw new TypeError('protected diagnostic frame invalid');
+    return true;
+  } catch(error) {
+    const base={schema:'oteryn.atlas.playwright-diagnostic',version:1,commandId};
+    const output=`${PLAYWRIGHT_DIAGNOSTIC_PREFIX} ${JSON.stringify({...base,type:'error',error:String(error?.message??error).slice(0,256)})}\n${PLAYWRIGHT_DIAGNOSTIC_PREFIX} ${JSON.stringify({...base,type:'complete',fileCount:0,totalRawBytes:0,omissionCount:0,errorCount:1,complete:true})}\n`;
+    if(output.split('\n').every(line=>!line||Buffer.byteLength(line)<PLAYWRIGHT_DIAGNOSTIC_LOG_LINE_BYTES))try{write(output);}catch{}
+    return false;
+  }
+}
+
+export function reviewArtifactVolumeArgs({volumeName,anchorName,image,uid=process.getuid(),gid=process.getgid()}={}) {
+  if(!/^atlas-playwright-artifacts-[a-f0-9-]+$/.test(volumeName??'')||!/^atlas-playwright-anchor-[a-f0-9-]+$/.test(anchorName??'')
+    ||!/^sha256:[a-f0-9]{64}$/.test(image??'')||!Number.isSafeInteger(uid)||uid<0||!Number.isSafeInteger(gid)||gid<0)fail('diagnostic volume identity');
+  return {
+    create:['volume','create','--driver','local','--opt','type=tmpfs','--opt','device=tmpfs','--opt',`o=size=${CANDIDATE_ARTIFACT_TMPFS_BYTES},uid=${uid},gid=${gid},mode=0700,nodev,nosuid`,volumeName],
+    anchor:['create','--name',anchorName,'--network=none','--read-only','--user',`${uid}:${gid}`,'--cap-drop=ALL','--security-opt=no-new-privileges','--pids-limit','16','--memory','67108864','--cpus','0.25','--mount',`type=volume,src=${volumeName},dst=/artifacts`,image,'tail','-f','/dev/null'],
+  };
+}
+
+export function relayPlaywrightFailureDiagnostics(stderr,expectedCommandId,write=record=>fs.writeSync(2,record)) {
+  if(!diagnosticSafeCommand(expectedCommandId))return 0;
+  const lines=String(stderr??'').split('\n').filter(line=>line.startsWith(`${PLAYWRIGHT_DIAGNOSTIC_PREFIX} `));
+  let rows;try{rows=lines.map(line=>JSON.parse(line.slice(PLAYWRIGHT_DIAGNOSTIC_PREFIX.length+1)));}catch{return 0;}
+  if(!rows.length||rows.some(row=>!row||row.schema!=='oteryn.atlas.playwright-diagnostic'||row.version!==1||row.commandId!==expectedCommandId))return 0;
+  const files=new Map();let totalRawBytes=0,omissionCount=0,errorCount=0,completeCount=0;
+  const uint=value=>Number.isSafeInteger(value)&&value>=0;
+  for(const row of rows) {
+    if(row.type==='file') {
+      if(!diagnosticSafePath(row.path)||files.has(row.path)||!uint(row.byteLength)||row.byteLength>PLAYWRIGHT_DIAGNOSTIC_LIMITS.maxFileBytes||!/^[a-f0-9]{64}$/.test(row.sha256??'')||row.encoding!=='base64'||!uint(row.chunkCount))return 0;
+      files.set(row.path,{header:row,chunks:[],ended:false});continue;
+    }
+    if(row.type==='chunk') {
+      const file=files.get(row.path);if(!file||file.ended||row.index!==file.chunks.length||row.chunkCount!==file.header.chunkCount||typeof row.data!=='string'||row.data.length%4!==0||!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(row.data))return 0;
+      const bytes=Buffer.from(row.data,'base64');if(bytes.toString('base64')!==row.data||bytes.length>PLAYWRIGHT_DIAGNOSTIC_LIMITS.maxChunkBytes)return 0;file.chunks.push(bytes);continue;
+    }
+    if(row.type==='end') {
+      const file=files.get(row.path);if(!file||file.ended||row.complete!==true||row.byteLength!==file.header.byteLength||row.sha256!==file.header.sha256||file.chunks.length!==file.header.chunkCount)return 0;
+      const bytes=Buffer.concat(file.chunks);if(bytes.length!==row.byteLength||createHash('sha256').update(bytes).digest('hex')!==row.sha256)return 0;file.ended=true;totalRawBytes+=bytes.length;continue;
+    }
+    if(row.type==='omission'){if(typeof row.reason!=='string'||!['max-depth','max-entries','unsafe-path','max-files','max-file-bytes','max-total-raw-bytes','file-changed','directory-changed'].includes(row.reason)||!Number.isSafeInteger(row.count)||row.count<1)return 0;omissionCount+=row.count;continue;}
+    if(row.type==='error'){if(typeof row.error!=='string'||!row.error.length||row.error.length>256)return 0;errorCount++;continue;}
+    if(row.type==='complete'){completeCount++;if(row!==rows.at(-1)||row.complete!==true||row.fileCount!==files.size||row.totalRawBytes!==totalRawBytes||row.omissionCount!==omissionCount||row.errorCount!==errorCount)return 0;continue;}
+    return 0;
+  }
+  if(completeCount!==1||files.size>PLAYWRIGHT_DIAGNOSTIC_LIMITS.maxFiles||totalRawBytes>PLAYWRIGHT_DIAGNOSTIC_LIMITS.maxTotalRawBytes||[...files.values()].some(file=>!file.ended))return 0;
+  const output=lines.map(line=>`${line}\n`).join('');if(Buffer.byteLength(output)>PLAYWRIGHT_DIAGNOSTIC_LIMITS.maxOutputBytes)return 0;try{write(output);}catch{return 0;}return lines.length;
+}
+
 // pull_request_target and merge_group both load protected workflow authority.
 // Candidate content is inert input and never supplies executable control metadata.
 export async function resolveShadowEvent({eventName,event,githubSha,githubRef,request=githubRequest}) {
@@ -495,22 +620,32 @@ export function fixtureBrowserArgs(composeArgs,{uid=process.getuid(),gid=process
 }
 
 const CANDIDATE_ARTIFACT_TMPFS_BYTES=64*1024*1024;
-const MACHINE_BROWSER_COMMAND='exec ./node_modules/.bin/playwright test --config=playwright.config.mjs --test-list=/run/atlas-protected-test-list.txt --shard="${ATLAS_E2E_SHARD:?ATLAS_E2E_SHARD is required}" --workers="${ATLAS_E2E_WORKERS:-1}" --retries=0 --reporter=json';
-export function machineFixtureBrowserArgs(composeArgs,{uid=process.getuid(),gid=process.getgid()}={}) {
+const MACHINE_BROWSER_BASE_COMMAND='./node_modules/.bin/playwright test --config=playwright.config.mjs --test-list=/run/atlas-protected-test-list.txt --shard="${ATLAS_E2E_SHARD:?ATLAS_E2E_SHARD is required}" --workers="${ATLAS_E2E_WORKERS:-1}" --retries=0 --reporter=json';
+const MACHINE_BROWSER_COMMAND=`exec ${MACHINE_BROWSER_BASE_COMMAND}`;
+export function machineFixtureBrowserArgs(composeArgs,{uid=process.getuid(),gid=process.getgid(),reviewBearing=false,commandId=null,containerName=null}={}) {
   if(!Array.isArray(composeArgs)||composeArgs.some(value=>typeof value!=='string')||!Number.isSafeInteger(uid)||uid<0||!Number.isSafeInteger(gid)||gid<0) fail('machine fixture identity');
-  return [...composeArgs,'run','--user',`${uid}:${gid}`,'--rm','--no-deps','e2e','bash','-lc',MACHINE_BROWSER_COMMAND];
+  if(reviewBearing&&(!diagnosticSafeCommand(commandId)||!/^atlas-playwright-[a-f0-9-]+$/.test(containerName??'')))fail('machine diagnostic identity');
+  return [...composeArgs,'run',...(reviewBearing?['--name',containerName]:[]),'--user',`${uid}:${gid}`,...(reviewBearing?[]:['--rm']),'--no-deps','e2e','bash','-lc',MACHINE_BROWSER_COMMAND];
 }
-export function writeCandidateArtifactContainment(file) {
+
+export function writeCandidateArtifactContainment(file,{volumeName=null}={}) {
   if(typeof file!=='string'||!path.isAbsolute(file)||fs.existsSync(file)) fail('candidate artifact containment destination');
-  const source=`services:\n  e2e:\n    volumes:\n      - type: tmpfs\n        target: /artifacts\n        tmpfs:\n          size: ${CANDIDATE_ARTIFACT_TMPFS_BYTES}\n`;
+  if(volumeName!==null&&!/^atlas-playwright-artifacts-[a-f0-9-]+$/.test(volumeName))fail('candidate artifact volume identity');
+  const source=volumeName
+    ?`services:\n  e2e:\n    volumes:\n      - type: volume\n        source: failure_artifacts\n        target: /artifacts\nvolumes:\n  failure_artifacts:\n    external: true\n    name: ${volumeName}\n`
+    :`services:\n  e2e:\n    volumes:\n      - type: tmpfs\n        target: /artifacts\n        tmpfs:\n          size: ${CANDIDATE_ARTIFACT_TMPFS_BYTES}\n`;
   fs.writeFileSync(file,source,{encoding:'utf8',mode:0o444});
   return file;
 }
-export function assertCandidateArtifactComposeConfig(config) {
-  const volumes=config?.services?.e2e?.volumes;
+export function assertCandidateArtifactComposeConfig(config,{volumeName=null}={}) {
+  const service=config?.services?.e2e,volumes=service?.volumes;
   if(!Array.isArray(volumes))fail('candidate artifact compose config');
+  if(service.read_only!==true||canonicalJson(service.cap_drop)!==canonicalJson(['ALL'])||!service.security_opt?.includes('no-new-privileges:true')
+    ||Number(service.pids_limit)!==192||Number(service.mem_limit)!==1610612736||Number(service.cpus)!==2)fail('candidate artifact compose containment');
   const artifact=volumes.filter(row=>row?.target==='/artifacts');
-  if(artifact.length!==1||artifact[0].type!=='tmpfs'||Number(artifact[0].tmpfs?.size)!==CANDIDATE_ARTIFACT_TMPFS_BYTES) fail('candidate artifact mount must be bounded tmpfs');
+  if(artifact.length!==1||(volumeName
+    ?artifact[0].type!=='volume'||artifact[0].source!=='failure_artifacts'||config?.volumes?.failure_artifacts?.name!==volumeName||config.volumes.failure_artifacts.external!==true
+    :artifact[0].type!=='tmpfs'||Number(artifact[0].tmpfs?.size)!==CANDIDATE_ARTIFACT_TMPFS_BYTES)) fail('candidate artifact mount must be bounded tmpfs');
   return true;
 }
 function parseMachineBrowserReport(stdout) {
@@ -603,11 +738,10 @@ async function runPublicationBrowser(command,{candidate,contract,publication,dir
     const wired=bindProtectedVisualReferenceConsumer({composeArgs:args,env,protectedRoot:controlRoot,referenceSnapshots:reference.snapshots});
     args=wired.composeArgs;env=wired.env;
   }
-  const artifactContainment=writeCandidateArtifactContainment(path.join(directory,`candidate-artifacts-${suffix}.yml`));
-  const machineArgs=[...args,'-f',artifactContainment];
-  const composeConfig=spawnSync('docker',[...machineArgs,'config','--format','json'],{env,encoding:'utf8',timeout:30000,maxBuffer:4*1024*1024});
-  if(composeConfig.error||composeConfig.status!==0||composeConfig.signal)fail('candidate artifact compose resolution failed');
-  try {assertCandidateArtifactComposeConfig(JSON.parse(composeConfig.stdout));} catch(error) {if(error?.message?.startsWith('verification shadow:'))throw error;fail('candidate artifact compose JSON');}
+  const reviewBearing=reviewFrames.length>0;
+  const diagnosticId=randomUUID(),volumeName=reviewBearing?`atlas-playwright-artifacts-${diagnosticId}`:null;
+  const anchorName=reviewBearing?`atlas-playwright-anchor-${diagnosticId}`:null,collectorName=reviewBearing?`atlas-playwright-collector-${diagnosticId}`:null;
+  let diagnosticImage=null,diagnosticVolumeReady=false,diagnosticSetupError=null;
   try {
     for(const setup of [['build','e2e'],['up','-d','--wait','--wait-timeout','180','atlas-web']]) {
       const result=spawnSync('docker',[...args,...setup],{env,encoding:'utf8',timeout:300000,maxBuffer:16*1024*1024});
@@ -620,7 +754,31 @@ async function runPublicationBrowser(command,{candidate,contract,publication,dir
         fail('protected browser service setup failed');
       }
     }
-    const result=spawnSync('docker',machineFixtureBrowserArgs(machineArgs),{env,encoding:'utf8',timeout:command.timeoutSeconds*1000,maxBuffer:16*1024*1024});
+    if(reviewBearing)try {
+      diagnosticImage=resolveProtectedComposeServiceImage({composeArgs:args,service:'e2e',env});
+      const volume=reviewArtifactVolumeArgs({volumeName,anchorName,image:diagnosticImage});
+      for(const operation of [volume.create,volume.anchor,['start',anchorName]]) {const setup=spawnSync('docker',operation,{env,encoding:'utf8',timeout:30000,maxBuffer:1024*1024});if(setup.error||setup.status!==0||setup.signal)throw new TypeError('diagnostic volume setup failed');}
+      const inspected=spawnSync('docker',['volume','inspect',volumeName,'--format','{{json .Options}}'],{env,encoding:'utf8',timeout:30000,maxBuffer:1024*1024});
+      const options=JSON.parse(String(inspected.stdout??'').trim());if(inspected.error||inspected.status!==0||inspected.signal||options?.type!=='tmpfs'||options?.device!=='tmpfs'||options?.o!==`size=${CANDIDATE_ARTIFACT_TMPFS_BYTES},uid=${process.getuid()},gid=${process.getgid()},mode=0700,nodev,nosuid`)throw new TypeError('diagnostic volume configuration');
+      diagnosticVolumeReady=true;
+    } catch(error) {diagnosticSetupError=error;}
+    const artifactContainmentPath=path.join(directory,`candidate-artifacts-${suffix}.yml`);
+    const resolveArtifactContainment=selectedVolume=>{
+      fs.rmSync(artifactContainmentPath,{force:true});
+      const overlay=writeCandidateArtifactContainment(artifactContainmentPath,{volumeName:selectedVolume});
+      const selectedArgs=[...args,'-f',overlay];
+      const composeConfig=spawnSync('docker',[...selectedArgs,'config','--format','json'],{env,encoding:'utf8',timeout:30000,maxBuffer:4*1024*1024});
+      if(composeConfig.error||composeConfig.status!==0||composeConfig.signal)throw new TypeError('candidate artifact compose resolution failed');
+      assertCandidateArtifactComposeConfig(JSON.parse(composeConfig.stdout),{volumeName:selectedVolume});return selectedArgs;
+    };
+    let machineArgs;
+    if(diagnosticVolumeReady)try {machineArgs=resolveArtifactContainment(volumeName);} catch(error) {diagnosticSetupError=error;diagnosticVolumeReady=false;}
+    if(!diagnosticVolumeReady)try {machineArgs=resolveArtifactContainment(null);} catch {fail('candidate artifact compose resolution failed');}
+    const result=spawnSync('docker',machineFixtureBrowserArgs(machineArgs),{env,encoding:'utf8',timeout:command.timeoutSeconds*1000,maxBuffer:MACHINE_BROWSER_STDERR_BUFFER_BYTES});
+    if(reviewBearing&&result.status!==0&&!result.signal) {
+      if(diagnosticVolumeReady)collectVolumePlaywrightDiagnostics({volumeName,collectorName,commandId:command.id,image:diagnosticImage});
+      else {const base={schema:'oteryn.atlas.playwright-diagnostic',version:1,commandId:command.id};try{fs.writeSync(2,`${PLAYWRIGHT_DIAGNOSTIC_PREFIX} ${JSON.stringify({...base,type:'error',error:String(diagnosticSetupError?.message??'diagnostic setup failed').slice(0,256)})}\n${PLAYWRIGHT_DIAGNOSTIC_PREFIX} ${JSON.stringify({...base,type:'complete',fileCount:0,totalRawBytes:0,omissionCount:0,errorCount:1,complete:true})}\n`);}catch{}}
+    }
     if(result.error||result.status!==0||result.signal) {console.error(JSON.stringify({phase:'browser-execution',dataCapability:command.dataCapability,exitCode:result.status,signal:result.signal,error:result.error?.message??null,stdout:String(result.stdout??'').slice(-12288),stderr:String(result.stderr??'').slice(-4096)}));fail('protected browser execution failed');}
     const readCensusReport=report=>{
       const observed=[];
@@ -647,6 +805,7 @@ async function runPublicationBrowser(command,{candidate,contract,publication,dir
     }
     return row;
   } finally {
+    if(reviewBearing){for(const operation of [['rm','-f',collectorName],['rm','-f',anchorName],['volume','rm','-f',volumeName]])try{spawnSync('docker',operation,{env,stdio:'ignore',timeout:30000});}catch{}}
     spawnSync('docker',[...args,'down','--volumes','--remove-orphans'],{env,stdio:'ignore'});
     if(revalidateVisualReference) await revalidateVisualReference();
   }
