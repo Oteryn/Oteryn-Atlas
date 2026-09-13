@@ -611,6 +611,8 @@ test('failed Playwright diagnostics are filtered, ordered, lossless and bounded'
   assert.ok(chunks.every(row=>Buffer.from(row.data,'base64').length<=PLAYWRIGHT_DIAGNOSTIC_LIMITS.maxChunkBytes));
   assert.equal(rows.find(row=>row.type==='end'&&row.path===header.path).complete,true);
  }
+ const worstChunkLine=`${PLAYWRIGHT_DIAGNOSTIC_PREFIX} ${JSON.stringify({schema:'oteryn.atlas.playwright-diagnostic',version:1,type:'chunk',commandId,path:'\u0001'.repeat(1024),index:Number.MAX_SAFE_INTEGER,chunkCount:Number.MAX_SAFE_INTEGER,data:Buffer.alloc(PLAYWRIGHT_DIAGNOSTIC_LIMITS.maxChunkBytes).toString('base64')})}\n`;
+ assert.ok(Buffer.byteLength(worstChunkLine)<=PLAYWRIGHT_DIAGNOSTIC_LIMITS.maxLogLineBytes);assert.ok(PLAYWRIGHT_DIAGNOSTIC_LIMITS.maxLogLineBytes<=60*1024);
  assert.ok(rows.some(row=>row.type==='omission'&&row.reason==='unsafe-path'));assert.equal(rows.at(-1).type,'complete');assert.equal(rows.at(-1).complete,true);
  const relayed=[];assert.equal(relayPlaywrightFailureDiagnostics(`unrelated stderr\n${output}`,commandId,value=>relayed.push(value)),rows.length);assert.equal(relayed.join(''),output);
  assert.throws(()=>emitPlaywrightFailureDiagnostics({commandId:'unsafe',testResultsRoot:root,write:()=>{}}),/unsafe diagnostic input/);
