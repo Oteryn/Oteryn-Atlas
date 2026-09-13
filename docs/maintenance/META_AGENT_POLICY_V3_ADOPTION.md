@@ -24,7 +24,7 @@ This is an evidence-reuse/authority-identity effect, not a reactivation of the c
 
 The authenticated Atlas consumer must resolve the exact bound META commit, validate policy identity/version and canonical human surfaces, and fail closed if the binding cannot be authenticated as protected-META ancestry. Root/reusable prompt validation remains provider-owned; binding success does not itself grant merge, production or cross-repository authority.
 
-The fail-closed provider consumer on protected Atlas `main` admits policy `3.1.0` only at the final protected META authority `ce20300aa8a9e1017aff722fe0cd628587fadf63`, while preserving policy `3.0.0` compatibility and rejecting mixed, unknown or malformed coordinates.
+Protected prerequisite PR #489 updated the fail-closed provider consumer on Atlas `main` to admit policy `3.1.0` only at the final protected META authority `ce20300aa8a9e1017aff722fe0cd628587fadf63`, while preserving policy `3.0.0` compatibility and rejecting mixed, unknown or malformed coordinates.
 
 ## Integration
 
