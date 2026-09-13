@@ -309,7 +309,8 @@ export function prepareProtectedBrowserCaptureHarness({protectedRoot,candidateRo
     fs.writeFileSync(output,Buffer.from(encoded,'base64'));
   }
   const protectedSources=protectedHarnessSources(path.join(path.resolve(protectedRoot),'e2e'));
-  const expected=qualificationBindings===null?protectedSources:renderQualificationHarnessBindings({protectedSources,bindings:qualificationBindings});
+  const renderedExpected=qualificationBindings===null?protectedSources:renderQualificationHarnessBindings({protectedSources,bindings:qualificationBindings});
+  const expected={...renderedExpected};
   for(const key of Object.keys(expected)) if(key.split('/').some((_,index,parts)=>SNAPSHOT_DIRECTORY.test(parts.slice(0,index+1).join('/')))) delete expected[key];
   Object.assign(expected,snapshotSources);
   const actual=protectedHarnessSources(target);
