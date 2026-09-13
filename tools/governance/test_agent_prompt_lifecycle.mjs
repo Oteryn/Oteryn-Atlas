@@ -63,6 +63,14 @@ test('Atlas Documentation/Agent IA has one mutable lifecycle authority', () => {
       authority_repository: 'Oteryn/Oteryn',
     },
   );
+  assert.equal(typeof binding.policy_version, 'string', 'binding policy_version must be a string');
+  assert.equal(typeof binding.authority_commit, 'string', 'binding authority_commit must be a string');
+  assert.equal(
+    SUPPORTED_META_BINDINGS.has(binding.policy_version),
+    true,
+    `binding must use a supported META version: ${binding.policy_version}`,
+  );
+  assert.match(binding.authority_commit, /^[0-9a-f]{40}$/u, 'binding authority_commit must be a lowercase full SHA');
   assert.equal(
     binding.authority_commit,
     SUPPORTED_META_BINDINGS.get(binding.policy_version),
