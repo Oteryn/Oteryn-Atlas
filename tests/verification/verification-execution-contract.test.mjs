@@ -264,7 +264,7 @@ test('candidate execution metadata cannot replace protected interpreter or hashe
  assert(!JSON.stringify(contract).includes('candidate-policy'));
 });
 
-import {authenticateR5SemanticSource,buildR5SemanticPublication,resolveShadowEvent,planShadow,deterministicDockerArgs,fixtureBrowserArgs,machineFixtureBrowserArgs,requiresProtectedVisualReference,bindProtectedVisualReferenceConsumer,prepareProtectedBrowserHarness,prepareProtectedBrowserCaptureHarness,writeProtectedBrowserContainment,emitPlaywrightFailureDiagnostics,emitStoppedContainerPlaywrightDiagnostics,relayPlaywrightFailureDiagnostics,PLAYWRIGHT_DIAGNOSTIC_PREFIX,PLAYWRIGHT_DIAGNOSTIC_LIMITS,PLAYWRIGHT_DIAGNOSTIC_LOG_LINE_BYTES} from '../../tools/verification/run-verification-shadow.mjs';
+import {authenticateR5SemanticSource,buildR5SemanticPublication,resolveShadowEvent,planShadow,deterministicDockerArgs,fixtureBrowserArgs,machineFixtureBrowserArgs,requiresProtectedVisualReference,bindProtectedVisualReferenceConsumer,prepareProtectedBrowserHarness,prepareProtectedBrowserCaptureHarness,writeProtectedBrowserContainment,writeCandidateArtifactContainment,assertCandidateArtifactComposeConfig,emitPlaywrightFailureDiagnostics,collectVolumePlaywrightDiagnostics,reviewArtifactVolumeArgs,relayPlaywrightFailureDiagnostics,PLAYWRIGHT_DIAGNOSTIC_PREFIX,PLAYWRIGHT_DIAGNOSTIC_LIMITS,PLAYWRIGHT_DIAGNOSTIC_LOG_LINE_BYTES} from '../../tools/verification/run-verification-shadow.mjs';
 import {assertShadowExecutorCoverage,assertShadowReviewCaptureCensus,normalizeShadowReviewChangedFiles,shadowReviewPlanDigest} from '../../tools/verification/verification-shadow-review.mjs';
 test('shadow materializes candidate browser tests, support and snapshots while protected executor control stays protected',t=>{
  const {scratch,candidateRoot}=copyCandidateBrowserPayload(t);
@@ -306,7 +306,7 @@ test('hosted browser machine and protected visual capture use isolated producers
  assert.match(source,/ATLAS_USER_VISUAL_EVIDENCE:'1'/);
  assert.match(source,/persistShadowReviewCapture\(\{artifactRoot:captureArtifacts/);
  assert.doesNotMatch(source,/persistShadowReviewCapture\(\{artifactRoot:artifacts/);
- assert.match(source,/if\(reviewBearing&&result\.status!==0&&!result\.signal\)emitStoppedContainerPlaywrightDiagnostics/);
+ assert.match(source,/if\(reviewBearing&&result\.status!==0&&!result\.signal\)[^]*collectVolumePlaywrightDiagnostics/);
  assert.doesNotMatch(source,/relayPlaywrightFailureDiagnostics\(result\.stderr/);
 });
 
@@ -659,21 +659,25 @@ test('diagnostic file reads fail closed when the discovered identity is race-swa
  try {const rows=diagnosticRows(emitPlaywrightFailureDiagnostics({commandId:'sha256:'+'d'.repeat(64),testResultsRoot:resultRoot,write:()=>{}}));assert.equal(rows.some(row=>row.path==='nested/forged-diff.png'),false);assert.ok(rows.some(row=>row.type==='omission'&&row.reason==='directory-changed'));} finally {fs.openSync=originalOpen;}
 });
 
-test('review-bearing browser keeps qualified containment and host exports stopped-container diagnostics',t=>{
- const temporary=fs.mkdtempSync(path.join(os.tmpdir(),'atlas-stopped-diagnostic-'));t.after(()=>fs.rmSync(temporary,{recursive:true,force:true}));
- const id='sha256:'+'b'.repeat(64),containerName='atlas-playwright-1234-abcd',compose=['compose'];
- const reviewArgs=machineFixtureBrowserArgs(compose,{uid:1000,gid:1000,reviewBearing:true,commandId:id,containerName});
- assert.equal(reviewArgs.includes('--cap-add'),false);assert.equal(reviewArgs[reviewArgs.indexOf('--user')+1],'1000:1000');assert.equal(reviewArgs.includes('--rm'),false);
- assert.deepEqual(reviewArgs.slice(reviewArgs.indexOf('run')+1,reviewArgs.indexOf('--user')),['--name',containerName]);assert.equal(reviewArgs.at(-1),'exec ./node_modules/.bin/playwright test --config=playwright.config.mjs --test-list=/run/atlas-protected-test-list.txt --shard="${ATLAS_E2E_SHARD:?ATLAS_E2E_SHARD is required}" --workers="${ATLAS_E2E_WORKERS:-1}" --retries=0 --reporter=json');
- const ordinaryArgs=machineFixtureBrowserArgs(compose,{uid:1000,gid:1000});assert.equal(ordinaryArgs.includes('--name'),false);assert.equal(ordinaryArgs.includes('--rm'),true);assert.equal(ordinaryArgs[ordinaryArgs.indexOf('--user')+1],'1000:1000');
- assert.throws(()=>machineFixtureBrowserArgs(compose,{uid:1000,gid:1000,reviewBearing:true,commandId:'unsafe',containerName}),/diagnostic identity/);
- const destination=path.join(temporary,'exported'),image=Buffer.from('restricted image bytes'),calls=[];
- const run=(file,args)=>{calls.push([file,args]);fs.mkdirSync(path.join(destination,'nested'),{recursive:true,mode:0o700});fs.writeFileSync(path.join(destination,'nested/frame-actual.png'),image,{mode:0o600});fs.writeFileSync(path.join(destination,'nested/ignored.png'),'ignored',{mode:0o600});return {status:0,signal:null};};
- const written=[];assert.equal(emitStoppedContainerPlaywrightDiagnostics({containerName,commandId:id,destination,run,write:value=>written.push(value)}),true);
- assert.deepEqual(calls,[['docker',['cp',`${containerName}:/artifacts/test-results/.`,destination]]]);const rows=diagnosticRows(written.join(''));
- assert.deepEqual(rows.filter(row=>row.type==='file').map(row=>row.path),['nested/frame-actual.png']);assert.deepEqual(Buffer.from(rows.filter(row=>row.type==='chunk').map(row=>row.data).join(''),'base64'),image);
- const failedDestination=path.join(temporary,'failed'),failedOutput=[];assert.equal(emitStoppedContainerPlaywrightDiagnostics({containerName,commandId:id,destination:failedDestination,run:()=>({status:1}),write:value=>failedOutput.push(value)}),false);assert.deepEqual(diagnosticRows(failedOutput.join('')).map(row=>row.type),['error','complete']);
- const source=fs.readFileSync(path.join(root,'tools/verification/run-verification-shadow.mjs'),'utf8');assert.match(source,/result\.status!==0[^]*emitStoppedContainerPlaywrightDiagnostics[^]*docker'?,?\['rm','-f',containerName\]/);assert.doesNotMatch(source,/--cap-add|setpriv --reuid|pkill -KILL/);
+test('review-bearing browser keeps qualified containment and uses an isolated bounded tmpfs volume collector',t=>{
+ const temporary=fs.mkdtempSync(path.join(os.tmpdir(),'atlas-volume-diagnostic-'));t.after(()=>fs.rmSync(temporary,{recursive:true,force:true}));
+ const id='sha256:'+'b'.repeat(64),compose=['compose'];
+ const candidateArgs=machineFixtureBrowserArgs(compose,{uid:1000,gid:1000});
+ for(const flag of ['--rm','--user'])assert.ok(candidateArgs.includes(flag));assert.equal(candidateArgs[candidateArgs.indexOf('--user')+1],'1000:1000');assert.equal(candidateArgs.includes('--cap-add'),false);
+ const volumeName='atlas-playwright-artifacts-1234-abcd',anchorName='atlas-playwright-anchor-1234-abcd',collectorName='atlas-playwright-collector-1234-abcd',image='sha256:'+'c'.repeat(64);
+ const volume=reviewArtifactVolumeArgs({volumeName,anchorName,image,uid:1000,gid:1000});
+ assert.deepEqual(volume.create.slice(0,6),['volume','create','--driver','local','--opt','type=tmpfs']);assert.ok(volume.create.includes('o=size=67108864,uid=1000,gid=1000,mode=0700,nodev,nosuid'));
+ for(const flag of ['--network=none','--read-only','--cap-drop=ALL','--security-opt=no-new-privileges'])assert.ok(volume.anchor.includes(flag));assert.equal(volume.anchor[volume.anchor.indexOf('--user')+1],'1000:1000');
+ const overlay=writeCandidateArtifactContainment(path.join(temporary,'volume.yml'),{volumeName});assert.match(fs.readFileSync(overlay,'utf8'),/external: true[^]*name: atlas-playwright-artifacts-1234-abcd/);
+ assertCandidateArtifactComposeConfig({services:{e2e:{read_only:true,cap_drop:['ALL'],security_opt:['no-new-privileges:true'],pids_limit:192,mem_limit:1610612736,cpus:2,volumes:[{type:'volume',source:'failure_artifacts',target:'/artifacts'}]}},volumes:{failure_artifacts:{name:volumeName,external:true}}},{volumeName});
+ const frameRoot=path.join(temporary,'test-results');fs.mkdirSync(frameRoot);fs.writeFileSync(path.join(frameRoot,'frame-actual.png'),'restricted image bytes',{mode:0o600});
+ const frame=emitPlaywrightFailureDiagnostics({commandId:id,testResultsRoot:frameRoot,write:()=>{}}),calls=[],written=[];
+ const run=(file,args)=>{calls.push([file,args]);return {status:0,signal:null,stderr:frame};};
+ assert.equal(collectVolumePlaywrightDiagnostics({volumeName,collectorName,commandId:id,image,uid:1000,gid:1000,protectedRoot:root,run,write:value=>written.push(value)}),true);
+ const collectorArgs=calls[0][1];for(const flag of ['--network=none','--read-only','--cap-drop=ALL','--security-opt=no-new-privileges'])assert.ok(collectorArgs.includes(flag));
+ assert.ok(collectorArgs.includes(`type=volume,src=${volumeName},dst=/artifacts,readonly`));assert.ok(collectorArgs.includes(`type=bind,src=${root},dst=/atlas-protected,readonly`));assert.equal(written.join(''),frame);assert.equal(calls.some(([,args])=>args[0]==='cp'),false);
+ const failed=[];assert.equal(collectVolumePlaywrightDiagnostics({volumeName,collectorName,commandId:id,image,protectedRoot:root,run:()=>({status:1}),write:value=>failed.push(value)}),false);assert.deepEqual(diagnosticRows(failed.join('')).map(row=>row.type),['error','complete']);
+ const source=fs.readFileSync(path.join(root,'tools/verification/run-verification-shadow.mjs'),'utf8');assert.doesNotMatch(source,/docker'?,?\['cp'|--cap-add|setpriv --reuid|pkill -KILL/);assert.match(source,/finally \{[^]*\['volume','rm','-f',volumeName\]/);
 });
 
 {
@@ -797,6 +801,8 @@ import {buildVerificationPlan} from '../../tools/verification/build-verification
 test('authenticated self-only subjects compose with docs, another subject and HTTP without claiming core',t=>{
  const directory=fs.mkdtempSync(path.join(os.tmpdir(),'atlas-subject-composition-'));t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
  fs.cpSync(path.join(root,'tests'),path.join(directory,'tests'),{recursive:true});
+ fs.mkdirSync(path.join(directory,'tools/governance'),{recursive:true});
+ for(const spec of ['test_agent_prompt_lifecycle.mjs','test_validate_meta_agent_policy.py'])fs.copyFileSync(path.join(root,'tools/governance',spec),path.join(directory,'tools/governance',spec));
  const first='tests/new-subject.mjs',second='tests/second-subject.py';
  fs.writeFileSync(path.join(directory,first),"import test from 'node:test';test('subject',()=>{});\n");fs.writeFileSync(path.join(directory,second),'assert True\n');
  const base=executionInput(first);base.root=directory;base.protectedRoot=root;
@@ -811,8 +817,8 @@ test('authenticated self-only subjects compose with docs, another subject and HT
   for(const subject of contract.candidateTestSubjects)assert.deepEqual(contract.commands.find(command=>command.id===subject.commandId).expectedTestIds,[subject.spec]);
  }
  const actualCore=resolveExecutionContract(input([{path:'tests/verification/artifacts.test.mjs',status:'modified'}]));
- assert.equal(actualCore.commands.filter(command=>command.groupIds.includes('deterministic.core')).length,144);
- assert.equal(actualCore.commands.length,145);
+ assert.equal(actualCore.commands.filter(command=>command.groupIds.includes('deterministic.core')).length,146);
+ assert.equal(actualCore.commands.length,147);
  assert.equal(actualCore.candidateTestSubjects.length,1);
  const subjectOnly=resolveExecutionContract(input());
  const forged=structuredClone(subjectOnly);forged.candidateTestSubjects[0].spec='tests/../outside.mjs';assert.throws(()=>sealExecutionContract(forged),/subject/);
@@ -830,13 +836,13 @@ test('authenticated self-only subjects compose with docs, another subject and HT
  samePathManifest.entries.push({pathPrefix:first,exactMatch:true,domains:['subject-semantic'],minimumProfile:'focused',requiredGroups:['deterministic.core']});
  const samePath=buildVerificationPlan({...planInput,trustedImpactManifest:samePathManifest,candidateImpactManifest:base.protectedImpactManifest});
  assert.ok(samePath.requiredGroupIds.includes('deterministic.core'));assert.deepEqual(samePath.candidateTestSubjects,[first]);
- assert.equal(resolveExecutionContract({...input(),protectedImpactManifest:samePathManifest}).commands.length,145);
+ assert.equal(resolveExecutionContract({...input(),protectedImpactManifest:samePathManifest}).commands.length,147);
  const escalatedManifest=structuredClone(base.protectedImpactManifest);
  escalatedManifest.entries.push({pathPrefix:first,exactMatch:true,domains:['subject-semantic'],minimumProfile:'focused',requiredGroups:[]});
  escalatedManifest.crossDomainEscalations.push({id:'subject-core-proof',whenDomains:['subject-semantic','documentation'],minimumProfile:'focused',requiredGroups:['deterministic.core']});
  const escalated=buildVerificationPlan({...planInput,changedFiles:[{path:first,status:'added'},{path:'docs/example.md',status:'added'}],trustedImpactManifest:escalatedManifest,candidateImpactManifest:escalatedManifest});
  assert.ok(escalated.requiredGroupIds.includes('deterministic.core'));assert.deepEqual(escalated.candidateTestSubjects,[first]);
- assert.equal(resolveExecutionContract({...input([{path:'docs/example.md',status:'added'}]),protectedImpactManifest:escalatedManifest}).commands.length,145);
+ assert.equal(resolveExecutionContract({...input([{path:'docs/example.md',status:'added'}]),protectedImpactManifest:escalatedManifest}).commands.length,147);
  const renamed=input();renamed.candidate.changedFiles=[{path:first,previousPath:'tests/old-unowned.mjs',status:'renamed'}];renamed.planInput.changedFiles=renamed.candidate.changedFiles;assert.equal(resolveExecutionContract(renamed).commands.length,1);
 });
 
