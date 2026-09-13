@@ -257,6 +257,28 @@
       "defaultRule": true
     },
     {
+      "pathPrefix": "tools/governance/test_agent_prompt_lifecycle.mjs",
+      "exactMatch": true,
+      "domains": [
+        "meta-governance"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.core"
+      ]
+    },
+    {
+      "pathPrefix": "tools/governance/validate_meta_agent_policy.py",
+      "exactMatch": true,
+      "domains": [
+        "meta-governance"
+      ],
+      "minimumProfile": "focused",
+      "requiredGroups": [
+        "deterministic.core"
+      ]
+    },
+    {
       "pathPrefix": "tools/verification/",
       "domains": [
         "verification-governance"

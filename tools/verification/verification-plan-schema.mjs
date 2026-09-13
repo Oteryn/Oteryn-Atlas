@@ -8,6 +8,10 @@ const SPECIALIST_REASONS = new Set(['private-visual', 'native-windows-gpu', 'lan
 const DATA_CAPABILITIES = new Set(['qualification_fixture', 'bounded_real_world', 'real_fullworld']);
 const GROUP_ID = /^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$/;
 const SAFE_PATH = /^(?:tests|e2e)\/[A-Za-z0-9_./*-]+$/;
+const EXACT_GOVERNANCE_TEST_PATHS = new Set([
+  'tools/governance/test_agent_prompt_lifecycle.mjs',
+  'tools/governance/test_validate_meta_agent_policy.py',
+]);
 
 const LEGACY_BOOTSTRAP_CATALOG_V1 = {
   schemaVersion: 1,
@@ -79,7 +83,7 @@ function uniqueStrings(values, kind, field) {
 
 function safeRepositoryPath(value) {
   return typeof value === 'string'
-    && SAFE_PATH.test(value)
+    && (SAFE_PATH.test(value) || EXACT_GOVERNANCE_TEST_PATHS.has(value))
     && !value.includes('..')
     && !value.includes('\\')
     && !value.includes('//');

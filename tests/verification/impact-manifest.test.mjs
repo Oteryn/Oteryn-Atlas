@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import {
@@ -48,6 +49,21 @@ const v2Manifest = {
     requiredGroups: ['e2e.common-smoke'],
   }],
 };
+
+function readRepositoryJson(relativePath) {
+  return JSON.parse(readFileSync(new URL(relativePath, import.meta.url), 'utf8'));
+}
+
+function executionRowsFor(node, spec, rows = []) {
+  if (Array.isArray(node)) {
+    for (const value of node) executionRowsFor(value, spec, rows);
+    return rows;
+  }
+  if (!node || typeof node !== 'object') return rows;
+  if (node.spec === spec && typeof node.interpreter === 'string' && Array.isArray(node.argv)) rows.push(node);
+  for (const value of Object.values(node)) executionRowsFor(value, spec, rows);
+  return rows;
+}
 
 test('impact manifest accepts explicit cross-domain escalation rules with allowlisted groups', () => {
   const manifest = validateImpactManifest(v2Manifest, catalog);
@@ -132,4 +148,39 @@ test('verification catalog rejects a real_fullworld group that could run on GitH
   const invalid = structuredClone(catalog);
   invalid.groups['e2e.common-smoke'].capabilities.dataCapability = 'real_fullworld';
   assert.throws(() => validateVerificationCatalog(invalid), /real_fullworld.*specialist/i);
+});
+
+test('META provider governance consumers are exact-routed and execution-owned by protected verification', () => {
+  const manifest = readRepositoryJson('../../tools/verification/impact-manifest.json');
+  const canonicalCatalog = readRepositoryJson('../../tools/verification/verification-catalog.json');
+  const exactRoutes = [
+    'tools/governance/test_agent_prompt_lifecycle.mjs',
+    'tools/governance/validate_meta_agent_policy.py',
+  ];
+
+  for (const path of exactRoutes) {
+    const matches = manifest.entries.filter((entry) => entry.pathPrefix === path && entry.exactMatch === true);
+    assert.equal(matches.length, 1, `${path} must have exactly one protected exact impact route`);
+    assert.equal(matches[0].minimumProfile, 'focused', `${path} should require focused deterministic qualification`);
+    assert.deepEqual(matches[0].requiredGroups, ['deterministic.core'], `${path} must route to deterministic.core`);
+  }
+  assert.equal(
+    manifest.entries.some((entry) => entry.pathPrefix === 'tools/governance/' && entry.exactMatch !== true),
+    false,
+    'META adoption must not broaden all tools/governance paths into a permissive catch-all route',
+  );
+
+  const expectedOwners = [
+    { spec: 'tools/governance/test_agent_prompt_lifecycle.mjs', interpreter: 'node', argv: ['--test', 'tools/governance/test_agent_prompt_lifecycle.mjs'] },
+    { spec: 'tools/governance/test_validate_meta_agent_policy.py', interpreter: 'python3', argv: ['tools/governance/test_validate_meta_agent_policy.py'] },
+  ];
+  const coreSpecs = canonicalCatalog.groups['deterministic.core'].specs;
+  for (const expected of expectedOwners) {
+    assert(coreSpecs.includes(expected.spec), `${expected.spec} must be a deterministic.core spec`);
+    const rows = executionRowsFor(canonicalCatalog, expected.spec);
+    assert.equal(rows.length, 1, `${expected.spec} must have exactly one canonical execution owner`);
+    assert.equal(rows[0].interpreter, expected.interpreter, `${expected.spec} interpreter must be explicit`);
+    assert.deepEqual(rows[0].argv, expected.argv, `${expected.spec} argv must be exact`);
+    assert.match(rows[0].sourceSha256 ?? '', /^[0-9a-f]{64}$/u, `${expected.spec} must carry exact source SHA-256 ownership`);
+  }
 });
