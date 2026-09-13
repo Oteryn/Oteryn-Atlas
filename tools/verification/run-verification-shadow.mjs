@@ -49,7 +49,7 @@ export function emitPlaywrightFailureDiagnostics({commandId,testResultsRoot,writ
   if(!diagnosticSafeCommand(commandId)||typeof testResultsRoot!=='string'||!path.isAbsolute(testResultsRoot)) throw new TypeError('unsafe diagnostic input');
   const rootStat=fs.lstatSync(testResultsRoot);
   if(rootStat.isSymbolicLink()||!rootStat.isDirectory()) throw new TypeError('unsafe diagnostic root');
-  const records=[],omitted=new Map();let entries=0;
+  const records=[],omitted=new Map();let entries=0,totalCollected=0;
   const record=(type,data={})=>records.push(`${PLAYWRIGHT_DIAGNOSTIC_PREFIX} ${JSON.stringify({schema:'oteryn.atlas.playwright-diagnostic',version:1,type,commandId,...data})}\n`);
   const omit=(reason,count=1)=>omitted.set(reason,(omitted.get(reason)??0)+count);
   const files=[];
@@ -69,7 +69,10 @@ export function emitPlaywrightFailureDiagnostics({commandId,testResultsRoot,writ
         if(stat.isSymbolicLink())continue;
         if(stat.isDirectory()){walk(absolute,next,depth+1,stat);continue;}
         if(stat.isFile()&&(name.endsWith('-actual.png')||name.endsWith('-diff.png'))) {
-          let descriptor;try {descriptor=fs.openSync(absolute,fs.constants.O_RDONLY|fs.constants.O_NOFOLLOW|fs.constants.O_NONBLOCK);const opened=fs.fstatSync(descriptor);if(!opened.isFile()||opened.dev!==stat.dev||opened.ino!==stat.ino||opened.size!==stat.size)throw new TypeError('file changed');const bytes=fs.readFileSync(descriptor),finished=fs.fstatSync(descriptor);if(bytes.length!==stat.size||finished.dev!==stat.dev||finished.ino!==stat.ino||finished.size!==stat.size)throw new TypeError('file changed');files.push({path:next,bytes});}catch{omit('file-changed');}finally{if(descriptor!==undefined)try{fs.closeSync(descriptor);}catch{}}
+          if(files.length>=limits.maxFiles){omit('max-files');continue;}
+          if(stat.size>limits.maxFileBytes){omit('max-file-bytes');continue;}
+          if(totalCollected+stat.size>limits.maxTotalRawBytes){omit('max-total-raw-bytes');continue;}
+          let descriptor;try {descriptor=fs.openSync(absolute,fs.constants.O_RDONLY|fs.constants.O_NOFOLLOW|fs.constants.O_NONBLOCK);const opened=fs.fstatSync(descriptor);if(!opened.isFile()||opened.dev!==stat.dev||opened.ino!==stat.ino||opened.size!==stat.size)throw new TypeError('file changed');const bytes=fs.readFileSync(descriptor),finished=fs.fstatSync(descriptor);if(bytes.length!==stat.size||finished.dev!==stat.dev||finished.ino!==stat.ino||finished.size!==stat.size)throw new TypeError('file changed');files.push({path:next,bytes});totalCollected+=bytes.length;}catch{omit('file-changed');}finally{if(descriptor!==undefined)try{fs.closeSync(descriptor);}catch{}}
         }
       }
     } catch {omit('directory-changed');} finally {if(handle)try{handle.closeSync();}catch{}if(directoryDescriptor!==undefined)try{fs.closeSync(directoryDescriptor);}catch{}}
@@ -77,10 +80,7 @@ export function emitPlaywrightFailureDiagnostics({commandId,testResultsRoot,writ
   walk(testResultsRoot);files.sort((a,b)=>a.path<b.path?-1:a.path>b.path?1:0);
   let totalRaw=0,emittedFiles=0;
   for(const file of files) {
-    if(emittedFiles>=limits.maxFiles){omit('max-files');continue;}
     const bytes=file.bytes;
-    if(bytes.length>limits.maxFileBytes){omit('max-file-bytes');continue;}
-    if(totalRaw+bytes.length>limits.maxTotalRawBytes){omit('max-total-raw-bytes');continue;}
     const chunks=[];for(let offset=0;offset<bytes.length;offset+=limits.maxChunkBytes)chunks.push(bytes.subarray(offset,offset+limits.maxChunkBytes).toString('base64'));
     const digest=createHash('sha256').update(bytes).digest('hex');
     record('file',{path:file.path,byteLength:bytes.length,sha256:digest,encoding:'base64',chunkCount:chunks.length});
@@ -96,7 +96,7 @@ function playwrightDiagnosticHelperSource() {
   return `import fs from 'node:fs';import path from 'node:path';import {createHash} from 'node:crypto';const PLAYWRIGHT_DIAGNOSTIC_PREFIX=${JSON.stringify(PLAYWRIGHT_DIAGNOSTIC_PREFIX)};const PLAYWRIGHT_DIAGNOSTIC_LIMITS=${JSON.stringify(PLAYWRIGHT_DIAGNOSTIC_LIMITS)};const diagnosticSafeCommand=${diagnosticSafeCommand.toString()};const diagnosticSafePath=${diagnosticSafePath.toString()};const emitPlaywrightFailureDiagnostics=${emitPlaywrightFailureDiagnostics.toString()};try{emitPlaywrightFailureDiagnostics({commandId:process.argv[1],testResultsRoot:process.argv[2]});}catch(error){const commandId=diagnosticSafeCommand(process.argv[1])?process.argv[1]:'invalid',base={schema:'oteryn.atlas.playwright-diagnostic',version:1,commandId};fs.writeSync(2,PLAYWRIGHT_DIAGNOSTIC_PREFIX+' '+JSON.stringify({...base,type:'error',error:String(error?.message??error).slice(0,256)})+'\\n'+PLAYWRIGHT_DIAGNOSTIC_PREFIX+' '+JSON.stringify({...base,type:'complete',fileCount:0,totalRawBytes:0,omissionCount:0,errorCount:1,complete:true})+'\\n');process.exitCode=1;}`;
 }
 function playwrightStderrConsumerSource() {
-  return `import fs from 'node:fs';const limit=${PLAYWRIGHT_STDERR_TAIL_BYTES};let tail=Buffer.alloc(0);for await(const chunk of process.stdin){tail=Buffer.concat([tail,chunk]);if(tail.length>limit)tail=tail.subarray(tail.length-limit);}if(tail.length)fs.writeSync(2,'ATLAS_SHADOW_PLAYWRIGHT_STDERR_TAIL '+tail.toString('base64')+'\\n');`;
+  return `import fs from 'node:fs';const limit=${PLAYWRIGHT_STDERR_TAIL_BYTES};let tail=Buffer.alloc(0),finished=false;const finish=()=>{if(finished)return;finished=true;if(tail.length)fs.writeSync(2,'ATLAS_SHADOW_PLAYWRIGHT_STDERR_TAIL '+tail.toString('base64')+'\\n');};process.on('SIGTERM',()=>{finish();process.exit(0);});fs.writeFileSync(process.argv[1],'ready\\n');for await(const chunk of process.stdin){tail=Buffer.concat([tail,chunk]);if(tail.length>limit)tail=tail.subarray(tail.length-limit);}finish();`;
 }
 const shellQuote=value=>`'${String(value).replaceAll("'",`'\\''`)}'`;
 
@@ -589,9 +589,9 @@ const MACHINE_BROWSER_BASE_COMMAND='./node_modules/.bin/playwright test --config
 const MACHINE_BROWSER_COMMAND=`exec ${MACHINE_BROWSER_BASE_COMMAND}`;
 export function machineFixtureBrowserArgs(composeArgs,{uid=process.getuid(),gid=process.getgid(),reviewBearing=false,commandId=null}={}) {
   if(!Array.isArray(composeArgs)||composeArgs.some(value=>typeof value!=='string')||!Number.isSafeInteger(uid)||uid<0||!Number.isSafeInteger(gid)||gid<0) fail('machine fixture identity');
-  if(reviewBearing&&!diagnosticSafeCommand(commandId))fail('machine diagnostic command id');
-  const command=reviewBearing?`exec 3>&1; { setpriv --reuid=${uid} --regid=${gid} --clear-groups ${MACHINE_BROWSER_BASE_COMMAND} 2>&1 1>&3; } | node --input-type=module -e ${shellQuote(playwrightStderrConsumerSource())} >&2; status=\${PIPESTATUS[0]}; if [ "$status" -ne 0 ]; then node --input-type=module -e ${shellQuote(playwrightDiagnosticHelperSource())} ${shellQuote(commandId)} /artifacts/test-results || :; fi; exit "$status"`:MACHINE_BROWSER_COMMAND;
-  return [...composeArgs,'run','--user',reviewBearing?'0:0':`${uid}:${gid}`,'--rm','--no-deps','e2e','bash','-lc',command];
+  if(reviewBearing&&(!diagnosticSafeCommand(commandId)||uid===0||gid===0))fail('machine diagnostic identity');
+  const command=reviewBearing?`exec 3>&1; stderr_dir=$(mktemp -d /tmp/atlas-playwright-stderr.XXXXXX) || exit 125; chmod 700 "$stderr_dir" || exit 125; mkfifo "$stderr_dir/pipe" "$stderr_dir/ready" || exit 125; exec 4<>"$stderr_dir/pipe"; node --input-type=module -e ${shellQuote(playwrightStderrConsumerSource())} "$stderr_dir/ready" <&4 >&2 & consumer=$!; read -r ready <"$stderr_dir/ready" || exit 125; setpriv --reuid=${uid} --regid=${gid} --clear-groups ${MACHINE_BROWSER_BASE_COMMAND} 1>&3 2>&4; status=$?; pkill -KILL -u ${uid} 2>/dev/null || :; if ps -o stat= -u ${uid} 2>/dev/null | grep -Eq '^[[:space:]]*[^Z[:space:]]'; then quiesced=0; else quiesced=1; fi; exec 4>&-; kill -TERM "$consumer" 2>/dev/null || :; wait "$consumer" 2>/dev/null || :; rm -f "$stderr_dir/pipe" "$stderr_dir/ready"; rmdir "$stderr_dir" 2>/dev/null || :; if [ "$status" -ne 0 ] && [ "$quiesced" -eq 1 ]; then node --input-type=module -e ${shellQuote(playwrightDiagnosticHelperSource())} ${shellQuote(commandId)} /artifacts/test-results || :; fi; exit "$status"`:MACHINE_BROWSER_COMMAND;
+  return [...composeArgs,'run',...(reviewBearing?['--cap-add','SETUID','--cap-add','SETGID']:[]),'--user',reviewBearing?'0:0':`${uid}:${gid}`,'--rm','--no-deps','e2e','bash','-lc',command];
 }
 export function writeCandidateArtifactContainment(file) {
   if(typeof file!=='string'||!path.isAbsolute(file)||fs.existsSync(file)) fail('candidate artifact containment destination');
