@@ -264,7 +264,7 @@ test('candidate execution metadata cannot replace protected interpreter or hashe
  assert(!JSON.stringify(contract).includes('candidate-policy'));
 });
 
-import {authenticateR5SemanticSource,buildR5SemanticPublication,resolveShadowEvent,planShadow,deterministicDockerArgs,fixtureBrowserArgs,machineFixtureBrowserArgs,requiresProtectedVisualReference,bindProtectedVisualReferenceConsumer,prepareProtectedBrowserHarness,prepareProtectedBrowserCaptureHarness,writeProtectedBrowserContainment,writeCandidateArtifactContainment,assertCandidateArtifactComposeConfig,emitPlaywrightFailureDiagnostics,collectVolumePlaywrightDiagnostics,reviewArtifactVolumeArgs,relayPlaywrightFailureDiagnostics,PLAYWRIGHT_DIAGNOSTIC_PREFIX,PLAYWRIGHT_DIAGNOSTIC_LIMITS,PLAYWRIGHT_DIAGNOSTIC_LOG_LINE_BYTES} from '../../tools/verification/run-verification-shadow.mjs';
+import {authenticateR5SemanticSource,buildR5SemanticPublication,resolveShadowEvent,planShadow,deterministicDockerArgs,fixtureBrowserArgs,machineFixtureBrowserArgs,requiresProtectedVisualReference,bindProtectedVisualReferenceConsumer,prepareProtectedBrowserHarness,prepareProtectedBrowserCaptureHarness,writeProtectedBrowserContainment,writeCandidateArtifactContainment,assertCandidateArtifactComposeConfig,emitPlaywrightFailureDiagnostics,collectVolumePlaywrightDiagnostics,resolveProtectedComposeServiceImage,reviewArtifactVolumeArgs,relayPlaywrightFailureDiagnostics,PLAYWRIGHT_DIAGNOSTIC_PREFIX,PLAYWRIGHT_DIAGNOSTIC_LIMITS,PLAYWRIGHT_DIAGNOSTIC_LOG_LINE_BYTES} from '../../tools/verification/run-verification-shadow.mjs';
 import {assertShadowExecutorCoverage,assertShadowReviewCaptureCensus,normalizeShadowReviewChangedFiles,shadowReviewPlanDigest} from '../../tools/verification/verification-shadow-review.mjs';
 test('shadow materializes candidate browser tests, support and snapshots while protected executor control stays protected',t=>{
  const {scratch,candidateRoot}=copyCandidateBrowserPayload(t);
@@ -615,6 +615,9 @@ test('failed Playwright diagnostics are filtered, ordered, lossless and bounded'
  assert.ok(depthLimited.some(row=>row.type==='omission'&&row.reason==='max-depth'));
  const entryLimited=diagnosticRows(emitPlaywrightFailureDiagnostics({commandId,testResultsRoot:root,write:()=>{},limits:{...PLAYWRIGHT_DIAGNOSTIC_LIMITS,maxEntries:1}}));
  assert.ok(entryLimited.some(row=>row.type==='omission'&&row.reason==='max-entries'));
+ const nestedEntryRoot=path.join(temporary,'nested-entry-limit');fs.mkdirSync(path.join(nestedEntryRoot,'a'),{recursive:true});fs.writeFileSync(path.join(nestedEntryRoot,'a/child.txt'),'entry');fs.writeFileSync(path.join(nestedEntryRoot,'b-actual.png'),'must not be read');
+ const nestedEntryLimited=diagnosticRows(emitPlaywrightFailureDiagnostics({commandId,testResultsRoot:nestedEntryRoot,write:()=>{},limits:{...PLAYWRIGHT_DIAGNOSTIC_LIMITS,maxEntries:2}}));
+ assert.equal(nestedEntryLimited.some(row=>row.type==='file'&&row.path==='b-actual.png'),false);assert.ok(nestedEntryLimited.some(row=>row.type==='omission'&&row.reason==='max-entries'));
  const boundsRoot=path.join(temporary,'bounds');fs.mkdirSync(boundsRoot);fs.writeFileSync(path.join(boundsRoot,'a-actual.png'),'12');fs.writeFileSync(path.join(boundsRoot,'b-diff.png'),'34');
  for(const [override,reason] of [[{maxFiles:1},'max-files'],[{maxFileBytes:1},'max-file-bytes'],[{maxTotalRawBytes:3},'max-total-raw-bytes']]) {
   const bounded=diagnosticRows(emitPlaywrightFailureDiagnostics({commandId,testResultsRoot:boundsRoot,write:()=>{},limits:{...PLAYWRIGHT_DIAGNOSTIC_LIMITS,...override}}));assert.ok(bounded.some(row=>row.type==='omission'&&row.reason===reason),reason);
@@ -678,6 +681,17 @@ test('review-bearing browser keeps qualified containment and uses an isolated bo
  assert.ok(collectorArgs.includes(`type=volume,src=${volumeName},dst=/artifacts,readonly`));assert.ok(collectorArgs.includes(`type=bind,src=${root},dst=/atlas-protected,readonly`));assert.equal(written.join(''),frame);assert.equal(calls.some(([,args])=>args[0]==='cp'),false);
  const failed=[];assert.equal(collectVolumePlaywrightDiagnostics({volumeName,collectorName,commandId:id,image,protectedRoot:root,run:()=>({status:1}),write:value=>failed.push(value)}),false);assert.deepEqual(diagnosticRows(failed.join('')).map(row=>row.type),['error','complete']);
  const source=fs.readFileSync(path.join(root,'tools/verification/run-verification-shadow.mjs'),'utf8');assert.doesNotMatch(source,/docker'?,?\['cp'|--cap-add|setpriv --reuid|pkill -KILL/);assert.match(source,/finally \{[^]*\['volume','rm','-f',volumeName\]/);
+});
+
+test('protected collector image is resolved from Compose config to an immutable local identity',()=>{
+ const composeArgs=['compose','--project-name','atlas'],image='atlas-e2e:local',identity='sha256:'+'e'.repeat(64),calls=[];
+ const run=(file,args)=>{calls.push([file,args]);return args[0]==='image'?{status:0,signal:null,stdout:`${identity}\n`}:{status:0,signal:null,stdout:`${image}\n`};};
+ assert.equal(resolveProtectedComposeServiceImage({composeArgs,service:'e2e',run}),identity);
+ assert.deepEqual(calls,[['docker',[...composeArgs,'config','--images','e2e']],['docker',['image','inspect','--format','{{.Id}}',image]]]);
+ for(const outputs of [['',identity],[`${image}\nsecond:tag\n`,identity],[image,'atlas-e2e:local'],[image,`${identity}\nsha256:${'f'.repeat(64)}\n`]]) {
+  let index=0;assert.throws(()=>resolveProtectedComposeServiceImage({composeArgs,service:'e2e',run:()=>({status:0,signal:null,stdout:outputs[index++]})}),/protected collector/);
+ }
+ const source=fs.readFileSync(path.join(root,'tools/verification/run-verification-shadow.mjs'),'utf8');assert.doesNotMatch(source,/['"]images['"],['"]-q['"],['"]e2e['"]/);assert.match(source,/['"]config['"],['"]--images['"],service/);
 });
 
 {

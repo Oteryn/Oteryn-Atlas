@@ -47,6 +47,16 @@ export const PLAYWRIGHT_DIAGNOSTIC_LIMITS=Object.freeze({maxDepth:8,maxEntries:2
 export const MACHINE_BROWSER_STDERR_BUFFER_BYTES=16*1024*1024;
 const diagnosticSafeCommand=id=>/^sha256:[a-f0-9]{64}$/.test(id??'');
 const diagnosticSafePath=value=>typeof value==='string'&&value.length>0&&value.length<=1024&&value===value.replaceAll('\\','/')&&!path.posix.isAbsolute(value)&&value.split('/').every(part=>part&&part!=='.'&&part!=='..');
+export function resolveProtectedComposeServiceImage({composeArgs,service,env=process.env,run=spawnSync}={}) {
+  if(!Array.isArray(composeArgs)||composeArgs.some(value=>typeof value!=='string')||!/^[-a-z0-9]+$/.test(service??''))throw new TypeError('protected collector image input');
+  const configured=run('docker',[...composeArgs,'config','--images',service],{env,encoding:'utf8',timeout:30000,maxBuffer:1024*1024});
+  const references=String(configured?.stdout??'').split(/\r?\n/).map(value=>value.trim()).filter(Boolean);
+  if(configured?.error||configured?.status!==0||configured?.signal||references.length!==1)throw new TypeError('protected collector service image reference');
+  const inspected=run('docker',['image','inspect','--format','{{.Id}}',references[0]],{env,encoding:'utf8',timeout:30000,maxBuffer:1024*1024});
+  const identities=String(inspected?.stdout??'').split(/\r?\n/).map(value=>value.trim()).filter(Boolean);
+  if(inspected?.error||inspected?.status!==0||inspected?.signal||identities.length!==1||!/^sha256:[a-f0-9]{64}$/.test(identities[0]))throw new TypeError('protected collector image identity');
+  return identities[0];
+}
 export function emitPlaywrightFailureDiagnostics({commandId,testResultsRoot,write=record=>fs.writeSync(2,record),limits=PLAYWRIGHT_DIAGNOSTIC_LIMITS}={}) {
   if(!diagnosticSafeCommand(commandId)||typeof testResultsRoot!=='string'||!path.isAbsolute(testResultsRoot)) throw new TypeError('unsafe diagnostic input');
   const rootStat=fs.lstatSync(testResultsRoot);
@@ -65,6 +75,7 @@ export function emitPlaywrightFailureDiagnostics({commandId,testResultsRoot,writ
       for(let entry;(entry=handle.readSync());){if(entries+names.length>=limits.maxEntries){omit('max-entries');return;}names.push(entry.name);}
       handle.closeSync();handle=null;
       for(const name of names.sort()) {
+        if(entries>=limits.maxEntries){omit('max-entries');return;}
         entries++;const next=relative?`${relative}/${name}`:name;
         if(!diagnosticSafePath(next)){omit('unsafe-path');continue;}
         const absolute=`/proc/self/fd/${directoryDescriptor}/${name}`;let stat;try{stat=fs.lstatSync(absolute);}catch{omit('file-changed');continue;}
@@ -744,8 +755,7 @@ async function runPublicationBrowser(command,{candidate,contract,publication,dir
       }
     }
     if(reviewBearing)try {
-      const imageResult=spawnSync('docker',[...args,'images','-q','e2e'],{env,encoding:'utf8',timeout:30000,maxBuffer:1024*1024});
-      diagnosticImage=String(imageResult.stdout??'').trim();if(imageResult.error||imageResult.status!==0||imageResult.signal||!/^sha256:[a-f0-9]{64}$/.test(diagnosticImage))throw new TypeError('protected collector image identity');
+      diagnosticImage=resolveProtectedComposeServiceImage({composeArgs:args,service:'e2e',env});
       const volume=reviewArtifactVolumeArgs({volumeName,anchorName,image:diagnosticImage});
       for(const operation of [volume.create,volume.anchor,['start',anchorName]]) {const setup=spawnSync('docker',operation,{env,encoding:'utf8',timeout:30000,maxBuffer:1024*1024});if(setup.error||setup.status!==0||setup.signal)throw new TypeError('diagnostic volume setup failed');}
       const inspected=spawnSync('docker',['volume','inspect',volumeName,'--format','{{json .Options}}'],{env,encoding:'utf8',timeout:30000,maxBuffer:1024*1024});
