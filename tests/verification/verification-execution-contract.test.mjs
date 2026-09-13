@@ -692,14 +692,17 @@ test('protected collector image is resolved from Compose config to an immutable 
   let index=0;assert.throws(()=>resolveProtectedComposeServiceImage({composeArgs,service:'e2e',run:()=>({status:0,signal:null,stdout:outputs[index++]})}),/protected collector/);
  }
  const buildCompose=['compose','-p','atlas-r5-test','-f','/protected/base.yml'];
- const buildRunFor=(modeledImage,calls)=>(file,args)=>{calls.push([file,args]);if(args[0]==='image')return {status:0,signal:null,stdout:`${identity}\n`};if(args.includes('--images'))return {status:0,signal:null,stdout:''};const definition={build:{context:'/candidate'}};if(modeledImage!==undefined)definition.image=modeledImage;return {status:0,signal:null,stdout:JSON.stringify({services:{e2e:definition}})};};
+ const buildRunFor=(modeledImage,calls,configuredImages='')=>(file,args)=>{calls.push([file,args]);if(args[0]==='image')return {status:0,signal:null,stdout:`${identity}\n`};if(args.includes('--images'))return {status:0,signal:null,stdout:configuredImages};const definition={build:{context:'/candidate'}};if(modeledImage!==undefined)definition.image=modeledImage;return {status:0,signal:null,stdout:JSON.stringify({services:{e2e:definition}})};};
  const expectedBuildCalls=[['docker',[...buildCompose,'config','--images','e2e']],['docker',[...buildCompose,'config','--format','json','e2e']],['docker',['image','inspect','--format','{{.Id}}','atlas-r5-test-e2e']]];
- for(const modeledImage of [undefined,'atlas-r5-test-e2e']) {
+ for(const modeledImage of [undefined,null,'atlas-r5-test-e2e']) {
   const buildCalls=[];assert.equal(resolveProtectedComposeServiceImage({composeArgs:buildCompose,service:'e2e',run:buildRunFor(modeledImage,buildCalls)}),identity);assert.deepEqual(buildCalls,expectedBuildCalls);
  }
- for(const failed of [{status:1,stdout:''},{status:0,signal:'SIGTERM',stdout:''},{status:0,error:new Error('spawn'),stdout:''},{status:0,stdout:`one\ntwo\n`}]) {
+ const dependentCalls=[],dependentImages='dependency-one:tag\ndependency-two:tag\natlas-r5-test-e2e\n';
+ assert.equal(resolveProtectedComposeServiceImage({composeArgs:buildCompose,service:'e2e',run:buildRunFor(null,dependentCalls,dependentImages)}),identity);assert.deepEqual(dependentCalls,expectedBuildCalls);
+ for(const failed of [{status:1,stdout:''},{status:0,signal:'SIGTERM',stdout:''},{status:0,error:new Error('spawn'),stdout:''}]) {
   const failedCalls=[];assert.throws(()=>resolveProtectedComposeServiceImage({composeArgs:buildCompose,service:'e2e',run:(file,args)=>{failedCalls.push([file,args]);return failed;}}),/service image reference/);assert.equal(failedCalls.length,1);
  }
+ const ambiguousCalls=[];assert.throws(()=>resolveProtectedComposeServiceImage({composeArgs:buildCompose,service:'e2e',run:(file,args)=>{ambiguousCalls.push([file,args]);return args.includes('--images')?{status:0,stdout:'one\ntwo\n'}:{status:0,stdout:'{}'};}}),/service image reference/);assert.equal(ambiguousCalls.length,2);
  const rejectedModels=['{',JSON.stringify({services:{other:{build:{context:'.'}}}}),JSON.stringify({services:{e2e:{}}}),JSON.stringify({services:{e2e:{build:{context:'/candidate'},image:'mutable:tag'}}})];
  for(const stdout of rejectedModels)assert.throws(()=>resolveProtectedComposeServiceImage({composeArgs:buildCompose,service:'e2e',run:(file,args)=>args.includes('--images')?{status:0,stdout:''}:{status:0,stdout}}),/service image reference/);
  for(const args of [['compose'],['compose','-p','one','--project-name','two'],['compose','-p','INVALID!']])assert.throws(()=>resolveProtectedComposeServiceImage({composeArgs:args,service:'e2e',run:()=>({status:0,stdout:''})}),/service image reference/);
