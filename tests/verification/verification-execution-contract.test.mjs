@@ -275,7 +275,7 @@ test('candidate execution metadata cannot replace protected interpreter or hashe
  assert(!JSON.stringify(contract).includes('candidate-policy'));
 });
 
-import {authenticateR5SemanticSource,buildR5SemanticPublication,resolveShadowEvent,planShadow,deterministicDockerArgs,fixtureBrowserArgs,machineFixtureBrowserArgs,requiresProtectedVisualReference,bindProtectedVisualReferenceConsumer,prepareProtectedBrowserHarness,prepareProtectedBrowserCaptureHarness,writeProtectedBrowserContainment,emitPlaywrightFailureDiagnostics,relayPlaywrightFailureDiagnostics,PLAYWRIGHT_DIAGNOSTIC_PREFIX,PLAYWRIGHT_DIAGNOSTIC_LIMITS,PLAYWRIGHT_STDERR_TAIL_BYTES,MACHINE_BROWSER_STDERR_BUFFER_BYTES} from '../../tools/verification/run-verification-shadow.mjs';
+import {authenticateR5SemanticSource,buildR5SemanticPublication,resolveShadowEvent,planShadow,deterministicDockerArgs,fixtureBrowserArgs,machineFixtureBrowserArgs,requiresProtectedVisualReference,bindProtectedVisualReferenceConsumer,prepareProtectedBrowserHarness,prepareProtectedBrowserCaptureHarness,writeProtectedBrowserContainment,emitPlaywrightFailureDiagnostics,relayPlaywrightFailureDiagnostics,PLAYWRIGHT_DIAGNOSTIC_PREFIX,PLAYWRIGHT_DIAGNOSTIC_LOG_LINE_BYTES,PLAYWRIGHT_DIAGNOSTIC_LIMITS,PLAYWRIGHT_STDERR_TAIL_BYTES,MACHINE_BROWSER_STDERR_BUFFER_BYTES} from '../../tools/verification/run-verification-shadow.mjs';
 import {assertShadowExecutorCoverage,assertShadowReviewCaptureCensus,normalizeShadowReviewChangedFiles,shadowReviewPlanDigest} from '../../tools/verification/verification-shadow-review.mjs';
 test('shadow materializes candidate browser tests, support and snapshots while protected executor control stays protected',t=>{
  const {scratch,candidateRoot}=copyCandidateBrowserPayload(t);
@@ -611,9 +611,10 @@ test('failed Playwright diagnostics are filtered, ordered, lossless and bounded'
   assert.ok(chunks.every(row=>Buffer.from(row.data,'base64').length<=PLAYWRIGHT_DIAGNOSTIC_LIMITS.maxChunkBytes));
   assert.equal(rows.find(row=>row.type==='end'&&row.path===header.path).complete,true);
  }
- const worstChunkLine=`${PLAYWRIGHT_DIAGNOSTIC_PREFIX} ${JSON.stringify({schema:'oteryn.atlas.playwright-diagnostic',version:1,type:'chunk',commandId,path:'\u0001'.repeat(1024),index:Number.MAX_SAFE_INTEGER,chunkCount:Number.MAX_SAFE_INTEGER,data:Buffer.alloc(PLAYWRIGHT_DIAGNOSTIC_LIMITS.maxChunkBytes).toString('base64')})}\n`;
- assert.ok(Buffer.byteLength(worstChunkLine)<=PLAYWRIGHT_DIAGNOSTIC_LIMITS.maxLogLineBytes);assert.ok(PLAYWRIGHT_DIAGNOSTIC_LIMITS.maxLogLineBytes<=60*1024);
  assert.ok(rows.some(row=>row.type==='omission'&&row.reason==='unsafe-path'));assert.equal(rows.at(-1).type,'complete');assert.equal(rows.at(-1).complete,true);
+ const longestPath=`${'p'.repeat(1022)}/x`,maxChunk=Buffer.alloc(PLAYWRIGHT_DIAGNOSTIC_LIMITS.maxChunkBytes).toString('base64');
+ const longestChunkRecord=`${PLAYWRIGHT_DIAGNOSTIC_PREFIX} ${JSON.stringify({schema:'oteryn.atlas.playwright-diagnostic',version:1,type:'chunk',commandId,path:longestPath,index:Number.MAX_SAFE_INTEGER,chunkCount:Number.MAX_SAFE_INTEGER,data:maxChunk})}\n`;
+ assert.ok(Buffer.byteLength(longestChunkRecord)<=PLAYWRIGHT_DIAGNOSTIC_LOG_LINE_BYTES);assert.ok(PLAYWRIGHT_DIAGNOSTIC_LOG_LINE_BYTES<=64*1024-1024);
  const relayed=[];assert.equal(relayPlaywrightFailureDiagnostics(`unrelated stderr\n${output}`,commandId,value=>relayed.push(value)),rows.length);assert.equal(relayed.join(''),output);
  assert.throws(()=>emitPlaywrightFailureDiagnostics({commandId:'unsafe',testResultsRoot:root,write:()=>{}}),/unsafe diagnostic input/);
  assert.throws(()=>emitPlaywrightFailureDiagnostics({commandId,testResultsRoot:'relative',write:()=>{}}),/unsafe diagnostic input/);
