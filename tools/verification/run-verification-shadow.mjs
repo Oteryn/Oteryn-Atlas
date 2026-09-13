@@ -95,13 +95,20 @@ export function emitPlaywrightFailureDiagnostics({commandId,testResultsRoot,writ
   const output=records.join('');if(Buffer.byteLength(output)>limits.maxOutputBytes)throw new TypeError('diagnostic output bound');write(output);return output;
 }
 
-function playwrightDiagnosticHelperSource() {
-  return `import fs from 'node:fs';import path from 'node:path';import {createHash} from 'node:crypto';const PLAYWRIGHT_DIAGNOSTIC_PREFIX=${JSON.stringify(PLAYWRIGHT_DIAGNOSTIC_PREFIX)};const PLAYWRIGHT_DIAGNOSTIC_LOG_LINE_BYTES=${PLAYWRIGHT_DIAGNOSTIC_LOG_LINE_BYTES};const PLAYWRIGHT_DIAGNOSTIC_LIMITS=${JSON.stringify(PLAYWRIGHT_DIAGNOSTIC_LIMITS)};const diagnosticSafeCommand=${diagnosticSafeCommand.toString()};const diagnosticSafePath=${diagnosticSafePath.toString()};const emitPlaywrightFailureDiagnostics=${emitPlaywrightFailureDiagnostics.toString()};try{emitPlaywrightFailureDiagnostics({commandId:process.argv[1],testResultsRoot:process.argv[2]});}catch(error){const commandId=diagnosticSafeCommand(process.argv[1])?process.argv[1]:'invalid',base={schema:'oteryn.atlas.playwright-diagnostic',version:1,commandId};fs.writeSync(2,PLAYWRIGHT_DIAGNOSTIC_PREFIX+' '+JSON.stringify({...base,type:'error',error:String(error?.message??error).slice(0,256)})+'\\n'+PLAYWRIGHT_DIAGNOSTIC_PREFIX+' '+JSON.stringify({...base,type:'complete',fileCount:0,totalRawBytes:0,omissionCount:0,errorCount:1,complete:true})+'\\n');process.exitCode=1;}`;
+export function emitStoppedContainerPlaywrightDiagnostics({containerName,commandId,destination,run=spawnSync,write=record=>fs.writeSync(2,record)}={}) {
+  if(!/^atlas-playwright-[a-f0-9-]+$/.test(containerName??'')||!diagnosticSafeCommand(commandId)||typeof destination!=='string'||!path.isAbsolute(destination)||fs.existsSync(destination))return false;
+  fs.mkdirSync(destination,{mode:0o700});
+  try {
+    const copied=run('docker',['cp',`${containerName}:/artifacts/test-results/.`,destination],{encoding:'utf8',timeout:30000,maxBuffer:1024*1024});
+    if(copied?.error||copied?.status!==0||copied?.signal)throw new TypeError('container artifact export failed');
+    emitPlaywrightFailureDiagnostics({commandId,testResultsRoot:destination,write});return true;
+  } catch(error) {
+    const base={schema:'oteryn.atlas.playwright-diagnostic',version:1,commandId};
+    const output=`${PLAYWRIGHT_DIAGNOSTIC_PREFIX} ${JSON.stringify({...base,type:'error',error:String(error?.message??error).slice(0,256)})}\n${PLAYWRIGHT_DIAGNOSTIC_PREFIX} ${JSON.stringify({...base,type:'complete',fileCount:0,totalRawBytes:0,omissionCount:0,errorCount:1,complete:true})}\n`;
+    if(output.split('\n').every(line=>!line||Buffer.byteLength(line)<PLAYWRIGHT_DIAGNOSTIC_LOG_LINE_BYTES))try{write(output);}catch{}
+    return false;
+  }
 }
-function playwrightStderrConsumerSource() {
-  return `import fs from 'node:fs';const limit=${PLAYWRIGHT_STDERR_TAIL_BYTES};let tail=Buffer.alloc(0),finished=false;const finish=()=>{if(finished)return;finished=true;if(tail.length)fs.writeSync(2,'ATLAS_SHADOW_PLAYWRIGHT_STDERR_TAIL '+tail.toString('base64')+'\\n');};process.on('SIGTERM',()=>{finish();process.exit(0);});fs.writeFileSync(process.argv[1],'ready\\n');for await(const chunk of process.stdin){tail=Buffer.concat([tail,chunk]);if(tail.length>limit)tail=tail.subarray(tail.length-limit);}finish();`;
-}
-const shellQuote=value=>`'${String(value).replaceAll("'",`'\\''`)}'`;
 
 export function relayPlaywrightFailureDiagnostics(stderr,expectedCommandId,write=record=>fs.writeSync(2,record)) {
   if(!diagnosticSafeCommand(expectedCommandId))return 0;
@@ -590,12 +597,12 @@ export function fixtureBrowserArgs(composeArgs,{uid=process.getuid(),gid=process
 const CANDIDATE_ARTIFACT_TMPFS_BYTES=64*1024*1024;
 const MACHINE_BROWSER_BASE_COMMAND='./node_modules/.bin/playwright test --config=playwright.config.mjs --test-list=/run/atlas-protected-test-list.txt --shard="${ATLAS_E2E_SHARD:?ATLAS_E2E_SHARD is required}" --workers="${ATLAS_E2E_WORKERS:-1}" --retries=0 --reporter=json';
 const MACHINE_BROWSER_COMMAND=`exec ${MACHINE_BROWSER_BASE_COMMAND}`;
-export function machineFixtureBrowserArgs(composeArgs,{uid=process.getuid(),gid=process.getgid(),reviewBearing=false,commandId=null}={}) {
+export function machineFixtureBrowserArgs(composeArgs,{uid=process.getuid(),gid=process.getgid(),reviewBearing=false,commandId=null,containerName=null}={}) {
   if(!Array.isArray(composeArgs)||composeArgs.some(value=>typeof value!=='string')||!Number.isSafeInteger(uid)||uid<0||!Number.isSafeInteger(gid)||gid<0) fail('machine fixture identity');
-  if(reviewBearing&&(!diagnosticSafeCommand(commandId)||uid===0||gid===0))fail('machine diagnostic identity');
-  const command=reviewBearing?`exec 3>&1; stderr_dir=$(mktemp -d /tmp/atlas-playwright-stderr.XXXXXX) || exit 125; chmod 700 "$stderr_dir" || exit 125; mkfifo "$stderr_dir/pipe" "$stderr_dir/ready" || exit 125; exec 4<>"$stderr_dir/pipe"; node --input-type=module -e ${shellQuote(playwrightStderrConsumerSource())} "$stderr_dir/ready" <&4 >&2 & consumer=$!; read -r ready <"$stderr_dir/ready" || exit 125; setpriv --reuid=${uid} --regid=${gid} --clear-groups ${MACHINE_BROWSER_BASE_COMMAND} 1>&3 2>&4; status=$?; quiesced=0; pkill -KILL -u ${uid} 2>/dev/null; cleanup_status=$?; process_states=$(ps -eo uid=,stat= 2>/dev/null); probe_status=$?; live_count=$(printf '%s\n' "$process_states" | awk -v uid=${uid} '$1 == uid && $2 !~ /^Z/ { count++ } END { print count+0 }'); state_status=$?; if { [ "$cleanup_status" -eq 0 ] || [ "$cleanup_status" -eq 1 ]; } && [ "$probe_status" -eq 0 ] && [ "$state_status" -eq 0 ] && [ "$live_count" -eq 0 ]; then quiesced=1; fi; exec 4>&-; kill -TERM "$consumer" 2>/dev/null || :; wait "$consumer" 2>/dev/null || :; rm -f "$stderr_dir/pipe" "$stderr_dir/ready"; rmdir "$stderr_dir" 2>/dev/null || :; if [ "$status" -ne 0 ] && [ "$quiesced" -eq 1 ]; then node --input-type=module -e ${shellQuote(playwrightDiagnosticHelperSource())} ${shellQuote(commandId)} /artifacts/test-results || :; fi; exit "$status"`:MACHINE_BROWSER_COMMAND;
-  return [...composeArgs,'run',...(reviewBearing?['--cap-add','SETUID','--cap-add','SETGID','--cap-add','KILL']:[]),'--user',reviewBearing?'0:0':`${uid}:${gid}`,'--rm','--no-deps','e2e','bash','-lc',command];
+  if(reviewBearing&&(!diagnosticSafeCommand(commandId)||!/^atlas-playwright-[a-f0-9-]+$/.test(containerName??'')))fail('machine diagnostic identity');
+  return [...composeArgs,'run',...(reviewBearing?['--name',containerName]:[]),'--user',`${uid}:${gid}`,...(reviewBearing?[]:['--rm']),'--no-deps','e2e','bash','-lc',MACHINE_BROWSER_COMMAND];
 }
+
 export function writeCandidateArtifactContainment(file) {
   if(typeof file!=='string'||!path.isAbsolute(file)||fs.existsSync(file)) fail('candidate artifact containment destination');
   const source=`services:\n  e2e:\n    volumes:\n      - type: tmpfs\n        target: /artifacts\n        tmpfs:\n          size: ${CANDIDATE_ARTIFACT_TMPFS_BYTES}\n`;
@@ -716,8 +723,12 @@ async function runPublicationBrowser(command,{candidate,contract,publication,dir
         fail('protected browser service setup failed');
       }
     }
-    const result=spawnSync('docker',machineFixtureBrowserArgs(machineArgs,{reviewBearing:reviewFrames.length>0,commandId:command.id}),{env,encoding:'utf8',timeout:command.timeoutSeconds*1000,maxBuffer:MACHINE_BROWSER_STDERR_BUFFER_BYTES});
-    if(result.error||result.status!==0||result.signal) {if(reviewFrames.length>0)relayPlaywrightFailureDiagnostics(result.stderr,command.id);console.error(JSON.stringify({phase:'browser-execution',dataCapability:command.dataCapability,exitCode:result.status,signal:result.signal,error:result.error?.message??null,stdout:String(result.stdout??'').slice(-12288),stderr:String(result.stderr??'').slice(-4096)}));fail('protected browser execution failed');}
+    const reviewBearing=reviewFrames.length>0;
+    const containerName=reviewBearing?`atlas-playwright-${randomUUID()}`:null;
+    const result=spawnSync('docker',machineFixtureBrowserArgs(machineArgs,{reviewBearing,commandId:command.id,containerName}),{env,encoding:'utf8',timeout:command.timeoutSeconds*1000,maxBuffer:MACHINE_BROWSER_STDERR_BUFFER_BYTES});
+    if(reviewBearing&&result.status!==0&&!result.signal)emitStoppedContainerPlaywrightDiagnostics({containerName,commandId:command.id,destination:path.join(directory,`failed-playwright-${suffix}`)});
+    if(reviewBearing)spawnSync('docker',['rm','-f',containerName],{encoding:'utf8',timeout:30000,maxBuffer:1024*1024});
+    if(result.error||result.status!==0||result.signal) {console.error(JSON.stringify({phase:'browser-execution',dataCapability:command.dataCapability,exitCode:result.status,signal:result.signal,error:result.error?.message??null,stdout:String(result.stdout??'').slice(-12288),stderr:String(result.stderr??'').slice(-4096)}));fail('protected browser execution failed');}
     const readCensusReport=report=>{
       const observed=[];
       const walk=suites=>{for(const suite of suites??[]){for(const spec of suite.specs??[]){for(const test of spec.tests??[]){if(test.status!=='expected'||test.results?.length!==1||test.results[0].status!=='passed'||test.results[0].retry!==0)fail('fixture nonpass/retry');observed.push(`${test.projectName}::e2e/tests/${spec.file.replace(/^.*\/tests\//,'')}::${spec.title}`);}}walk(suite.suites);}};
