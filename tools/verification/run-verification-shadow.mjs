@@ -125,7 +125,7 @@ export function relayPlaywrightFailureDiagnostics(stderr,expectedCommandId,write
     return 0;
   }
   if(completeCount!==1||files.size>PLAYWRIGHT_DIAGNOSTIC_LIMITS.maxFiles||totalRawBytes>PLAYWRIGHT_DIAGNOSTIC_LIMITS.maxTotalRawBytes||[...files.values()].some(file=>!file.ended))return 0;
-  const output=lines.map(line=>`${line}\n`).join('');if(Buffer.byteLength(output)>PLAYWRIGHT_DIAGNOSTIC_LIMITS.maxOutputBytes)return 0;write(output);return lines.length;
+  const output=lines.map(line=>`${line}\n`).join('');if(Buffer.byteLength(output)>PLAYWRIGHT_DIAGNOSTIC_LIMITS.maxOutputBytes)return 0;try{write(output);}catch{return 0;}return lines.length;
 }
 
 // pull_request_target and merge_group both load protected workflow authority.
