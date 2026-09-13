@@ -41,33 +41,29 @@ const controlRoot=path.resolve(fileURLToPath(new URL('../../',import.meta.url)))
 
 export const PLAYWRIGHT_DIAGNOSTIC_PREFIX='ATLAS_SHADOW_PLAYWRIGHT_DIAGNOSTIC';
 export const PLAYWRIGHT_DIAGNOSTIC_LIMITS=Object.freeze({maxDepth:8,maxEntries:2048,maxFiles:8,maxFileBytes:4*1024*1024,maxTotalRawBytes:8*1024*1024,maxChunkBytes:48*1024,maxOutputBytes:12*1024*1024});
+export const PLAYWRIGHT_STDERR_TAIL_BYTES=16*1024;
+export const MACHINE_BROWSER_STDERR_BUFFER_BYTES=16*1024*1024;
 const diagnosticSafeCommand=id=>/^sha256:[a-f0-9]{64}$/.test(id??'');
 const diagnosticSafePath=value=>typeof value==='string'&&value.length>0&&value.length<=1024&&value===value.replaceAll('\\','/')&&!path.posix.isAbsolute(value)&&value.split('/').every(part=>part&&part!=='.'&&part!=='..');
 export function emitPlaywrightFailureDiagnostics({commandId,testResultsRoot,write=record=>fs.writeSync(2,record),limits=PLAYWRIGHT_DIAGNOSTIC_LIMITS}={}) {
   if(!diagnosticSafeCommand(commandId)||typeof testResultsRoot!=='string'||!path.isAbsolute(testResultsRoot)) throw new TypeError('unsafe diagnostic input');
   const rootStat=fs.lstatSync(testResultsRoot);
   if(rootStat.isSymbolicLink()||!rootStat.isDirectory()) throw new TypeError('unsafe diagnostic root');
-  const records=[], omitted=new Map();let entries=0;
+  const records=[],omitted=new Map();let entries=0;
   const record=(type,data={})=>records.push(`${PLAYWRIGHT_DIAGNOSTIC_PREFIX} ${JSON.stringify({schema:'oteryn.atlas.playwright-diagnostic',version:1,type,commandId,...data})}\n`);
   const omit=(reason,count=1)=>omitted.set(reason,(omitted.get(reason)??0)+count);
   const files=[];
   const walk=(directory,relative='',depth=0)=>{
     if(depth>limits.maxDepth){omit('max-depth');return;}
     const names=[],handle=fs.opendirSync(directory);
-    try {
-      for(let entry;(entry=handle.readSync());) {
-        if(entries+names.length>=limits.maxEntries){omit('max-entries');return;}
-        names.push(entry.name);
-      }
-    } finally {handle.closeSync();}
+    try {for(let entry;(entry=handle.readSync());){if(entries+names.length>=limits.maxEntries){omit('max-entries');return;}names.push(entry.name);}} finally {handle.closeSync();}
     for(const name of names.sort()) {
-      entries++;
-      const next=relative?`${relative}/${name}`:name;
+      entries++;const next=relative?`${relative}/${name}`:name;
       if(!diagnosticSafePath(next)){omit('unsafe-path');continue;}
       const absolute=path.join(directory,name),stat=fs.lstatSync(absolute);
-      if(stat.isSymbolicLink()) continue;
+      if(stat.isSymbolicLink())continue;
       if(stat.isDirectory()){walk(absolute,next,depth+1);continue;}
-      if(stat.isFile()&&(name.endsWith('-actual.png')||name.endsWith('-diff.png'))) files.push({path:next,absolute,bytes:stat.size});
+      if(stat.isFile()&&(name.endsWith('-actual.png')||name.endsWith('-diff.png')))files.push({path:next,absolute,bytes:stat.size,dev:stat.dev,ino:stat.ino});
     }
   };
   walk(testResultsRoot);files.sort((a,b)=>a.path<b.path?-1:a.path>b.path?1:0);
@@ -76,34 +72,60 @@ export function emitPlaywrightFailureDiagnostics({commandId,testResultsRoot,writ
     if(emittedFiles>=limits.maxFiles){omit('max-files');continue;}
     if(file.bytes>limits.maxFileBytes){omit('max-file-bytes');continue;}
     if(totalRaw+file.bytes>limits.maxTotalRawBytes){omit('max-total-raw-bytes');continue;}
-    const bytes=fs.readFileSync(file.absolute);
-    if(bytes.length!==file.bytes){omit('file-changed');continue;}
+    let descriptor,bytes;
+    try {
+      descriptor=fs.openSync(file.absolute,fs.constants.O_RDONLY|fs.constants.O_NOFOLLOW);
+      const opened=fs.fstatSync(descriptor);
+      if(!opened.isFile()||opened.dev!==file.dev||opened.ino!==file.ino||opened.size!==file.bytes){omit('file-changed');continue;}
+      bytes=fs.readFileSync(descriptor);const finished=fs.fstatSync(descriptor);
+      if(bytes.length!==file.bytes||finished.dev!==file.dev||finished.ino!==file.ino||finished.size!==file.bytes){omit('file-changed');continue;}
+    } catch {omit('file-changed');continue;} finally {if(descriptor!==undefined)try{fs.closeSync(descriptor);}catch{}}
     const chunks=[];for(let offset=0;offset<bytes.length;offset+=limits.maxChunkBytes)chunks.push(bytes.subarray(offset,offset+limits.maxChunkBytes).toString('base64'));
     const digest=createHash('sha256').update(bytes).digest('hex');
     record('file',{path:file.path,byteLength:bytes.length,sha256:digest,encoding:'base64',chunkCount:chunks.length});
     chunks.forEach((data,index)=>record('chunk',{path:file.path,index,chunkCount:chunks.length,data}));
-    record('end',{path:file.path,byteLength:bytes.length,sha256:digest,complete:true});
-    totalRaw+=bytes.length;emittedFiles++;
+    record('end',{path:file.path,byteLength:bytes.length,sha256:digest,complete:true});totalRaw+=bytes.length;emittedFiles++;
   }
-  for(const [reason,count] of [...omitted].sort(([a],[b])=>a<b?-1:a>b?1:0)) record('omission',{reason,count});
-  record('complete',{fileCount:emittedFiles,totalRawBytes:totalRaw,complete:true});
-  const output=records.join('');
-  if(Buffer.byteLength(output)>limits.maxOutputBytes) throw new TypeError('diagnostic output bound');
-  write(output);return output;
+  for(const [reason,count] of [...omitted].sort(([a],[b])=>a<b?-1:a>b?1:0))record('omission',{reason,count});
+  record('complete',{fileCount:emittedFiles,totalRawBytes:totalRaw,omissionCount:[...omitted.values()].reduce((sum,count)=>sum+count,0),errorCount:0,complete:true});
+  const output=records.join('');if(Buffer.byteLength(output)>limits.maxOutputBytes)throw new TypeError('diagnostic output bound');write(output);return output;
 }
 
 function playwrightDiagnosticHelperSource() {
-  return `import fs from 'node:fs';import path from 'node:path';import {createHash} from 'node:crypto';const PLAYWRIGHT_DIAGNOSTIC_PREFIX=${JSON.stringify(PLAYWRIGHT_DIAGNOSTIC_PREFIX)};const PLAYWRIGHT_DIAGNOSTIC_LIMITS=${JSON.stringify(PLAYWRIGHT_DIAGNOSTIC_LIMITS)};const diagnosticSafeCommand=${diagnosticSafeCommand.toString()};const diagnosticSafePath=${diagnosticSafePath.toString()};const emitPlaywrightFailureDiagnostics=${emitPlaywrightFailureDiagnostics.toString()};try{emitPlaywrightFailureDiagnostics({commandId:process.argv[1],testResultsRoot:process.argv[2]});}catch(error){const commandId=diagnosticSafeCommand(process.argv[1])?process.argv[1]:'invalid';fs.writeSync(2,PLAYWRIGHT_DIAGNOSTIC_PREFIX+' '+JSON.stringify({schema:'oteryn.atlas.playwright-diagnostic',version:1,type:'error',commandId,error:String(error?.message??error).slice(0,256)})+'\\n');process.exitCode=1;}`;
+  return `import fs from 'node:fs';import path from 'node:path';import {createHash} from 'node:crypto';const PLAYWRIGHT_DIAGNOSTIC_PREFIX=${JSON.stringify(PLAYWRIGHT_DIAGNOSTIC_PREFIX)};const PLAYWRIGHT_DIAGNOSTIC_LIMITS=${JSON.stringify(PLAYWRIGHT_DIAGNOSTIC_LIMITS)};const diagnosticSafeCommand=${diagnosticSafeCommand.toString()};const diagnosticSafePath=${diagnosticSafePath.toString()};const emitPlaywrightFailureDiagnostics=${emitPlaywrightFailureDiagnostics.toString()};try{emitPlaywrightFailureDiagnostics({commandId:process.argv[1],testResultsRoot:process.argv[2]});}catch(error){const commandId=diagnosticSafeCommand(process.argv[1])?process.argv[1]:'invalid',base={schema:'oteryn.atlas.playwright-diagnostic',version:1,commandId};fs.writeSync(2,PLAYWRIGHT_DIAGNOSTIC_PREFIX+' '+JSON.stringify({...base,type:'error',error:String(error?.message??error).slice(0,256)})+'\\n'+PLAYWRIGHT_DIAGNOSTIC_PREFIX+' '+JSON.stringify({...base,type:'complete',fileCount:0,totalRawBytes:0,omissionCount:0,errorCount:1,complete:true})+'\\n');process.exitCode=1;}`;
+}
+function playwrightStderrConsumerSource() {
+  return `import fs from 'node:fs';const limit=${PLAYWRIGHT_STDERR_TAIL_BYTES};let tail=Buffer.alloc(0);for await(const chunk of process.stdin){tail=Buffer.concat([tail,chunk]);if(tail.length>limit)tail=tail.subarray(tail.length-limit);}if(tail.length)fs.writeSync(2,'ATLAS_SHADOW_PLAYWRIGHT_STDERR_TAIL '+tail.toString('base64')+'\\n');`;
 }
 const shellQuote=value=>`'${String(value).replaceAll("'",`'\\''`)}'`;
 
-export function relayPlaywrightFailureDiagnostics(stderr,write=record=>fs.writeSync(2,record)) {
-  const records=String(stderr??'').split('\n').filter(line=>{
-    if(!line.startsWith(`${PLAYWRIGHT_DIAGNOSTIC_PREFIX} `))return false;
-    try {const row=JSON.parse(line.slice(PLAYWRIGHT_DIAGNOSTIC_PREFIX.length+1));return row?.schema==='oteryn.atlas.playwright-diagnostic'&&row.version===1;} catch {return false;}
-  });
-  if(records.length) write(records.map(line=>`${line}\n`).join(''));
-  return records.length;
+export function relayPlaywrightFailureDiagnostics(stderr,expectedCommandId,write=record=>fs.writeSync(2,record)) {
+  if(!diagnosticSafeCommand(expectedCommandId))return 0;
+  const lines=String(stderr??'').split('\n').filter(line=>line.startsWith(`${PLAYWRIGHT_DIAGNOSTIC_PREFIX} `));
+  let rows;try{rows=lines.map(line=>JSON.parse(line.slice(PLAYWRIGHT_DIAGNOSTIC_PREFIX.length+1)));}catch{return 0;}
+  if(!rows.length||rows.some(row=>!row||row.schema!=='oteryn.atlas.playwright-diagnostic'||row.version!==1||row.commandId!==expectedCommandId))return 0;
+  const files=new Map();let totalRawBytes=0,omissionCount=0,errorCount=0,completeCount=0;
+  const uint=value=>Number.isSafeInteger(value)&&value>=0;
+  for(const row of rows) {
+    if(row.type==='file') {
+      if(!diagnosticSafePath(row.path)||files.has(row.path)||!uint(row.byteLength)||row.byteLength>PLAYWRIGHT_DIAGNOSTIC_LIMITS.maxFileBytes||!/^[a-f0-9]{64}$/.test(row.sha256??'')||row.encoding!=='base64'||!uint(row.chunkCount))return 0;
+      files.set(row.path,{header:row,chunks:[],ended:false});continue;
+    }
+    if(row.type==='chunk') {
+      const file=files.get(row.path);if(!file||file.ended||row.index!==file.chunks.length||row.chunkCount!==file.header.chunkCount||typeof row.data!=='string'||row.data.length%4!==0||!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(row.data))return 0;
+      const bytes=Buffer.from(row.data,'base64');if(bytes.toString('base64')!==row.data||bytes.length>PLAYWRIGHT_DIAGNOSTIC_LIMITS.maxChunkBytes)return 0;file.chunks.push(bytes);continue;
+    }
+    if(row.type==='end') {
+      const file=files.get(row.path);if(!file||file.ended||row.complete!==true||row.byteLength!==file.header.byteLength||row.sha256!==file.header.sha256||file.chunks.length!==file.header.chunkCount)return 0;
+      const bytes=Buffer.concat(file.chunks);if(bytes.length!==row.byteLength||createHash('sha256').update(bytes).digest('hex')!==row.sha256)return 0;file.ended=true;totalRawBytes+=bytes.length;continue;
+    }
+    if(row.type==='omission'){if(typeof row.reason!=='string'||!['max-depth','max-entries','unsafe-path','max-files','max-file-bytes','max-total-raw-bytes','file-changed'].includes(row.reason)||!Number.isSafeInteger(row.count)||row.count<1)return 0;omissionCount+=row.count;continue;}
+    if(row.type==='error'){if(typeof row.error!=='string'||!row.error.length||row.error.length>256)return 0;errorCount++;continue;}
+    if(row.type==='complete'){completeCount++;if(row!==rows.at(-1)||row.complete!==true||row.fileCount!==files.size||row.totalRawBytes!==totalRawBytes||row.omissionCount!==omissionCount||row.errorCount!==errorCount)return 0;continue;}
+    return 0;
+  }
+  if(completeCount!==1||files.size>PLAYWRIGHT_DIAGNOSTIC_LIMITS.maxFiles||totalRawBytes>PLAYWRIGHT_DIAGNOSTIC_LIMITS.maxTotalRawBytes||[...files.values()].some(file=>!file.ended))return 0;
+  const output=lines.map(line=>`${line}\n`).join('');if(Buffer.byteLength(output)>PLAYWRIGHT_DIAGNOSTIC_LIMITS.maxOutputBytes)return 0;write(output);return lines.length;
 }
 
 // pull_request_target and merge_group both load protected workflow authority.
@@ -567,7 +589,7 @@ const MACHINE_BROWSER_COMMAND=`exec ${MACHINE_BROWSER_BASE_COMMAND}`;
 export function machineFixtureBrowserArgs(composeArgs,{uid=process.getuid(),gid=process.getgid(),reviewBearing=false,commandId=null}={}) {
   if(!Array.isArray(composeArgs)||composeArgs.some(value=>typeof value!=='string')||!Number.isSafeInteger(uid)||uid<0||!Number.isSafeInteger(gid)||gid<0) fail('machine fixture identity');
   if(reviewBearing&&!diagnosticSafeCommand(commandId))fail('machine diagnostic command id');
-  const command=reviewBearing?`${MACHINE_BROWSER_BASE_COMMAND}; status=$?; if [ "$status" -ne 0 ]; then node --input-type=module -e ${shellQuote(playwrightDiagnosticHelperSource())} ${shellQuote(commandId)} /artifacts/test-results || :; fi; exit "$status"`:MACHINE_BROWSER_COMMAND;
+  const command=reviewBearing?`{ ${MACHINE_BROWSER_BASE_COMMAND} 2>&1 1>&3; } 3>&1 | node --input-type=module -e ${shellQuote(playwrightStderrConsumerSource())} >&2; status=\${PIPESTATUS[0]}; if [ "$status" -ne 0 ]; then node --input-type=module -e ${shellQuote(playwrightDiagnosticHelperSource())} ${shellQuote(commandId)} /artifacts/test-results || :; fi; exit "$status"`:MACHINE_BROWSER_COMMAND;
   return [...composeArgs,'run','--user',`${uid}:${gid}`,'--rm','--no-deps','e2e','bash','-lc',command];
 }
 export function writeCandidateArtifactContainment(file) {
@@ -690,8 +712,8 @@ async function runPublicationBrowser(command,{candidate,contract,publication,dir
         fail('protected browser service setup failed');
       }
     }
-    const result=spawnSync('docker',machineFixtureBrowserArgs(machineArgs,{reviewBearing:reviewFrames.length>0,commandId:command.id}),{env,encoding:'utf8',timeout:command.timeoutSeconds*1000,maxBuffer:32*1024*1024});
-    if(result.error||result.status!==0||result.signal) {relayPlaywrightFailureDiagnostics(result.stderr);console.error(JSON.stringify({phase:'browser-execution',dataCapability:command.dataCapability,exitCode:result.status,signal:result.signal,error:result.error?.message??null,stdout:String(result.stdout??'').slice(-12288),stderr:String(result.stderr??'').slice(-4096)}));fail('protected browser execution failed');}
+    const result=spawnSync('docker',machineFixtureBrowserArgs(machineArgs,{reviewBearing:reviewFrames.length>0,commandId:command.id}),{env,encoding:'utf8',timeout:command.timeoutSeconds*1000,maxBuffer:MACHINE_BROWSER_STDERR_BUFFER_BYTES});
+    if(result.error||result.status!==0||result.signal) {relayPlaywrightFailureDiagnostics(result.stderr,command.id);console.error(JSON.stringify({phase:'browser-execution',dataCapability:command.dataCapability,exitCode:result.status,signal:result.signal,error:result.error?.message??null,stdout:String(result.stdout??'').slice(-12288),stderr:String(result.stderr??'').slice(-4096)}));fail('protected browser execution failed');}
     const readCensusReport=report=>{
       const observed=[];
       const walk=suites=>{for(const suite of suites??[]){for(const spec of suite.specs??[]){for(const test of spec.tests??[]){if(test.status!=='expected'||test.results?.length!==1||test.results[0].status!=='passed'||test.results[0].retry!==0)fail('fixture nonpass/retry');observed.push(`${test.projectName}::e2e/tests/${spec.file.replace(/^.*\/tests\//,'')}::${spec.title}`);}}walk(suite.suites);}};
