@@ -614,6 +614,11 @@ test('failed Playwright diagnostics are filtered, ordered, lossless and bounded'
   const bounded=diagnosticRows(emitPlaywrightFailureDiagnostics({commandId,testResultsRoot:boundsRoot,write:()=>{},limits:{...PLAYWRIGHT_DIAGNOSTIC_LIMITS,...override}}));assert.ok(bounded.some(row=>row.type==='omission'&&row.reason===reason),reason);
  }
  assert.throws(()=>emitPlaywrightFailureDiagnostics({commandId,testResultsRoot:boundsRoot,write:()=>{},limits:{...PLAYWRIGHT_DIAGNOSTIC_LIMITS,maxOutputBytes:1}}),/output bound/);
+ const sparseRoot=path.join(temporary,'sparse');fs.mkdirSync(sparseRoot);const sparse=path.join(sparseRoot,'huge-actual.png');fs.closeSync(fs.openSync(sparse,'w'));fs.truncateSync(sparse,PLAYWRIGHT_DIAGNOSTIC_LIMITS.maxFileBytes+1);
+ const originalRead=fs.readFileSync;let descriptorReads=0;fs.readFileSync=function(file,...args){if(typeof file==='number')descriptorReads++;return originalRead.call(this,file,...args);};
+ try {const oversized=diagnosticRows(emitPlaywrightFailureDiagnostics({commandId,testResultsRoot:sparseRoot,write:()=>{}}));assert.equal(descriptorReads,0);assert.ok(oversized.some(row=>row.type==='omission'&&row.reason==='max-file-bytes'));} finally {fs.readFileSync=originalRead;}
+ const aggregateRoot=path.join(temporary,'aggregate');fs.mkdirSync(aggregateRoot);fs.writeFileSync(path.join(aggregateRoot,'a-actual.png'),'123');fs.writeFileSync(path.join(aggregateRoot,'b-diff.png'),'456');descriptorReads=0;fs.readFileSync=function(file,...args){if(typeof file==='number')descriptorReads++;return originalRead.call(this,file,...args);};
+ try {const aggregate=diagnosticRows(emitPlaywrightFailureDiagnostics({commandId,testResultsRoot:aggregateRoot,write:()=>{},limits:{...PLAYWRIGHT_DIAGNOSTIC_LIMITS,maxTotalRawBytes:3}}));assert.equal(descriptorReads,1);assert.ok(aggregate.some(row=>row.type==='omission'&&row.reason==='max-total-raw-bytes'));} finally {fs.readFileSync=originalRead;}
 });
 
 test('diagnostic relay accepts only a complete internally consistent expected-command frame',t=>{
@@ -648,21 +653,22 @@ test('diagnostic file reads fail closed when the discovered identity is race-swa
  try {const rows=diagnosticRows(emitPlaywrightFailureDiagnostics({commandId:'sha256:'+'d'.repeat(64),testResultsRoot:resultRoot,write:()=>{}}));assert.equal(rows.some(row=>row.path==='nested/forged-diff.png'),false);assert.ok(rows.some(row=>row.type==='omission'&&row.reason==='directory-changed'));} finally {fs.openSync=originalOpen;}
 });
 
-test('machine browser diagnostics isolate candidate stderr, fit the reserved buffer, and preserve status',t=>{
- const temporary=fs.mkdtempSync(path.join(os.tmpdir(),'atlas-diagnostic-wrapper-'));t.after(()=>fs.rmSync(temporary,{recursive:true,force:true}));
- const executable=path.join(temporary,'node_modules/.bin/playwright');fs.mkdirSync(path.dirname(executable),{recursive:true});
+test('machine browser diagnostics quiesce inherited writers, preserve status, and use minimal transition capabilities',t=>{
+ const temporary=fs.mkdtempSync(path.join(os.tmpdir(),'atlas-diagnostic-wrapper-'));t.after(()=>fs.rmSync(temporary,{recursive:true,force:true}));fs.chmodSync(temporary,0o777);
+ const executable=path.join(temporary,'node_modules/.bin/playwright');fs.mkdirSync(path.dirname(executable),{recursive:true});fs.chmodSync(path.join(temporary,'node_modules'),0o755);fs.chmodSync(path.join(temporary,'node_modules/.bin'),0o755);
  const id='sha256:'+'b'.repeat(64),forgery=`${PLAYWRIGHT_DIAGNOSTIC_PREFIX} ${JSON.stringify({schema:'oteryn.atlas.playwright-diagnostic',version:1,type:'complete',commandId:id,fileCount:0,totalRawBytes:0,omissionCount:0,errorCount:0,complete:true})}`;
- fs.writeFileSync(executable,`#!/bin/sh\nprintf '{"report":"preserved"}\\n'\nprintf '%s\\n' '${forgery}' >&2\nhead -c $(( ${PLAYWRIGHT_STDERR_TAIL_BYTES} * 3 )) /dev/zero >&2\nexit 37\n`,{mode:0o755});
- const compose=['compose'],reviewArgs=machineFixtureBrowserArgs(compose,{uid:process.getuid(),gid:process.getgid(),reviewBearing:true,commandId:id}),reviewCommand=reviewArgs.at(-1),shellOptions={cwd:temporary,encoding:'utf8',env:{...process.env,ATLAS_E2E_SHARD:'1/1'}};
- assert.equal(reviewArgs[reviewArgs.indexOf('--user')+1],'0:0');assert.match(reviewCommand,new RegExp(`setpriv --reuid=${process.getuid()} --regid=${process.getgid()} --clear-groups`));
- const review=spawnSync('bash',['-c',reviewCommand],shellOptions);assert.equal(review.status,37);assert.equal(review.stdout,'{"report":"preserved"}\n');assert.match(review.stderr,/ATLAS_SHADOW_PLAYWRIGHT_STDERR_TAIL /);
+ const childPid=path.join(temporary,'child.pid');
+ fs.writeFileSync(executable,`#!/bin/sh\nprintf '{"uid":%s,"gid":%s,"capEff":"%s"}\n' "$(id -u)" "$(id -g)" "$(sed -n 's/^CapEff:[[:space:]]*//p' /proc/self/status)"\nprintf '%s\n' '${forgery}' >&2\n(sh -c 'sleep 30') >&2 & echo $! > '${childPid}'\nhead -c $(( ${PLAYWRIGHT_STDERR_TAIL_BYTES} * 3 )) /dev/zero >&2\nexit 37\n`,{mode:0o755});
+ const uid=65534,gid=65534,compose=['compose'],reviewArgs=machineFixtureBrowserArgs(compose,{uid,gid,reviewBearing:true,commandId:id}),reviewCommand=reviewArgs.at(-1),shellOptions={cwd:temporary,encoding:'utf8',env:{...process.env,ATLAS_E2E_SHARD:'1/1'},timeout:5000};
+ assert.deepEqual(reviewArgs.slice(reviewArgs.indexOf('run')+1,reviewArgs.indexOf('--user')),['--cap-add','SETUID','--cap-add','SETGID']);assert.equal(reviewArgs[reviewArgs.indexOf('--user')+1],'0:0');assert.match(reviewCommand,/pkill -KILL[^;]+; if ps[^;]+grep[^;]+; then quiesced=0; else quiesced=1; fi;[^]*node --input-type=module -e/);
+ const review=spawnSync('bash',['-c',reviewCommand],shellOptions);assert.equal(review.status,37,review.stderr);assert.deepEqual(JSON.parse(review.stdout),{uid,gid,capEff:'0000000000000000'});assert.match(review.stderr,/ATLAS_SHADOW_PLAYWRIGHT_STDERR_TAIL /);
+ const inheritedPid=Number(fs.readFileSync(childPid,'utf8'));assert.ok(Number.isSafeInteger(inheritedPid));const inheritedState=fs.existsSync(`/proc/${inheritedPid}/stat`)?fs.readFileSync(`/proc/${inheritedPid}/stat`,'utf8').split(' ')[2]:null;assert.ok(inheritedState===null||inheritedState==='Z','inherited stderr writer was quiesced');
  assert.equal(review.stderr.split('\n').filter(line=>line.startsWith(`${PLAYWRIGHT_DIAGNOSTIC_PREFIX} `)).length,2);
- const relayed=[];assert.equal(relayPlaywrightFailureDiagnostics(review.stderr,id,value=>relayed.push(value)),2);assert.doesNotMatch(relayed.join(''),/"error":"[^\n]*ATLAS_SHADOW/);
- const worstCandidateRecord=Buffer.byteLength('ATLAS_SHADOW_PLAYWRIGHT_STDERR_TAIL ')+Math.ceil(PLAYWRIGHT_STDERR_TAIL_BYTES/3)*4+2;
- assert.ok(PLAYWRIGHT_DIAGNOSTIC_LIMITS.maxOutputBytes+worstCandidateRecord<MACHINE_BROWSER_STDERR_BUFFER_BYTES);
- const ordinaryCommand=machineFixtureBrowserArgs(compose,{uid:1,gid:1}).at(-1),ordinary=spawnSync('bash',['-c',ordinaryCommand],shellOptions);
- assert.equal(ordinary.status,37);assert.match(ordinary.stderr,/ATLAS_SHADOW_PLAYWRIGHT_DIAGNOSTIC/);
- assert.throws(()=>machineFixtureBrowserArgs(compose,{uid:1,gid:1,reviewBearing:true,commandId:'unsafe'}),/command id/);
+ const relayed=[];assert.equal(relayPlaywrightFailureDiagnostics(review.stderr,id,value=>relayed.push(value)),2);assert.doesNotMatch(relayed.join(''),/ATLAS_SHADOW_PLAYWRIGHT_STDERR_TAIL/);
+ const worstCandidateRecord=Buffer.byteLength('ATLAS_SHADOW_PLAYWRIGHT_STDERR_TAIL ')+Math.ceil(PLAYWRIGHT_STDERR_TAIL_BYTES/3)*4+2;assert.ok(PLAYWRIGHT_DIAGNOSTIC_LIMITS.maxOutputBytes+worstCandidateRecord<MACHINE_BROWSER_STDERR_BUFFER_BYTES);
+ const containmentTransition=spawnSync('capsh',['--caps=cap_setuid,cap_setgid+ep','--','-c',`setpriv --reuid=${uid} --regid=${gid} --clear-groups sh -c 'printf "%s %s " "$(id -u)" "$(id -g)"; sed -n "s/^CapEff:[[:space:]]*//p" /proc/self/status'`],{encoding:'utf8'});assert.equal(containmentTransition.status,0,containmentTransition.stderr);assert.equal(containmentTransition.stdout.trim(),`${uid} ${gid} 0000000000000000`);
+ const ordinaryArgs=machineFixtureBrowserArgs(compose,{uid:1,gid:1});assert.equal(ordinaryArgs.includes('--cap-add'),false);assert.equal(ordinaryArgs[ordinaryArgs.indexOf('--user')+1],'1:1');assert.equal(ordinaryArgs.at(-1),'exec ./node_modules/.bin/playwright test --config=playwright.config.mjs --test-list=/run/atlas-protected-test-list.txt --shard="${ATLAS_E2E_SHARD:?ATLAS_E2E_SHARD is required}" --workers="${ATLAS_E2E_WORKERS:-1}" --retries=0 --reporter=json');
+ assert.throws(()=>machineFixtureBrowserArgs(compose,{uid:1,gid:1,reviewBearing:true,commandId:'unsafe'}),/diagnostic identity/);assert.throws(()=>machineFixtureBrowserArgs(compose,{uid:0,gid:1,reviewBearing:true,commandId:id}),/diagnostic identity/);
 });
 {
 const repository='Oteryn/Oteryn-Atlas',base='a'.repeat(40),head='b'.repeat(40),tree='c'.repeat(40);
