@@ -16,7 +16,7 @@ SPEC.loader.exec_module(atlas)
 
 LEGACY_VERSION = "3.0.0"
 PIN = "1dedfc0f264fe0e23e5365dbe9280c2d96df50c5"
-TARGET_PIN = "3b39e0be05aef008f1bd442821daefa898a201dd"
+TARGET_PIN = "ce20300aa8a9e1017aff722fe0cd628587fadf63"
 MAIN = PIN
 
 
