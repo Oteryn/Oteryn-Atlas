@@ -20,8 +20,6 @@ AGENTS_PATH = Path("AGENTS.md")
 PROMPTS_PATH = Path("docs/agents/prompts")
 AUTHORITY_REPOSITORY = "Oteryn/Oteryn"
 POLICY_ID = "OTERYN_ORGANIZATION_AGENT_POLICY"
-# Retained for the current protected 3.0 fixture; admission itself is exact-coordinate based.
-POLICY_VERSION = "3.0.0"
 SUPPORTED_POLICY_COORDINATES = {
     "3.0.0": "1dedfc0f264fe0e23e5365dbe9280c2d96df50c5",
     "3.1.0": "3b39e0be05aef008f1bd442821daefa898a201dd",
