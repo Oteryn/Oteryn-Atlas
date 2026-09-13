@@ -2,7 +2,7 @@
 
 ## Current authority
 
-Atlas adopts `OTERYN_ORGANIZATION_AGENT_POLICY` version `3.1.0` from protected META commit `3b39e0be05aef008f1bd442821daefa898a201dd`.
+Atlas adopts `OTERYN_ORGANIZATION_AGENT_POLICY` version `3.1.0` from protected META commit `ce20300aa8a9e1017aff722fe0cd628587fadf63`.
 
 This is the final app-free META 3.1 authority produced by Oteryn/Oteryn#187. The organization integration contract uses native GitHub REST `merge-async` with the exact qualified `sha` and explicit `merge_action=merge_queue`. A direct authenticated execution surface may invoke that native operation. A custom Oteryn GitHub App is not required or authorized merely to submit Merge Queue work, and built-in workflow `GITHUB_TOKEN` is not used as the queue mutation credential when downstream `merge_group` execution is required.
 
@@ -24,7 +24,7 @@ This is an evidence-reuse/authority-identity effect, not a reactivation of the c
 
 The authenticated Atlas consumer must resolve the exact bound META commit, validate policy identity/version and canonical human surfaces, and fail closed if the binding cannot be authenticated as protected-META ancestry. Root/reusable prompt validation remains provider-owned; binding success does not itself grant merge, production or cross-repository authority.
 
-The fail-closed provider consumer must be coherently updated to policy `3.1.0` before this binding can integrate. That consumer migration is a separately protected prerequisite so this provider repin cannot self-authorize its own verification routing or validator behavior.
+The fail-closed provider consumer on protected Atlas `main` admits policy `3.1.0` only at the final protected META authority `ce20300aa8a9e1017aff722fe0cd628587fadf63`, while preserving policy `3.0.0` compatibility and rejecting mixed, unknown or malformed coordinates.
 
 ## Integration
 
