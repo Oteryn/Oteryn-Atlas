@@ -28,6 +28,7 @@ services:
       retries: 30
 
   e2e:
+    image: ${COMPOSE_PROJECT_NAME:?COMPOSE_PROJECT_NAME is required}-e2e
     build:
       context: ${ATLAS_EXECUTION_CONTEXT:?ATLAS_EXECUTION_CONTEXT is required}
       dockerfile: e2e/Dockerfile
