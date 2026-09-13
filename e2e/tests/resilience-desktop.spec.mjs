@@ -55,7 +55,7 @@ test('unavailable creature index remains an isolated fail-closed optional surfac
   await waitForAtlas(page);
   await page.waitForFunction(() => globalThis.__OTERYN_ATLAS_CREATURES__?.status === 'FAIL', null, { timeout: 30_000 });
   const creatures = await page.evaluate(() => globalThis.__OTERYN_ATLAS_CREATURES__);
-  expect(creatures.error).toMatch(/index\.json HTTP 503/i);
+  expect(creatures.error).toMatch(/^\/data\/creatures\/index\.json fetch failed: 503$/i);
   expect(creatures.drawnRecords).toBe(0);
   await expect(page.locator('#creature-status')).toContainText('Unavailable:');
 });

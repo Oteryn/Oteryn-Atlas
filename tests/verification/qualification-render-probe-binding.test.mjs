@@ -26,7 +26,7 @@ test('every qualification-capability historical gotoAtlas caller binds out-of-bo
   const sourceContract=item.spec.includes('-source-contract-');
   assert.equal(item.dataCapability,sourceContract?'bounded_real_world':'qualification_fixture');
   if(sourceContract)assert.equal(rendered[item.spec.slice(4)],fixture.source[item.spec.slice(4)]);
-  else assert.match(rendered[item.spec.slice(4)],/installQualificationGameplayRoute/);
+  else assert.doesNotMatch(rendered[item.spec.slice(4)],/installQualificationGameplayRoute|page\.route\(/);
  }
 });
 test('visual canonical coordinates are preserved only when inside independently bound floor bounds',t=>{

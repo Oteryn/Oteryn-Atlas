@@ -180,7 +180,7 @@ if (process.argv.includes('--emit-entry')) {
     const sourcePins = [...source.matchAll(/^\/\/ Source blob ([a-f0-9]{40}) (.+)$/gm)];
     assert.equal(sourcePins.length, 9, 'generated source-pin inventory recorded');
     for (const [, recordedBlob, relative] of sourcePins) {
-      const actualBlob = execFileSync('git', ['rev-parse', `HEAD:${relative}`], { cwd: repository, encoding: 'utf8' }).trim();
+      const actualBlob = execFileSync('git', ['-c', `safe.directory=${repository}`, 'rev-parse', `HEAD:${relative}`], { cwd: repository, encoding: 'utf8' }).trim();
       assert.equal(recordedBlob, actualBlob, `recorded source blob drift: ${relative}`);
     }
     const recorded = source.match(/^\/\/ Payload sha256 ([a-f0-9]{64})$/m);

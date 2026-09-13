@@ -67,3 +67,25 @@ test('candidate duplicate owner produces an explicit execution blocker',()=>{
  const p=buildVerificationPlan({repository:'Oteryn/Oteryn-Atlas',headSha:'a'.repeat(40),integrationBaseSha:'b'.repeat(40),mergeBaseSha:'c'.repeat(40),changedFiles:[{path:'tests/semantic-search.mjs'}],trustedImpactManifest:manifest([]),candidateImpactManifest:manifest([]),trustedVerificationCatalog:catalog,candidateVerificationCatalog:candidate});
  assert(p.executionBlockers.some(row=>row.reason==='ambiguous-test-owner'));
 });
+
+test('Linux Playwright visual snapshot baselines retain full protected routing',()=>{
+ const impact=JSON.parse(fs.readFileSync(new URL('../../tools/verification/impact-manifest.json',import.meta.url)));
+ const paths=[
+  'e2e/tests/visual-desktop.spec.mjs-snapshots/desktop-inspector-desktop-chromium-linux.png',
+  'e2e/tests/visual-desktop.spec.mjs-snapshots/desktop-topbar-desktop-chromium-linux.png',
+  'e2e/tests/visual-desktop.spec.mjs-snapshots/desktop-view-mode-desktop-chromium-linux.png',
+  'e2e/tests/visual-mobile.spec.mjs-snapshots/mobile-controls-panel-mobile-chromium-linux.png',
+  'e2e/tests/visual-mobile.spec.mjs-snapshots/mobile-inspector-panel-mobile-chromium-linux.png',
+  'e2e/tests/visual-mobile.spec.mjs-snapshots/mobile-topbar-mobile-chromium-linux.png',
+  'e2e/tests/visual-mobile.spec.mjs-snapshots/mobile-view-mode-mobile-chromium-linux.png',
+ ];
+ for(const path of paths){
+  const p=plan(impact,impact,path);
+  assert.equal(p.profile,'full',path);
+  assert(p.impactDomains.includes('verification-governance'),path);
+  assert(p.requiredGroupIds.includes('deterministic.core'),path);
+  for(const id of catalog.groups['e2e.full'].dependsOnGroups) assert(p.requiredGroupIds.includes(id),`${path} -> ${id}`);
+  assert.equal(p.requiresRealFullWorld,false,path);
+  assert(!p.executionBlockers.some(row=>row.reason==='unknown-impact'&&row.path===path),path);
+ }
+});

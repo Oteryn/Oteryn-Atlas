@@ -212,6 +212,28 @@
       ]
     },
     {
+      "pathPrefix": "e2e/tests/visual-desktop.spec.mjs-snapshots/",
+      "domains": [
+        "verification-governance"
+      ],
+      "minimumProfile": "full",
+      "requiredGroups": [
+        "deterministic.core",
+        "e2e.full"
+      ]
+    },
+    {
+      "pathPrefix": "e2e/tests/visual-mobile.spec.mjs-snapshots/",
+      "domains": [
+        "verification-governance"
+      ],
+      "minimumProfile": "full",
+      "requiredGroups": [
+        "deterministic.core",
+        "e2e.full"
+      ]
+    },
+    {
       "pathPrefix": "e2e/",
       "domains": [
         "verification-governance"

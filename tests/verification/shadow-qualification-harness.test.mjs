@@ -22,10 +22,10 @@ async function fixture(t) {
     productRoot,
     expectedProductDigest: manifest.productDigest,
   });
-  return { scratch, bindings };
+  return { scratch, productRoot, bindings };
 }
 test('shadow binds protected qualification harness without weakening production assertions', async (t) => {
-  const { scratch, bindings } = await fixture(t);
+  const { scratch, productRoot, bindings } = await fixture(t);
   const destination = path.join(scratch, 'bound-e2e');
   const result = prepareProtectedBrowserHarness({
     protectedRoot: root,
@@ -38,7 +38,8 @@ test('shadow binds protected qualification harness without weakening production 
   assert.match(source, /32380/);
   assert.match(source, new RegExp(String(bindings.distinct[0].x)));
   const gameplay = fs.readFileSync(path.join(destination, 'tests/creature-gameplay-desktop.spec.mjs'), 'utf8');
-  assert.match(gameplay, /installQualificationGameplayRoute/);
+  assert.doesNotMatch(gameplay, /installQualificationGameplayRoute|page\.route\(/);
+  assert.equal(fs.existsSync(path.join(productRoot, 'web/creature-gameplay/manifest.json')), true);
 });
 
 test('shadow keeps non-qualification protected harness byte-identical', async (t) => {

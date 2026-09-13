@@ -5048,7 +5048,7 @@
             "--test",
             "tests/verification/verification-execution-contract.test.mjs"
           ],
-          "sourceSha256": "a55acf79b7b716af5c10c4862c10b5bfb9d29e2b08eb2f42bff664b4a113633c",
+          "sourceSha256": "663d4cff488b39719852f5f1c319bf4498f08d659f9eec636cdf10c4c636ec59",
           "imports": [],
           "subprocessTests": [],
           "qualification": "local-contract",
@@ -5156,7 +5156,7 @@
           "argv": [
             "tools/governance/test_validate_meta_agent_policy.py"
           ],
-          "sourceSha256": "562fbb8ac24d1f72bbd3bbca5c384542bc56f308ae93882761314f58abba670b",
+          "sourceSha256": "cf8d90bb5558c20b16ead1fb21f9143d39077e0b717e7fd982f15cf0bdf35839",
           "imports": [],
           "subprocessTests": [],
           "qualification": "active-semantic"
