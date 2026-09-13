@@ -264,7 +264,7 @@ test('candidate execution metadata cannot replace protected interpreter or hashe
  assert(!JSON.stringify(contract).includes('candidate-policy'));
 });
 
-import {authenticateR5SemanticSource,buildR5SemanticPublication,resolveShadowEvent,planShadow,deterministicDockerArgs,fixtureBrowserArgs,machineFixtureBrowserArgs,requiresProtectedVisualReference,bindProtectedVisualReferenceConsumer,prepareProtectedBrowserHarness,prepareProtectedBrowserCaptureHarness,writeProtectedBrowserContainment,emitPlaywrightFailureDiagnostics,emitStoppedContainerPlaywrightDiagnostics,relayPlaywrightFailureDiagnostics,PLAYWRIGHT_DIAGNOSTIC_PREFIX,PLAYWRIGHT_DIAGNOSTIC_LIMITS,PLAYWRIGHT_DIAGNOSTIC_LOG_LINE_BYTES,MACHINE_BROWSER_STDERR_BUFFER_BYTES} from '../../tools/verification/run-verification-shadow.mjs';
+import {authenticateR5SemanticSource,buildR5SemanticPublication,resolveShadowEvent,planShadow,deterministicDockerArgs,fixtureBrowserArgs,machineFixtureBrowserArgs,requiresProtectedVisualReference,bindProtectedVisualReferenceConsumer,prepareProtectedBrowserHarness,prepareProtectedBrowserCaptureHarness,writeProtectedBrowserContainment,emitPlaywrightFailureDiagnostics,emitStoppedContainerPlaywrightDiagnostics,relayPlaywrightFailureDiagnostics,PLAYWRIGHT_DIAGNOSTIC_PREFIX,PLAYWRIGHT_DIAGNOSTIC_LIMITS,PLAYWRIGHT_DIAGNOSTIC_LOG_LINE_BYTES} from '../../tools/verification/run-verification-shadow.mjs';
 import {assertShadowExecutorCoverage,assertShadowReviewCaptureCensus,normalizeShadowReviewChangedFiles,shadowReviewPlanDigest} from '../../tools/verification/verification-shadow-review.mjs';
 test('shadow materializes candidate browser tests, support and snapshots while protected executor control stays protected',t=>{
  const {scratch,candidateRoot}=copyCandidateBrowserPayload(t);
