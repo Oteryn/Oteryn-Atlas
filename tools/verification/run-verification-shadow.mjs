@@ -62,10 +62,10 @@ export function resolveProtectedComposeServiceImage({composeArgs,service,env=pro
     if(projects.length!==1||!/^[a-z0-9][a-z0-9_-]*$/.test(projects[0]??''))throw new TypeError('protected collector service image reference');
     const modeled=run('docker',[...composeArgs,'config','--format','json',service],{env,encoding:'utf8',timeout:30000,maxBuffer:1024*1024});
     let model;try{model=JSON.parse(String(modeled?.stdout??''));}catch{throw new TypeError('protected collector service image reference');}
-    const definition=model?.services?.[service],build=definition?.build;
+    const definition=model?.services?.[service],build=definition?.build,reference=`${projects[0]}-${service}`;
     const buildBacked=(typeof build==='string'&&build.length>0)||(build!==null&&typeof build==='object'&&!Array.isArray(build));
-    if(modeled?.error||modeled?.status!==0||modeled?.signal||!definition||!buildBacked||(typeof definition.image==='string'&&definition.image.trim())||definition.image!==undefined&&typeof definition.image!=='string')throw new TypeError('protected collector service image reference');
-    references.push(`${projects[0]}-${service}`);
+    if(modeled?.error||modeled?.status!==0||modeled?.signal||!definition||!buildBacked||![undefined,'',reference].includes(definition.image))throw new TypeError('protected collector service image reference');
+    references.push(reference);
   }
   const inspected=run('docker',['image','inspect','--format','{{.Id}}',references[0]],{env,encoding:'utf8',timeout:30000,maxBuffer:1024*1024});
   const identities=String(inspected?.stdout??'').split(/\r?\n/).map(value=>value.trim()).filter(Boolean);
