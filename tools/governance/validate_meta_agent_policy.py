@@ -20,7 +20,12 @@ AGENTS_PATH = Path("AGENTS.md")
 PROMPTS_PATH = Path("docs/agents/prompts")
 AUTHORITY_REPOSITORY = "Oteryn/Oteryn"
 POLICY_ID = "OTERYN_ORGANIZATION_AGENT_POLICY"
+# Retained for the current protected 3.0 fixture; admission itself is exact-coordinate based.
 POLICY_VERSION = "3.0.0"
+SUPPORTED_POLICY_COORDINATES = {
+    "3.0.0": "1dedfc0f264fe0e23e5365dbe9280c2d96df50c5",
+    "3.1.0": "3b39e0be05aef008f1bd442821daefa898a201dd",
+}
 CENTRAL_POLICY_PATH = "ecosystem/organization-agent-policy.json"
 CENTRAL_VALIDATOR_PATH = "tools/governance/central_agent_policy.py"
 EXPECTED_SURFACES = {
@@ -95,13 +100,17 @@ def validate_binding_bootstrap(binding: dict[str, object]) -> list[str]:
         errors.append("binding schema_version must be integer 1")
     if binding.get("policy_id") != POLICY_ID:
         errors.append(f"binding policy_id must be {POLICY_ID}")
-    if binding.get("policy_version") != POLICY_VERSION:
-        errors.append(f"binding policy_version must be {POLICY_VERSION}")
+    version = binding.get("policy_version")
+    expected_commit = SUPPORTED_POLICY_COORDINATES.get(version) if isinstance(version, str) else None
+    if expected_commit is None:
+        errors.append("binding policy_version must be an exact supported META version")
     if binding.get("authority_repository") != AUTHORITY_REPOSITORY:
         errors.append(f"binding authority_repository must be {AUTHORITY_REPOSITORY}")
     commit = binding.get("authority_commit")
     if not isinstance(commit, str) or SHA_RE.fullmatch(commit) is None:
         errors.append("binding authority_commit must be a lowercase full SHA")
+    elif expected_commit is not None and commit != expected_commit:
+        errors.append(f"binding authority_commit must match policy_version {version}")
     actual_surfaces = {
         "organization_policy": binding.get("organization_policy_path"),
         "prompting_standard": binding.get("prompting_standard_path"),
@@ -123,6 +132,7 @@ def resolve_authority(
     if bootstrap_errors:
         raise ValidationFailure("; ".join(bootstrap_errors))
     commit = str(binding["authority_commit"])
+    policy_version = str(binding["policy_version"])
     api = f"https://api.github.com/repos/{AUTHORITY_REPOSITORY}"
 
     commit_payload = json_reader(f"{api}/commits/{commit}")
@@ -156,7 +166,7 @@ def resolve_authority(
         raise ValidationFailure("central META policy root is not an object")
     if (
         policy.get("policy_id") != POLICY_ID
-        or policy.get("policy_version") != POLICY_VERSION
+        or policy.get("policy_version") != policy_version
         or policy.get("authority_repository") != AUTHORITY_REPOSITORY
         or policy.get("canonical_human_surfaces") != EXPECTED_SURFACES
     ):
