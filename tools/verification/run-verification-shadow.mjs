@@ -39,6 +39,73 @@ const git=(root,...args)=>execFileSync('git',['--no-replace-objects','-C',root,'
 const gitBlob=(root,revision,name)=>execFileSync('git',['--no-replace-objects','-C',root,'-c','core.hooksPath=/dev/null','show',`${revision}:${name}`],{maxBuffer:2*1024*1024});
 const controlRoot=path.resolve(fileURLToPath(new URL('../../',import.meta.url)));
 
+export const PLAYWRIGHT_DIAGNOSTIC_PREFIX='ATLAS_SHADOW_PLAYWRIGHT_DIAGNOSTIC';
+export const PLAYWRIGHT_DIAGNOSTIC_LIMITS=Object.freeze({maxDepth:8,maxEntries:2048,maxFiles:8,maxFileBytes:4*1024*1024,maxTotalRawBytes:8*1024*1024,maxChunkBytes:48*1024,maxOutputBytes:12*1024*1024});
+const diagnosticSafeCommand=id=>/^sha256:[a-f0-9]{64}$/.test(id??'');
+const diagnosticSafePath=value=>typeof value==='string'&&value.length>0&&value.length<=1024&&value===value.replaceAll('\\','/')&&!path.posix.isAbsolute(value)&&value.split('/').every(part=>part&&part!=='.'&&part!=='..');
+export function emitPlaywrightFailureDiagnostics({commandId,testResultsRoot,write=record=>fs.writeSync(2,record),limits=PLAYWRIGHT_DIAGNOSTIC_LIMITS}={}) {
+  if(!diagnosticSafeCommand(commandId)||typeof testResultsRoot!=='string'||!path.isAbsolute(testResultsRoot)) throw new TypeError('unsafe diagnostic input');
+  const rootStat=fs.lstatSync(testResultsRoot);
+  if(rootStat.isSymbolicLink()||!rootStat.isDirectory()) throw new TypeError('unsafe diagnostic root');
+  const records=[], omitted=new Map();let entries=0;
+  const record=(type,data={})=>records.push(`${PLAYWRIGHT_DIAGNOSTIC_PREFIX} ${JSON.stringify({schema:'oteryn.atlas.playwright-diagnostic',version:1,type,commandId,...data})}\n`);
+  const omit=(reason,count=1)=>omitted.set(reason,(omitted.get(reason)??0)+count);
+  const files=[];
+  const walk=(directory,relative='',depth=0)=>{
+    if(depth>limits.maxDepth){omit('max-depth');return;}
+    const names=[],handle=fs.opendirSync(directory);
+    try {
+      for(let entry;(entry=handle.readSync());) {
+        if(entries+names.length>=limits.maxEntries){omit('max-entries');return;}
+        names.push(entry.name);
+      }
+    } finally {handle.closeSync();}
+    for(const name of names.sort()) {
+      entries++;
+      const next=relative?`${relative}/${name}`:name;
+      if(!diagnosticSafePath(next)){omit('unsafe-path');continue;}
+      const absolute=path.join(directory,name),stat=fs.lstatSync(absolute);
+      if(stat.isSymbolicLink()) continue;
+      if(stat.isDirectory()){walk(absolute,next,depth+1);continue;}
+      if(stat.isFile()&&(name.endsWith('-actual.png')||name.endsWith('-diff.png'))) files.push({path:next,absolute,bytes:stat.size});
+    }
+  };
+  walk(testResultsRoot);files.sort((a,b)=>a.path<b.path?-1:a.path>b.path?1:0);
+  let totalRaw=0,emittedFiles=0;
+  for(const file of files) {
+    if(emittedFiles>=limits.maxFiles){omit('max-files');continue;}
+    if(file.bytes>limits.maxFileBytes){omit('max-file-bytes');continue;}
+    if(totalRaw+file.bytes>limits.maxTotalRawBytes){omit('max-total-raw-bytes');continue;}
+    const bytes=fs.readFileSync(file.absolute);
+    if(bytes.length!==file.bytes){omit('file-changed');continue;}
+    const chunks=[];for(let offset=0;offset<bytes.length;offset+=limits.maxChunkBytes)chunks.push(bytes.subarray(offset,offset+limits.maxChunkBytes).toString('base64'));
+    const digest=createHash('sha256').update(bytes).digest('hex');
+    record('file',{path:file.path,byteLength:bytes.length,sha256:digest,encoding:'base64',chunkCount:chunks.length});
+    chunks.forEach((data,index)=>record('chunk',{path:file.path,index,chunkCount:chunks.length,data}));
+    record('end',{path:file.path,byteLength:bytes.length,sha256:digest,complete:true});
+    totalRaw+=bytes.length;emittedFiles++;
+  }
+  for(const [reason,count] of [...omitted].sort(([a],[b])=>a<b?-1:a>b?1:0)) record('omission',{reason,count});
+  record('complete',{fileCount:emittedFiles,totalRawBytes:totalRaw,complete:true});
+  const output=records.join('');
+  if(Buffer.byteLength(output)>limits.maxOutputBytes) throw new TypeError('diagnostic output bound');
+  write(output);return output;
+}
+
+function playwrightDiagnosticHelperSource() {
+  return `import fs from 'node:fs';import path from 'node:path';import {createHash} from 'node:crypto';const PLAYWRIGHT_DIAGNOSTIC_PREFIX=${JSON.stringify(PLAYWRIGHT_DIAGNOSTIC_PREFIX)};const PLAYWRIGHT_DIAGNOSTIC_LIMITS=${JSON.stringify(PLAYWRIGHT_DIAGNOSTIC_LIMITS)};const diagnosticSafeCommand=${diagnosticSafeCommand.toString()};const diagnosticSafePath=${diagnosticSafePath.toString()};const emitPlaywrightFailureDiagnostics=${emitPlaywrightFailureDiagnostics.toString()};try{emitPlaywrightFailureDiagnostics({commandId:process.argv[1],testResultsRoot:process.argv[2]});}catch(error){const commandId=diagnosticSafeCommand(process.argv[1])?process.argv[1]:'invalid';fs.writeSync(2,PLAYWRIGHT_DIAGNOSTIC_PREFIX+' '+JSON.stringify({schema:'oteryn.atlas.playwright-diagnostic',version:1,type:'error',commandId,error:String(error?.message??error).slice(0,256)})+'\\n');process.exitCode=1;}`;
+}
+const shellQuote=value=>`'${String(value).replaceAll("'",`'\\''`)}'`;
+
+export function relayPlaywrightFailureDiagnostics(stderr,write=record=>fs.writeSync(2,record)) {
+  const records=String(stderr??'').split('\n').filter(line=>{
+    if(!line.startsWith(`${PLAYWRIGHT_DIAGNOSTIC_PREFIX} `))return false;
+    try {const row=JSON.parse(line.slice(PLAYWRIGHT_DIAGNOSTIC_PREFIX.length+1));return row?.schema==='oteryn.atlas.playwright-diagnostic'&&row.version===1;} catch {return false;}
+  });
+  if(records.length) write(records.map(line=>`${line}\n`).join(''));
+  return records.length;
+}
+
 // pull_request_target and merge_group both load protected workflow authority.
 // Candidate content is inert input and never supplies executable control metadata.
 export async function resolveShadowEvent({eventName,event,githubSha,githubRef,request=githubRequest}) {
@@ -495,10 +562,13 @@ export function fixtureBrowserArgs(composeArgs,{uid=process.getuid(),gid=process
 }
 
 const CANDIDATE_ARTIFACT_TMPFS_BYTES=64*1024*1024;
-const MACHINE_BROWSER_COMMAND='exec ./node_modules/.bin/playwright test --config=playwright.config.mjs --test-list=/run/atlas-protected-test-list.txt --shard="${ATLAS_E2E_SHARD:?ATLAS_E2E_SHARD is required}" --workers="${ATLAS_E2E_WORKERS:-1}" --retries=0 --reporter=json';
-export function machineFixtureBrowserArgs(composeArgs,{uid=process.getuid(),gid=process.getgid()}={}) {
+const MACHINE_BROWSER_BASE_COMMAND='./node_modules/.bin/playwright test --config=playwright.config.mjs --test-list=/run/atlas-protected-test-list.txt --shard="${ATLAS_E2E_SHARD:?ATLAS_E2E_SHARD is required}" --workers="${ATLAS_E2E_WORKERS:-1}" --retries=0 --reporter=json';
+const MACHINE_BROWSER_COMMAND=`exec ${MACHINE_BROWSER_BASE_COMMAND}`;
+export function machineFixtureBrowserArgs(composeArgs,{uid=process.getuid(),gid=process.getgid(),reviewBearing=false,commandId=null}={}) {
   if(!Array.isArray(composeArgs)||composeArgs.some(value=>typeof value!=='string')||!Number.isSafeInteger(uid)||uid<0||!Number.isSafeInteger(gid)||gid<0) fail('machine fixture identity');
-  return [...composeArgs,'run','--user',`${uid}:${gid}`,'--rm','--no-deps','e2e','bash','-lc',MACHINE_BROWSER_COMMAND];
+  if(reviewBearing&&!diagnosticSafeCommand(commandId))fail('machine diagnostic command id');
+  const command=reviewBearing?`${MACHINE_BROWSER_BASE_COMMAND}; status=$?; if [ "$status" -ne 0 ]; then node --input-type=module -e ${shellQuote(playwrightDiagnosticHelperSource())} ${shellQuote(commandId)} /artifacts/test-results || :; fi; exit "$status"`:MACHINE_BROWSER_COMMAND;
+  return [...composeArgs,'run','--user',`${uid}:${gid}`,'--rm','--no-deps','e2e','bash','-lc',command];
 }
 export function writeCandidateArtifactContainment(file) {
   if(typeof file!=='string'||!path.isAbsolute(file)||fs.existsSync(file)) fail('candidate artifact containment destination');
@@ -620,8 +690,8 @@ async function runPublicationBrowser(command,{candidate,contract,publication,dir
         fail('protected browser service setup failed');
       }
     }
-    const result=spawnSync('docker',machineFixtureBrowserArgs(machineArgs),{env,encoding:'utf8',timeout:command.timeoutSeconds*1000,maxBuffer:16*1024*1024});
-    if(result.error||result.status!==0||result.signal) {console.error(JSON.stringify({phase:'browser-execution',dataCapability:command.dataCapability,exitCode:result.status,signal:result.signal,error:result.error?.message??null,stdout:String(result.stdout??'').slice(-12288),stderr:String(result.stderr??'').slice(-4096)}));fail('protected browser execution failed');}
+    const result=spawnSync('docker',machineFixtureBrowserArgs(machineArgs,{reviewBearing:reviewFrames.length>0,commandId:command.id}),{env,encoding:'utf8',timeout:command.timeoutSeconds*1000,maxBuffer:32*1024*1024});
+    if(result.error||result.status!==0||result.signal) {relayPlaywrightFailureDiagnostics(result.stderr);console.error(JSON.stringify({phase:'browser-execution',dataCapability:command.dataCapability,exitCode:result.status,signal:result.signal,error:result.error?.message??null,stdout:String(result.stdout??'').slice(-12288),stderr:String(result.stderr??'').slice(-4096)}));fail('protected browser execution failed');}
     const readCensusReport=report=>{
       const observed=[];
       const walk=suites=>{for(const suite of suites??[]){for(const spec of suite.specs??[]){for(const test of spec.tests??[]){if(test.status!=='expected'||test.results?.length!==1||test.results[0].status!=='passed'||test.results[0].retry!==0)fail('fixture nonpass/retry');observed.push(`${test.projectName}::e2e/tests/${spec.file.replace(/^.*\/tests\//,'')}::${spec.title}`);}}walk(suite.suites);}};
