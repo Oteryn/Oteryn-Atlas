@@ -14,6 +14,10 @@ const REGISTRY_VALIDATOR = resolve(ROOT, 'tools/governance/validate_documentatio
 const REGISTRY_TEST = resolve(ROOT, 'tools/governance/test_documentation_ia.py');
 const ACTIVE_TASKS = resolve(ROOT, 'docs/agents/tasks/active');
 const ARCHIVED_TASKS = resolve(ROOT, 'docs/agents/tasks/archive');
+const SUPPORTED_META_BINDINGS = new Map([
+  ['3.0.0', '1dedfc0f264fe0e23e5365dbe9280c2d96df50c5'],
+  ['3.1.0', '3b39e0be05aef008f1bd442821daefa898a201dd'],
+]);
 const TERMINAL_VERIFICATION_PROMPTS = [
   'ATLAS-E2E-VERIFICATION-ANTI-LOOP-HARDENING.md',
   'ATLAS-E2E-VERIFICATION-OPTIMIZATION-IMPLEMENTATION-DATA-CAPABILITY-AMENDMENT.md',
@@ -52,14 +56,25 @@ test('Atlas Documentation/Agent IA has one mutable lifecycle authority', () => {
   assert.deepEqual(
     {
       policy_id: binding.policy_id,
-      policy_version: binding.policy_version,
       authority_repository: binding.authority_repository,
     },
     {
       policy_id: 'OTERYN_ORGANIZATION_AGENT_POLICY',
-      policy_version: '3.0.0',
       authority_repository: 'Oteryn/Oteryn',
     },
+  );
+  assert.equal(typeof binding.policy_version, 'string', 'binding policy_version must be a string');
+  assert.equal(typeof binding.authority_commit, 'string', 'binding authority_commit must be a string');
+  assert.equal(
+    SUPPORTED_META_BINDINGS.has(binding.policy_version),
+    true,
+    `binding must use a supported META version: ${binding.policy_version}`,
+  );
+  assert.match(binding.authority_commit, /^[0-9a-f]{40}$/u, 'binding authority_commit must be a lowercase full SHA');
+  assert.equal(
+    binding.authority_commit,
+    SUPPORTED_META_BINDINGS.get(binding.policy_version),
+    `binding must use an exact supported META coordinate: ${binding.policy_version}`,
   );
   for (const phrase of [
     '`docs/agents/prompts/*.md` are reusable prompt contracts',
