@@ -14,6 +14,7 @@ assert SPEC and SPEC.loader
 atlas = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(atlas)
 
+LEGACY_VERSION = "3.0.0"
 PIN = "1dedfc0f264fe0e23e5365dbe9280c2d96df50c5"
 TARGET_PIN = "3b39e0be05aef008f1bd442821daefa898a201dd"
 MAIN = PIN
@@ -33,13 +34,13 @@ def binding_for(version: str, commit: str) -> dict[str, object]:
 
 
 def valid_binding() -> dict[str, object]:
-    return binding_for(atlas.POLICY_VERSION, PIN)
+    return binding_for(LEGACY_VERSION, PIN)
 
 
 def policy() -> dict[str, object]:
     return {
         "policy_id": atlas.POLICY_ID,
-        "policy_version": atlas.POLICY_VERSION,
+        "policy_version": LEGACY_VERSION,
         "authority_repository": atlas.AUTHORITY_REPOSITORY,
         "canonical_human_surfaces": atlas.EXPECTED_SURFACES,
     }
