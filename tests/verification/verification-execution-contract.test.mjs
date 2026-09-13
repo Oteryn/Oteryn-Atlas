@@ -23,6 +23,17 @@ function executionInput(path='tests/semantic-search.mjs') {
    candidateVerificationCatalog:protectedCatalog,candidateImpactManifest:protectedImpactManifest}};
 }
 
+function hasReviewWrapperTransitionAuthority() {
+ if(process.getuid?.()!==0)return false;
+ const status=fs.readFileSync('/proc/self/status','utf8');
+ const required=(1n<<5n)|(1n<<6n)|(1n<<7n); // CAP_KILL, CAP_SETGID, CAP_SETUID
+ for(const field of ['CapPrm','CapEff','CapBnd']) {
+  const match=status.match(new RegExp(`^${field}:\\s*([0-9a-f]+)$`,'mi'));
+  if(!match||(BigInt(`0x${match[1]}`)&required)!==required)return false;
+ }
+ return true;
+}
+
 function copyCandidateBrowserPayload(t) {
  const scratch=fs.mkdtempSync(path.join(os.tmpdir(),'atlas-shadow-candidate-payload-'));
  t.after(()=>fs.rmSync(scratch,{recursive:true,force:true}));
@@ -661,6 +672,12 @@ test('machine browser diagnostics quiesce inherited writers, preserve status, an
  fs.writeFileSync(executable,`#!/bin/sh\nprintf '{"uid":%s,"gid":%s,"capEff":"%s"}\n' "$(id -u)" "$(id -g)" "$(sed -n 's/^CapEff:[[:space:]]*//p' /proc/self/status)"\nprintf '%s\n' '${forgery}' >&2\n(sh -c 'sleep 30') >&2 & echo $! > '${childPid}'\nhead -c $(( ${PLAYWRIGHT_STDERR_TAIL_BYTES} * 3 )) /dev/zero >&2\nexit 37\n`,{mode:0o755});
  const uid=65534,gid=65534,compose=['compose'],reviewArgs=machineFixtureBrowserArgs(compose,{uid,gid,reviewBearing:true,commandId:id}),reviewCommand=reviewArgs.at(-1),shellOptions={cwd:temporary,encoding:'utf8',env:{...process.env,ATLAS_E2E_SHARD:'1/1'},timeout:5000};
  assert.deepEqual(reviewArgs.slice(reviewArgs.indexOf('run')+1,reviewArgs.indexOf('--user')),['--cap-add','SETUID','--cap-add','SETGID','--cap-add','KILL']);assert.equal(reviewArgs[reviewArgs.indexOf('--user')+1],'0:0');assert.match(reviewCommand,/pkill -KILL[^;]+; cleanup_status=\$\?; process_states=\$\(ps[^;]+; probe_status=\$\?; live_count=\$\([^;]+; state_status=\$\?;[^]*\[ "\$cleanup_status" -eq 0 \][^]*\[ "\$probe_status" -eq 0 \][^]*\[ "\$state_status" -eq 0 \][^]*\[ "\$live_count" -eq 0 \][^]*node --input-type=module -e/);
+ const ordinaryArgs=machineFixtureBrowserArgs(compose,{uid:1,gid:1});assert.equal(ordinaryArgs.includes('--cap-add'),false);assert.equal(ordinaryArgs[ordinaryArgs.indexOf('--user')+1],'1:1');assert.equal(ordinaryArgs.at(-1),'exec ./node_modules/.bin/playwright test --config=playwright.config.mjs --test-list=/run/atlas-protected-test-list.txt --shard="${ATLAS_E2E_SHARD:?ATLAS_E2E_SHARD is required}" --workers="${ATLAS_E2E_WORKERS:-1}" --retries=0 --reporter=json');
+ assert.throws(()=>machineFixtureBrowserArgs(compose,{uid:1,gid:1,reviewBearing:true,commandId:'unsafe'}),/diagnostic identity/);assert.throws(()=>machineFixtureBrowserArgs(compose,{uid:0,gid:1,reviewBearing:true,commandId:id}),/diagnostic identity/);
+ if(!hasReviewWrapperTransitionAuthority()) {
+  t.diagnostic('privileged kernel-transition subcheck requires already-available CAP_SETUID, CAP_SETGID, and CAP_KILL; static wrapper, quiescence, and fail-closed contracts remain asserted');
+  return;
+ }
  const restricted=(prefix='')=>spawnSync('capsh',['--caps=cap_setuid,cap_setgid,cap_kill+ep','--','-c',`${prefix} eval "$REVIEW_COMMAND"`],{...shellOptions,env:{...shellOptions.env,REVIEW_COMMAND:reviewCommand}});
  const review=restricted();assert.equal(review.status,37,review.stderr);assert.deepEqual(JSON.parse(review.stdout),{uid,gid,capEff:'0000000000000000'});assert.match(review.stderr,/ATLAS_SHADOW_PLAYWRIGHT_STDERR_TAIL /);
  const inheritedPid=Number(fs.readFileSync(childPid,'utf8'));assert.ok(Number.isSafeInteger(inheritedPid));const inheritedState=fs.existsSync(`/proc/${inheritedPid}/stat`)?fs.readFileSync(`/proc/${inheritedPid}/stat`,'utf8').split(' ')[2]:null;assert.ok(inheritedState===null||inheritedState==='Z','inherited stderr writer was quiesced');
@@ -671,8 +688,6 @@ test('machine browser diagnostics quiesce inherited writers, preserve status, an
  for(const failedCommand of ['pkill','ps']) {
   const failed=restricted(`${failedCommand}(){ return 2; }; `);assert.equal(failed.status,37,failed.stderr);assert.equal(failed.stderr.split('\n').some(line=>line.startsWith(`${PLAYWRIGHT_DIAGNOSTIC_PREFIX} `)),false,`${failedCommand} failure emitted diagnostics`);
  }
- const ordinaryArgs=machineFixtureBrowserArgs(compose,{uid:1,gid:1});assert.equal(ordinaryArgs.includes('--cap-add'),false);assert.equal(ordinaryArgs[ordinaryArgs.indexOf('--user')+1],'1:1');assert.equal(ordinaryArgs.at(-1),'exec ./node_modules/.bin/playwright test --config=playwright.config.mjs --test-list=/run/atlas-protected-test-list.txt --shard="${ATLAS_E2E_SHARD:?ATLAS_E2E_SHARD is required}" --workers="${ATLAS_E2E_WORKERS:-1}" --retries=0 --reporter=json');
- assert.throws(()=>machineFixtureBrowserArgs(compose,{uid:1,gid:1,reviewBearing:true,commandId:'unsafe'}),/diagnostic identity/);assert.throws(()=>machineFixtureBrowserArgs(compose,{uid:0,gid:1,reviewBearing:true,commandId:id}),/diagnostic identity/);
 });
 {
 const repository='Oteryn/Oteryn-Atlas',base='a'.repeat(40),head='b'.repeat(40),tree='c'.repeat(40);
