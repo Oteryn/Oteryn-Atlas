@@ -714,7 +714,7 @@ async function runPublicationBrowser(command,{candidate,contract,publication,dir
       }
     }
     const result=spawnSync('docker',machineFixtureBrowserArgs(machineArgs,{reviewBearing:reviewFrames.length>0,commandId:command.id}),{env,encoding:'utf8',timeout:command.timeoutSeconds*1000,maxBuffer:MACHINE_BROWSER_STDERR_BUFFER_BYTES});
-    if(result.error||result.status!==0||result.signal) {relayPlaywrightFailureDiagnostics(result.stderr,command.id);console.error(JSON.stringify({phase:'browser-execution',dataCapability:command.dataCapability,exitCode:result.status,signal:result.signal,error:result.error?.message??null,stdout:String(result.stdout??'').slice(-12288),stderr:String(result.stderr??'').slice(-4096)}));fail('protected browser execution failed');}
+    if(result.error||result.status!==0||result.signal) {if(reviewFrames.length>0)relayPlaywrightFailureDiagnostics(result.stderr,command.id);console.error(JSON.stringify({phase:'browser-execution',dataCapability:command.dataCapability,exitCode:result.status,signal:result.signal,error:result.error?.message??null,stdout:String(result.stdout??'').slice(-12288),stderr:String(result.stderr??'').slice(-4096)}));fail('protected browser execution failed');}
     const readCensusReport=report=>{
       const observed=[];
       const walk=suites=>{for(const suite of suites??[]){for(const spec of suite.specs??[]){for(const test of spec.tests??[]){if(test.status!=='expected'||test.results?.length!==1||test.results[0].status!=='passed'||test.results[0].retry!==0)fail('fixture nonpass/retry');observed.push(`${test.projectName}::e2e/tests/${spec.file.replace(/^.*\/tests\//,'')}::${spec.title}`);}}walk(suite.suites);}};
