@@ -264,7 +264,7 @@ test('candidate execution metadata cannot replace protected interpreter or hashe
  assert(!JSON.stringify(contract).includes('candidate-policy'));
 });
 
-import {authenticateR5SemanticSource,buildR5SemanticPublication,resolveShadowEvent,planShadow,deterministicDockerArgs,fixtureBrowserArgs,machineFixtureBrowserArgs,requiresProtectedVisualReference,bindProtectedVisualReferenceConsumer,prepareProtectedBrowserHarness,prepareProtectedBrowserCaptureHarness,writeProtectedBrowserContainment,emitPlaywrightFailureDiagnostics,relayPlaywrightFailureDiagnostics,PLAYWRIGHT_DIAGNOSTIC_PREFIX,PLAYWRIGHT_DIAGNOSTIC_LIMITS} from '../../tools/verification/run-verification-shadow.mjs';
+import {authenticateR5SemanticSource,buildR5SemanticPublication,resolveShadowEvent,planShadow,deterministicDockerArgs,fixtureBrowserArgs,machineFixtureBrowserArgs,requiresProtectedVisualReference,bindProtectedVisualReferenceConsumer,prepareProtectedBrowserHarness,prepareProtectedBrowserCaptureHarness,writeProtectedBrowserContainment,emitPlaywrightFailureDiagnostics,relayPlaywrightFailureDiagnostics,PLAYWRIGHT_DIAGNOSTIC_PREFIX,PLAYWRIGHT_DIAGNOSTIC_LIMITS,PLAYWRIGHT_STDERR_TAIL_BYTES,MACHINE_BROWSER_STDERR_BUFFER_BYTES} from '../../tools/verification/run-verification-shadow.mjs';
 import {assertShadowExecutorCoverage,assertShadowReviewCaptureCensus,normalizeShadowReviewChangedFiles,shadowReviewPlanDigest} from '../../tools/verification/verification-shadow-review.mjs';
 test('shadow materializes candidate browser tests, support and snapshots while protected executor control stays protected',t=>{
  const {scratch,candidateRoot}=copyCandidateBrowserPayload(t);
@@ -600,7 +600,7 @@ test('failed Playwright diagnostics are filtered, ordered, lossless and bounded'
   assert.equal(rows.find(row=>row.type==='end'&&row.path===header.path).complete,true);
  }
  assert.ok(rows.some(row=>row.type==='omission'&&row.reason==='unsafe-path'));assert.equal(rows.at(-1).type,'complete');assert.equal(rows.at(-1).complete,true);
- const relayed=[];assert.equal(relayPlaywrightFailureDiagnostics(`unrelated stderr\n${output}`,value=>relayed.push(value)),rows.length);assert.equal(relayed.join(''),output);
+ const relayed=[];assert.equal(relayPlaywrightFailureDiagnostics(`unrelated stderr\n${output}`,commandId,value=>relayed.push(value)),rows.length);assert.equal(relayed.join(''),output);
  assert.throws(()=>emitPlaywrightFailureDiagnostics({commandId:'unsafe',testResultsRoot:root,write:()=>{}}),/unsafe diagnostic input/);
  assert.throws(()=>emitPlaywrightFailureDiagnostics({commandId,testResultsRoot:'relative',write:()=>{}}),/unsafe diagnostic input/);
  const empty=path.join(temporary,'empty');fs.mkdirSync(empty);const emptyRows=diagnosticRows(emitPlaywrightFailureDiagnostics({commandId,testResultsRoot:empty,write:()=>{}}));
@@ -616,16 +616,48 @@ test('failed Playwright diagnostics are filtered, ordered, lossless and bounded'
  assert.throws(()=>emitPlaywrightFailureDiagnostics({commandId,testResultsRoot:boundsRoot,write:()=>{},limits:{...PLAYWRIGHT_DIAGNOSTIC_LIMITS,maxOutputBytes:1}}),/output bound/);
 });
 
-test('machine browser diagnostics are review-only, fully relayed, and preserve original status',t=>{
+test('diagnostic relay accepts only a complete internally consistent expected-command frame',t=>{
+ const temporary=fs.mkdtempSync(path.join(os.tmpdir(),'atlas-diagnostic-relay-'));t.after(()=>fs.rmSync(temporary,{recursive:true,force:true}));
+ const resultRoot=path.join(temporary,'test-results');fs.mkdirSync(resultRoot);fs.writeFileSync(path.join(resultRoot,'frame-actual.png'),'protected bytes');
+ const id='sha256:'+'b'.repeat(64),valid=emitPlaywrightFailureDiagnostics({commandId:id,testResultsRoot:resultRoot,write:()=>{}}),lines=valid.trimEnd().split('\n');
+ const relay=value=>{const output=[];return [relayPlaywrightFailureDiagnostics(value,id,row=>output.push(row)),output.join('')];};
+ assert.deepEqual(relay(valid),[lines.length,valid]);
+ const mutations=[
+  lines.slice(0,-1),
+  lines.map((line,index)=>index===1?line.replace('"index":0','"index":1'):line),
+  lines.map((line,index)=>index===1?line.replace(/"data":"[^"]+"/,'"data":"***="'):line),
+  lines.map((line,index)=>index===2?line.replace(/[a-f0-9]{64}/,'0'.repeat(64)):line),
+  lines.map(line=>line.replace(id,'sha256:'+'c'.repeat(64))),
+  [lines[0],lines[2],lines[1],...lines.slice(3)],
+ ];
+ for(const malformed of mutations)assert.deepEqual(relay(malformed.join('\n')+'\n'),[0,'']);
+ assert.deepEqual(relay(`${PLAYWRIGHT_DIAGNOSTIC_PREFIX} not-json\n${valid}`),[0,'']);
+});
+
+test('diagnostic file reads fail closed when the discovered identity is race-swapped',t=>{
+ const temporary=fs.mkdtempSync(path.join(os.tmpdir(),'atlas-diagnostic-race-'));t.after(()=>fs.rmSync(temporary,{recursive:true,force:true}));
+ const resultRoot=path.join(temporary,'test-results');fs.mkdirSync(resultRoot);const image=path.join(resultRoot,'frame-actual.png'),outside=path.join(temporary,'outside');
+ fs.writeFileSync(outside,'secret!');const originalOpen=fs.openSync;
+ for(const replacement of ['symlink','regular']) {
+  fs.rmSync(image,{force:true});fs.rmSync(image+'.discovered',{force:true});fs.writeFileSync(image,'inside!');let swapped=false;
+  fs.openSync=function(file,...args){if(file===image&&!swapped){swapped=true;fs.renameSync(image,image+'.discovered');if(replacement==='symlink')fs.symlinkSync(outside,image);else fs.writeFileSync(image,'secret!');}return originalOpen.call(this,file,...args);};
+  try {const rows=diagnosticRows(emitPlaywrightFailureDiagnostics({commandId:'sha256:'+'d'.repeat(64),testResultsRoot:resultRoot,write:()=>{}}));assert.equal(rows.some(row=>row.type==='file'),false,replacement);assert.ok(rows.some(row=>row.type==='omission'&&row.reason==='file-changed'),replacement);} finally {fs.openSync=originalOpen;}
+ }
+});
+
+test('machine browser diagnostics isolate candidate stderr, fit the reserved buffer, and preserve status',t=>{
  const temporary=fs.mkdtempSync(path.join(os.tmpdir(),'atlas-diagnostic-wrapper-'));t.after(()=>fs.rmSync(temporary,{recursive:true,force:true}));
- const executable=path.join(temporary,'node_modules/.bin/playwright');fs.mkdirSync(path.dirname(executable),{recursive:true});fs.writeFileSync(executable,'#!/bin/sh\nexit 37\n',{mode:0o755});
- const id='sha256:'+'b'.repeat(64),compose=['compose'],reviewCommand=machineFixtureBrowserArgs(compose,{uid:1,gid:1,reviewBearing:true,commandId:id}).at(-1);
- const shellOptions={cwd:temporary,encoding:'utf8',env:{...process.env,ATLAS_E2E_SHARD:'1/1'}};
- const review=spawnSync('bash',['-c',reviewCommand],shellOptions);assert.equal(review.status,37);assert.equal(diagnosticRows(review.stderr)[0].type,'error');
- const relayed=[];assert.equal(relayPlaywrightFailureDiagnostics(`noise\n${review.stderr}tail\n`,value=>relayed.push(value)),1);
- assert.ok(relayed.join('').split('\n').filter(Boolean).every(line=>line.startsWith(`${PLAYWRIGHT_DIAGNOSTIC_PREFIX} `)));
+ const executable=path.join(temporary,'node_modules/.bin/playwright');fs.mkdirSync(path.dirname(executable),{recursive:true});
+ const id='sha256:'+'b'.repeat(64),forgery=`${PLAYWRIGHT_DIAGNOSTIC_PREFIX} ${JSON.stringify({schema:'oteryn.atlas.playwright-diagnostic',version:1,type:'complete',commandId:id,fileCount:0,totalRawBytes:0,omissionCount:0,errorCount:0,complete:true})}`;
+ fs.writeFileSync(executable,`#!/bin/sh\nprintf '%s\\n' '${forgery}' >&2\nhead -c $(( ${PLAYWRIGHT_STDERR_TAIL_BYTES} * 3 )) /dev/zero >&2\nexit 37\n`,{mode:0o755});
+ const compose=['compose'],reviewCommand=machineFixtureBrowserArgs(compose,{uid:1,gid:1,reviewBearing:true,commandId:id}).at(-1),shellOptions={cwd:temporary,encoding:'utf8',env:{...process.env,ATLAS_E2E_SHARD:'1/1'}};
+ const review=spawnSync('bash',['-c',reviewCommand],shellOptions);assert.equal(review.status,37);assert.match(review.stderr,/ATLAS_SHADOW_PLAYWRIGHT_STDERR_TAIL /);
+ assert.equal(review.stderr.split('\n').filter(line=>line.startsWith(`${PLAYWRIGHT_DIAGNOSTIC_PREFIX} `)).length,2);
+ const relayed=[];assert.equal(relayPlaywrightFailureDiagnostics(review.stderr,id,value=>relayed.push(value)),2);assert.doesNotMatch(relayed.join(''),/"error":"[^\n]*ATLAS_SHADOW/);
+ const worstCandidateRecord=Buffer.byteLength('ATLAS_SHADOW_PLAYWRIGHT_STDERR_TAIL ')+Math.ceil(PLAYWRIGHT_STDERR_TAIL_BYTES/3)*4+2;
+ assert.ok(PLAYWRIGHT_DIAGNOSTIC_LIMITS.maxOutputBytes+worstCandidateRecord<MACHINE_BROWSER_STDERR_BUFFER_BYTES);
  const ordinaryCommand=machineFixtureBrowserArgs(compose,{uid:1,gid:1}).at(-1),ordinary=spawnSync('bash',['-c',ordinaryCommand],shellOptions);
- assert.equal(ordinary.status,37);assert.doesNotMatch(ordinary.stderr,/ATLAS_SHADOW_PLAYWRIGHT_DIAGNOSTIC/);
+ assert.equal(ordinary.status,37);assert.match(ordinary.stderr,/ATLAS_SHADOW_PLAYWRIGHT_DIAGNOSTIC/);
  assert.throws(()=>machineFixtureBrowserArgs(compose,{uid:1,gid:1,reviewBearing:true,commandId:'unsafe'}),/command id/);
 });
 {
