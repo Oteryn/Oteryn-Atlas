@@ -51,7 +51,22 @@ export function resolveProtectedComposeServiceImage({composeArgs,service,env=pro
   if(!Array.isArray(composeArgs)||composeArgs.some(value=>typeof value!=='string')||!/^[-a-z0-9]+$/.test(service??''))throw new TypeError('protected collector image input');
   const configured=run('docker',[...composeArgs,'config','--images',service],{env,encoding:'utf8',timeout:30000,maxBuffer:1024*1024});
   const references=String(configured?.stdout??'').split(/\r?\n/).map(value=>value.trim()).filter(Boolean);
-  if(configured?.error||configured?.status!==0||configured?.signal||references.length!==1)throw new TypeError('protected collector service image reference');
+  if(configured?.error||configured?.status!==0||configured?.signal||references.length>1)throw new TypeError('protected collector service image reference');
+  if(references.length===0) {
+    const projects=[];
+    for(let index=0;index<composeArgs.length;index++) {
+      const value=composeArgs[index];
+      if(value==='-p'||value==='--project-name')projects.push(composeArgs[++index]);
+      else if(value.startsWith('--project-name='))projects.push(value.slice('--project-name='.length));
+    }
+    if(projects.length!==1||!/^[a-z0-9][a-z0-9_-]*$/.test(projects[0]??''))throw new TypeError('protected collector service image reference');
+    const modeled=run('docker',[...composeArgs,'config','--format','json',service],{env,encoding:'utf8',timeout:30000,maxBuffer:1024*1024});
+    let model;try{model=JSON.parse(String(modeled?.stdout??''));}catch{throw new TypeError('protected collector service image reference');}
+    const definition=model?.services?.[service],build=definition?.build;
+    const buildBacked=(typeof build==='string'&&build.length>0)||(build!==null&&typeof build==='object'&&!Array.isArray(build));
+    if(modeled?.error||modeled?.status!==0||modeled?.signal||!definition||!buildBacked||(typeof definition.image==='string'&&definition.image.trim())||definition.image!==undefined&&typeof definition.image!=='string')throw new TypeError('protected collector service image reference');
+    references.push(`${projects[0]}-${service}`);
+  }
   const inspected=run('docker',['image','inspect','--format','{{.Id}}',references[0]],{env,encoding:'utf8',timeout:30000,maxBuffer:1024*1024});
   const identities=String(inspected?.stdout??'').split(/\r?\n/).map(value=>value.trim()).filter(Boolean);
   if(inspected?.error||inspected?.status!==0||inspected?.signal||identities.length!==1||!/^sha256:[a-f0-9]{64}$/.test(identities[0]))throw new TypeError('protected collector image identity');
