@@ -308,18 +308,24 @@ test('hosted browser machine and protected visual capture use isolated producers
  assert.doesNotMatch(source,/persistShadowReviewCapture\(\{artifactRoot:artifacts/);
 });
 
-test('protected visual capture overlays only authenticated candidate PNG snapshot oracle data',t=>{
+test('protected visual capture overlays only authenticated candidate PNG snapshot oracle data',async t=>{
  const {scratch,candidateRoot}=copyCandidateBrowserPayload(t);
  const e2e=path.join(candidateRoot,'e2e'), snapshot=firstBrowserSnapshot(e2e);
  const protectedSnapshot=fs.readFileSync(path.join(root,'e2e',snapshot));
  fs.writeFileSync(path.join(e2e,snapshot),Buffer.concat([protectedSnapshot,Buffer.from('candidate-capture-snapshot-marker')]));
  fs.appendFileSync(path.join(e2e,'tests/visual-desktop.spec.mjs'),'\n// candidate capture spec must stay inert\n');
  fs.appendFileSync(path.join(e2e,'support/user-acceptance.mjs'),'\n// candidate capture support must stay inert\n');
+ const productRoot=path.join(scratch,'qualification-product');
+ const manifest=await buildQualificationWorld(productRoot);
+ await verifyQualificationWorld(productRoot);
+ const bindings=resolveQualificationScenarioBindings({productRoot,expectedProductDigest:manifest.productDigest});
+ const protectedDestination=path.join(scratch,'protected-qualified');
+ prepareProtectedBrowserHarness({protectedRoot:root,destination:protectedDestination,qualificationBindings:bindings});
  const destination=path.join(scratch,'protected-capture');
- prepareProtectedBrowserCaptureHarness({protectedRoot:root,candidateRoot,destination});
+ prepareProtectedBrowserCaptureHarness({protectedRoot:root,candidateRoot,destination,qualificationBindings:bindings});
  assert.equal(fs.readFileSync(path.join(destination,snapshot)).includes(Buffer.from('candidate-capture-snapshot-marker')),true);
- assert.deepEqual(fs.readFileSync(path.join(destination,'tests/visual-desktop.spec.mjs')),fs.readFileSync(path.join(root,'e2e/tests/visual-desktop.spec.mjs')));
- assert.deepEqual(fs.readFileSync(path.join(destination,'support/user-acceptance.mjs')),fs.readFileSync(path.join(root,'e2e/support/user-acceptance.mjs')));
+ assert.deepEqual(fs.readFileSync(path.join(destination,'tests/visual-desktop.spec.mjs')),fs.readFileSync(path.join(protectedDestination,'tests/visual-desktop.spec.mjs')));
+ assert.deepEqual(fs.readFileSync(path.join(destination,'support/user-acceptance.mjs')),fs.readFileSync(path.join(protectedDestination,'support/user-acceptance.mjs')));
 
  fs.rmSync(path.join(e2e,snapshot));
  const deletedDestination=path.join(scratch,'protected-capture-deleted');
