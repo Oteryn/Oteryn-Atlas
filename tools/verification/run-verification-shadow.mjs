@@ -44,7 +44,6 @@ export const PLAYWRIGHT_DIAGNOSTIC_PREFIX='ATLAS_SHADOW_PLAYWRIGHT_DIAGNOSTIC';
 // including the longest accepted path and JSON metadata, with a deterministic 1 KiB margin.
 export const PLAYWRIGHT_DIAGNOSTIC_LOG_LINE_BYTES=63*1024;
 export const PLAYWRIGHT_DIAGNOSTIC_LIMITS=Object.freeze({maxDepth:8,maxEntries:2048,maxFiles:8,maxFileBytes:4*1024*1024,maxTotalRawBytes:8*1024*1024,maxChunkBytes:45*1024,maxOutputBytes:12*1024*1024});
-export const PLAYWRIGHT_STDERR_TAIL_BYTES=16*1024;
 export const MACHINE_BROWSER_STDERR_BUFFER_BYTES=16*1024*1024;
 const diagnosticSafeCommand=id=>/^sha256:[a-f0-9]{64}$/.test(id??'');
 const diagnosticSafePath=value=>typeof value==='string'&&value.length>0&&value.length<=1024&&value===value.replaceAll('\\','/')&&!path.posix.isAbsolute(value)&&value.split('/').every(part=>part&&part!=='.'&&part!=='..');
