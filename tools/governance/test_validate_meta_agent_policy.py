@@ -15,20 +15,25 @@ atlas = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(atlas)
 
 PIN = "1dedfc0f264fe0e23e5365dbe9280c2d96df50c5"
+TARGET_PIN = "3b39e0be05aef008f1bd442821daefa898a201dd"
 MAIN = PIN
 
 
-def valid_binding() -> dict[str, object]:
+def binding_for(version: str, commit: str) -> dict[str, object]:
     return {
         "schema_version": 1,
         "policy_id": atlas.POLICY_ID,
-        "policy_version": atlas.POLICY_VERSION,
+        "policy_version": version,
         "authority_repository": atlas.AUTHORITY_REPOSITORY,
-        "authority_commit": PIN,
+        "authority_commit": commit,
         "organization_policy_path": atlas.EXPECTED_SURFACES["organization_policy"],
         "prompting_standard_path": atlas.EXPECTED_SURFACES["prompting_standard"],
         "prompt_eval_standard_path": atlas.EXPECTED_SURFACES["prompt_eval_standard"],
     }
+
+
+def valid_binding() -> dict[str, object]:
+    return binding_for(atlas.POLICY_VERSION, PIN)
 
 
 def policy() -> dict[str, object]:
@@ -72,6 +77,25 @@ class AtlasMetaPolicyTests(unittest.TestCase):
             "human_surfaces": {path: "policy text" for path in atlas.EXPECTED_SURFACES.values()},
             "validator_source": CENTRAL_STUB,
         }
+
+    def test_bootstrap_accepts_only_exact_transition_coordinates(self) -> None:
+        self.assertEqual(atlas.validate_binding_bootstrap(binding_for("3.0.0", PIN)), [])
+        self.assertEqual(atlas.validate_binding_bootstrap(binding_for("3.1.0", TARGET_PIN)), [])
+
+        for version, commit in (
+            ("3.0.0", TARGET_PIN),
+            ("3.1.0", PIN),
+            ("3.2.0", TARGET_PIN),
+        ):
+            binding = binding_for(version, commit)
+            calls: list[str] = []
+            with self.assertRaises(atlas.ValidationFailure):
+                atlas.resolve_authority(
+                    binding,
+                    json_reader=lambda url: calls.append(url),
+                    text_reader=lambda repository, resolved_commit, path: calls.append(path),
+                )
+            self.assertEqual(calls, [], f"{version}@{commit}")
 
     def test_bootstrap_rejects_malformed_coordinates_before_remote_reads(self) -> None:
         for field, value in (
