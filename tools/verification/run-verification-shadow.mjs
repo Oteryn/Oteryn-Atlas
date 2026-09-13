@@ -53,33 +53,34 @@ export function emitPlaywrightFailureDiagnostics({commandId,testResultsRoot,writ
   const record=(type,data={})=>records.push(`${PLAYWRIGHT_DIAGNOSTIC_PREFIX} ${JSON.stringify({schema:'oteryn.atlas.playwright-diagnostic',version:1,type,commandId,...data})}\n`);
   const omit=(reason,count=1)=>omitted.set(reason,(omitted.get(reason)??0)+count);
   const files=[];
-  const walk=(directory,relative='',depth=0)=>{
+  const walk=(directory,relative='',depth=0,expected=rootStat)=>{
     if(depth>limits.maxDepth){omit('max-depth');return;}
-    const names=[],handle=fs.opendirSync(directory);
-    try {for(let entry;(entry=handle.readSync());){if(entries+names.length>=limits.maxEntries){omit('max-entries');return;}names.push(entry.name);}} finally {handle.closeSync();}
-    for(const name of names.sort()) {
-      entries++;const next=relative?`${relative}/${name}`:name;
-      if(!diagnosticSafePath(next)){omit('unsafe-path');continue;}
-      const absolute=path.join(directory,name),stat=fs.lstatSync(absolute);
-      if(stat.isSymbolicLink())continue;
-      if(stat.isDirectory()){walk(absolute,next,depth+1);continue;}
-      if(stat.isFile()&&(name.endsWith('-actual.png')||name.endsWith('-diff.png')))files.push({path:next,absolute,bytes:stat.size,dev:stat.dev,ino:stat.ino});
-    }
+    let directoryDescriptor,handle;const names=[];
+    try {
+      directoryDescriptor=fs.openSync(directory,fs.constants.O_RDONLY|fs.constants.O_DIRECTORY|fs.constants.O_NOFOLLOW|fs.constants.O_NONBLOCK);
+      const opened=fs.fstatSync(directoryDescriptor);if(!opened.isDirectory()||opened.dev!==expected.dev||opened.ino!==expected.ino)throw new TypeError('directory changed');
+      handle=fs.opendirSync(`/proc/self/fd/${directoryDescriptor}`);
+      for(let entry;(entry=handle.readSync());){if(entries+names.length>=limits.maxEntries){omit('max-entries');return;}names.push(entry.name);}
+      handle.closeSync();handle=null;
+      for(const name of names.sort()) {
+        entries++;const next=relative?`${relative}/${name}`:name;
+        if(!diagnosticSafePath(next)){omit('unsafe-path');continue;}
+        const absolute=`/proc/self/fd/${directoryDescriptor}/${name}`;let stat;try{stat=fs.lstatSync(absolute);}catch{omit('file-changed');continue;}
+        if(stat.isSymbolicLink())continue;
+        if(stat.isDirectory()){walk(absolute,next,depth+1,stat);continue;}
+        if(stat.isFile()&&(name.endsWith('-actual.png')||name.endsWith('-diff.png'))) {
+          let descriptor;try {descriptor=fs.openSync(absolute,fs.constants.O_RDONLY|fs.constants.O_NOFOLLOW|fs.constants.O_NONBLOCK);const opened=fs.fstatSync(descriptor);if(!opened.isFile()||opened.dev!==stat.dev||opened.ino!==stat.ino||opened.size!==stat.size)throw new TypeError('file changed');const bytes=fs.readFileSync(descriptor),finished=fs.fstatSync(descriptor);if(bytes.length!==stat.size||finished.dev!==stat.dev||finished.ino!==stat.ino||finished.size!==stat.size)throw new TypeError('file changed');files.push({path:next,bytes});}catch{omit('file-changed');}finally{if(descriptor!==undefined)try{fs.closeSync(descriptor);}catch{}}
+        }
+      }
+    } catch {omit('directory-changed');} finally {if(handle)try{handle.closeSync();}catch{}if(directoryDescriptor!==undefined)try{fs.closeSync(directoryDescriptor);}catch{}}
   };
   walk(testResultsRoot);files.sort((a,b)=>a.path<b.path?-1:a.path>b.path?1:0);
   let totalRaw=0,emittedFiles=0;
   for(const file of files) {
     if(emittedFiles>=limits.maxFiles){omit('max-files');continue;}
-    if(file.bytes>limits.maxFileBytes){omit('max-file-bytes');continue;}
-    if(totalRaw+file.bytes>limits.maxTotalRawBytes){omit('max-total-raw-bytes');continue;}
-    let descriptor,bytes;
-    try {
-      descriptor=fs.openSync(file.absolute,fs.constants.O_RDONLY|fs.constants.O_NOFOLLOW);
-      const opened=fs.fstatSync(descriptor);
-      if(!opened.isFile()||opened.dev!==file.dev||opened.ino!==file.ino||opened.size!==file.bytes){omit('file-changed');continue;}
-      bytes=fs.readFileSync(descriptor);const finished=fs.fstatSync(descriptor);
-      if(bytes.length!==file.bytes||finished.dev!==file.dev||finished.ino!==file.ino||finished.size!==file.bytes){omit('file-changed');continue;}
-    } catch {omit('file-changed');continue;} finally {if(descriptor!==undefined)try{fs.closeSync(descriptor);}catch{}}
+    const bytes=file.bytes;
+    if(bytes.length>limits.maxFileBytes){omit('max-file-bytes');continue;}
+    if(totalRaw+bytes.length>limits.maxTotalRawBytes){omit('max-total-raw-bytes');continue;}
     const chunks=[];for(let offset=0;offset<bytes.length;offset+=limits.maxChunkBytes)chunks.push(bytes.subarray(offset,offset+limits.maxChunkBytes).toString('base64'));
     const digest=createHash('sha256').update(bytes).digest('hex');
     record('file',{path:file.path,byteLength:bytes.length,sha256:digest,encoding:'base64',chunkCount:chunks.length});
@@ -119,7 +120,7 @@ export function relayPlaywrightFailureDiagnostics(stderr,expectedCommandId,write
       const file=files.get(row.path);if(!file||file.ended||row.complete!==true||row.byteLength!==file.header.byteLength||row.sha256!==file.header.sha256||file.chunks.length!==file.header.chunkCount)return 0;
       const bytes=Buffer.concat(file.chunks);if(bytes.length!==row.byteLength||createHash('sha256').update(bytes).digest('hex')!==row.sha256)return 0;file.ended=true;totalRawBytes+=bytes.length;continue;
     }
-    if(row.type==='omission'){if(typeof row.reason!=='string'||!['max-depth','max-entries','unsafe-path','max-files','max-file-bytes','max-total-raw-bytes','file-changed'].includes(row.reason)||!Number.isSafeInteger(row.count)||row.count<1)return 0;omissionCount+=row.count;continue;}
+    if(row.type==='omission'){if(typeof row.reason!=='string'||!['max-depth','max-entries','unsafe-path','max-files','max-file-bytes','max-total-raw-bytes','file-changed','directory-changed'].includes(row.reason)||!Number.isSafeInteger(row.count)||row.count<1)return 0;omissionCount+=row.count;continue;}
     if(row.type==='error'){if(typeof row.error!=='string'||!row.error.length||row.error.length>256)return 0;errorCount++;continue;}
     if(row.type==='complete'){completeCount++;if(row!==rows.at(-1)||row.complete!==true||row.fileCount!==files.size||row.totalRawBytes!==totalRawBytes||row.omissionCount!==omissionCount||row.errorCount!==errorCount)return 0;continue;}
     return 0;
@@ -589,8 +590,8 @@ const MACHINE_BROWSER_COMMAND=`exec ${MACHINE_BROWSER_BASE_COMMAND}`;
 export function machineFixtureBrowserArgs(composeArgs,{uid=process.getuid(),gid=process.getgid(),reviewBearing=false,commandId=null}={}) {
   if(!Array.isArray(composeArgs)||composeArgs.some(value=>typeof value!=='string')||!Number.isSafeInteger(uid)||uid<0||!Number.isSafeInteger(gid)||gid<0) fail('machine fixture identity');
   if(reviewBearing&&!diagnosticSafeCommand(commandId))fail('machine diagnostic command id');
-  const command=reviewBearing?`{ ${MACHINE_BROWSER_BASE_COMMAND} 2>&1 1>&3; } 3>&1 | node --input-type=module -e ${shellQuote(playwrightStderrConsumerSource())} >&2; status=\${PIPESTATUS[0]}; if [ "$status" -ne 0 ]; then node --input-type=module -e ${shellQuote(playwrightDiagnosticHelperSource())} ${shellQuote(commandId)} /artifacts/test-results || :; fi; exit "$status"`:MACHINE_BROWSER_COMMAND;
-  return [...composeArgs,'run','--user',`${uid}:${gid}`,'--rm','--no-deps','e2e','bash','-lc',command];
+  const command=reviewBearing?`exec 3>&1; { setpriv --reuid=${uid} --regid=${gid} --clear-groups ${MACHINE_BROWSER_BASE_COMMAND} 2>&1 1>&3; } | node --input-type=module -e ${shellQuote(playwrightStderrConsumerSource())} >&2; status=\${PIPESTATUS[0]}; if [ "$status" -ne 0 ]; then node --input-type=module -e ${shellQuote(playwrightDiagnosticHelperSource())} ${shellQuote(commandId)} /artifacts/test-results || :; fi; exit "$status"`:MACHINE_BROWSER_COMMAND;
+  return [...composeArgs,'run','--user',reviewBearing?'0:0':`${uid}:${gid}`,'--rm','--no-deps','e2e','bash','-lc',command];
 }
 export function writeCandidateArtifactContainment(file) {
   if(typeof file!=='string'||!path.isAbsolute(file)||fs.existsSync(file)) fail('candidate artifact containment destination');
