@@ -181,6 +181,7 @@ document.addEventListener('keydown', event => {
   if (!mobileQuery.matches || !drawer) return;
   if (event.key === 'Escape') {
     event.preventDefault();
+    event.stopImmediatePropagation();
     closeDrawer();
   } else if (event.key === 'Tab') {
     const items = tabbable(panels[drawer]);
@@ -235,7 +236,7 @@ $('#skip-to-map')?.addEventListener('click', () => focus($('#map-frame')));
 function responsiveFocusTarget(active, mobile) {
   if (!(active instanceof HTMLElement)) return null;
   if (mobile) {
-    if (active.matches('#search-input')) return $('#mobile-find-toggle');
+    if (active.closest('#search-form')) return $('#mobile-find-toggle');
     if (active.matches('#desktop-controls-toggle')) return $('#mobile-controls-toggle');
     if (active.matches('#desktop-inspector-toggle')) return $('#mobile-inspector-toggle');
     if (active.matches('#map-focus-toggle')) return $('#mobile-controls-toggle');
