@@ -621,7 +621,7 @@ test('diagnostic relay accepts only a complete internally consistent expected-co
  const resultRoot=path.join(temporary,'test-results');fs.mkdirSync(resultRoot);fs.writeFileSync(path.join(resultRoot,'frame-actual.png'),'protected bytes');
  const id='sha256:'+'b'.repeat(64),valid=emitPlaywrightFailureDiagnostics({commandId:id,testResultsRoot:resultRoot,write:()=>{}}),lines=valid.trimEnd().split('\n');
  const relay=value=>{const output=[];return [relayPlaywrightFailureDiagnostics(value,id,row=>output.push(row)),output.join('')];};
- assert.deepEqual(relay(valid),[lines.length,valid]);
+ assert.deepEqual(relay(valid),[lines.length,valid]);assert.equal(relayPlaywrightFailureDiagnostics(valid,id,()=>{throw new Error('relay failed');}),0);
  const mutations=[
   lines.slice(0,-1),
   lines.map((line,index)=>index===1?line.replace('"index":0','"index":1'):line),
