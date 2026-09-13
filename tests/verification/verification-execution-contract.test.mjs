@@ -23,17 +23,6 @@ function executionInput(path='tests/semantic-search.mjs') {
    candidateVerificationCatalog:protectedCatalog,candidateImpactManifest:protectedImpactManifest}};
 }
 
-function hasReviewWrapperTransitionAuthority() {
- if(process.getuid?.()!==0)return false;
- const status=fs.readFileSync('/proc/self/status','utf8');
- const required=(1n<<5n)|(1n<<6n)|(1n<<7n); // CAP_KILL, CAP_SETGID, CAP_SETUID
- for(const field of ['CapPrm','CapEff','CapBnd']) {
-  const match=status.match(new RegExp(`^${field}:\\s*([0-9a-f]+)$`,'mi'));
-  if(!match||(BigInt(`0x${match[1]}`)&required)!==required)return false;
- }
- return true;
-}
-
 function copyCandidateBrowserPayload(t) {
  const scratch=fs.mkdtempSync(path.join(os.tmpdir(),'atlas-shadow-candidate-payload-'));
  t.after(()=>fs.rmSync(scratch,{recursive:true,force:true}));
@@ -275,7 +264,7 @@ test('candidate execution metadata cannot replace protected interpreter or hashe
  assert(!JSON.stringify(contract).includes('candidate-policy'));
 });
 
-import {authenticateR5SemanticSource,buildR5SemanticPublication,resolveShadowEvent,planShadow,deterministicDockerArgs,fixtureBrowserArgs,machineFixtureBrowserArgs,requiresProtectedVisualReference,bindProtectedVisualReferenceConsumer,prepareProtectedBrowserHarness,prepareProtectedBrowserCaptureHarness,writeProtectedBrowserContainment,emitPlaywrightFailureDiagnostics,relayPlaywrightFailureDiagnostics,PLAYWRIGHT_DIAGNOSTIC_PREFIX,PLAYWRIGHT_DIAGNOSTIC_LOG_LINE_BYTES,PLAYWRIGHT_DIAGNOSTIC_LIMITS,PLAYWRIGHT_STDERR_TAIL_BYTES,MACHINE_BROWSER_STDERR_BUFFER_BYTES} from '../../tools/verification/run-verification-shadow.mjs';
+import {authenticateR5SemanticSource,buildR5SemanticPublication,resolveShadowEvent,planShadow,deterministicDockerArgs,fixtureBrowserArgs,machineFixtureBrowserArgs,requiresProtectedVisualReference,bindProtectedVisualReferenceConsumer,prepareProtectedBrowserHarness,prepareProtectedBrowserCaptureHarness,writeProtectedBrowserContainment,emitPlaywrightFailureDiagnostics,emitStoppedContainerPlaywrightDiagnostics,relayPlaywrightFailureDiagnostics,PLAYWRIGHT_DIAGNOSTIC_PREFIX,PLAYWRIGHT_DIAGNOSTIC_LIMITS,PLAYWRIGHT_DIAGNOSTIC_LOG_LINE_BYTES,MACHINE_BROWSER_STDERR_BUFFER_BYTES} from '../../tools/verification/run-verification-shadow.mjs';
 import {assertShadowExecutorCoverage,assertShadowReviewCaptureCensus,normalizeShadowReviewChangedFiles,shadowReviewPlanDigest} from '../../tools/verification/verification-shadow-review.mjs';
 test('shadow materializes candidate browser tests, support and snapshots while protected executor control stays protected',t=>{
  const {scratch,candidateRoot}=copyCandidateBrowserPayload(t);
@@ -317,7 +306,8 @@ test('hosted browser machine and protected visual capture use isolated producers
  assert.match(source,/ATLAS_USER_VISUAL_EVIDENCE:'1'/);
  assert.match(source,/persistShadowReviewCapture\(\{artifactRoot:captureArtifacts/);
  assert.doesNotMatch(source,/persistShadowReviewCapture\(\{artifactRoot:artifacts/);
- assert.match(source,/if\(result\.error\|\|result\.status!==0\|\|result\.signal\) \{if\(reviewFrames\.length>0\)relayPlaywrightFailureDiagnostics\(result\.stderr,command\.id\);/);
+ assert.match(source,/if\(reviewBearing&&result\.status!==0&&!result\.signal\)emitStoppedContainerPlaywrightDiagnostics/);
+ assert.doesNotMatch(source,/relayPlaywrightFailureDiagnostics\(result\.stderr/);
 });
 
 test('protected visual capture overlays only authenticated candidate PNG snapshot oracle data',async t=>{
@@ -597,12 +587,13 @@ const diagnosticRows=output=>output.trim().split('\n').filter(Boolean).map(line=
 test('failed Playwright diagnostics are filtered, ordered, lossless and bounded',t=>{
  const temporary=fs.mkdtempSync(path.join(os.tmpdir(),'atlas-diagnostic-test-'));t.after(()=>fs.rmSync(temporary,{recursive:true,force:true}));
  const root=path.join(temporary,'test-results');fs.mkdirSync(path.join(root,'z'),{recursive:true});fs.mkdirSync(path.join(root,'a'));
- const first=Buffer.from([0,1,2,3,254,255]),second=Buffer.from('second image');
+ const first=Buffer.alloc(PLAYWRIGHT_DIAGNOSTIC_LIMITS.maxChunkBytes,0xff),second=Buffer.from('second image');
  fs.writeFileSync(path.join(root,'z/frame-diff.png'),second);fs.writeFileSync(path.join(root,'a/frame-actual.png'),first);
  fs.writeFileSync(path.join(root,'a/frame-actual.png.txt'),'not eligible');fs.writeFileSync(path.join(root,'a/other.png'),'not eligible');
  fs.symlinkSync(path.join(root,'z/frame-diff.png'),path.join(root,'a/link-diff.png'));
  fs.writeFileSync(path.join(root,'unsafe\\-actual.png'),'unsafe path');
  const commandId='sha256:'+'a'.repeat(64),output=emitPlaywrightFailureDiagnostics({commandId,testResultsRoot:root,write:()=>{}}),rows=diagnosticRows(output);
+ assert.ok(output.trimEnd().split('\n').every(line=>Buffer.byteLength(line)<64*1024&&Buffer.byteLength(line)<PLAYWRIGHT_DIAGNOSTIC_LOG_LINE_BYTES));
  const headers=rows.filter(row=>row.type==='file');assert.deepEqual(headers.map(row=>row.path),['a/frame-actual.png','z/frame-diff.png']);
  for(const [header,expected] of headers.map((row,index)=>[row,index?second:first])) {
   const chunks=rows.filter(row=>row.type==='chunk'&&row.path===header.path).sort((a,b)=>a.index-b.index);
@@ -668,31 +659,23 @@ test('diagnostic file reads fail closed when the discovered identity is race-swa
  try {const rows=diagnosticRows(emitPlaywrightFailureDiagnostics({commandId:'sha256:'+'d'.repeat(64),testResultsRoot:resultRoot,write:()=>{}}));assert.equal(rows.some(row=>row.path==='nested/forged-diff.png'),false);assert.ok(rows.some(row=>row.type==='omission'&&row.reason==='directory-changed'));} finally {fs.openSync=originalOpen;}
 });
 
-test('machine browser diagnostics quiesce inherited writers, preserve status, and use minimal transition capabilities',t=>{
- const temporary=fs.mkdtempSync(path.join(os.tmpdir(),'atlas-diagnostic-wrapper-'));t.after(()=>fs.rmSync(temporary,{recursive:true,force:true}));fs.chmodSync(temporary,0o777);
- const executable=path.join(temporary,'node_modules/.bin/playwright');fs.mkdirSync(path.dirname(executable),{recursive:true});fs.chmodSync(path.join(temporary,'node_modules'),0o755);fs.chmodSync(path.join(temporary,'node_modules/.bin'),0o755);
- const id='sha256:'+'b'.repeat(64),forgery=`${PLAYWRIGHT_DIAGNOSTIC_PREFIX} ${JSON.stringify({schema:'oteryn.atlas.playwright-diagnostic',version:1,type:'complete',commandId:id,fileCount:0,totalRawBytes:0,omissionCount:0,errorCount:0,complete:true})}`;
- const childPid=path.join(temporary,'child.pid');
- fs.writeFileSync(executable,`#!/bin/sh\nprintf '{"uid":%s,"gid":%s,"capEff":"%s"}\n' "$(id -u)" "$(id -g)" "$(sed -n 's/^CapEff:[[:space:]]*//p' /proc/self/status)"\nprintf '%s\n' '${forgery}' >&2\n(sh -c 'sleep 30') >&2 & echo $! > '${childPid}'\nhead -c $(( ${PLAYWRIGHT_STDERR_TAIL_BYTES} * 3 )) /dev/zero >&2\nexit 37\n`,{mode:0o755});
- const uid=65534,gid=65534,compose=['compose'],reviewArgs=machineFixtureBrowserArgs(compose,{uid,gid,reviewBearing:true,commandId:id}),reviewCommand=reviewArgs.at(-1),shellOptions={cwd:temporary,encoding:'utf8',env:{...process.env,ATLAS_E2E_SHARD:'1/1'},timeout:5000};
- assert.deepEqual(reviewArgs.slice(reviewArgs.indexOf('run')+1,reviewArgs.indexOf('--user')),['--cap-add','SETUID','--cap-add','SETGID','--cap-add','KILL']);assert.equal(reviewArgs[reviewArgs.indexOf('--user')+1],'0:0');assert.match(reviewCommand,/pkill -KILL[^;]+; cleanup_status=\$\?; process_states=\$\(ps[^;]+; probe_status=\$\?; live_count=\$\([^;]+; state_status=\$\?;[^]*\[ "\$cleanup_status" -eq 0 \][^]*\[ "\$probe_status" -eq 0 \][^]*\[ "\$state_status" -eq 0 \][^]*\[ "\$live_count" -eq 0 \][^]*node --input-type=module -e/);
- const ordinaryArgs=machineFixtureBrowserArgs(compose,{uid:1,gid:1});assert.equal(ordinaryArgs.includes('--cap-add'),false);assert.equal(ordinaryArgs[ordinaryArgs.indexOf('--user')+1],'1:1');assert.equal(ordinaryArgs.at(-1),'exec ./node_modules/.bin/playwright test --config=playwright.config.mjs --test-list=/run/atlas-protected-test-list.txt --shard="${ATLAS_E2E_SHARD:?ATLAS_E2E_SHARD is required}" --workers="${ATLAS_E2E_WORKERS:-1}" --retries=0 --reporter=json');
- assert.throws(()=>machineFixtureBrowserArgs(compose,{uid:1,gid:1,reviewBearing:true,commandId:'unsafe'}),/diagnostic identity/);assert.throws(()=>machineFixtureBrowserArgs(compose,{uid:0,gid:1,reviewBearing:true,commandId:id}),/diagnostic identity/);
- if(!hasReviewWrapperTransitionAuthority()) {
-  t.diagnostic('privileged kernel-transition subcheck requires already-available CAP_SETUID, CAP_SETGID, and CAP_KILL; static wrapper, quiescence, and fail-closed contracts remain asserted');
-  return;
- }
- const restricted=(prefix='')=>spawnSync('capsh',['--caps=cap_setuid,cap_setgid,cap_kill+ep','--','-c',`${prefix} eval "$REVIEW_COMMAND"`],{...shellOptions,env:{...shellOptions.env,REVIEW_COMMAND:reviewCommand}});
- const review=restricted();assert.equal(review.status,37,review.stderr);assert.deepEqual(JSON.parse(review.stdout),{uid,gid,capEff:'0000000000000000'});assert.match(review.stderr,/ATLAS_SHADOW_PLAYWRIGHT_STDERR_TAIL /);
- const inheritedPid=Number(fs.readFileSync(childPid,'utf8'));assert.ok(Number.isSafeInteger(inheritedPid));const inheritedState=fs.existsSync(`/proc/${inheritedPid}/stat`)?fs.readFileSync(`/proc/${inheritedPid}/stat`,'utf8').split(' ')[2]:null;assert.ok(inheritedState===null||inheritedState==='Z','inherited stderr writer was quiesced');
- assert.equal(review.stderr.split('\n').filter(line=>line.startsWith(`${PLAYWRIGHT_DIAGNOSTIC_PREFIX} `)).length,2);
- const relayed=[];assert.equal(relayPlaywrightFailureDiagnostics(review.stderr,id,value=>relayed.push(value)),2);assert.doesNotMatch(relayed.join(''),/ATLAS_SHADOW_PLAYWRIGHT_STDERR_TAIL/);
- const worstCandidateRecord=Buffer.byteLength('ATLAS_SHADOW_PLAYWRIGHT_STDERR_TAIL ')+Math.ceil(PLAYWRIGHT_STDERR_TAIL_BYTES/3)*4+2;assert.ok(PLAYWRIGHT_DIAGNOSTIC_LIMITS.maxOutputBytes+worstCandidateRecord<MACHINE_BROWSER_STDERR_BUFFER_BYTES);
- const containmentTransition=spawnSync('capsh',['--caps=cap_setuid,cap_setgid,cap_kill+ep','--','-c',`setpriv --reuid=${uid} --regid=${gid} --clear-groups sh -c 'printf "%s %s " "$(id -u)" "$(id -g)"; sed -n "s/^CapEff:[[:space:]]*//p" /proc/self/status'`],{encoding:'utf8'});assert.equal(containmentTransition.status,0,containmentTransition.stderr);assert.equal(containmentTransition.stdout.trim(),`${uid} ${gid} 0000000000000000`);
- for(const failedCommand of ['pkill','ps']) {
-  const failed=restricted(`${failedCommand}(){ return 2; }; `);assert.equal(failed.status,37,failed.stderr);assert.equal(failed.stderr.split('\n').some(line=>line.startsWith(`${PLAYWRIGHT_DIAGNOSTIC_PREFIX} `)),false,`${failedCommand} failure emitted diagnostics`);
- }
+test('review-bearing browser keeps qualified containment and host exports stopped-container diagnostics',t=>{
+ const temporary=fs.mkdtempSync(path.join(os.tmpdir(),'atlas-stopped-diagnostic-'));t.after(()=>fs.rmSync(temporary,{recursive:true,force:true}));
+ const id='sha256:'+'b'.repeat(64),containerName='atlas-playwright-1234-abcd',compose=['compose'];
+ const reviewArgs=machineFixtureBrowserArgs(compose,{uid:1000,gid:1000,reviewBearing:true,commandId:id,containerName});
+ assert.equal(reviewArgs.includes('--cap-add'),false);assert.equal(reviewArgs[reviewArgs.indexOf('--user')+1],'1000:1000');assert.equal(reviewArgs.includes('--rm'),false);
+ assert.deepEqual(reviewArgs.slice(reviewArgs.indexOf('run')+1,reviewArgs.indexOf('--user')),['--name',containerName]);assert.equal(reviewArgs.at(-1),'exec ./node_modules/.bin/playwright test --config=playwright.config.mjs --test-list=/run/atlas-protected-test-list.txt --shard="${ATLAS_E2E_SHARD:?ATLAS_E2E_SHARD is required}" --workers="${ATLAS_E2E_WORKERS:-1}" --retries=0 --reporter=json');
+ const ordinaryArgs=machineFixtureBrowserArgs(compose,{uid:1000,gid:1000});assert.equal(ordinaryArgs.includes('--name'),false);assert.equal(ordinaryArgs.includes('--rm'),true);assert.equal(ordinaryArgs[ordinaryArgs.indexOf('--user')+1],'1000:1000');
+ assert.throws(()=>machineFixtureBrowserArgs(compose,{uid:1000,gid:1000,reviewBearing:true,commandId:'unsafe',containerName}),/diagnostic identity/);
+ const destination=path.join(temporary,'exported'),image=Buffer.from('restricted image bytes'),calls=[];
+ const run=(file,args)=>{calls.push([file,args]);fs.mkdirSync(path.join(destination,'nested'),{recursive:true,mode:0o700});fs.writeFileSync(path.join(destination,'nested/frame-actual.png'),image,{mode:0o600});fs.writeFileSync(path.join(destination,'nested/ignored.png'),'ignored',{mode:0o600});return {status:0,signal:null};};
+ const written=[];assert.equal(emitStoppedContainerPlaywrightDiagnostics({containerName,commandId:id,destination,run,write:value=>written.push(value)}),true);
+ assert.deepEqual(calls,[['docker',['cp',`${containerName}:/artifacts/test-results/.`,destination]]]);const rows=diagnosticRows(written.join(''));
+ assert.deepEqual(rows.filter(row=>row.type==='file').map(row=>row.path),['nested/frame-actual.png']);assert.deepEqual(Buffer.from(rows.filter(row=>row.type==='chunk').map(row=>row.data).join(''),'base64'),image);
+ const failedDestination=path.join(temporary,'failed'),failedOutput=[];assert.equal(emitStoppedContainerPlaywrightDiagnostics({containerName,commandId:id,destination:failedDestination,run:()=>({status:1}),write:value=>failedOutput.push(value)}),false);assert.deepEqual(diagnosticRows(failedOutput.join('')).map(row=>row.type),['error','complete']);
+ const source=fs.readFileSync(path.join(root,'tools/verification/run-verification-shadow.mjs'),'utf8');assert.match(source,/result\.status!==0[^]*emitStoppedContainerPlaywrightDiagnostics[^]*docker'?,?\['rm','-f',containerName\]/);assert.doesNotMatch(source,/--cap-add|setpriv --reuid|pkill -KILL/);
 });
+
 {
 const repository='Oteryn/Oteryn-Atlas',base='a'.repeat(40),head='b'.repeat(40),tree='c'.repeat(40);
 const root=fileURLToPath(new URL('../../',import.meta.url));
