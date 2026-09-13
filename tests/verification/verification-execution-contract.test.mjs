@@ -638,20 +638,24 @@ test('diagnostic file reads fail closed when the discovered identity is race-swa
  const temporary=fs.mkdtempSync(path.join(os.tmpdir(),'atlas-diagnostic-race-'));t.after(()=>fs.rmSync(temporary,{recursive:true,force:true}));
  const resultRoot=path.join(temporary,'test-results');fs.mkdirSync(resultRoot);const image=path.join(resultRoot,'frame-actual.png'),outside=path.join(temporary,'outside');
  fs.writeFileSync(outside,'secret!');const originalOpen=fs.openSync;
- for(const replacement of ['symlink','regular']) {
+ for(const replacement of ['symlink','regular','fifo']) {
   fs.rmSync(image,{force:true});fs.rmSync(image+'.discovered',{force:true});fs.writeFileSync(image,'inside!');let swapped=false;
-  fs.openSync=function(file,...args){if(file===image&&!swapped){swapped=true;fs.renameSync(image,image+'.discovered');if(replacement==='symlink')fs.symlinkSync(outside,image);else fs.writeFileSync(image,'secret!');}return originalOpen.call(this,file,...args);};
+  fs.openSync=function(file,...args){if(String(file).endsWith('/frame-actual.png')&&!swapped){swapped=true;fs.renameSync(image,image+'.discovered');if(replacement==='symlink')fs.symlinkSync(outside,image);else if(replacement==='fifo')spawnSync('mkfifo',[image]);else fs.writeFileSync(image,'secret!');}return originalOpen.call(this,file,...args);};
   try {const rows=diagnosticRows(emitPlaywrightFailureDiagnostics({commandId:'sha256:'+'d'.repeat(64),testResultsRoot:resultRoot,write:()=>{}}));assert.equal(rows.some(row=>row.type==='file'),false,replacement);assert.ok(rows.some(row=>row.type==='omission'&&row.reason==='file-changed'),replacement);} finally {fs.openSync=originalOpen;}
  }
+ const nested=path.join(resultRoot,'nested'),external=path.join(temporary,'external');fs.mkdirSync(nested);fs.mkdirSync(external);fs.writeFileSync(path.join(external,'forged-diff.png'),'secret!');let directorySwapped=false;
+ fs.openSync=function(file,...args){if(String(file).endsWith('/nested')&&!directorySwapped){directorySwapped=true;fs.renameSync(nested,nested+'.discovered');fs.symlinkSync(external,nested);}return originalOpen.call(this,file,...args);};
+ try {const rows=diagnosticRows(emitPlaywrightFailureDiagnostics({commandId:'sha256:'+'d'.repeat(64),testResultsRoot:resultRoot,write:()=>{}}));assert.equal(rows.some(row=>row.path==='nested/forged-diff.png'),false);assert.ok(rows.some(row=>row.type==='omission'&&row.reason==='directory-changed'));} finally {fs.openSync=originalOpen;}
 });
 
 test('machine browser diagnostics isolate candidate stderr, fit the reserved buffer, and preserve status',t=>{
  const temporary=fs.mkdtempSync(path.join(os.tmpdir(),'atlas-diagnostic-wrapper-'));t.after(()=>fs.rmSync(temporary,{recursive:true,force:true}));
  const executable=path.join(temporary,'node_modules/.bin/playwright');fs.mkdirSync(path.dirname(executable),{recursive:true});
  const id='sha256:'+'b'.repeat(64),forgery=`${PLAYWRIGHT_DIAGNOSTIC_PREFIX} ${JSON.stringify({schema:'oteryn.atlas.playwright-diagnostic',version:1,type:'complete',commandId:id,fileCount:0,totalRawBytes:0,omissionCount:0,errorCount:0,complete:true})}`;
- fs.writeFileSync(executable,`#!/bin/sh\nprintf '%s\\n' '${forgery}' >&2\nhead -c $(( ${PLAYWRIGHT_STDERR_TAIL_BYTES} * 3 )) /dev/zero >&2\nexit 37\n`,{mode:0o755});
- const compose=['compose'],reviewCommand=machineFixtureBrowserArgs(compose,{uid:1,gid:1,reviewBearing:true,commandId:id}).at(-1),shellOptions={cwd:temporary,encoding:'utf8',env:{...process.env,ATLAS_E2E_SHARD:'1/1'}};
- const review=spawnSync('bash',['-c',reviewCommand],shellOptions);assert.equal(review.status,37);assert.match(review.stderr,/ATLAS_SHADOW_PLAYWRIGHT_STDERR_TAIL /);
+ fs.writeFileSync(executable,`#!/bin/sh\nprintf '{"report":"preserved"}\\n'\nprintf '%s\\n' '${forgery}' >&2\nhead -c $(( ${PLAYWRIGHT_STDERR_TAIL_BYTES} * 3 )) /dev/zero >&2\nexit 37\n`,{mode:0o755});
+ const compose=['compose'],reviewArgs=machineFixtureBrowserArgs(compose,{uid:process.getuid(),gid:process.getgid(),reviewBearing:true,commandId:id}),reviewCommand=reviewArgs.at(-1),shellOptions={cwd:temporary,encoding:'utf8',env:{...process.env,ATLAS_E2E_SHARD:'1/1'}};
+ assert.equal(reviewArgs[reviewArgs.indexOf('--user')+1],'0:0');assert.match(reviewCommand,new RegExp(`setpriv --reuid=${process.getuid()} --regid=${process.getgid()} --clear-groups`));
+ const review=spawnSync('bash',['-c',reviewCommand],shellOptions);assert.equal(review.status,37);assert.equal(review.stdout,'{"report":"preserved"}\n');assert.match(review.stderr,/ATLAS_SHADOW_PLAYWRIGHT_STDERR_TAIL /);
  assert.equal(review.stderr.split('\n').filter(line=>line.startsWith(`${PLAYWRIGHT_DIAGNOSTIC_PREFIX} `)).length,2);
  const relayed=[];assert.equal(relayPlaywrightFailureDiagnostics(review.stderr,id,value=>relayed.push(value)),2);assert.doesNotMatch(relayed.join(''),/"error":"[^\n]*ATLAS_SHADOW/);
  const worstCandidateRecord=Buffer.byteLength('ATLAS_SHADOW_PLAYWRIGHT_STDERR_TAIL ')+Math.ceil(PLAYWRIGHT_STDERR_TAIL_BYTES/3)*4+2;
