@@ -10,10 +10,22 @@ import {readCandidateSnapshot, gitChangedFiles, githubRequest, resolveDirectMerg
 import {buildProtectedExecutionEnvironmentIdentity} from './protected-execution-environment.mjs';
 import {canonicalJson} from './verification-plan-schema.mjs';
 import {buildQualificationWorld, verifyQualificationWorld, qualificationTrustDescriptor} from './qualification-world.mjs';
+import {resolveQualificationScenarioBindings, renderQualificationHarnessBindings} from './qualification-scenario-bindings.mjs';
 import {buildBoundedRealWorld, verifyBoundedRealWorld, boundedRealTrustDescriptor} from './bounded-real-world.mjs';
 import {buildProtectedExpectedAuthority, PUBLICATION_AUTHORITY_ID} from './proof-provenance.mjs';
 import {SELECTED_GAMEPLAY_INPUTS, buildSelectedGameplaySource} from './shadow-gameplay-source.mjs';
 import {runSelectedGameplayHttp} from './shadow-gameplay-http.mjs';
+import {runProtectedVisualReference} from './run-protected-visual-reference.mjs';
+import {PROTECTED_VISUAL_BROWSER} from './protected-visual-reference.mjs';
+import {
+  assertShadowExecutorCoverage,
+  assertShadowReviewCaptureCensus,
+  currentShadowJobId,
+  persistShadowReviewCapture,
+  shadowOracleDigest,
+  shadowReviewFramesForCommand,
+  waitForShadowReviewGate,
+} from './verification-shadow-review.mjs';
 
 const REPOSITORY='Oteryn/Oteryn-Atlas';
 const TEMPLATE='tools/maintenance/verification-shadow.yml';
@@ -26,6 +38,131 @@ const readJson=file=>JSON.parse(fs.readFileSync(file,'utf8'));
 const git=(root,...args)=>execFileSync('git',['--no-replace-objects','-C',root,'-c','core.hooksPath=/dev/null',...args],{encoding:'utf8',maxBuffer:32*1024*1024}).trim();
 const gitBlob=(root,revision,name)=>execFileSync('git',['--no-replace-objects','-C',root,'-c','core.hooksPath=/dev/null','show',`${revision}:${name}`],{maxBuffer:2*1024*1024});
 const controlRoot=path.resolve(fileURLToPath(new URL('../../',import.meta.url)));
+
+export const PLAYWRIGHT_DIAGNOSTIC_PREFIX='ATLAS_SHADOW_PLAYWRIGHT_DIAGNOSTIC';
+// Keep every complete prefixed JSON record below GitHub Actions' 64 KiB log-line limit,
+// including the longest accepted path and JSON metadata, with a deterministic 1 KiB margin.
+export const PLAYWRIGHT_DIAGNOSTIC_LOG_LINE_BYTES=63*1024;
+export const PLAYWRIGHT_DIAGNOSTIC_LIMITS=Object.freeze({maxDepth:8,maxEntries:2048,maxFiles:8,maxFileBytes:4*1024*1024,maxTotalRawBytes:8*1024*1024,maxChunkBytes:45*1024,maxOutputBytes:12*1024*1024});
+export const MACHINE_BROWSER_STDERR_BUFFER_BYTES=16*1024*1024;
+const diagnosticSafeCommand=id=>/^sha256:[a-f0-9]{64}$/.test(id??'');
+const diagnosticSafePath=value=>typeof value==='string'&&value.length>0&&value.length<=1024&&value===value.replaceAll('\\','/')&&!path.posix.isAbsolute(value)&&value.split('/').every(part=>part&&part!=='.'&&part!=='..');
+export function resolveProtectedComposeServiceImage({composeArgs,service,env=process.env,run=spawnSync}={}) {
+  if(!Array.isArray(composeArgs)||composeArgs.some(value=>typeof value!=='string')||!/^[-a-z0-9]+$/.test(service??''))throw new TypeError('protected collector image input');
+  const configured=run('docker',[...composeArgs,'config','--images',service],{env,encoding:'utf8',timeout:30000,maxBuffer:1024*1024});
+  const references=String(configured?.stdout??'').split(/\r?\n/).map(value=>value.trim()).filter(Boolean);
+  if(configured?.error||configured?.status!==0||configured?.signal||references.length!==1)throw new TypeError('protected collector service image reference');
+  const inspected=run('docker',['image','inspect','--format','{{.Id}}',references[0]],{env,encoding:'utf8',timeout:30000,maxBuffer:1024*1024});
+  const identities=String(inspected?.stdout??'').split(/\r?\n/).map(value=>value.trim()).filter(Boolean);
+  if(inspected?.error||inspected?.status!==0||inspected?.signal||identities.length!==1||!/^sha256:[a-f0-9]{64}$/.test(identities[0]))throw new TypeError('protected collector image identity');
+  return identities[0];
+}
+export function emitPlaywrightFailureDiagnostics({commandId,testResultsRoot,write=record=>fs.writeSync(2,record),limits=PLAYWRIGHT_DIAGNOSTIC_LIMITS}={}) {
+  if(!diagnosticSafeCommand(commandId)||typeof testResultsRoot!=='string'||!path.isAbsolute(testResultsRoot)) throw new TypeError('unsafe diagnostic input');
+  const rootStat=fs.lstatSync(testResultsRoot);
+  if(rootStat.isSymbolicLink()||!rootStat.isDirectory()) throw new TypeError('unsafe diagnostic root');
+  const records=[],omitted=new Map();let entries=0,totalCollected=0;
+  const record=(type,data={})=>{const line=`${PLAYWRIGHT_DIAGNOSTIC_PREFIX} ${JSON.stringify({schema:'oteryn.atlas.playwright-diagnostic',version:1,type,commandId,...data})}\n`;if(Buffer.byteLength(line)>PLAYWRIGHT_DIAGNOSTIC_LOG_LINE_BYTES)throw new TypeError('diagnostic log line bound');records.push(line);};
+  const omit=(reason,count=1)=>omitted.set(reason,(omitted.get(reason)??0)+count);
+  const files=[];
+  const walk=(directory,relative='',depth=0,expected=rootStat)=>{
+    if(depth>limits.maxDepth){omit('max-depth');return;}
+    let directoryDescriptor,handle;const names=[];
+    try {
+      directoryDescriptor=fs.openSync(directory,fs.constants.O_RDONLY|fs.constants.O_DIRECTORY|fs.constants.O_NOFOLLOW|fs.constants.O_NONBLOCK);
+      const opened=fs.fstatSync(directoryDescriptor);if(!opened.isDirectory()||opened.dev!==expected.dev||opened.ino!==expected.ino)throw new TypeError('directory changed');
+      handle=fs.opendirSync(`/proc/self/fd/${directoryDescriptor}`);
+      for(let entry;(entry=handle.readSync());){if(entries+names.length>=limits.maxEntries){omit('max-entries');return;}names.push(entry.name);}
+      handle.closeSync();handle=null;
+      for(const name of names.sort()) {
+        if(entries>=limits.maxEntries){omit('max-entries');return;}
+        entries++;const next=relative?`${relative}/${name}`:name;
+        if(!diagnosticSafePath(next)){omit('unsafe-path');continue;}
+        const absolute=`/proc/self/fd/${directoryDescriptor}/${name}`;let stat;try{stat=fs.lstatSync(absolute);}catch{omit('file-changed');continue;}
+        if(stat.isSymbolicLink())continue;
+        if(stat.isDirectory()){walk(absolute,next,depth+1,stat);continue;}
+        if(stat.isFile()&&(name.endsWith('-actual.png')||name.endsWith('-diff.png'))) {
+          if(files.length>=limits.maxFiles){omit('max-files');continue;}
+          if(stat.size>limits.maxFileBytes){omit('max-file-bytes');continue;}
+          if(totalCollected+stat.size>limits.maxTotalRawBytes){omit('max-total-raw-bytes');continue;}
+          let descriptor;try {descriptor=fs.openSync(absolute,fs.constants.O_RDONLY|fs.constants.O_NOFOLLOW|fs.constants.O_NONBLOCK);const opened=fs.fstatSync(descriptor);if(!opened.isFile()||opened.dev!==stat.dev||opened.ino!==stat.ino||opened.size!==stat.size)throw new TypeError('file changed');const bytes=fs.readFileSync(descriptor),finished=fs.fstatSync(descriptor);if(bytes.length!==stat.size||finished.dev!==stat.dev||finished.ino!==stat.ino||finished.size!==stat.size)throw new TypeError('file changed');files.push({path:next,bytes});totalCollected+=bytes.length;}catch{omit('file-changed');}finally{if(descriptor!==undefined)try{fs.closeSync(descriptor);}catch{}}
+        }
+      }
+    } catch {omit('directory-changed');} finally {if(handle)try{handle.closeSync();}catch{}if(directoryDescriptor!==undefined)try{fs.closeSync(directoryDescriptor);}catch{}}
+  };
+  walk(testResultsRoot);files.sort((a,b)=>a.path<b.path?-1:a.path>b.path?1:0);
+  let totalRaw=0,emittedFiles=0;
+  for(const file of files) {
+    const bytes=file.bytes;
+    const chunks=[];for(let offset=0;offset<bytes.length;offset+=limits.maxChunkBytes)chunks.push(bytes.subarray(offset,offset+limits.maxChunkBytes).toString('base64'));
+    const digest=createHash('sha256').update(bytes).digest('hex');
+    record('file',{path:file.path,byteLength:bytes.length,sha256:digest,encoding:'base64',chunkCount:chunks.length});
+    chunks.forEach((data,index)=>record('chunk',{path:file.path,index,chunkCount:chunks.length,data}));
+    record('end',{path:file.path,byteLength:bytes.length,sha256:digest,complete:true});totalRaw+=bytes.length;emittedFiles++;
+  }
+  for(const [reason,count] of [...omitted].sort(([a],[b])=>a<b?-1:a>b?1:0))record('omission',{reason,count});
+  record('complete',{fileCount:emittedFiles,totalRawBytes:totalRaw,omissionCount:[...omitted.values()].reduce((sum,count)=>sum+count,0),errorCount:0,complete:true});
+  const output=records.join('');if(Buffer.byteLength(output)>limits.maxOutputBytes)throw new TypeError('diagnostic output bound');write(output);return output;
+}
+
+export function collectVolumePlaywrightDiagnostics({volumeName,collectorName,commandId,image,uid=process.getuid(),gid=process.getgid(),protectedRoot=controlRoot,run=spawnSync,write=record=>fs.writeSync(2,record)}={}) {
+  if(!/^atlas-playwright-artifacts-[a-f0-9-]+$/.test(volumeName??'')||!/^atlas-playwright-collector-[a-f0-9-]+$/.test(collectorName??'')
+    ||!diagnosticSafeCommand(commandId)||!/^sha256:[a-f0-9]{64}$/.test(image??'')||!Number.isSafeInteger(uid)||uid<0||!Number.isSafeInteger(gid)||gid<0
+    ||typeof protectedRoot!=='string'||!path.isAbsolute(protectedRoot))return false;
+  try {
+    const script=`import {emitPlaywrightFailureDiagnostics} from '/atlas-protected/tools/verification/run-verification-shadow.mjs';emitPlaywrightFailureDiagnostics({commandId:${JSON.stringify(commandId)},testResultsRoot:'/artifacts/test-results'});`;
+    const collected=run('docker',['run','--rm','--name',collectorName,'--network=none','--read-only','--user',`${uid}:${gid}`,'--cap-drop=ALL','--security-opt=no-new-privileges',
+      '--pids-limit','64','--memory','268435456','--cpus','1','--tmpfs','/tmp:rw,nodev,nosuid,size=16m',
+      '--mount',`type=volume,src=${volumeName},dst=/artifacts,readonly`,'--mount',`type=bind,src=${protectedRoot},dst=/atlas-protected,readonly`,
+      image,'node','--input-type=module','--eval',script],{encoding:'utf8',timeout:30000,maxBuffer:MACHINE_BROWSER_STDERR_BUFFER_BYTES});
+    if(collected?.error||collected?.status!==0||collected?.signal)throw new TypeError('protected diagnostic collector failed');
+    if(relayPlaywrightFailureDiagnostics(collected.stderr,commandId,write)<1)throw new TypeError('protected diagnostic frame invalid');
+    return true;
+  } catch(error) {
+    const base={schema:'oteryn.atlas.playwright-diagnostic',version:1,commandId};
+    const output=`${PLAYWRIGHT_DIAGNOSTIC_PREFIX} ${JSON.stringify({...base,type:'error',error:String(error?.message??error).slice(0,256)})}\n${PLAYWRIGHT_DIAGNOSTIC_PREFIX} ${JSON.stringify({...base,type:'complete',fileCount:0,totalRawBytes:0,omissionCount:0,errorCount:1,complete:true})}\n`;
+    if(output.split('\n').every(line=>!line||Buffer.byteLength(line)<PLAYWRIGHT_DIAGNOSTIC_LOG_LINE_BYTES))try{write(output);}catch{}
+    return false;
+  }
+}
+
+export function reviewArtifactVolumeArgs({volumeName,anchorName,image,uid=process.getuid(),gid=process.getgid()}={}) {
+  if(!/^atlas-playwright-artifacts-[a-f0-9-]+$/.test(volumeName??'')||!/^atlas-playwright-anchor-[a-f0-9-]+$/.test(anchorName??'')
+    ||!/^sha256:[a-f0-9]{64}$/.test(image??'')||!Number.isSafeInteger(uid)||uid<0||!Number.isSafeInteger(gid)||gid<0)fail('diagnostic volume identity');
+  return {
+    create:['volume','create','--driver','local','--opt','type=tmpfs','--opt','device=tmpfs','--opt',`o=size=${CANDIDATE_ARTIFACT_TMPFS_BYTES},uid=${uid},gid=${gid},mode=0700,nodev,nosuid`,volumeName],
+    anchor:['create','--name',anchorName,'--network=none','--read-only','--user',`${uid}:${gid}`,'--cap-drop=ALL','--security-opt=no-new-privileges','--pids-limit','16','--memory','67108864','--cpus','0.25','--mount',`type=volume,src=${volumeName},dst=/artifacts`,image,'tail','-f','/dev/null'],
+  };
+}
+
+export function relayPlaywrightFailureDiagnostics(stderr,expectedCommandId,write=record=>fs.writeSync(2,record)) {
+  if(!diagnosticSafeCommand(expectedCommandId))return 0;
+  const lines=String(stderr??'').split('\n').filter(line=>line.startsWith(`${PLAYWRIGHT_DIAGNOSTIC_PREFIX} `));
+  let rows;try{rows=lines.map(line=>JSON.parse(line.slice(PLAYWRIGHT_DIAGNOSTIC_PREFIX.length+1)));}catch{return 0;}
+  if(!rows.length||rows.some(row=>!row||row.schema!=='oteryn.atlas.playwright-diagnostic'||row.version!==1||row.commandId!==expectedCommandId))return 0;
+  const files=new Map();let totalRawBytes=0,omissionCount=0,errorCount=0,completeCount=0;
+  const uint=value=>Number.isSafeInteger(value)&&value>=0;
+  for(const row of rows) {
+    if(row.type==='file') {
+      if(!diagnosticSafePath(row.path)||files.has(row.path)||!uint(row.byteLength)||row.byteLength>PLAYWRIGHT_DIAGNOSTIC_LIMITS.maxFileBytes||!/^[a-f0-9]{64}$/.test(row.sha256??'')||row.encoding!=='base64'||!uint(row.chunkCount))return 0;
+      files.set(row.path,{header:row,chunks:[],ended:false});continue;
+    }
+    if(row.type==='chunk') {
+      const file=files.get(row.path);if(!file||file.ended||row.index!==file.chunks.length||row.chunkCount!==file.header.chunkCount||typeof row.data!=='string'||row.data.length%4!==0||!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(row.data))return 0;
+      const bytes=Buffer.from(row.data,'base64');if(bytes.toString('base64')!==row.data||bytes.length>PLAYWRIGHT_DIAGNOSTIC_LIMITS.maxChunkBytes)return 0;file.chunks.push(bytes);continue;
+    }
+    if(row.type==='end') {
+      const file=files.get(row.path);if(!file||file.ended||row.complete!==true||row.byteLength!==file.header.byteLength||row.sha256!==file.header.sha256||file.chunks.length!==file.header.chunkCount)return 0;
+      const bytes=Buffer.concat(file.chunks);if(bytes.length!==row.byteLength||createHash('sha256').update(bytes).digest('hex')!==row.sha256)return 0;file.ended=true;totalRawBytes+=bytes.length;continue;
+    }
+    if(row.type==='omission'){if(typeof row.reason!=='string'||!['max-depth','max-entries','unsafe-path','max-files','max-file-bytes','max-total-raw-bytes','file-changed','directory-changed'].includes(row.reason)||!Number.isSafeInteger(row.count)||row.count<1)return 0;omissionCount+=row.count;continue;}
+    if(row.type==='error'){if(typeof row.error!=='string'||!row.error.length||row.error.length>256)return 0;errorCount++;continue;}
+    if(row.type==='complete'){completeCount++;if(row!==rows.at(-1)||row.complete!==true||row.fileCount!==files.size||row.totalRawBytes!==totalRawBytes||row.omissionCount!==omissionCount||row.errorCount!==errorCount)return 0;continue;}
+    return 0;
+  }
+  if(completeCount!==1||files.size>PLAYWRIGHT_DIAGNOSTIC_LIMITS.maxFiles||totalRawBytes>PLAYWRIGHT_DIAGNOSTIC_LIMITS.maxTotalRawBytes||[...files.values()].some(file=>!file.ended))return 0;
+  const output=lines.map(line=>`${line}\n`).join('');if(Buffer.byteLength(output)>PLAYWRIGHT_DIAGNOSTIC_LIMITS.maxOutputBytes)return 0;try{write(output);}catch{return 0;}return lines.length;
+}
 
 // pull_request_target and merge_group both load protected workflow authority.
 // Candidate content is inert input and never supplies executable control metadata.
@@ -98,6 +235,214 @@ export function prepareExecutionView({sourceRoot,revision,destination}) {
   assertCheckout(sourceRoot,revision);
   return destination;
 }
+function protectedHarnessSources(e2eRoot) {
+  const result={};
+  const walk=(relative='')=>{
+    const directory=path.join(e2eRoot,...relative.split('/').filter(Boolean));
+    for(const name of fs.readdirSync(directory).sort()) {
+      if(name==='node_modules') continue;
+      const key=path.posix.join(relative,name), absolute=path.join(directory,name), stat=fs.lstatSync(absolute);
+      if(stat.isSymbolicLink()) fail('protected harness symlink');
+      if(stat.isDirectory()) {walk(key);continue;}
+      if(!stat.isFile()) fail('protected harness specialfile');
+      const bytes=fs.readFileSync(absolute);
+      if(key.endsWith('.mjs')) {
+        const text=bytes.toString('utf8');
+        if(!Buffer.from(text,'utf8').equals(bytes)) fail('protected harness invalid UTF-8');
+        result[key]=text;
+      } else result[key]=bytes.toString('base64');
+    }
+  };
+  walk();
+  return result;
+}
+
+const CANDIDATE_BROWSER_PAYLOAD=['tests','support'];
+const SNAPSHOT_DIRECTORY=/(?:^|\/)[^/]+\.spec\.mjs-snapshots$/;
+const QUALIFICATION_PREFIX="const __atlasQualification = process.env.ATLAS_E2E_DATA_CAPABILITY === 'qualification_fixture';\n";
+function candidateSnapshotSources(e2eRoot) {
+  const testsRoot=path.join(e2eRoot,'tests'), result={};
+  if(!fs.existsSync(testsRoot)) fail('candidate snapshot tests missing');
+  const testsStat=fs.lstatSync(testsRoot);
+  if(testsStat.isSymbolicLink()||!testsStat.isDirectory()) fail('candidate snapshot tests root');
+  const walkForSnapshotDirectories=(directory,relative='tests')=>{
+    for(const name of fs.readdirSync(directory).sort()) {
+      if(!name||name==='.'||name==='..') fail('candidate snapshot unsafe path');
+      const absolute=path.join(directory,name), key=path.posix.join(relative,name), stat=fs.lstatSync(absolute);
+      if(stat.isSymbolicLink()) {
+        if(SNAPSHOT_DIRECTORY.test(key)||SNAPSHOT_DIRECTORY.test(relative)) fail('candidate snapshot symlink');
+        continue;
+      }
+      if(!stat.isDirectory()) continue;
+      if(SNAPSHOT_DIRECTORY.test(key)) {walkSnapshotDirectory(absolute,key);continue;}
+      walkForSnapshotDirectories(absolute,key);
+    }
+  };
+  const walkSnapshotDirectory=(directory,relative)=>{
+    for(const name of fs.readdirSync(directory).sort()) {
+      if(!name||name==='.'||name==='..') fail('candidate snapshot unsafe path');
+      const absolute=path.join(directory,name), key=path.posix.join(relative,name), stat=fs.lstatSync(absolute);
+      if(stat.isSymbolicLink()) fail('candidate snapshot symlink');
+      if(stat.isDirectory()) {walkSnapshotDirectory(absolute,key);continue;}
+      if(!stat.isFile()) fail('candidate snapshot specialfile');
+      if(!name.endsWith('.png')) fail('candidate snapshot non-PNG data');
+      result[key]=fs.readFileSync(absolute).toString('base64');
+    }
+  };
+  walkForSnapshotDirectories(testsRoot);
+  return result;
+}
+
+function candidateHarnessSources(e2eRoot) {
+  const result={};
+  for(const root of CANDIDATE_BROWSER_PAYLOAD) {
+    const directory=path.join(e2eRoot,root);
+    if(!fs.existsSync(directory)) fail(`candidate browser payload missing ${root}`);
+    const rootStat=fs.lstatSync(directory);
+    if(rootStat.isSymbolicLink()||!rootStat.isDirectory()) fail('candidate browser payload root');
+    const walk=(current,relative)=>{
+      for(const name of fs.readdirSync(current).sort()) {
+        if(name==='node_modules'||!name||name==='.'||name==='..') fail('candidate browser payload unsafe path');
+        const key=path.posix.join(relative,name), absolute=path.join(current,name), stat=fs.lstatSync(absolute);
+        if(stat.isSymbolicLink()) fail('candidate browser payload symlink');
+        if(stat.isDirectory()) {walk(absolute,key);continue;}
+        if(!stat.isFile()) fail('candidate browser payload specialfile');
+        const bytes=fs.readFileSync(absolute);
+        if(key.endsWith('.mjs')) {
+          const source=bytes.toString('utf8');
+          if(!Buffer.from(source,'utf8').equals(bytes)) fail('candidate browser payload invalid UTF-8');
+          if(source.includes('__atlasQualification')) fail('candidate browser payload uses reserved qualification syntax');
+          result[key]=source;
+        } else result[key]=bytes.toString('base64');
+      }
+    };
+    walk(directory,root);
+  }
+  return result;
+}
+
+function sourceLines(source) {return source.match(/[^\n]*\n|[^\n]+$/g)??[];}
+function lineOccurrences(lines,needle) {
+  const result=[];
+  if(!needle.length)return result;
+  outer:for(let i=0;i+needle.length<=lines.length;i++) {
+    for(let j=0;j<needle.length;j++)if(lines[i+j]!==needle[j])continue outer;
+    result.push(i);
+  }
+  return result;
+}
+function protectedQualificationHunks(original,rendered) {
+  const left=sourceLines(original),right=sourceLines(rendered),cols=right.length+1,cells=(left.length+1)*cols;
+  if(cells>8_000_000)fail('protected qualification diff too large');
+  const lcs=new Uint32Array(cells);
+  for(let i=left.length-1;i>=0;i--)for(let j=right.length-1;j>=0;j--)
+    lcs[i*cols+j]=left[i]===right[j]?1+lcs[(i+1)*cols+j+1]:Math.max(lcs[(i+1)*cols+j],lcs[i*cols+j+1]);
+  const hunks=[];let current=null,i=0,j=0;
+  const flush=()=>{if(current){hunks.push(current);current=null;}};
+  while(i<left.length||j<right.length) {
+    if(i<left.length&&j<right.length&&left[i]===right[j]){flush();i++;j++;continue;}
+    if(!current)current={baseStart:i,removed:[],added:[]};
+    const down=i<left.length?lcs[(i+1)*cols+j]:-1,rightward=j<right.length?lcs[i*cols+j+1]:-1;
+    if(j<right.length&&(i===left.length||rightward>=down))current.added.push(right[j++]);
+    else current.removed.push(left[i++]);
+  }
+  flush();
+  return {left,hunks};
+}
+
+// Qualification substitution is derived exclusively from the protected source.
+// Candidate bytes are never scanned for fixture tokens. Each protected line hunk
+// must still occupy one unambiguous protected-source slot in the candidate; edits
+// that overlap or duplicate that slot fail closed instead of being rewritten.
+export function projectProtectedQualificationBindings({protectedSource,candidateSource,renderedProtectedSource}={}) {
+  if(typeof protectedSource!=='string'||typeof candidateSource!=='string'||typeof renderedProtectedSource!=='string') fail('qualification binding source');
+  if(candidateSource===protectedSource)return renderedProtectedSource;
+  const qualified=renderedProtectedSource.startsWith(QUALIFICATION_PREFIX);
+  const renderedBody=qualified?renderedProtectedSource.slice(QUALIFICATION_PREFIX.length):renderedProtectedSource;
+  if(renderedBody===protectedSource)return candidateSource;
+  const {left,hunks}=protectedQualificationHunks(protectedSource,renderedBody),candidate=sourceLines(candidateSource),patches=[];
+  for(const hunk of hunks) {
+    let lo=hunk.baseStart,hi=hunk.baseStart+hunk.removed.length;
+    if(lo===hi){if(lo>0)lo--;else if(hi<left.length)hi++;else fail('protected qualification empty anchor');}
+    while(lineOccurrences(left,left.slice(lo,hi)).length!==1) {
+      if(lo>0)lo--;else if(hi<left.length)hi++;else fail('protected qualification ambiguous anchor');
+    }
+    const anchor=left.slice(lo,hi),hits=lineOccurrences(candidate,anchor);
+    if(hits.length!==1)fail('candidate qualification binding overlaps protected slot');
+    const start=hits[0]+(hunk.baseStart-lo);
+    if(hunk.removed.some((line,index)=>candidate[start+index]!==line))fail('candidate qualification binding slot drift');
+    patches.push({start,count:hunk.removed.length,added:hunk.added});
+  }
+  patches.sort((a,b)=>b.start-a.start);
+  for(let i=1;i<patches.length;i++)if(patches[i-1].start<patches[i].start+patches[i].count)fail('protected qualification patch overlap');
+  for(const patch of patches)candidate.splice(patch.start,patch.count,...patch.added);
+  const merged=candidate.join('');
+  return qualified?QUALIFICATION_PREFIX+merged:merged;
+}
+
+export function prepareProtectedBrowserHarness({protectedRoot,candidateRoot=protectedRoot,destination,qualificationBindings=null}={}) {
+  const sourceRoot=path.join(path.resolve(protectedRoot),'e2e'), candidateE2e=path.join(path.resolve(candidateRoot),'e2e'), target=path.resolve(destination);
+  if(!fs.existsSync(sourceRoot)||fs.existsSync(target)||target===sourceRoot||target.startsWith(sourceRoot+path.sep)
+    ||target===candidateE2e||target.startsWith(candidateE2e+path.sep)) fail('protected harness destination');
+  const protectedSources=protectedHarnessSources(sourceRoot);
+  const candidateSources=candidateHarnessSources(candidateE2e);
+  fs.cpSync(sourceRoot,target,{recursive:true,filter:file=>!file.split(path.sep).includes('node_modules')});
+  for(const root of CANDIDATE_BROWSER_PAYLOAD) {
+    const destinationRoot=path.join(target,root), candidatePayloadRoot=path.join(candidateE2e,root);
+    fs.rmSync(destinationRoot,{recursive:true,force:true});
+    if(fs.existsSync(candidatePayloadRoot)) fs.cpSync(candidatePayloadRoot,destinationRoot,{recursive:true});
+  }
+  const combined=Object.fromEntries(Object.entries(protectedSources).filter(([name])=>!CANDIDATE_BROWSER_PAYLOAD.some(root=>name===root||name.startsWith(`${root}/`))));
+  Object.assign(combined,candidateSources);
+  let expected=combined;
+  if(qualificationBindings!==null) {
+    const renderedProtected=renderQualificationHarnessBindings({protectedSources,bindings:qualificationBindings});
+    expected={...combined};
+    for(const [relative,rendered] of Object.entries(renderedProtected)) {
+      const candidateOwned=CANDIDATE_BROWSER_PAYLOAD.some(root=>relative===root||relative.startsWith(`${root}/`));
+      if(!candidateOwned){expected[relative]=rendered;continue;}
+      if(!relative.endsWith('.mjs')||!Object.hasOwn(candidateSources,relative))continue;
+      if(typeof protectedSources[relative]!=='string'||typeof candidateSources[relative]!=='string'||typeof rendered!=='string')fail('qualification binding source type');
+      expected[relative]=projectProtectedQualificationBindings({protectedSource:protectedSources[relative],candidateSource:candidateSources[relative],renderedProtectedSource:rendered});
+    }
+  }
+  if(qualificationBindings!==null) for(const [relative,source] of Object.entries(expected)) {
+    if(!relative.endsWith('.mjs')) continue;
+    const targetFile=path.join(target,...relative.split('/'));
+    fs.writeFileSync(targetFile,source,'utf8');
+  }
+  const actual=protectedHarnessSources(target);
+  if(canonicalJson(actual)!==canonicalJson(expected)) fail('protected harness materialization mismatch');
+  return {bound:qualificationBindings!==null,sourceDigest:digest(expected),files:Object.keys(expected).sort()};
+}
+
+export function prepareProtectedBrowserCaptureHarness({protectedRoot,candidateRoot,destination,qualificationBindings=null}={}) {
+  prepareProtectedBrowserHarness({protectedRoot,destination,qualificationBindings});
+  const target=path.resolve(destination), snapshotSources=candidateSnapshotSources(path.join(path.resolve(candidateRoot),'e2e'));
+  const removeSnapshotDirectories=directory=>{
+    for(const name of fs.readdirSync(directory).sort()) {
+      const absolute=path.join(directory,name), relative=path.posix.relative(target,absolute), stat=fs.lstatSync(absolute);
+      if(!stat.isDirectory()) continue;
+      if(SNAPSHOT_DIRECTORY.test(relative)) {fs.rmSync(absolute,{recursive:true,force:true});continue;}
+      removeSnapshotDirectories(absolute);
+    }
+  };
+  removeSnapshotDirectories(path.join(target,'tests'));
+  for(const [relative,encoded] of Object.entries(snapshotSources)) {
+    const output=path.join(target,...relative.split('/'));
+    fs.mkdirSync(path.dirname(output),{recursive:true});
+    fs.writeFileSync(output,Buffer.from(encoded,'base64'));
+  }
+  const protectedSources=protectedHarnessSources(path.join(path.resolve(protectedRoot),'e2e'));
+  const renderedExpected=qualificationBindings===null?protectedSources:renderQualificationHarnessBindings({protectedSources,bindings:qualificationBindings});
+  const expected={...renderedExpected};
+  for(const key of Object.keys(expected)) if(key.split('/').some((_,index,parts)=>SNAPSHOT_DIRECTORY.test(parts.slice(0,index+1).join('/')))) delete expected[key];
+  Object.assign(expected,snapshotSources);
+  const actual=protectedHarnessSources(target);
+  if(canonicalJson(actual)!==canonicalJson(expected)) fail('protected capture snapshot materialization mismatch');
+  return {bound:qualificationBindings!==null,sourceDigest:digest(expected),files:Object.keys(expected).sort()};
+}
+
 export function assertContainerStarted(container,result={}) {
   const state=container?.State;
   if(!state||state.Error||!state.StartedAt||/^0001-/.test(state.StartedAt)||!Number.isFinite(Date.parse(state.StartedAt))||result.status===125) {
@@ -112,14 +457,13 @@ export function planShadow({candidate,root,protectedRoot}) {
   const protectedImpactManifest=readJson(path.join(protectedRoot,'tools/verification/impact-manifest.json'));
   const protectedStableTestIds=readJson(path.join(protectedRoot,'tools/verification/protected-scenario-inventory.json')).stableTestIds;
   const planInput={repository:REPOSITORY,headSha:candidate.headSha,integrationBaseSha:candidate.baseSha,
-    mergeBaseSha:candidate.baseSha,changedFiles:candidate.changedFiles};
+    mergeBaseSha:candidate.baseSha,changedFiles:candidate.changedFiles,allowControlPlaneMachineOnly:true};
   const unprivilegedDeterministicSubjects=[...new Set(candidate.changedFiles.flatMap(row=>row.status==='renamed'?[row.previousPath,row.path]:['added','modified'].includes(row.status)?[row.path]:[]).filter(name=>typeof name==='string'&&/^tests\/[A-Za-z0-9_./-]+\.(mjs|py)$/.test(name)))].sort();
   const plan=buildVerificationPlan({...planInput,trustedVerificationCatalog:protectedCatalog,candidateVerificationCatalog:protectedCatalog,
     trustedImpactManifest:protectedImpactManifest,candidateImpactManifest:protectedImpactManifest,
     protectedStableTestIds,unprivilegedDeterministicSubjects});
   assertPlanExecutable(plan);
-  const supported=new Set(['e2e.layer-availability','e2e.farm-explorer','e2e.search-navigation','integration.source-contract-browser','integration.source-contract-http']);
-  for(const group of plan.groups) if(group.executionEngine!=='deterministic'&&!supported.has(group.id)) fail(`R5 bounded executor unavailable for ${group.id}`);
+  assertShadowExecutorCoverage(plan);
   return {plan,input:{root,protectedRoot,candidate,planInput,protectedCatalog,protectedImpactManifest,protectedStableTestIds}};
 }
 
@@ -173,7 +517,6 @@ function executeDeterministic(command,root,image,dependencyRoot,shimRoot,protect
   let result,container;
   try {
     result=spawnSync('docker',argv,{encoding:'utf8',timeout:command.timeoutSeconds*1000,maxBuffer:16*1024*1024,env:{PATH:process.env.PATH,HOME:process.env.HOME}});
-    // Inspect the actual container, even for timeout/nonzero/daemon failures.
     try {container=JSON.parse(execFileSync('docker',['inspect',name],{encoding:'utf8'}))[0];} catch {assertContainerStarted(null,result);}
     assertContainerStarted(container,result);
     assertDeterministicContainer(container,{command,candidateRoot:root,dependencyRoot,shimRoot,protectedHarnessFile,protectedInputFile,image});
@@ -194,13 +537,14 @@ async function fixtureProof(destination) {
   await buildQualificationWorld(destination);
   await verifyQualificationWorld(destination);
   const manifest=readJson(path.join(destination,'fixture-manifest.json'));
+  const bindings=resolveQualificationScenarioBindings({productRoot:destination,expectedProductDigest:manifest.productDigest});
   const publicationManifestBytes=fs.readFileSync(path.join(destination,'publication/publication.json'));
   const productFiles=manifest.files.map(row=>({path:row.path,bytes:fs.readFileSync(path.join(destination,row.path))}));
   const authority=buildProtectedExpectedAuthority({schemaVersion:1,authorityId:PUBLICATION_AUTHORITY_ID,
     dataCapability:'qualification_fixture',product:{id:manifest.fixtureId,manifestPath:'fixture-manifest.json',digest:manifest.productDigest},
     publication:{manifestPath:'publication/publication.json',digest:bytesDigest(publicationManifestBytes)},
     source:{kind:'atlas-owned-fixture',repository:null,revision:null,selectedBytes:[]},completeProductContractDigest:null});
-  return {manifest,authority,proof:{dataCapability:'qualification_fixture',productManifestBytes:fs.readFileSync(path.join(destination,'fixture-manifest.json')),
+  return {manifest,bindings,authority,proof:{dataCapability:'qualification_fixture',productManifestBytes:fs.readFileSync(path.join(destination,'fixture-manifest.json')),
     publicationManifestBytes,productFiles,source:null,completeProduct:null}};
 }
 
@@ -275,26 +619,129 @@ export function fixtureBrowserArgs(composeArgs,{uid=process.getuid(),gid=process
   return [...composeArgs,'run','--user',`${uid}:${gid}`,'--rm','--no-deps','e2e'];
 }
 
-function runPublicationBrowser(command,{candidate,contract,publication,directory,root}) {
+const CANDIDATE_ARTIFACT_TMPFS_BYTES=64*1024*1024;
+const MACHINE_BROWSER_BASE_COMMAND='./node_modules/.bin/playwright test --config=playwright.config.mjs --test-list=/run/atlas-protected-test-list.txt --shard="${ATLAS_E2E_SHARD:?ATLAS_E2E_SHARD is required}" --workers="${ATLAS_E2E_WORKERS:-1}" --retries=0 --reporter=json';
+const MACHINE_BROWSER_COMMAND=`exec ${MACHINE_BROWSER_BASE_COMMAND}`;
+export function machineFixtureBrowserArgs(composeArgs,{uid=process.getuid(),gid=process.getgid(),reviewBearing=false,commandId=null,containerName=null}={}) {
+  if(!Array.isArray(composeArgs)||composeArgs.some(value=>typeof value!=='string')||!Number.isSafeInteger(uid)||uid<0||!Number.isSafeInteger(gid)||gid<0) fail('machine fixture identity');
+  if(reviewBearing&&(!diagnosticSafeCommand(commandId)||!/^atlas-playwright-[a-f0-9-]+$/.test(containerName??'')))fail('machine diagnostic identity');
+  return [...composeArgs,'run',...(reviewBearing?['--name',containerName]:[]),'--user',`${uid}:${gid}`,...(reviewBearing?[]:['--rm']),'--no-deps','e2e','bash','-lc',MACHINE_BROWSER_COMMAND];
+}
+
+export function writeCandidateArtifactContainment(file,{volumeName=null}={}) {
+  if(typeof file!=='string'||!path.isAbsolute(file)||fs.existsSync(file)) fail('candidate artifact containment destination');
+  if(volumeName!==null&&!/^atlas-playwright-artifacts-[a-f0-9-]+$/.test(volumeName))fail('candidate artifact volume identity');
+  const source=volumeName
+    ?`services:\n  e2e:\n    volumes:\n      - type: volume\n        source: failure_artifacts\n        target: /artifacts\nvolumes:\n  failure_artifacts:\n    external: true\n    name: ${volumeName}\n`
+    :`services:\n  e2e:\n    volumes:\n      - type: tmpfs\n        target: /artifacts\n        tmpfs:\n          size: ${CANDIDATE_ARTIFACT_TMPFS_BYTES}\n`;
+  fs.writeFileSync(file,source,{encoding:'utf8',mode:0o444});
+  return file;
+}
+export function assertCandidateArtifactComposeConfig(config,{volumeName=null}={}) {
+  const service=config?.services?.e2e,volumes=service?.volumes;
+  if(!Array.isArray(volumes))fail('candidate artifact compose config');
+  if(service.read_only!==true||canonicalJson(service.cap_drop)!==canonicalJson(['ALL'])||!service.security_opt?.includes('no-new-privileges:true')
+    ||Number(service.pids_limit)!==192||Number(service.mem_limit)!==1610612736||Number(service.cpus)!==2)fail('candidate artifact compose containment');
+  const artifact=volumes.filter(row=>row?.target==='/artifacts');
+  if(artifact.length!==1||(volumeName
+    ?artifact[0].type!=='volume'||artifact[0].source!=='failure_artifacts'||config?.volumes?.failure_artifacts?.name!==volumeName||config.volumes.failure_artifacts.external!==true
+    :artifact[0].type!=='tmpfs'||Number(artifact[0].tmpfs?.size)!==CANDIDATE_ARTIFACT_TMPFS_BYTES)) fail('candidate artifact mount must be bounded tmpfs');
+  return true;
+}
+function parseMachineBrowserReport(stdout) {
+  const bytes=Buffer.byteLength(String(stdout??''),'utf8');
+  if(bytes<2||bytes>16*1024*1024)fail('candidate browser report bounds');
+  let report;
+  try {report=JSON.parse(String(stdout).trim());} catch {fail('candidate browser report JSON');}
+  if(!report||typeof report!=='object'||Array.isArray(report))fail('candidate browser report shape');
+  return report;
+}
+
+export function writeProtectedBrowserContainment(file) {
+  if(typeof file!=='string'||!path.isAbsolute(file)||fs.existsSync(file)) fail('protected browser containment destination');
+  const source=`services:\n  e2e:\n    read_only: true\n    cap_drop:\n      - ALL\n    security_opt:\n      - no-new-privileges:true\n    pids_limit: 192\n    mem_limit: 1610612736\n    cpus: 2\n    tmpfs:\n      - /tmp:rw,nodev,nosuid,size=256m\n`;
+  fs.writeFileSync(file,source,{encoding:'utf8',mode:0o444});
+  return file;
+}
+
+const VISUAL_REFERENCE_SPECS=new Set(['e2e/tests/visual-desktop.spec.mjs','e2e/tests/visual-mobile.spec.mjs']);
+export function requiresProtectedVisualReference(command) {
+  if(command?.engine!=='playwright'||command.dataCapability!=='qualification_fixture'||!Array.isArray(command.expectedTestIds)) return false;
+  return command.expectedTestIds.some(id=>{
+    if(typeof id!=='string') return false;
+    const parts=id.split('::');
+    return parts.length>=3&&VISUAL_REFERENCE_SPECS.has(parts[1]);
+  });
+}
+
+export function bindProtectedVisualReferenceConsumer({composeArgs,env,protectedRoot,referenceSnapshots}={}) {
+  if(!Array.isArray(composeArgs)||composeArgs.some(value=>typeof value!=='string')||!env||typeof env!=='object'||Array.isArray(env)
+    ||typeof protectedRoot!=='string'||!path.isAbsolute(protectedRoot)||typeof referenceSnapshots!=='string'||!path.isAbsolute(referenceSnapshots)) fail('protected visual reference consumer');
+  const overlay=path.join(protectedRoot,'e2e/compose.protected-visual-consumer.yml');
+  const stat=fs.lstatSync(overlay);
+  if(!stat.isFile()||stat.isSymbolicLink()) fail('protected visual reference consumer overlay');
+  return {composeArgs:[...composeArgs,'-f',overlay],env:{...env,ATLAS_REFERENCE_SNAPSHOTS:referenceSnapshots}};
+}
+
+async function runPublicationBrowser(command,{candidate,contract,publication,directory,root,producerJobId,evidenceRoot,oracleDigest,freshSnapshot}) {
   const suffix=command.id.slice('sha256:'.length,'sha256:'.length+12);
   const context=path.join(directory,`browser-context-${suffix}`);fs.mkdirSync(context);
   for(const relative of ['web','src']) fs.cpSync(path.join(root,relative),path.join(context,relative),{recursive:true});
-  // Candidate web/source bytes are inert inputs. Every executable harness byte
-  // comes from the authenticated protected checkout.
-  fs.cpSync(path.join(controlRoot,'e2e'),path.join(context,'e2e'),{recursive:true,filter:p=>!p.split(path.sep).includes('node_modules')});
+  // Protected control and execution authority come from the authenticated protected
+  // checkout; ordinary browser payload comes from the candidate. Qualification data
+  // expressions are rendered only from independently verified protected fixture bindings.
+  prepareProtectedBrowserHarness({protectedRoot:controlRoot,candidateRoot:root,destination:path.join(context,'e2e'),
+    qualificationBindings:command.dataCapability==='qualification_fixture'?publication.bindings:null});
   fs.mkdirSync(path.join(context,'tools','verification'),{recursive:true});
   fs.copyFileSync(path.join(controlRoot,'tools/verification/stable-id.mjs'),path.join(context,'tools/verification/stable-id.mjs'));
   const list=path.join(directory,`test-list-${suffix}.txt`);
   fs.writeFileSync(list,command.expectedTestIds.map(id=>{const [project,spec,...title]=id.split('::');return `[${project}] › ${spec.replace('e2e/tests/','')} › ${title.join('::')}`;}).join('\n')+'\n');
-  const artifacts=path.join(directory,`artifacts-${suffix}`);fs.mkdirSync(artifacts);fs.chmodSync(artifacts,0o777);
+  const artifacts=path.join(directory,`artifacts-${suffix}`);fs.mkdirSync(artifacts,{mode:0o700});
+  const reviewFrames=shadowReviewFramesForCommand(contract,command);
+  const captureContext=reviewFrames.length?path.join(directory,`protected-capture-context-${suffix}`):null;
+  const captureArtifacts=reviewFrames.length?path.join(directory,`protected-capture-artifacts-${suffix}`):null;
+  if(captureContext) {
+    fs.mkdirSync(captureContext);
+    for(const relative of ['web','src']) fs.cpSync(path.join(root,relative),path.join(captureContext,relative),{recursive:true});
+    // Protected executable capture code stays protected; authenticated candidate
+    // Playwright PNG snapshots are overlaid solely as reviewable oracle data.
+    prepareProtectedBrowserCaptureHarness({protectedRoot:controlRoot,candidateRoot:root,destination:path.join(captureContext,'e2e'),
+      qualificationBindings:command.dataCapability==='qualification_fixture'?publication.bindings:null});
+    fs.mkdirSync(path.join(captureContext,'tools','verification'),{recursive:true});
+    fs.copyFileSync(path.join(controlRoot,'tools/verification/stable-id.mjs'),path.join(captureContext,'tools/verification/stable-id.mjs'));
+    fs.mkdirSync(captureArtifacts);fs.chmodSync(captureArtifacts,0o777);
+  }
   const project=`atlas-r5-${randomUUID()}`;
-  const args=['compose','-p',project,'-f',path.join(controlRoot,'e2e/compose.protected-hosted-executor.yml'),'-f',path.join(controlRoot,'e2e/compose.github-hosted.yml')];
-  const env={PATH:process.env.PATH,HOME:process.env.HOME,ATLAS_EXECUTION_CONTEXT:context,ATLAS_CODE_REVISION:candidate.headSha,
+  const containment=writeProtectedBrowserContainment(path.join(directory,`browser-containment-${suffix}.yml`));
+  let args=['compose','-p',project,'-f',path.join(controlRoot,'e2e/compose.protected-hosted-executor.yml'),'-f',path.join(controlRoot,'e2e/compose.github-hosted.yml'),'-f',containment];
+  let env={PATH:process.env.PATH,HOME:process.env.HOME,COMPOSE_PROJECT_NAME:project,ATLAS_EXECUTION_CONTEXT:context,ATLAS_CODE_REVISION:candidate.headSha,
     ATLAS_QUALIFICATION_PUBLICATION_HOST:publication.root,ATLAS_QUALIFICATION_TRUST_JSON:JSON.stringify(publication.trustDescriptor),
     ATLAS_PROTECTED_TEST_LIST:list,ATLAS_E2E_ARTIFACTS_HOST:artifacts,ATLAS_E2E_SHARD:'1/1',ATLAS_E2E_WORKERS:'1',
-    ATLAS_E2E_DATA_CAPABILITY:command.dataCapability,...fixtureReadinessEnvironment(contract),
+    ATLAS_E2E_DATA_CAPABILITY:command.dataCapability,ATLAS_USER_VISUAL_EVIDENCE:'0',...fixtureReadinessEnvironment(contract),
     ATLAS_AUTHORITY_DIGEST:publication.authority.authorityDigest,
     GITHUB_RUN_ID:process.env.GITHUB_RUN_ID,GITHUB_REPOSITORY:REPOSITORY};
+  let revalidateVisualReference=null;
+  if(requiresProtectedVisualReference(command)) {
+    if(!Number.isSafeInteger(producerJobId)||producerJobId<1||typeof freshSnapshot!=='function'||!publication.bindings?.navigation
+      ||!/^sha256:[a-f0-9]{64}$/.test(publication.manifest?.productDigest??'')) fail('protected visual reference producer');
+    const referenceTree=git(controlRoot,'rev-parse',`${candidate.baseSha}^{tree}`);
+    const identity={repository:candidate.repository,pr:candidate.prNumber,headSha:candidate.headSha,baseSha:candidate.baseSha,candidateTree:candidate.treeSha,
+      referenceTree,productDigest:publication.manifest.productDigest,workflow:ACTIVE,runId:Number(process.env.GITHUB_RUN_ID),jobId:producerJobId,attempt:1,browserImage:PROTECTED_VISUAL_BROWSER};
+    const freshReadback=async()=>{
+      await freshSnapshot();
+      resolveQualificationScenarioBindings({productRoot:publication.root,expectedProductDigest:publication.manifest.productDigest});
+    };
+    const reference=await runProtectedVisualReference({protectedRoot:controlRoot,referenceRoot:controlRoot,
+      outputRoot:path.join(directory,`private-visual-reference-${suffix}`),identity,navigation:publication.bindings.navigation,composeEnv:env,freshReadback,
+      candidateWritablePaths:[artifacts]});
+    revalidateVisualReference=reference.revalidate;
+    const wired=bindProtectedVisualReferenceConsumer({composeArgs:args,env,protectedRoot:controlRoot,referenceSnapshots:reference.snapshots});
+    args=wired.composeArgs;env=wired.env;
+  }
+  const reviewBearing=reviewFrames.length>0;
+  const diagnosticId=randomUUID(),volumeName=reviewBearing?`atlas-playwright-artifacts-${diagnosticId}`:null;
+  const anchorName=reviewBearing?`atlas-playwright-anchor-${diagnosticId}`:null,collectorName=reviewBearing?`atlas-playwright-collector-${diagnosticId}`:null;
+  let diagnosticImage=null,diagnosticVolumeReady=false,diagnosticSetupError=null;
   try {
     for(const setup of [['build','e2e'],['up','-d','--wait','--wait-timeout','180','atlas-web']]) {
       const result=spawnSync('docker',[...args,...setup],{env,encoding:'utf8',timeout:300000,maxBuffer:16*1024*1024});
@@ -307,19 +754,65 @@ function runPublicationBrowser(command,{candidate,contract,publication,directory
         fail('protected browser service setup failed');
       }
     }
-    const result=spawnSync('docker',fixtureBrowserArgs(args),{env,encoding:'utf8',timeout:command.timeoutSeconds*1000,maxBuffer:16*1024*1024});
+    if(reviewBearing)try {
+      diagnosticImage=resolveProtectedComposeServiceImage({composeArgs:args,service:'e2e',env});
+      const volume=reviewArtifactVolumeArgs({volumeName,anchorName,image:diagnosticImage});
+      for(const operation of [volume.create,volume.anchor,['start',anchorName]]) {const setup=spawnSync('docker',operation,{env,encoding:'utf8',timeout:30000,maxBuffer:1024*1024});if(setup.error||setup.status!==0||setup.signal)throw new TypeError('diagnostic volume setup failed');}
+      const inspected=spawnSync('docker',['volume','inspect',volumeName,'--format','{{json .Options}}'],{env,encoding:'utf8',timeout:30000,maxBuffer:1024*1024});
+      const options=JSON.parse(String(inspected.stdout??'').trim());if(inspected.error||inspected.status!==0||inspected.signal||options?.type!=='tmpfs'||options?.device!=='tmpfs'||options?.o!==`size=${CANDIDATE_ARTIFACT_TMPFS_BYTES},uid=${process.getuid()},gid=${process.getgid()},mode=0700,nodev,nosuid`)throw new TypeError('diagnostic volume configuration');
+      diagnosticVolumeReady=true;
+    } catch(error) {diagnosticSetupError=error;}
+    const artifactContainmentPath=path.join(directory,`candidate-artifacts-${suffix}.yml`);
+    const resolveArtifactContainment=selectedVolume=>{
+      fs.rmSync(artifactContainmentPath,{force:true});
+      const overlay=writeCandidateArtifactContainment(artifactContainmentPath,{volumeName:selectedVolume});
+      const selectedArgs=[...args,'-f',overlay];
+      const composeConfig=spawnSync('docker',[...selectedArgs,'config','--format','json'],{env,encoding:'utf8',timeout:30000,maxBuffer:4*1024*1024});
+      if(composeConfig.error||composeConfig.status!==0||composeConfig.signal)throw new TypeError('candidate artifact compose resolution failed');
+      assertCandidateArtifactComposeConfig(JSON.parse(composeConfig.stdout),{volumeName:selectedVolume});return selectedArgs;
+    };
+    let machineArgs;
+    if(diagnosticVolumeReady)try {machineArgs=resolveArtifactContainment(volumeName);} catch(error) {diagnosticSetupError=error;diagnosticVolumeReady=false;}
+    if(!diagnosticVolumeReady)try {machineArgs=resolveArtifactContainment(null);} catch {fail('candidate artifact compose resolution failed');}
+    const result=spawnSync('docker',machineFixtureBrowserArgs(machineArgs),{env,encoding:'utf8',timeout:command.timeoutSeconds*1000,maxBuffer:MACHINE_BROWSER_STDERR_BUFFER_BYTES});
+    if(reviewBearing&&result.status!==0&&!result.signal) {
+      if(diagnosticVolumeReady)collectVolumePlaywrightDiagnostics({volumeName,collectorName,commandId:command.id,image:diagnosticImage});
+      else {const base={schema:'oteryn.atlas.playwright-diagnostic',version:1,commandId:command.id};try{fs.writeSync(2,`${PLAYWRIGHT_DIAGNOSTIC_PREFIX} ${JSON.stringify({...base,type:'error',error:String(diagnosticSetupError?.message??'diagnostic setup failed').slice(0,256)})}\n${PLAYWRIGHT_DIAGNOSTIC_PREFIX} ${JSON.stringify({...base,type:'complete',fileCount:0,totalRawBytes:0,omissionCount:0,errorCount:1,complete:true})}\n`);}catch{}}
+    }
     if(result.error||result.status!==0||result.signal) {console.error(JSON.stringify({phase:'browser-execution',dataCapability:command.dataCapability,exitCode:result.status,signal:result.signal,error:result.error?.message??null,stdout:String(result.stdout??'').slice(-12288),stderr:String(result.stderr??'').slice(-4096)}));fail('protected browser execution failed');}
-    const report=readJson(path.join(artifacts,'results.json'));
-    const observed=[];
-    const walk=suites=>{for(const suite of suites??[]){for(const spec of suite.specs??[]){for(const test of spec.tests??[]){if(test.status!=='expected'||test.results?.length!==1||test.results[0].status!=='passed'||test.results[0].retry!==0)fail('fixture nonpass/retry');observed.push(`${test.projectName}::e2e/tests/${spec.file.replace(/^.*\/tests\//,'')}::${spec.title}`);}}walk(suite.suites);}};
-    walk(report.suites);
-    if(report.errors?.length||canonicalJson(observed.sort())!==canonicalJson([...command.expectedTestIds].sort())) fail('fixture actual test census');
-    return {commandId:command.id,passed:true,retry:0,workers:1,expectedTestIds:command.expectedTestIds,observedTestIds:observed,reportDigest:digest(report)};
-  } finally {spawnSync('docker',[...args,'down','--volumes','--remove-orphans'],{env,stdio:'ignore'});}
+    const readCensusReport=report=>{
+      const observed=[];
+      const walk=suites=>{for(const suite of suites??[]){for(const spec of suite.specs??[]){for(const test of spec.tests??[]){if(test.status!=='expected'||test.results?.length!==1||test.results[0].status!=='passed'||test.results[0].retry!==0)fail('fixture nonpass/retry');observed.push(`${test.projectName}::e2e/tests/${spec.file.replace(/^.*\/tests\//,'')}::${spec.title}`);}}walk(suite.suites);}};
+      walk(report.suites);
+      if(report.errors?.length||canonicalJson(observed.sort())!==canonicalJson([...command.expectedTestIds].sort())) fail('fixture actual test census');
+      return {report,observed};
+    };
+    const readCensus=artifactRoot=>readCensusReport(readJson(path.join(artifactRoot,'results.json')));
+    const {report,observed}=readCensusReport(parseMachineBrowserReport(result.stdout));
+    const row={commandId:command.id,passed:true,retry:0,workers:1,expectedTestIds:command.expectedTestIds,observedTestIds:observed,reportDigest:digest(report)};
+    if(reviewFrames.length) {
+      if(!Number.isSafeInteger(producerJobId)||producerJobId<1||!path.isAbsolute(evidenceRoot??''))fail('review capture producer');
+      const captureEnv={...env,ATLAS_EXECUTION_CONTEXT:captureContext,ATLAS_E2E_ARTIFACTS_HOST:captureArtifacts,ATLAS_USER_VISUAL_EVIDENCE:'1'};
+      for(const setup of [['build','e2e'],['up','-d','--wait','--wait-timeout','180','atlas-web']]) {
+        const captureSetup=spawnSync('docker',[...args,...setup],{env:captureEnv,encoding:'utf8',timeout:300000,maxBuffer:16*1024*1024});
+        if(captureSetup.error||captureSetup.status!==0||captureSetup.signal) fail('protected browser capture setup failed');
+      }
+      const captureResult=spawnSync('docker',fixtureBrowserArgs(args),{env:captureEnv,encoding:'utf8',timeout:command.timeoutSeconds*1000,maxBuffer:16*1024*1024});
+      if(captureResult.error||captureResult.status!==0||captureResult.signal) fail('protected browser capture failed');
+      readCensus(captureArtifacts);
+      row.reviewCapture=persistShadowReviewCapture({artifactRoot:captureArtifacts,evidenceRoot,currentCandidate:candidate,command,contract,publication,
+        producer:{workflowPath:ACTIVE,sourceSha:candidate.baseSha,runId:Number(process.env.GITHUB_RUN_ID),jobId:producerJobId,runAttempt:1},oracleDigest});
+    }
+    return row;
+  } finally {
+    if(reviewBearing){for(const operation of [['rm','-f',collectorName],['rm','-f',anchorName],['volume','rm','-f',volumeName]])try{spawnSync('docker',operation,{env,stdio:'ignore',timeout:30000});}catch{}}
+    spawnSync('docker',[...args,'down','--volumes','--remove-orphans'],{env,stdio:'ignore'});
+    if(revalidateVisualReference) await revalidateVisualReference();
+  }
 }
 
 export async function runShadow(mode,root) {
-  if(!['plan','execute'].includes(mode)) fail('mode');
+  if(!['plan','execute','review'].includes(mode)) fail('mode');
   root=path.resolve(root);
   if(process.env.GITHUB_RUN_ATTEMPT!=='1') fail('reruns are not shadow evidence');
   const event=await resolveShadowEvent({eventName:process.env.GITHUB_EVENT_NAME,event:readJson(process.env.GITHUB_EVENT_PATH),githubSha:process.env.GITHUB_SHA,githubRef:process.env.GITHUB_REF});
@@ -341,13 +834,16 @@ export async function runShadow(mode,root) {
     runId:currentRunId,runAttempt:1,workflowSourceRevision:event.baseSha,apiRunHeadSha:currentRun.head_sha,planDigest:digest(plan),groups:plan.groups.map(g=>g.id),
     parentWorkflowDigest:null,workflowDigest:bytesDigest(fs.readFileSync(path.join(controlRoot,TEMPLATE))),results:[],status:'UNRESOLVED'};
   const hasWork=plan.groups.length>0||plan.candidateTestSubjects.length>0;
+  const requiresReview=plan.groups.some(group=>group.evidence==='restricted-visual-review');
   summary.candidateTestSubjects=plan.candidateTestSubjects;
+  summary.requiresReview=requiresReview;
   if(!hasWork) {summary.status='NO_PRODUCT_WORK';summary.commands=[];}
   if(mode==='plan') {
-    if(process.env.GITHUB_OUTPUT) fs.appendFileSync(process.env.GITHUB_OUTPUT,`has_commands=${hasWork}\n`);
+    if(process.env.GITHUB_OUTPUT) fs.appendFileSync(process.env.GITHUB_OUTPUT,`has_commands=${hasWork}\nrequires_review=${requiresReview}\n`);
     return summary;
   }
   if(!hasWork) fail('S0 must not start product job');
+  if(mode==='review'&&!requiresReview)fail('review job without protected review obligations');
   const directory=fs.mkdtempSync(path.join(os.tmpdir(),'atlas-r5-'));
   try {
     const config=readJson(path.join(controlRoot,'tools/verification/protected-execution-environment.json'));
@@ -362,6 +858,20 @@ export async function runShadow(mode,root) {
       protectedExpectedAuthorities:publications.length?Object.fromEntries(publications.map(([id,value])=>[id,value.authority])):undefined,
       selectedGameplayFiles:selected?.productFiles,selectedSemanticFiles:bounded?.selectedFiles});
     summary.contractDigest=contract.contractDigest;summary.environmentDigest=environmentDigest;summary.commands=contract.commands;
+    const oracleDigest=requiresReview?shadowOracleDigest(controlRoot):null;
+    const freshSnapshot=async()=>{
+      const current=await readCandidateSnapshot({...event,changedFiles:gitChangedFiles(root,event.baseSha,event.headSha)});
+      assertCandidateReadback({planned:candidate,current,sourceRepository:REPOSITORY,sourceRef:'refs/heads/main',sourceRevision:event.baseSha});
+      assertCheckout(root,event.headSha);
+      return current;
+    };
+    if(mode==='review') {
+      if(!fixture)fail('review qualification fixture missing');
+      summary.review=await waitForShadowReviewGate({candidate,currentRunId,contract,productDigest:fixture.manifest.productDigest,oracleDigest});
+      await freshSnapshot();
+      summary.status='PASS';
+      return summary;
+    }
     const executionRoot=contract.commands.some(command=>command.engine==='deterministic')?prepareExecutionView({sourceRoot:root,revision:candidate.headSha,destination:path.join(directory,'candidate-view')}):null;
     const hasSemanticOracle=contract.commands.some(command=>command.executionScope==='protected-harness');
     const protectedHarnessFile=hasSemanticOracle?path.join(directory,'r5-semantic-builder-oracle.mjs'):null;
@@ -369,6 +879,16 @@ export async function runShadow(mode,root) {
     if(hasSemanticOracle) {
       fs.writeFileSync(protectedHarnessFile,R5_SEMANTIC_BUILDER_ORACLE,{flag:'wx',mode:0o444});
       if(bytesDigest(fs.readFileSync(protectedHarnessFile))!==R5_SEMANTIC_BUILDER_ORACLE_DIGEST) fail('protected semantic harness materialization');
+    }
+    const requiresVisualReference=contract.commands.some(requiresProtectedVisualReference);
+    let producerJobId=null,evidenceRoot=null;
+    if(requiresReview||requiresVisualReference) producerJobId=await currentShadowJobId(currentRunId,'execute');
+    if(requiresReview) {
+      const requested=process.env.ATLAS_SHADOW_EVIDENCE_DIR;
+      if(typeof requested!=='string'||!path.isAbsolute(requested))fail('review evidence directory required');
+      evidenceRoot=path.resolve(requested);
+      if(fs.existsSync(evidenceRoot)&&fs.readdirSync(evidenceRoot).length)fail('review evidence directory must be fresh');
+      fs.mkdirSync(evidenceRoot,{recursive:true});
     }
     for(const command of contract.commands) {
       if(command.engine==='deterministic') {verifyExecutionView({viewRoot:executionRoot,sourceRoot:root,revision:candidate.headSha});summary.results.push(executeDeterministic(command,executionRoot,config.container.image,path.join(controlRoot,'e2e/node_modules'),shimRoot,protectedHarnessFile,protectedInputFile));}
@@ -380,13 +900,16 @@ export async function runShadow(mode,root) {
       } else if(command.engine==='playwright') {
         const product=command.dataCapability==='qualification_fixture'?fixture:command.dataCapability==='bounded_real_world'?bounded:null;
         if(!product)fail(`missing ${command.dataCapability} browser publication`);
-        summary.results.push(runPublicationBrowser(command,{candidate,contract,publication:{...product,root:command.dataCapability==='qualification_fixture'?path.join(directory,'fixture'):path.join(directory,'bounded'),trustDescriptor:command.dataCapability==='qualification_fixture'?qualificationTrustDescriptor(product.manifest):boundedRealTrustDescriptor(product.manifest)},directory,root}));
+        summary.results.push(await runPublicationBrowser(command,{candidate,contract,publication:{...product,root:command.dataCapability==='qualification_fixture'?path.join(directory,'fixture'):path.join(directory,'bounded'),trustDescriptor:command.dataCapability==='qualification_fixture'?qualificationTrustDescriptor(product.manifest):boundedRealTrustDescriptor(product.manifest)},directory,root,producerJobId,evidenceRoot,oracleDigest,freshSnapshot}));
       } else fail('unsupported command');
     }
-    const current=await readCandidateSnapshot({...event,changedFiles:gitChangedFiles(root,event.baseSha,event.headSha)});
-    assertCandidateReadback({planned:candidate,current,sourceRepository:REPOSITORY,sourceRef:'refs/heads/main',sourceRevision:event.baseSha});
-    assertCheckout(root,event.headSha);
+    if(requiresReview)assertShadowReviewCaptureCensus(contract,summary.results);
+    await freshSnapshot();
     summary.status=summary.results.length===contract.commands.length&&summary.results.every(row=>row.passed)?'PASS':'FAIL';
+    if(requiresReview) {
+      summary.reviewCaptures=summary.results.filter(row=>row.reviewCapture).map(row=>row.reviewCapture);
+      fs.writeFileSync(path.join(evidenceRoot,'machine-summary.json'),canonicalJson({candidate,contractDigest:contract.contractDigest,reviewPlanDigest:summary.reviewCaptures.length?JSON.parse(fs.readFileSync(path.join(evidenceRoot,summary.reviewCaptures[0].relativeRoot,'capture.json'),'utf8')).planDigest:null,reviewCaptures:summary.reviewCaptures})+'\n',{flag:'wx',mode:0o444});
+    }
     return summary;
   } finally {
     fs.rmSync(directory,{recursive:true,force:true});

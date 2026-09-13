@@ -6,6 +6,8 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
 import {fileURLToPath,pathToFileURL} from 'node:url';
+import {buildQualificationWorld,verifyQualificationWorld} from '../../tools/verification/qualification-world.mjs';
+import {resolveQualificationScenarioBindings} from '../../tools/verification/qualification-scenario-bindings.mjs';
 import {R5_SEMANTIC_BUILDER_ORACLE, R5_SEMANTIC_BUILDER_ORACLE_DIGEST, R5_SEMANTIC_SOURCE, assertCandidateReadback, resolveExecutionContract, sealExecutionContract, verifyR5SemanticProduct} from '../../tools/verification/verification-execution-contract.mjs';
 import {createPublicationProofFixtures} from './helpers/publication-proof-fixture.mjs';
 const sha = c => c.repeat(40);
@@ -19,6 +21,47 @@ function executionInput(path='tests/semantic-search.mjs') {
  return {root,candidate,protectedCatalog,protectedImpactManifest,environmentDigest:'f'.repeat(64),
   planInput:{repository:candidate.repository,headSha:candidate.headSha,integrationBaseSha:candidate.baseSha,mergeBaseSha:candidate.baseSha,changedFiles:candidate.changedFiles,
    candidateVerificationCatalog:protectedCatalog,candidateImpactManifest:protectedImpactManifest}};
+}
+
+function copyCandidateBrowserPayload(t) {
+ const scratch=fs.mkdtempSync(path.join(os.tmpdir(),'atlas-shadow-candidate-payload-'));
+ t.after(()=>fs.rmSync(scratch,{recursive:true,force:true}));
+ const candidateRoot=path.join(scratch,'candidate');
+ fs.mkdirSync(candidateRoot,{recursive:true});
+ fs.cpSync(path.join(root,'e2e'),path.join(candidateRoot,'e2e'),{recursive:true,filter:source=>!source.split(path.sep).includes('node_modules')});
+ return {scratch,candidateRoot};
+}
+
+function firstBrowserSnapshot(e2eRoot) {
+ for(const directory of ['tests/visual-desktop.spec.mjs-snapshots','tests/visual-mobile.spec.mjs-snapshots']) {
+  const rootPath=path.join(e2eRoot,directory);
+  if(!fs.existsSync(rootPath)) continue;
+  const queue=[rootPath];
+  while(queue.length) {
+   const current=queue.shift();
+   for(const entry of fs.readdirSync(current,{withFileTypes:true})) {
+    const absolute=path.join(current,entry.name);
+    if(entry.isDirectory()) queue.push(absolute);
+    else if(entry.isFile()&&entry.name.endsWith('.png')) return path.relative(e2eRoot,absolute);
+   }
+  }
+ }
+ throw new Error('visual snapshot fixture missing');
+}
+
+function mutateCandidateBrowserPayload(candidateRoot) {
+ const e2e=path.join(candidateRoot,'e2e');
+ const spec='tests/resilience-desktop.spec.mjs';
+ const support='support/user-acceptance.mjs';
+ fs.appendFileSync(path.join(e2e,spec),'\n// candidate-browser-spec-marker\n');
+ fs.appendFileSync(path.join(e2e,support),'\n// candidate-browser-support-marker\n');
+ fs.writeFileSync(path.join(e2e,'Dockerfile'),'candidate Dockerfile must remain inert\n');
+ fs.writeFileSync(path.join(e2e,'playwright.config.mjs'),'candidate config must remain inert\n');
+ fs.mkdirSync(path.join(e2e,'baselines'),{recursive:true});
+ fs.writeFileSync(path.join(e2e,'baselines/candidate.txt'),'candidate baseline must remain inert\n');
+ const snapshot=firstBrowserSnapshot(e2e);
+ fs.appendFileSync(path.join(e2e,snapshot),Buffer.from('candidate-snapshot-marker'));
+ return {spec,support,snapshot};
 }
 test('final candidate readback rejects head/base/tree/repository/file drift',()=>{
  const planned=snapshot();assert.equal(assertCandidateReadback({planned,current:snapshot(),...source}),true);
@@ -74,6 +117,11 @@ test('review frames remain additional obligations after exact browser command re
  Object.assign(input,createPublicationProofFixtures());
  const contract=resolveExecutionContract(input);
  assert.equal(contract.commands.length,2);assert.equal(contract.reviews.length,2);
+ const plan=buildVerificationPlan({...input.planInput,trustedVerificationCatalog:input.protectedCatalog,
+  candidateVerificationCatalog:input.protectedCatalog,trustedImpactManifest:input.protectedImpactManifest,
+  candidateImpactManifest:input.protectedImpactManifest,protectedStableTestIds:input.protectedStableTestIds});
+ assert.deepEqual(contract.reviews.map(({groupId})=>groupId).sort(),plan.requiredVisualGroupIds);
+ assert(contract.reviews.every(review=>review.frames.length&&review.commandIds.length));
  assert.equal(contract.reviews.flatMap(r=>r.frames).length,13);
  assert(contract.commands.every(c=>c.dataCapability==='qualification_fixture'));
 });
@@ -135,7 +183,6 @@ test('added candidate test executes as an unprivileged subject while candidate-o
  t.after(()=>fs.rmSync(subjectRoot,{recursive:true,force:true}));
  fs.writeFileSync(target,"import test from 'node:test'; test('ADD_CANDIDATE_EXECUTED',()=>{});\n");
  const input=executionInput(spec);
- // Repository bytes are the known protected fixture; only the new subject differs.
  input.protectedRoot=root;
  input.root=subjectRoot;
  input.candidate.changedFiles=[{path:spec,status:'added'}];
@@ -217,7 +264,99 @@ test('candidate execution metadata cannot replace protected interpreter or hashe
  assert(!JSON.stringify(contract).includes('candidate-policy'));
 });
 
-import {authenticateR5SemanticSource,buildR5SemanticPublication,resolveShadowEvent,planShadow,deterministicDockerArgs,fixtureBrowserArgs} from '../../tools/verification/run-verification-shadow.mjs';
+import {authenticateR5SemanticSource,buildR5SemanticPublication,resolveShadowEvent,planShadow,deterministicDockerArgs,fixtureBrowserArgs,machineFixtureBrowserArgs,requiresProtectedVisualReference,bindProtectedVisualReferenceConsumer,prepareProtectedBrowserHarness,prepareProtectedBrowserCaptureHarness,writeProtectedBrowserContainment,writeCandidateArtifactContainment,assertCandidateArtifactComposeConfig,emitPlaywrightFailureDiagnostics,collectVolumePlaywrightDiagnostics,resolveProtectedComposeServiceImage,reviewArtifactVolumeArgs,relayPlaywrightFailureDiagnostics,PLAYWRIGHT_DIAGNOSTIC_PREFIX,PLAYWRIGHT_DIAGNOSTIC_LIMITS,PLAYWRIGHT_DIAGNOSTIC_LOG_LINE_BYTES} from '../../tools/verification/run-verification-shadow.mjs';
+import {assertShadowExecutorCoverage,assertShadowReviewCaptureCensus,normalizeShadowReviewChangedFiles,shadowReviewPlanDigest} from '../../tools/verification/verification-shadow-review.mjs';
+test('shadow materializes candidate browser tests, support and snapshots while protected executor control stays protected',t=>{
+ const {scratch,candidateRoot}=copyCandidateBrowserPayload(t);
+ const changed=mutateCandidateBrowserPayload(candidateRoot);
+ const destination=path.join(scratch,'browser-harness');
+ prepareProtectedBrowserHarness({protectedRoot:root,candidateRoot,destination});
+ assert.match(fs.readFileSync(path.join(destination,changed.spec),'utf8'),/candidate-browser-spec-marker/);
+ assert.match(fs.readFileSync(path.join(destination,changed.support),'utf8'),/candidate-browser-support-marker/);
+ assert.equal(fs.readFileSync(path.join(destination,changed.snapshot)).includes(Buffer.from('candidate-snapshot-marker')),true);
+ assert.deepEqual(fs.readFileSync(path.join(destination,'Dockerfile')),fs.readFileSync(path.join(root,'e2e/Dockerfile')));
+ assert.doesNotMatch(fs.readFileSync(path.join(destination,'Dockerfile'),'utf8'),/candidate Dockerfile/);
+ assert.deepEqual(fs.readFileSync(path.join(destination,'playwright.config.mjs')),fs.readFileSync(path.join(root,'e2e/playwright.config.mjs')));
+ assert.equal(fs.existsSync(path.join(destination,'baselines/candidate.txt')),false);
+});
+
+test('candidate raw source cannot use protected qualification rehydration syntax',t=>{
+ const {scratch,candidateRoot}=copyCandidateBrowserPayload(t);
+ const visual=path.join(candidateRoot,'e2e/tests/visual-desktop.spec.mjs');
+ fs.writeFileSync(visual,"const __atlasQualification = true;\n(__atlasQualification ? (()=>{throw new Error('candidate failing assertion')})() : undefined);\n");
+ assert.throws(()=>prepareProtectedBrowserHarness({protectedRoot:root,candidateRoot,destination:path.join(scratch,'browser-harness')}),/reserved qualification syntax/);
+});
+
+test('protected browser containment bounds candidate and capture passes',t=>{
+ const scratch=fs.mkdtempSync(path.join(os.tmpdir(),'atlas-browser-containment-'));
+ t.after(()=>fs.rmSync(scratch,{recursive:true,force:true}));
+ const file=writeProtectedBrowserContainment(path.join(scratch,'containment.yml'));
+ const source=fs.readFileSync(file,'utf8');
+ assert.match(source,/read_only: true/);assert.match(source,/cap_drop:\n\s+- ALL/);
+ assert.match(source,/no-new-privileges:true/);assert.match(source,/pids_limit: 192/);
+ assert.match(source,/mem_limit: 1610612736/);assert.match(source,/cpus: 2/);
+ assert.match(source,/\/tmp:rw,nodev,nosuid,size=256m/);assert.doesNotMatch(source,/network_mode/);
+});
+
+test('hosted browser machine and protected visual capture use isolated producers',()=>{
+ const source=fs.readFileSync(path.join(root,'tools/verification/run-verification-shadow.mjs'),'utf8');
+ assert.match(source,/ATLAS_USER_VISUAL_EVIDENCE:'0'/);
+ assert.match(source,/candidateRoot:root/);
+ assert.match(source,/protected-capture-context-/);
+ assert.match(source,/ATLAS_USER_VISUAL_EVIDENCE:'1'/);
+ assert.match(source,/persistShadowReviewCapture\(\{artifactRoot:captureArtifacts/);
+ assert.doesNotMatch(source,/persistShadowReviewCapture\(\{artifactRoot:artifacts/);
+ assert.match(source,/if\(reviewBearing&&result\.status!==0&&!result\.signal\)[^]*collectVolumePlaywrightDiagnostics/);
+ assert.doesNotMatch(source,/relayPlaywrightFailureDiagnostics\(result\.stderr/);
+});
+
+test('protected visual capture overlays only authenticated candidate PNG snapshot oracle data',async t=>{
+ const {scratch,candidateRoot}=copyCandidateBrowserPayload(t);
+ const e2e=path.join(candidateRoot,'e2e'), snapshot=firstBrowserSnapshot(e2e);
+ const protectedSnapshot=fs.readFileSync(path.join(root,'e2e',snapshot));
+ fs.writeFileSync(path.join(e2e,snapshot),Buffer.concat([protectedSnapshot,Buffer.from('candidate-capture-snapshot-marker')]));
+ fs.appendFileSync(path.join(e2e,'tests/visual-desktop.spec.mjs'),'\n// candidate capture spec must stay inert\n');
+ fs.appendFileSync(path.join(e2e,'support/user-acceptance.mjs'),'\n// candidate capture support must stay inert\n');
+ const productRoot=path.join(scratch,'qualification-product');
+ const manifest=await buildQualificationWorld(productRoot);
+ await verifyQualificationWorld(productRoot);
+ const bindings=resolveQualificationScenarioBindings({productRoot,expectedProductDigest:manifest.productDigest});
+ const protectedDestination=path.join(scratch,'protected-qualified');
+ prepareProtectedBrowserHarness({protectedRoot:root,destination:protectedDestination,qualificationBindings:bindings});
+ const destination=path.join(scratch,'protected-capture');
+ prepareProtectedBrowserCaptureHarness({protectedRoot:root,candidateRoot,destination,qualificationBindings:bindings});
+ assert.equal(fs.readFileSync(path.join(destination,snapshot)).includes(Buffer.from('candidate-capture-snapshot-marker')),true);
+ assert.deepEqual(fs.readFileSync(path.join(destination,'tests/visual-desktop.spec.mjs')),fs.readFileSync(path.join(protectedDestination,'tests/visual-desktop.spec.mjs')));
+ assert.deepEqual(fs.readFileSync(path.join(destination,'support/user-acceptance.mjs')),fs.readFileSync(path.join(protectedDestination,'support/user-acceptance.mjs')));
+
+ fs.rmSync(path.join(e2e,snapshot));
+ const deletedDestination=path.join(scratch,'protected-capture-deleted');
+ prepareProtectedBrowserCaptureHarness({protectedRoot:root,candidateRoot,destination:deletedDestination});
+ assert.equal(fs.existsSync(path.join(deletedDestination,snapshot)),false);
+
+ const snapshotDirectory=path.dirname(path.join(e2e,snapshot));
+ fs.writeFileSync(path.join(snapshotDirectory,'invalid.txt'),'not snapshot oracle data');
+ assert.throws(()=>prepareProtectedBrowserCaptureHarness({protectedRoot:root,candidateRoot,destination:path.join(scratch,'protected-capture-invalid')}),/non-PNG data/);
+ fs.rmSync(path.join(snapshotDirectory,'invalid.txt'));
+ fs.symlinkSync(path.join(root,'e2e',snapshot),path.join(snapshotDirectory,'linked.png'));
+ assert.throws(()=>prepareProtectedBrowserCaptureHarness({protectedRoot:root,candidateRoot,destination:path.join(scratch,'protected-capture-symlink')}),/snapshot symlink/);
+});
+
+test('qualification binding is rendered onto candidate test payload without replacing candidate assertions',async t=>{
+ const {scratch,candidateRoot}=copyCandidateBrowserPayload(t);
+ const visual=path.join(candidateRoot,'e2e/tests/visual-desktop.spec.mjs');
+ fs.appendFileSync(visual,'\n// candidate-qualification-oracle-marker\n');
+ const productRoot=path.join(scratch,'product');
+ const manifest=await buildQualificationWorld(productRoot);
+ await verifyQualificationWorld(productRoot);
+ const bindings=resolveQualificationScenarioBindings({productRoot,expectedProductDigest:manifest.productDigest});
+ const destination=path.join(scratch,'qualified-browser-harness');
+ prepareProtectedBrowserHarness({protectedRoot:root,candidateRoot,destination,qualificationBindings:bindings});
+ const rendered=fs.readFileSync(path.join(destination,'tests/visual-desktop.spec.mjs'),'utf8');
+ assert.match(rendered,/candidate-qualification-oracle-marker/);
+ assert.match(rendered,/protected-reference/);
+ assert.deepEqual(fs.readFileSync(path.join(destination,'playwright.config.mjs')),fs.readFileSync(path.join(root,'e2e/playwright.config.mjs')));
+});
 test('fixture browser preserves runner ownership of report artifacts',()=>{
  const compose=['compose','-p','protected-fixture','-f','/protected/compose.yml'];
  assert.deepEqual(fixtureBrowserArgs(compose,{uid:1001,gid:1002}),[...compose,'run','--user','1001:1002','--rm','--no-deps','e2e']);
@@ -226,6 +365,26 @@ test('fixture browser preserves runner ownership of report artifacts',()=>{
   assert.throws(()=>fixtureBrowserArgs(compose,{uid:bad,gid:1002}),/fixture host identity/);
   assert.throws(()=>fixtureBrowserArgs(compose,{uid:1001,gid:bad}),/fixture host identity/);
  }
+});
+
+test('hosted shadow mounts independent protected visual references only for qualification visual specs',()=>{
+ const command=({spec='visual-desktop.spec.mjs',capability='qualification_fixture',engine='playwright'}={})=>({engine,dataCapability:capability,expectedTestIds:[`desktop-chromium::e2e/tests/${spec}::visual acceptance`]});
+ assert.equal(requiresProtectedVisualReference(command()),true);
+ assert.equal(requiresProtectedVisualReference(command({spec:'visual-mobile.spec.mjs'})),true);
+ assert.equal(requiresProtectedVisualReference(command({spec:'state-desktop.spec.mjs'})),false);
+ assert.equal(requiresProtectedVisualReference(command({capability:'bounded_real_world'})),false);
+ assert.equal(requiresProtectedVisualReference(command({engine:'deterministic'})),false);
+ const composeArgs=['compose','-p','atlas-r5-test','-f','/protected/base.yml'];
+ const env={ATLAS_CODE_REVISION:'a'.repeat(40)};
+ const snapshots=path.join(root,'.protected-reference-test');
+ const wired=bindProtectedVisualReferenceConsumer({composeArgs,env,protectedRoot:root,referenceSnapshots:snapshots});
+ assert.deepEqual(composeArgs,['compose','-p','atlas-r5-test','-f','/protected/base.yml']);
+ assert.deepEqual(env,{ATLAS_CODE_REVISION:'a'.repeat(40)});
+ assert.deepEqual(wired.composeArgs,[...composeArgs,'-f',path.join(root,'e2e/compose.protected-visual-consumer.yml')]);
+ assert.equal(wired.env.ATLAS_REFERENCE_SNAPSHOTS,snapshots);
+ const overlay=fs.readFileSync(path.join(root,'e2e/compose.protected-visual-consumer.yml'),'utf8');
+ assert.match(overlay,/visual-desktop\.spec\.mjs-snapshots\/protected-reference:ro/);
+ assert.match(overlay,/visual-mobile\.spec\.mjs-snapshots\/protected-reference:ro/);
 });
 
 const r5Read = (name) => JSON.parse(fs.readFileSync(path.join(root, 'tools/verification', `${name}.json`), 'utf8'));
@@ -286,14 +445,48 @@ test('R5 C3 selects exact search and bounded-source obligations without unrelate
   assert.deepEqual(result.requiredVisualGroupIds, []);
 });
 
-test('R5 protected shadow planner accepts exactly the three bounded canary routes', () => {
+test('R5 protected shadow planner accepts exact canary routes plus hosted depth/full safety net', () => {
   for (const changedPath of [
     'tools/fullworld-layers/verify_authority_registry.py',
     'web/fullworld-farm-explorer.mjs',
     'tools/build-semantic-search-index.py',
+    'e2e/tests/performance-desktop.spec.mjs',
+    'e2e/tests/soak-desktop.spec.mjs',
+    'e2e/tests/stress-desktop.spec.mjs',
   ]) {
     assert.doesNotThrow(() => planShadow({ candidate: r5Candidate(changedPath), root, protectedRoot: root }), changedPath);
   }
+  const full = planShadow({ candidate: r5Candidate('tools/verification/impact-manifest.json'), root, protectedRoot: root }).plan;
+  for (const id of ['e2e.bounded-performance', 'e2e.bounded-soak', 'e2e.bounded-stress', 'e2e.common-smoke']) {
+    assert.ok(full.groups.some((group) => group.id === id), `full safety net must contain ${id}`);
+  }
+  assert.deepEqual(full.requiredVisualGroupIds, []);
+  assert.equal(full.groups.some((group) => group.executionRole === 'canonical-review' || group.evidence === 'restricted-visual-review' || group.capabilities?.visualReview === true), false);
+  assert.equal(full.groups.some((group) => group.capabilities?.dataCapability === 'real_fullworld'), false);
+  const fixture = createPublicationProofFixtures(['qualification_fixture']);
+  const contract = resolveExecutionContract({ ...planShadow({ candidate: r5Candidate('tools/verification/impact-manifest.json'), root, protectedRoot: root }).input,
+    environmentDigest: 'd'.repeat(64), ...fixture });
+  assert.deepEqual(contract.reviews, []);
+  for (const id of ['e2e.bounded-performance', 'e2e.bounded-soak', 'e2e.bounded-stress', 'e2e.common-smoke']) {
+    assert.ok(contract.groups.some((group) => group.id === id), `sealed machine safety net must contain ${id}`);
+  }
+  assert(contract.commands.every((command) => command.dataCapability === 'qualification_fixture'));
+  assert.throws(
+    () => planShadow({ candidate: r5Candidate('e2e/tests/fullworld-animation-census-desktop.spec.mjs'), root, protectedRoot: root }),
+    /executor unavailable|real[_ -]?fullworld|specialist/i,
+  );
+  const animation = planShadow({ candidate: r5Candidate('src/browser/animation-runtime.mjs'), root, protectedRoot: root }).plan;
+  assert.equal(animation.requiresRealFullWorld, false);
+  assert.deepEqual(animation.requiredDataCapabilities, ['qualification_fixture']);
+  assert.deepEqual(animation.requiredVisualGroupIds, ['review.creature-presentation-desktop','review.creature-presentation-mobile','review.visual-desktop','review.visual-mobile']);
+  assert.throws(() => planShadow({ candidate: r5Candidate('unknown/product.mjs'), root, protectedRoot: root }), /unresolved obligations/i);
+  const mixed = {...r5Candidate('tools/verification/impact-manifest.json'), changedFiles:[
+    {path:'tools/verification/impact-manifest.json',status:'modified'},
+    {path:'src/browser/animation-runtime.mjs',status:'modified'},
+  ]};
+  const mixedPlan=planShadow({candidate:mixed,root,protectedRoot:root}).plan;
+  assert.equal(mixedPlan.requiresRealFullWorld,false);
+  assert.equal(mixedPlan.requiredVisualGroupIds.length,9);
 });
 
 test('R5 bounded semantic publication derives from one exact authenticated Game source byte', async (t) => {
@@ -390,6 +583,117 @@ test('R5 protected harness executes only the candidate builder and enforces exac
 });
 
 import {assertDeterministicContainer} from '../../tools/verification/run-verification-shadow.mjs';
+const diagnosticRows=output=>output.trim().split('\n').filter(Boolean).map(line=>{assert.ok(line.startsWith(`${PLAYWRIGHT_DIAGNOSTIC_PREFIX} `));return JSON.parse(line.slice(PLAYWRIGHT_DIAGNOSTIC_PREFIX.length+1));});
+test('failed Playwright diagnostics are filtered, ordered, lossless and bounded',t=>{
+ const temporary=fs.mkdtempSync(path.join(os.tmpdir(),'atlas-diagnostic-test-'));t.after(()=>fs.rmSync(temporary,{recursive:true,force:true}));
+ const root=path.join(temporary,'test-results');fs.mkdirSync(path.join(root,'z'),{recursive:true});fs.mkdirSync(path.join(root,'a'));
+ const first=Buffer.alloc(PLAYWRIGHT_DIAGNOSTIC_LIMITS.maxChunkBytes,0xff),second=Buffer.from('second image');
+ fs.writeFileSync(path.join(root,'z/frame-diff.png'),second);fs.writeFileSync(path.join(root,'a/frame-actual.png'),first);
+ fs.writeFileSync(path.join(root,'a/frame-actual.png.txt'),'not eligible');fs.writeFileSync(path.join(root,'a/other.png'),'not eligible');
+ fs.symlinkSync(path.join(root,'z/frame-diff.png'),path.join(root,'a/link-diff.png'));
+ fs.writeFileSync(path.join(root,'unsafe\\-actual.png'),'unsafe path');
+ const commandId='sha256:'+'a'.repeat(64),output=emitPlaywrightFailureDiagnostics({commandId,testResultsRoot:root,write:()=>{}}),rows=diagnosticRows(output);
+ assert.ok(output.trimEnd().split('\n').every(line=>Buffer.byteLength(line)<64*1024&&Buffer.byteLength(line)<PLAYWRIGHT_DIAGNOSTIC_LOG_LINE_BYTES));
+ const headers=rows.filter(row=>row.type==='file');assert.deepEqual(headers.map(row=>row.path),['a/frame-actual.png','z/frame-diff.png']);
+ for(const [header,expected] of headers.map((row,index)=>[row,index?second:first])) {
+  const chunks=rows.filter(row=>row.type==='chunk'&&row.path===header.path).sort((a,b)=>a.index-b.index);
+  const reconstructed=Buffer.from(chunks.map(row=>row.data).join(''),'base64');assert.deepEqual(reconstructed,expected);
+  assert.equal(header.byteLength,expected.length);assert.equal(header.sha256,createHash('sha256').update(expected).digest('hex'));assert.equal(header.encoding,'base64');assert.equal(header.chunkCount,chunks.length);
+  assert.ok(chunks.every(row=>Buffer.from(row.data,'base64').length<=PLAYWRIGHT_DIAGNOSTIC_LIMITS.maxChunkBytes));
+  assert.equal(rows.find(row=>row.type==='end'&&row.path===header.path).complete,true);
+ }
+ assert.ok(rows.some(row=>row.type==='omission'&&row.reason==='unsafe-path'));assert.equal(rows.at(-1).type,'complete');assert.equal(rows.at(-1).complete,true);
+ const longestPath=`${'p'.repeat(1022)}/x`,maxChunk=Buffer.alloc(PLAYWRIGHT_DIAGNOSTIC_LIMITS.maxChunkBytes).toString('base64');
+ const longestChunkRecord=`${PLAYWRIGHT_DIAGNOSTIC_PREFIX} ${JSON.stringify({schema:'oteryn.atlas.playwright-diagnostic',version:1,type:'chunk',commandId,path:longestPath,index:Number.MAX_SAFE_INTEGER,chunkCount:Number.MAX_SAFE_INTEGER,data:maxChunk})}\n`;
+ assert.ok(Buffer.byteLength(longestChunkRecord)<=PLAYWRIGHT_DIAGNOSTIC_LOG_LINE_BYTES);assert.ok(PLAYWRIGHT_DIAGNOSTIC_LOG_LINE_BYTES<=64*1024-1024);
+ const relayed=[];assert.equal(relayPlaywrightFailureDiagnostics(`unrelated stderr\n${output}`,commandId,value=>relayed.push(value)),rows.length);assert.equal(relayed.join(''),output);
+ assert.throws(()=>emitPlaywrightFailureDiagnostics({commandId:'unsafe',testResultsRoot:root,write:()=>{}}),/unsafe diagnostic input/);
+ assert.throws(()=>emitPlaywrightFailureDiagnostics({commandId,testResultsRoot:'relative',write:()=>{}}),/unsafe diagnostic input/);
+ const empty=path.join(temporary,'empty');fs.mkdirSync(empty);const emptyRows=diagnosticRows(emitPlaywrightFailureDiagnostics({commandId,testResultsRoot:empty,write:()=>{}}));
+ assert.deepEqual(emptyRows.map(row=>row.type),['complete']);assert.equal(emptyRows[0].fileCount,0);
+ const depthLimited=diagnosticRows(emitPlaywrightFailureDiagnostics({commandId,testResultsRoot:root,write:()=>{},limits:{...PLAYWRIGHT_DIAGNOSTIC_LIMITS,maxDepth:0}}));
+ assert.ok(depthLimited.some(row=>row.type==='omission'&&row.reason==='max-depth'));
+ const entryLimited=diagnosticRows(emitPlaywrightFailureDiagnostics({commandId,testResultsRoot:root,write:()=>{},limits:{...PLAYWRIGHT_DIAGNOSTIC_LIMITS,maxEntries:1}}));
+ assert.ok(entryLimited.some(row=>row.type==='omission'&&row.reason==='max-entries'));
+ const nestedEntryRoot=path.join(temporary,'nested-entry-limit');fs.mkdirSync(path.join(nestedEntryRoot,'a'),{recursive:true});fs.writeFileSync(path.join(nestedEntryRoot,'a/child.txt'),'entry');fs.writeFileSync(path.join(nestedEntryRoot,'b-actual.png'),'must not be read');
+ const nestedEntryLimited=diagnosticRows(emitPlaywrightFailureDiagnostics({commandId,testResultsRoot:nestedEntryRoot,write:()=>{},limits:{...PLAYWRIGHT_DIAGNOSTIC_LIMITS,maxEntries:2}}));
+ assert.equal(nestedEntryLimited.some(row=>row.type==='file'&&row.path==='b-actual.png'),false);assert.ok(nestedEntryLimited.some(row=>row.type==='omission'&&row.reason==='max-entries'));
+ const boundsRoot=path.join(temporary,'bounds');fs.mkdirSync(boundsRoot);fs.writeFileSync(path.join(boundsRoot,'a-actual.png'),'12');fs.writeFileSync(path.join(boundsRoot,'b-diff.png'),'34');
+ for(const [override,reason] of [[{maxFiles:1},'max-files'],[{maxFileBytes:1},'max-file-bytes'],[{maxTotalRawBytes:3},'max-total-raw-bytes']]) {
+  const bounded=diagnosticRows(emitPlaywrightFailureDiagnostics({commandId,testResultsRoot:boundsRoot,write:()=>{},limits:{...PLAYWRIGHT_DIAGNOSTIC_LIMITS,...override}}));assert.ok(bounded.some(row=>row.type==='omission'&&row.reason===reason),reason);
+ }
+ assert.throws(()=>emitPlaywrightFailureDiagnostics({commandId,testResultsRoot:boundsRoot,write:()=>{},limits:{...PLAYWRIGHT_DIAGNOSTIC_LIMITS,maxOutputBytes:1}}),/output bound/);
+ const sparseRoot=path.join(temporary,'sparse');fs.mkdirSync(sparseRoot);const sparse=path.join(sparseRoot,'huge-actual.png');fs.closeSync(fs.openSync(sparse,'w'));fs.truncateSync(sparse,PLAYWRIGHT_DIAGNOSTIC_LIMITS.maxFileBytes+1);
+ const originalRead=fs.readFileSync;let descriptorReads=0;fs.readFileSync=function(file,...args){if(typeof file==='number')descriptorReads++;return originalRead.call(this,file,...args);};
+ try {const oversized=diagnosticRows(emitPlaywrightFailureDiagnostics({commandId,testResultsRoot:sparseRoot,write:()=>{}}));assert.equal(descriptorReads,0);assert.ok(oversized.some(row=>row.type==='omission'&&row.reason==='max-file-bytes'));} finally {fs.readFileSync=originalRead;}
+ const aggregateRoot=path.join(temporary,'aggregate');fs.mkdirSync(aggregateRoot);fs.writeFileSync(path.join(aggregateRoot,'a-actual.png'),'123');fs.writeFileSync(path.join(aggregateRoot,'b-diff.png'),'456');descriptorReads=0;fs.readFileSync=function(file,...args){if(typeof file==='number')descriptorReads++;return originalRead.call(this,file,...args);};
+ try {const aggregate=diagnosticRows(emitPlaywrightFailureDiagnostics({commandId,testResultsRoot:aggregateRoot,write:()=>{},limits:{...PLAYWRIGHT_DIAGNOSTIC_LIMITS,maxTotalRawBytes:3}}));assert.equal(descriptorReads,1);assert.ok(aggregate.some(row=>row.type==='omission'&&row.reason==='max-total-raw-bytes'));} finally {fs.readFileSync=originalRead;}
+});
+
+test('diagnostic relay accepts only a complete internally consistent expected-command frame',t=>{
+ const temporary=fs.mkdtempSync(path.join(os.tmpdir(),'atlas-diagnostic-relay-'));t.after(()=>fs.rmSync(temporary,{recursive:true,force:true}));
+ const resultRoot=path.join(temporary,'test-results');fs.mkdirSync(resultRoot);fs.writeFileSync(path.join(resultRoot,'frame-actual.png'),'protected bytes');
+ const id='sha256:'+'b'.repeat(64),valid=emitPlaywrightFailureDiagnostics({commandId:id,testResultsRoot:resultRoot,write:()=>{}}),lines=valid.trimEnd().split('\n');
+ const relay=value=>{const output=[];return [relayPlaywrightFailureDiagnostics(value,id,row=>output.push(row)),output.join('')];};
+ assert.deepEqual(relay(valid),[lines.length,valid]);assert.equal(relayPlaywrightFailureDiagnostics(valid,id,()=>{throw new Error('relay failed');}),0);
+ const mutations=[
+  lines.slice(0,-1),
+  lines.map((line,index)=>index===1?line.replace('"index":0','"index":1'):line),
+  lines.map((line,index)=>index===1?line.replace(/"data":"[^"]+"/,'"data":"***="'):line),
+  lines.map((line,index)=>index===2?line.replace(/[a-f0-9]{64}/,'0'.repeat(64)):line),
+  lines.map(line=>line.replace(id,'sha256:'+'c'.repeat(64))),
+  [lines[0],lines[2],lines[1],...lines.slice(3)],
+ ];
+ for(const malformed of mutations)assert.deepEqual(relay(malformed.join('\n')+'\n'),[0,'']);
+ assert.deepEqual(relay(`${PLAYWRIGHT_DIAGNOSTIC_PREFIX} not-json\n${valid}`),[0,'']);
+});
+
+test('diagnostic file reads fail closed when the discovered identity is race-swapped',t=>{
+ const temporary=fs.mkdtempSync(path.join(os.tmpdir(),'atlas-diagnostic-race-'));t.after(()=>fs.rmSync(temporary,{recursive:true,force:true}));
+ const resultRoot=path.join(temporary,'test-results');fs.mkdirSync(resultRoot);const image=path.join(resultRoot,'frame-actual.png'),outside=path.join(temporary,'outside');
+ fs.writeFileSync(outside,'secret!');const originalOpen=fs.openSync;
+ for(const replacement of ['symlink','regular','fifo']) {
+  fs.rmSync(image,{force:true});fs.rmSync(image+'.discovered',{force:true});fs.writeFileSync(image,'inside!');let swapped=false;
+  fs.openSync=function(file,...args){if(String(file).endsWith('/frame-actual.png')&&!swapped){swapped=true;fs.renameSync(image,image+'.discovered');if(replacement==='symlink')fs.symlinkSync(outside,image);else if(replacement==='fifo')spawnSync('mkfifo',[image]);else fs.writeFileSync(image,'secret!');}return originalOpen.call(this,file,...args);};
+  try {const rows=diagnosticRows(emitPlaywrightFailureDiagnostics({commandId:'sha256:'+'d'.repeat(64),testResultsRoot:resultRoot,write:()=>{}}));assert.equal(rows.some(row=>row.type==='file'),false,replacement);assert.ok(rows.some(row=>row.type==='omission'&&row.reason==='file-changed'),replacement);} finally {fs.openSync=originalOpen;}
+ }
+ const nested=path.join(resultRoot,'nested'),external=path.join(temporary,'external');fs.mkdirSync(nested);fs.mkdirSync(external);fs.writeFileSync(path.join(external,'forged-diff.png'),'secret!');let directorySwapped=false;
+ fs.openSync=function(file,...args){if(String(file).endsWith('/nested')&&!directorySwapped){directorySwapped=true;fs.renameSync(nested,nested+'.discovered');fs.symlinkSync(external,nested);}return originalOpen.call(this,file,...args);};
+ try {const rows=diagnosticRows(emitPlaywrightFailureDiagnostics({commandId:'sha256:'+'d'.repeat(64),testResultsRoot:resultRoot,write:()=>{}}));assert.equal(rows.some(row=>row.path==='nested/forged-diff.png'),false);assert.ok(rows.some(row=>row.type==='omission'&&row.reason==='directory-changed'));} finally {fs.openSync=originalOpen;}
+});
+
+test('review-bearing browser keeps qualified containment and uses an isolated bounded tmpfs volume collector',t=>{
+ const temporary=fs.mkdtempSync(path.join(os.tmpdir(),'atlas-volume-diagnostic-'));t.after(()=>fs.rmSync(temporary,{recursive:true,force:true}));
+ const id='sha256:'+'b'.repeat(64),compose=['compose'];
+ const candidateArgs=machineFixtureBrowserArgs(compose,{uid:1000,gid:1000});
+ for(const flag of ['--rm','--user'])assert.ok(candidateArgs.includes(flag));assert.equal(candidateArgs[candidateArgs.indexOf('--user')+1],'1000:1000');assert.equal(candidateArgs.includes('--cap-add'),false);
+ const volumeName='atlas-playwright-artifacts-1234-abcd',anchorName='atlas-playwright-anchor-1234-abcd',collectorName='atlas-playwright-collector-1234-abcd',image='sha256:'+'c'.repeat(64);
+ const volume=reviewArtifactVolumeArgs({volumeName,anchorName,image,uid:1000,gid:1000});
+ assert.deepEqual(volume.create.slice(0,6),['volume','create','--driver','local','--opt','type=tmpfs']);assert.ok(volume.create.includes('o=size=67108864,uid=1000,gid=1000,mode=0700,nodev,nosuid'));
+ for(const flag of ['--network=none','--read-only','--cap-drop=ALL','--security-opt=no-new-privileges'])assert.ok(volume.anchor.includes(flag));assert.equal(volume.anchor[volume.anchor.indexOf('--user')+1],'1000:1000');
+ const overlay=writeCandidateArtifactContainment(path.join(temporary,'volume.yml'),{volumeName});assert.match(fs.readFileSync(overlay,'utf8'),/external: true[^]*name: atlas-playwright-artifacts-1234-abcd/);
+ assertCandidateArtifactComposeConfig({services:{e2e:{read_only:true,cap_drop:['ALL'],security_opt:['no-new-privileges:true'],pids_limit:192,mem_limit:1610612736,cpus:2,volumes:[{type:'volume',source:'failure_artifacts',target:'/artifacts'}]}},volumes:{failure_artifacts:{name:volumeName,external:true}}},{volumeName});
+ const frameRoot=path.join(temporary,'test-results');fs.mkdirSync(frameRoot);fs.writeFileSync(path.join(frameRoot,'frame-actual.png'),'restricted image bytes',{mode:0o600});
+ const frame=emitPlaywrightFailureDiagnostics({commandId:id,testResultsRoot:frameRoot,write:()=>{}}),calls=[],written=[];
+ const run=(file,args)=>{calls.push([file,args]);return {status:0,signal:null,stderr:frame};};
+ assert.equal(collectVolumePlaywrightDiagnostics({volumeName,collectorName,commandId:id,image,uid:1000,gid:1000,protectedRoot:root,run,write:value=>written.push(value)}),true);
+ const collectorArgs=calls[0][1];for(const flag of ['--network=none','--read-only','--cap-drop=ALL','--security-opt=no-new-privileges'])assert.ok(collectorArgs.includes(flag));
+ assert.ok(collectorArgs.includes(`type=volume,src=${volumeName},dst=/artifacts,readonly`));assert.ok(collectorArgs.includes(`type=bind,src=${root},dst=/atlas-protected,readonly`));assert.equal(written.join(''),frame);assert.equal(calls.some(([,args])=>args[0]==='cp'),false);
+ const failed=[];assert.equal(collectVolumePlaywrightDiagnostics({volumeName,collectorName,commandId:id,image,protectedRoot:root,run:()=>({status:1}),write:value=>failed.push(value)}),false);assert.deepEqual(diagnosticRows(failed.join('')).map(row=>row.type),['error','complete']);
+ const source=fs.readFileSync(path.join(root,'tools/verification/run-verification-shadow.mjs'),'utf8');assert.doesNotMatch(source,/docker'?,?\['cp'|--cap-add|setpriv --reuid|pkill -KILL/);assert.match(source,/finally \{[^]*\['volume','rm','-f',volumeName\]/);
+});
+
+test('protected collector image is resolved from Compose config to an immutable local identity',()=>{
+ const composeArgs=['compose','--project-name','atlas'],image='atlas-e2e:local',identity='sha256:'+'e'.repeat(64),calls=[];
+ const run=(file,args)=>{calls.push([file,args]);return args[0]==='image'?{status:0,signal:null,stdout:`${identity}\n`}:{status:0,signal:null,stdout:`${image}\n`};};
+ assert.equal(resolveProtectedComposeServiceImage({composeArgs,service:'e2e',run}),identity);
+ assert.deepEqual(calls,[['docker',[...composeArgs,'config','--images','e2e']],['docker',['image','inspect','--format','{{.Id}}',image]]]);
+ for(const outputs of [['',identity],[`${image}\nsecond:tag\n`,identity],[image,'atlas-e2e:local'],[image,`${identity}\nsha256:${'f'.repeat(64)}\n`]]) {
+  let index=0;assert.throws(()=>resolveProtectedComposeServiceImage({composeArgs,service:'e2e',run:()=>({status:0,signal:null,stdout:outputs[index++]})}),/protected collector/);
+ }
+ const source=fs.readFileSync(path.join(root,'tools/verification/run-verification-shadow.mjs'),'utf8');assert.doesNotMatch(source,/['"]images['"],['"]-q['"],['"]e2e['"]/);assert.match(source,/['"]config['"],['"]--images['"],service/);
+});
+
 {
 const repository='Oteryn/Oteryn-Atlas',base='a'.repeat(40),head='b'.repeat(40),tree='c'.repeat(40);
 const root=fileURLToPath(new URL('../../',import.meta.url));
@@ -424,7 +728,36 @@ test('S0 plans zero groups and S2/S3 select only their narrow protected owners',
  assert.deepEqual(plan('docs/ordinary.md').groups,[]);
  assert.deepEqual(plan('e2e/tests/layer-audit-desktop.spec.mjs').groups.map(g=>g.id),['e2e.layer-availability']);
  assert.deepEqual(plan('e2e/tests/creature-gameplay-source-contract-desktop.spec.mjs').groups.map(g=>g.id),['integration.source-contract-http']);
- assert.throws(()=>plan('e2e/tests/soak-desktop.spec.mjs'),/bounded executor unavailable/);
+for(const name of ['e2e/tests/performance-desktop.spec.mjs','e2e/tests/soak-desktop.spec.mjs','e2e/tests/stress-desktop.spec.mjs']) assert.doesNotThrow(()=>plan(name),name);
+ const full=plan('tools/verification/impact-manifest.json');
+ for(const id of ['e2e.bounded-performance','e2e.bounded-soak','e2e.bounded-stress','e2e.common-smoke']) assert.ok(full.groups.some(group=>group.id===id),id);
+ assert.deepEqual(full.requiredVisualGroupIds,[]);
+ assert.equal(full.groups.some(group=>group.executionRole==='canonical-review'||group.evidence==='restricted-visual-review'||group.capabilities?.visualReview===true),false);
+ assert.equal(full.groups.some(group=>group.capabilities?.dataCapability==='real_fullworld'),false);
+ assert.throws(()=>plan('e2e/tests/fullworld-animation-census-desktop.spec.mjs'),/executor unavailable|real[_ -]?fullworld|specialist/i);
+ const animation=plan('src/browser/animation-runtime.mjs');
+ assert.equal(animation.requiresRealFullWorld,false);
+ assert.deepEqual(animation.requiredDataCapabilities,['qualification_fixture']);
+ assert.deepEqual(animation.requiredVisualGroupIds,['review.creature-presentation-desktop','review.creature-presentation-mobile','review.visual-desktop','review.visual-mobile']);
+});
+test('R5 broad executor accepts hosted fixture machine/review groups but still rejects specialist Real-FullWorld',()=>{
+ const hosted={id:'e2e.bounded-soak',executionRole:'canonical-machine',executionEngine:'playwright',evidence:'machine-summary',capabilities:{browser:true,hosted:true,requiresPublication:true,dataCapability:'qualification_fixture',visualReview:false,specialistReason:null}};
+ const review={id:'review.visual-desktop',executionRole:'canonical-review',executionEngine:'playwright',evidence:'restricted-visual-review',capabilities:{browser:true,hosted:true,requiresPublication:true,dataCapability:'qualification_fixture',visualReview:true,specialistReason:null}};
+ assert.equal(assertShadowExecutorCoverage({groups:[hosted,review]}),true);
+ const specialist={...hosted,id:'fullworld.animation-census',capabilities:{...hosted.capabilities,hosted:false,dataCapability:'real_fullworld',specialistReason:'real-fullworld-product'}};
+ assert.throws(()=>assertShadowExecutorCoverage({groups:[specialist]}),/executor unavailable/);
+});
+test('R5 review binding is exact-tree portable from PR head to MQ and requires a complete frame census',()=>{
+ const baseSha=sha('b'),treeSha=sha('c'),prFiles=[{path:'web/new.mjs',status:'renamed',previousPath:'web/old.mjs'}],mqFiles=[{path:'web/new.mjs',status:'added'},{path:'web/old.mjs',status:'removed'}];
+ const pr={repository:'Oteryn/Oteryn-Atlas',prNumber:344,headSha:sha('a'),baseSha,treeSha,changedFiles:prFiles};
+ const mq={...pr,prNumber:null,headSha:sha('d'),changedFiles:mqFiles};
+ assert.deepEqual(normalizeShadowReviewChangedFiles(pr.changedFiles),normalizeShadowReviewChangedFiles(mq.changedFiles));
+ const contract={commands:[{id:'sha256:'+'1'.repeat(64),engine:'playwright',spec:'e2e/tests/visual-desktop.spec.mjs',projects:['desktop-chromium'],expectedTestIds:['desktop-chromium::e2e/tests/visual-desktop.spec.mjs::frame'],dataCapability:'qualification_fixture'}],groups:[{id:'e2e.visual-presentation'},{id:'review.visual-desktop'}],reviews:[{groupId:'review.visual-desktop',commandIds:['sha256:'+'1'.repeat(64)],frames:[{frameId:'desktop.initial',stableTestId:'desktop-chromium::e2e/tests/visual-desktop.spec.mjs::frame'}]}]};
+ assert.equal(shadowReviewPlanDigest(pr,contract),shadowReviewPlanDigest(mq,contract));
+ assert.notEqual(shadowReviewPlanDigest(pr,contract),shadowReviewPlanDigest({...mq,treeSha:sha('e')},contract));
+ const results=[{reviewCapture:{frames:[{frameId:'desktop.initial',scenarioId:'desktop-chromium::e2e/tests/visual-desktop.spec.mjs::frame'}]}}];
+ assert.equal(assertShadowReviewCaptureCensus(contract,results),true);
+ assert.throws(()=>assertShadowReviewCaptureCensus(contract,[]),/incomplete/);
 });
 test('deterministic runner has exact command and readonly credential-free mounts with bounded isolation',()=>{
  const command={id:'sha256:'+'a'.repeat(64),engine:'deterministic',cwd:'.',argv:['node','--test','tests/example.mjs']};
@@ -482,6 +815,8 @@ import {buildVerificationPlan} from '../../tools/verification/build-verification
 test('authenticated self-only subjects compose with docs, another subject and HTTP without claiming core',t=>{
  const directory=fs.mkdtempSync(path.join(os.tmpdir(),'atlas-subject-composition-'));t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
  fs.cpSync(path.join(root,'tests'),path.join(directory,'tests'),{recursive:true});
+ fs.mkdirSync(path.join(directory,'tools/governance'),{recursive:true});
+ for(const spec of ['test_agent_prompt_lifecycle.mjs','test_validate_meta_agent_policy.py'])fs.copyFileSync(path.join(root,'tools/governance',spec),path.join(directory,'tools/governance',spec));
  const first='tests/new-subject.mjs',second='tests/second-subject.py';
  fs.writeFileSync(path.join(directory,first),"import test from 'node:test';test('subject',()=>{});\n");fs.writeFileSync(path.join(directory,second),'assert True\n');
  const base=executionInput(first);base.root=directory;base.protectedRoot=root;
@@ -496,8 +831,8 @@ test('authenticated self-only subjects compose with docs, another subject and HT
   for(const subject of contract.candidateTestSubjects)assert.deepEqual(contract.commands.find(command=>command.id===subject.commandId).expectedTestIds,[subject.spec]);
  }
  const actualCore=resolveExecutionContract(input([{path:'tests/verification/artifacts.test.mjs',status:'modified'}]));
- assert.equal(actualCore.commands.filter(command=>command.groupIds.includes('deterministic.core')).length,142);
- assert.equal(actualCore.commands.length,143);
+ assert.equal(actualCore.commands.filter(command=>command.groupIds.includes('deterministic.core')).length,146);
+ assert.equal(actualCore.commands.length,147);
  assert.equal(actualCore.candidateTestSubjects.length,1);
  const subjectOnly=resolveExecutionContract(input());
  const forged=structuredClone(subjectOnly);forged.candidateTestSubjects[0].spec='tests/../outside.mjs';assert.throws(()=>sealExecutionContract(forged),/subject/);
@@ -515,13 +850,13 @@ test('authenticated self-only subjects compose with docs, another subject and HT
  samePathManifest.entries.push({pathPrefix:first,exactMatch:true,domains:['subject-semantic'],minimumProfile:'focused',requiredGroups:['deterministic.core']});
  const samePath=buildVerificationPlan({...planInput,trustedImpactManifest:samePathManifest,candidateImpactManifest:base.protectedImpactManifest});
  assert.ok(samePath.requiredGroupIds.includes('deterministic.core'));assert.deepEqual(samePath.candidateTestSubjects,[first]);
- assert.equal(resolveExecutionContract({...input(),protectedImpactManifest:samePathManifest}).commands.length,143);
+ assert.equal(resolveExecutionContract({...input(),protectedImpactManifest:samePathManifest}).commands.length,147);
  const escalatedManifest=structuredClone(base.protectedImpactManifest);
  escalatedManifest.entries.push({pathPrefix:first,exactMatch:true,domains:['subject-semantic'],minimumProfile:'focused',requiredGroups:[]});
  escalatedManifest.crossDomainEscalations.push({id:'subject-core-proof',whenDomains:['subject-semantic','documentation'],minimumProfile:'focused',requiredGroups:['deterministic.core']});
  const escalated=buildVerificationPlan({...planInput,changedFiles:[{path:first,status:'added'},{path:'docs/example.md',status:'added'}],trustedImpactManifest:escalatedManifest,candidateImpactManifest:escalatedManifest});
  assert.ok(escalated.requiredGroupIds.includes('deterministic.core'));assert.deepEqual(escalated.candidateTestSubjects,[first]);
- assert.equal(resolveExecutionContract({...input([{path:'docs/example.md',status:'added'}]),protectedImpactManifest:escalatedManifest}).commands.length,143);
+ assert.equal(resolveExecutionContract({...input([{path:'docs/example.md',status:'added'}]),protectedImpactManifest:escalatedManifest}).commands.length,147);
  const renamed=input();renamed.candidate.changedFiles=[{path:first,previousPath:'tests/old-unowned.mjs',status:'renamed'}];renamed.planInput.changedFiles=renamed.candidate.changedFiles;assert.equal(resolveExecutionContract(renamed).commands.length,1);
 });
 
@@ -534,8 +869,6 @@ test('real protected shadow plan CLI schedules subject-only work and keeps docs-
  for(const file of ['browser-execution.mjs','build-verification-plan.mjs','deterministic-execution.mjs','verification-execution-contract.mjs','run-verification-shadow.mjs'])fs.copyFileSync(path.join(root,'tools/verification',file),path.join(control,'tools/verification',file));
  const commit=directory=>{git(directory,'add','.');git(directory,'-c','user.name=Fixture','-c','user.email=fixture@example.invalid','-c','commit.gpgsign=false','commit','--quiet','--allow-empty','-m','Fixture');return git(directory,'rev-parse','HEAD');};
  const base=commit(control);git(control,'clone','--quiet','--shared',control,candidateRoot);
- // Only the external GitHub transport is replaced; real CLI parsing, checkout,
- // diff authentication, planner, output routing and Git checks execute unchanged.
  const preload=path.join(temporary,'github-fixture.mjs');
  fs.writeFileSync(preload,"import cp from 'node:child_process';import fs from 'node:fs';import {syncBuiltinESMExports} from 'node:module';const original=cp.execFileSync;cp.execFileSync=function(file,args,options){if(file!=='gh')return original(file,args,options);const rows=JSON.parse(fs.readFileSync(process.env.ATLAS_TEST_GITHUB_RESPONSES));if(args[0]!=='api'||!Object.hasOwn(rows,args[1]))throw Error('unexpected GitHub fixture endpoint');return JSON.stringify(rows[args[1]]);};syncBuiltinESMExports();\n");
  for(const [subject,expected] of [['tests/cli-added-subject.mjs',true],['docs/cli-docs-only.md',false]]){
@@ -547,7 +880,7 @@ test('real protected shadow plan CLI schedules subject-only work and keeps docs-
   const responseFile=path.join(temporary,'responses.json'),eventFile=path.join(temporary,'event.json'),output=path.join(temporary,expected?'subject-output':'docs-output');
   fs.writeFileSync(responseFile,JSON.stringify(responses));fs.writeFileSync(eventFile,JSON.stringify({repository,action:'synchronize',pull_request:pr}));
   const result=spawnSync(process.execPath,['--import',pathToFileURL(preload).href,path.join(control,'tools/verification/run-verification-shadow.mjs'),'plan',candidateRoot],{encoding:'utf8',env:{PATH:process.env.PATH,HOME:os.tmpdir(),GITHUB_RUN_ATTEMPT:'1',GITHUB_EVENT_NAME:'pull_request_target',GITHUB_EVENT_PATH:eventFile,GITHUB_SHA:base,GITHUB_RUN_ID:'19',GITHUB_OUTPUT:output,ATLAS_TEST_GITHUB_RESPONSES:responseFile}});
-  assert.equal(result.status,0,result.stderr);assert.equal(fs.readFileSync(output,'utf8'),`has_commands=${expected}\n`);
+  assert.equal(result.status,0,result.stderr);assert.equal(fs.readFileSync(output,'utf8'),`has_commands=${expected}\nrequires_review=false\n`);
   const summary=JSON.parse(result.stdout);assert.deepEqual(summary.groups,[]);assert.deepEqual(summary.candidateTestSubjects,expected?[subject]:[]);
   assert.equal(summary.status,expected?'UNRESOLVED':'NO_PRODUCT_WORK');if(!expected)assert.deepEqual(summary.commands,[]);
  }

@@ -77,6 +77,7 @@ test('desktop Atlas-owned chrome and user journey retain reviewed visual contrac
   const runtime = captureRuntimeFailures(page);
   await gotoAtlas(page, `${VISUAL_ENTRY}&creatures=npc,monster`);
   await waitForAtlas(page);
+  const mapFirst = await page.locator('#desktop-inspector-toggle').count() === 1;
 
   const initialMetrics = await assertUserVisibleSurface(page, {
     label: 'desktop initial Atlas',
@@ -88,18 +89,22 @@ test('desktop Atlas-owned chrome and user journey retain reviewed visual contrac
       { selector: '#zoom-in', label: 'zoom in', interactive: true },
       { selector: '#mobile-controls-panel', label: 'desktop controls rail' },
       { selector: '#map-frame', label: 'world map' },
-      { selector: '#mobile-inspector-panel', label: 'desktop inspector' },
+      mapFirst
+        ? { selector: '#desktop-inspector-toggle', label: 'open contextual inspector', interactive: true }
+        : { selector: '#mobile-inspector-panel', label: 'desktop inspector' },
     ],
   });
-  await expect(page.locator('.topbar')).toHaveScreenshot('desktop-topbar.png', {
+  await expect(page.locator('.topbar')).toHaveScreenshot(mapFirst ? 'desktop-topbar-map-first.png' : 'desktop-topbar.png', {
     animations: 'disabled', caret: 'hide', scale: 'css',
   });
-  await expect(page.locator('#view-mode-control')).toHaveScreenshot('desktop-view-mode.png', {
+  await expect(page.locator('#view-mode-control')).toHaveScreenshot(mapFirst ? 'desktop-view-mode-map-first.png' : 'desktop-view-mode.png', {
     animations: 'disabled', caret: 'hide', scale: 'css',
   });
   await captureUserVisualEvidence(page, testInfo, 'desktop.initial', {
     surfaceMetrics: initialMetrics,
-    note: 'Initial desktop map, controls, inspector and chrome as seen by the user.',
+    note: mapFirst
+      ? 'Initial desktop map-first layout with controls visible and the contextual inspector collapsed.'
+      : 'Initial desktop map, controls, inspector and chrome as seen by the user.',
   });
 
   const search = page.locator('#search-input');
@@ -124,7 +129,7 @@ test('desktop Atlas-owned chrome and user journey retain reviewed visual contrac
       { selector: '#search-input', label: 'global search', interactive: true, minHeight: 30 },
     ],
   });
-  await expect(page.locator('#mobile-inspector-panel')).toHaveScreenshot('desktop-inspector.png', {
+  await expect(page.locator('#mobile-inspector-panel')).toHaveScreenshot(mapFirst ? 'desktop-inspector-map-first.png' : 'desktop-inspector.png', {
     animations: 'disabled', caret: 'hide', scale: 'css',
   });
   await captureUserVisualEvidence(page, testInfo, 'desktop.search-inspector', {
@@ -191,6 +196,7 @@ test('playback changes only verified animated presentation regions and restores 
   });
   await gotoAtlas(page, CREATURE_ONLY_PLAYBACK_ENTRY);
   await waitForAtlas(page);
+  const mapFirst = await page.locator('#desktop-inspector-toggle').count() === 1;
   await page.addStyleTag({ content: '#map-frame.visual-world-only #creature-overlay, #map-frame.visual-world-only #creature-presentation-overlay, #map-frame.visual-world-only #minimap-layer, #map-frame.visual-world-only #overview-overlay, #map-frame.visual-world-only #selection-box, #map-frame.visual-world-only #cursor-coordinate, #map-frame.visual-world-only #runtime-badge, #map-frame.visual-world-only #detail-badge { visibility: hidden !important; }' });
   await page.waitForFunction(() => globalThis.__OTERYN_ATLAS_CREATURES__?.status === 'PASS'
     && globalThis.__OTERYN_ATLAS_CREATURES__?.pixelDrawnRecords > 0
@@ -246,7 +252,9 @@ test('playback changes only verified animated presentation regions and restores 
       { selector: '#map-frame', label: 'animated world map' },
       { selector: 'label.layer:has(#animation-toggle)', label: 'playback toggle row', interactive: true },
       { selector: '#mobile-controls-panel', label: 'desktop controls rail' },
-      { selector: '#mobile-inspector-panel', label: 'desktop inspector' },
+      mapFirst
+        ? { selector: '#desktop-inspector-toggle', label: 'contextual inspector toggle', interactive: true }
+        : { selector: '#mobile-inspector-panel', label: 'desktop inspector' },
     ],
   });
   await captureUserVisualEvidence(page, testInfo, 'desktop.playback', {

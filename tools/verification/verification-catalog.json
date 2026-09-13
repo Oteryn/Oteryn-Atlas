@@ -126,6 +126,7 @@
         "tests/verification/qualification-render-probe-binding.test.mjs",
         "tests/verification/qualification-scenario-bindings.test.mjs",
         "tests/verification/qualification-semantic-source-trust.test.mjs",
+        "tests/verification/qualification-world-animation.test.mjs",
         "tests/verification/qualification-world.test.mjs",
         "tests/verification/renderer-diagnostics.test.mjs",
         "tests/verification/restoration-contract-ownership.test.mjs",
@@ -134,6 +135,7 @@
         "tests/verification/selfhosted-compose-contract.test.mjs",
         "tests/verification/semantic-experiment-identity.test.mjs",
         "tests/verification/semantic-routing-closure.test.mjs",
+        "tests/verification/shadow-qualification-harness.test.mjs",
         "tests/verification/stable-id-census.test.mjs",
         "tests/verification/stable-id.test.mjs",
         "tests/verification/summary-reporter.test.mjs",
@@ -144,7 +146,9 @@
         "tests/verification/verification-metadata.test.mjs",
         "tests/verification/verification-plan.test.mjs",
         "tests/verification/verification-progress-state.test.mjs",
-        "tests/verification/visual-user-acceptance-contract.test.mjs"
+        "tests/verification/visual-user-acceptance-contract.test.mjs",
+        "tools/governance/test_agent_prompt_lifecycle.mjs",
+        "tools/governance/test_validate_meta_agent_policy.py"
       ],
       "projects": [],
       "resourceClass": "cpu-light",
@@ -3008,7 +3012,7 @@
           "imports": [],
           "subprocessTests": [],
           "qualification": "local-contract",
-          "sourceSha256": "3461eeabed6b82b63cd9d36bb64412aa63f6d0d0a9a33f917cedb9a91278c4a9",
+          "sourceSha256": "8181bc11a009ea496b7932622a44ad18434993871a6afead44bb2fcd54f665a9",
           "contract": {
             "status": "active-semantic",
             "retainedInvariant": "Exact Node/Python commands preserve declared test/import coverage and fail closed for missing ownership, files, invalid paths, stale import proof and opaque subprocess overlap.",
@@ -3347,7 +3351,7 @@
           "imports": [],
           "subprocessTests": [],
           "qualification": "local-contract",
-          "sourceSha256": "6a9b7864ef0f597609d8d6b857269bd3a57f613d4209d6956cf2d1f15325c2b3",
+          "sourceSha256": "8c4dc301d425f6c346971be91244cdc90d547af23075fc0a9fd6670418eafd46",
           "contract": {
             "status": "active-semantic",
             "retainedInvariant": "impact manifest accepts explicit cross-domain escalation rules with allowlisted groups; impact manifest rejects malformed path rules and cross-domain escalations; impact manifest rejects arbitrary legacy schema v1 rather than silently bypassing v2 escalation policy",
@@ -4095,7 +4099,7 @@
           "imports": [],
           "subprocessTests": [],
           "qualification": "local-contract",
-          "sourceSha256": "0f26cae7714b22270e305cfbdc48bed9997a76636e31048f1cf1e120b2847453",
+          "sourceSha256": "f86f3840edf176fcf6eeb856a9b7c4e360bf5127ae917d052f6775e36814f42a",
           "contract": {
             "status": "active-semantic",
             "retainedInvariant": "protected hosted product identities pin qualification and bounded-real products",
@@ -4282,10 +4286,10 @@
           "imports": [],
           "subprocessTests": [],
           "qualification": "local-contract",
-          "sourceSha256": "c8c7250d1c1fd5ecae5b722ff9988af4515e5cb824ff416e49a3b8bc73157168",
+          "sourceSha256": "eff3389177e6cc03c3212eb1b965dd48a7369f864e39be0fb4e40decb931fcec",
           "contract": {
             "status": "active-semantic",
-            "retainedInvariant": "protected oracle preserves the existing verifier and trust descriptor for an exact valid product; protected oracle rejects lower-bound and source-oracle substitution even when the product is rehashed; mutable world, trust and semantic modules cannot become future protected verifier authority",
+            "retainedInvariant": "protected oracle preserves the existing verifier and trust descriptor for an exact valid product; protected oracle independently pins mounted qualification gameplay bytes after outer rehash; protected oracle rejects lower-bound and source-oracle substitution even when the product is rehashed; mutable world, trust and semantic modules cannot become future protected verifier authority; generated oracle source-pin inventory matches exact Git blobs used for reproducible payload review",
             "requiredRewrite": null
           }
         },
@@ -4681,6 +4685,23 @@
           }
         },
         {
+          "spec": "tests/verification/qualification-world-animation.test.mjs",
+          "interpreter": "node",
+          "argv": [
+            "--test",
+            "tests/verification/qualification-world-animation.test.mjs"
+          ],
+          "imports": [],
+          "subprocessTests": [],
+          "qualification": "local-contract",
+          "sourceSha256": "138392224aea50c40af06dc91b52f0ee1bfaf9ffa154b0c0f01dfa080c5dab70",
+          "contract": {
+            "status": "active-semantic",
+            "retainedInvariant": "published qualification world objects play distinct real phases and restore their published static pixels",
+            "requiredRewrite": null
+          }
+        },
+        {
           "spec": "tests/verification/qualification-world.test.mjs",
           "interpreter": "node",
           "argv": [
@@ -4690,7 +4711,7 @@
           "imports": [],
           "subprocessTests": [],
           "qualification": "local-contract",
-          "sourceSha256": "3c27b9a4c72b6d8d48c4f38f5dd81203af2daba4a3c6df5e754b0e94970e1dce",
+          "sourceSha256": "2d547311502e212c14e475291bedff3abae9ddab96af9fa88b6b3278ad423047",
           "contract": {
             "status": "active-semantic",
             "retainedInvariant": "qualification world is deterministic, complete for the 16-floor runtime contract, and rejects byte mutation; qualification trust descriptor is the exact browser trust subset of the verified product manifest",
@@ -4796,6 +4817,23 @@
           "contract": {
             "status": "active-semantic",
             "retainedInvariant": "Phase E repetitions retain semantic identity across unrelated main SHAs; Phase E semantic experiment identity changes for harness, authority, environment, product, policy or workload; Phase F evidence cannot bypass newly required stable IDs or specialist obligations",
+            "requiredRewrite": null
+          }
+        },
+        {
+          "spec": "tests/verification/shadow-qualification-harness.test.mjs",
+          "interpreter": "node",
+          "argv": [
+            "--test",
+            "tests/verification/shadow-qualification-harness.test.mjs"
+          ],
+          "imports": [],
+          "subprocessTests": [],
+          "qualification": "local-contract",
+          "sourceSha256": "332980aaacc5fd48db8c84f55b4bf59c4b2b5085ac0d78c6769e76d60670e671",
+          "contract": {
+            "status": "active-semantic",
+            "retainedInvariant": "shadow binds protected qualification harness without weakening production assertions; shadow keeps non-qualification protected harness byte-identical",
             "requiredRewrite": null
           }
         },
@@ -4911,7 +4949,7 @@
           "imports": [],
           "subprocessTests": [],
           "qualification": "local-contract",
-          "sourceSha256": "ab8f09ec633c9040d2a073de2f71ad13f902adb804195bd4a5a9c6571250a748",
+          "sourceSha256": "711cc4aa658154a68bcb41e3b3da53b059b99e2de6ce5e2e0c8de8d4a15e0583",
           "contract": {
             "status": "active-semantic",
             "retainedInvariant": "Canonical metadata projects complete unique ownership without duplicated execution facts; malformed or missing canonical ownership fails closed.",
@@ -5010,7 +5048,7 @@
             "--test",
             "tests/verification/verification-execution-contract.test.mjs"
           ],
-          "sourceSha256": "655f7b144c161c592fed1ff823605554bee4a5bdee7d6127b3efd12061edeb0d",
+          "sourceSha256": "663d4cff488b39719852f5f1c319bf4498f08d659f9eec636cdf10c4c636ec59",
           "imports": [],
           "subprocessTests": [],
           "qualification": "local-contract",
@@ -5099,6 +5137,29 @@
           "imports": [],
           "subprocessTests": [],
           "qualification": "unqualified"
+        },
+        {
+          "spec": "tools/governance/test_agent_prompt_lifecycle.mjs",
+          "interpreter": "node",
+          "argv": [
+            "--test",
+            "tools/governance/test_agent_prompt_lifecycle.mjs"
+          ],
+          "sourceSha256": "c2e0e26f7fb012c218074ddaf3422dabfcdd500b7f3344f31895dd5e6f2fefac",
+          "imports": [],
+          "subprocessTests": [],
+          "qualification": "active-semantic"
+        },
+        {
+          "spec": "tools/governance/test_validate_meta_agent_policy.py",
+          "interpreter": "python3",
+          "argv": [
+            "tools/governance/test_validate_meta_agent_policy.py"
+          ],
+          "sourceSha256": "cf8d90bb5558c20b16ead1fb21f9143d39077e0b717e7fd982f15cf0bdf35839",
+          "imports": [],
+          "subprocessTests": [],
+          "qualification": "active-semantic"
         }
       ]
     },

@@ -169,6 +169,14 @@ export function resolveExecutionContract({root, protectedRoot, candidate, planIn
     const resolved=resolveBrowserExecution({protectedRegistry:metadata.browser,requiredGroups:browserIds,
       atlasRevision:snapshot.headSha,protectedBaseSha:snapshot.baseSha,environmentDigest,policyResolved:true,
       publicationProofs,protectedExpectedAuthorities,selectedGameplayFiles,selectedSemanticFiles});
+    const requiredReviewIds=new Set(plan.requiredVisualGroupIds);
+    const resolvedReviews=new Map();
+    for(const review of resolved.reviews) {
+      if(!requiredReviewIds.has(review.groupId)) continue;
+      if(resolvedReviews.has(review.groupId)) fail(`duplicate required review: ${review.groupId}`);
+      resolvedReviews.set(review.groupId,review);
+    }
+    for(const id of requiredReviewIds) if(!resolvedReviews.has(id)) fail(`missing required review: ${id}`);
     const keys=new Map();
     for(const command of resolved.commands) {
       const prefix=`${command.project}::${command.spec}::`;
@@ -179,7 +187,10 @@ export function resolveExecutionContract({root, protectedRoot, candidate, planIn
         publication:command.identity.publication,timeoutSeconds:command.resourceClass==='soak'?14400:3600};
       const id=hash({identity,...entry});keys.set(command.executionKey,id);commands.push({...entry,id});
     }
-    for(const review of resolved.reviews) reviews.push({groupId:review.groupId,frames:review.requiredFrames,commandIds:review.machineExecutionKeys.map(key=>keys.get(key))});
+    for(const id of plan.requiredVisualGroupIds) {
+      const review=resolvedReviews.get(id);
+      reviews.push({groupId:id,frames:review.requiredFrames,commandIds:review.machineExecutionKeys.map(key=>keys.get(key))});
+    }
   }
   for(const group of plan.groups) {
     const commandIds=group.evidence==='restricted-visual-review'
