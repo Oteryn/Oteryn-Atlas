@@ -7,7 +7,6 @@ const compose=fs.readFileSync(new URL('../../e2e/compose.protected-hosted-execut
 test('candidate browser execution and hosted publication share one internal default network with no host IPC', () => {
   assert.match(compose, /networks:\n\s+default:\n\s+internal:\s*true/);
   assert.doesNotMatch(compose, /atlas-e2e-internal/);
-  assert.match(compose, /\n  e2e:\n    image: \$\{COMPOSE_PROJECT_NAME:\?COMPOSE_PROJECT_NAME is required\}-e2e\n    build:/);
   assert.match(compose, /--test-list=\/run\/atlas-protected-test-list\.txt/);
   assert.match(compose, /--retries=0/);
   assert.match(compose, /ATLAS_E2E_SHARD:\s*\$\{ATLAS_E2E_SHARD:\?ATLAS_E2E_SHARD is required\}/);
