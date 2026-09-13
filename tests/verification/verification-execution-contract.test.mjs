@@ -317,6 +317,7 @@ test('hosted browser machine and protected visual capture use isolated producers
  assert.match(source,/ATLAS_USER_VISUAL_EVIDENCE:'1'/);
  assert.match(source,/persistShadowReviewCapture\(\{artifactRoot:captureArtifacts/);
  assert.doesNotMatch(source,/persistShadowReviewCapture\(\{artifactRoot:artifacts/);
+ assert.match(source,/if\(result\.error\|\|result\.status!==0\|\|result\.signal\) \{if\(reviewFrames\.length>0\)relayPlaywrightFailureDiagnostics\(result\.stderr,command\.id\);/);
 });
 
 test('protected visual capture overlays only authenticated candidate PNG snapshot oracle data',async t=>{
