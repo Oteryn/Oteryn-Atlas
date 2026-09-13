@@ -16,7 +16,7 @@ const ACTIVE_TASKS = resolve(ROOT, 'docs/agents/tasks/active');
 const ARCHIVED_TASKS = resolve(ROOT, 'docs/agents/tasks/archive');
 const SUPPORTED_META_BINDINGS = new Map([
   ['3.0.0', '1dedfc0f264fe0e23e5365dbe9280c2d96df50c5'],
-  ['3.1.0', '3b39e0be05aef008f1bd442821daefa898a201dd'],
+  ['3.1.0', 'ce20300aa8a9e1017aff722fe0cd628587fadf63'],
 ]);
 const TERMINAL_VERIFICATION_PROMPTS = [
   'ATLAS-E2E-VERIFICATION-ANTI-LOOP-HARDENING.md',
