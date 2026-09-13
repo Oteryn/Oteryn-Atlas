@@ -40,7 +40,7 @@ const gitBlob=(root,revision,name)=>execFileSync('git',['--no-replace-objects','
 const controlRoot=path.resolve(fileURLToPath(new URL('../../',import.meta.url)));
 
 export const PLAYWRIGHT_DIAGNOSTIC_PREFIX='ATLAS_SHADOW_PLAYWRIGHT_DIAGNOSTIC';
-export const PLAYWRIGHT_DIAGNOSTIC_LIMITS=Object.freeze({maxDepth:8,maxEntries:2048,maxFiles:8,maxFileBytes:4*1024*1024,maxTotalRawBytes:8*1024*1024,maxChunkBytes:48*1024,maxOutputBytes:12*1024*1024});
+export const PLAYWRIGHT_DIAGNOSTIC_LIMITS=Object.freeze({maxDepth:8,maxEntries:2048,maxFiles:8,maxFileBytes:4*1024*1024,maxTotalRawBytes:8*1024*1024,maxChunkBytes:32*1024,maxLogLineBytes:60*1024,maxOutputBytes:12*1024*1024});
 export const PLAYWRIGHT_STDERR_TAIL_BYTES=16*1024;
 export const MACHINE_BROWSER_STDERR_BUFFER_BYTES=16*1024*1024;
 const diagnosticSafeCommand=id=>/^sha256:[a-f0-9]{64}$/.test(id??'');
@@ -50,7 +50,7 @@ export function emitPlaywrightFailureDiagnostics({commandId,testResultsRoot,writ
   const rootStat=fs.lstatSync(testResultsRoot);
   if(rootStat.isSymbolicLink()||!rootStat.isDirectory()) throw new TypeError('unsafe diagnostic root');
   const records=[],omitted=new Map();let entries=0,totalCollected=0;
-  const record=(type,data={})=>records.push(`${PLAYWRIGHT_DIAGNOSTIC_PREFIX} ${JSON.stringify({schema:'oteryn.atlas.playwright-diagnostic',version:1,type,commandId,...data})}\n`);
+  const record=(type,data={})=>{const line=`${PLAYWRIGHT_DIAGNOSTIC_PREFIX} ${JSON.stringify({schema:'oteryn.atlas.playwright-diagnostic',version:1,type,commandId,...data})}\n`;if(Buffer.byteLength(line)>limits.maxLogLineBytes)throw new TypeError('diagnostic log line bound');records.push(line);};
   const omit=(reason,count=1)=>omitted.set(reason,(omitted.get(reason)??0)+count);
   const files=[];
   const walk=(directory,relative='',depth=0,expected=rootStat)=>{
@@ -102,7 +102,7 @@ const shellQuote=value=>`'${String(value).replaceAll("'",`'\\''`)}'`;
 
 export function relayPlaywrightFailureDiagnostics(stderr,expectedCommandId,write=record=>fs.writeSync(2,record)) {
   if(!diagnosticSafeCommand(expectedCommandId))return 0;
-  const lines=String(stderr??'').split('\n').filter(line=>line.startsWith(`${PLAYWRIGHT_DIAGNOSTIC_PREFIX} `));
+  const lines=String(stderr??'').split('\n').filter(line=>line.startsWith(`${PLAYWRIGHT_DIAGNOSTIC_PREFIX} `));if(lines.some(line=>Buffer.byteLength(`${line}\n`)>PLAYWRIGHT_DIAGNOSTIC_LIMITS.maxLogLineBytes))return 0;
   let rows;try{rows=lines.map(line=>JSON.parse(line.slice(PLAYWRIGHT_DIAGNOSTIC_PREFIX.length+1)));}catch{return 0;}
   if(!rows.length||rows.some(row=>!row||row.schema!=='oteryn.atlas.playwright-diagnostic'||row.version!==1||row.commandId!==expectedCommandId))return 0;
   const files=new Map();let totalRawBytes=0,omissionCount=0,errorCount=0,completeCount=0;
