@@ -212,13 +212,15 @@ function sameTreeEntry(left,right) {
   return Boolean(left&&right&&left.mode===right.mode&&left.type===right.type&&left.sha===right.sha);
 }
 
-async function liveReviewCandidate(candidate,pr,request,defaultBranch) {
+async function liveReviewCandidate(candidate,pr,request,defaultBranch,normalizedChangedCount) {
   if(!Number.isSafeInteger(pr?.number)||pr.number<1||!exactSha(pr?.head?.sha??'')||!exactSha(pr?.base?.sha??'')
     ||pr.base?.ref!==defaultBranch||pr.base?.repo?.full_name!==candidate.repository||pr.head?.repo?.full_name!==candidate.repository)return null;
   const current=await request(`/repos/${candidate.repository}/pulls/${pr.number}`);
   if(current?.number!==pr.number||current.state!=='open'||current.merged===true||current.head?.sha!==pr.head.sha||!exactSha(current.head?.sha??'')||!exactSha(current.base?.sha??'')
     ||current.base?.ref!==defaultBranch||current.base?.repo?.full_name!==candidate.repository||current.head?.repo?.full_name!==candidate.repository
     ||!Number.isSafeInteger(current.changed_files)||current.changed_files<1)return null;
+  if(!Number.isSafeInteger(normalizedChangedCount)||normalizedChangedCount<1)fail('review candidate changed-file census');
+  if(current.changed_files>normalizedChangedCount||current.changed_files*2<normalizedChangedCount)return null;
   const changedFiles=[];
   for(let page=1;page<=30;page++) {
     const rows=await request(`/repos/${candidate.repository}/pulls/${pr.number}/files?per_page=100&page=${page}`);
@@ -245,7 +247,7 @@ async function exactReviewCandidate(candidate,request) {
   const candidateTree=await exactTreeEntries(request,candidate.repository,candidate.treeSha);
   const matches=[];
   for(const pr of candidates) {
-    const current=await liveReviewCandidate(candidate,pr,request,repo.default_branch);
+    const current=await liveReviewCandidate(candidate,pr,request,repo.default_branch,changedFiles.length);
     if(!current||!same(normalizeShadowReviewChangedFiles(current.changedFiles),changedFiles))continue;
     const sourceTree=await exactTreeEntries(request,candidate.repository,current.treeSha);
     let exact=true;
