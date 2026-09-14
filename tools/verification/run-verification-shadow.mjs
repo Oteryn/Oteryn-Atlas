@@ -882,7 +882,7 @@ export async function runShadow(mode,root) {
     };
     if(mode==='review') {
       if(!fixture)fail('review qualification fixture missing');
-      summary.review=await waitForShadowReviewGate({candidate,currentRunId,contract,productDigest:fixture.manifest.productDigest,oracleDigest});
+      summary.review=await waitForShadowReviewGate({candidate,currentRunId,contract,productDigest:fixture.manifest.productDigest,oracleDigest,qualificationPublicationProof:fixture.proof,qualificationExpectedAuthority:fixture.authority});
       await freshSnapshot();
       summary.status='PASS';
       return summary;

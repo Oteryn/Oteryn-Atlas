@@ -5,6 +5,8 @@ import fs from 'node:fs';
 import {fixture} from './fixtures/protected-review-fixture.mjs';
 import {evaluateProtectedRouting} from '../../tools/verification/protected-semantic-routing.mjs';
 import {shadowReviewArtifactName,shadowReviewPlanDigest,validateShadowReviewGate,waitForShadowReviewGate} from '../../tools/verification/verification-shadow-review.mjs';
+import {authenticatePublicationProof} from '../../tools/verification/proof-provenance.mjs';
+import {createPublicationProofFixture} from './helpers/publication-proof-fixture.mjs';
 
 const module = await import('../../tools/verification/protected-review-evidence.mjs').catch(error => {
   if (error.code === 'ERR_MODULE_NOT_FOUND') return {};
@@ -297,8 +299,13 @@ test('R5 Merge Queue consumes reviewed PR bytes across rename normalization and 
   const prCandidate={repository,prNumber:344,headSha:prHead,baseSha:reviewedBaseSha,treeSha:prTreeSha,changedFiles:[{path:'web/new.mjs',status:'renamed',previousPath:'web/old.mjs'}]};
   const mqCandidate={repository,prNumber:null,headSha:mqHead,baseSha:currentBaseSha,treeSha:mqTreeSha,changedFiles:[{path:'web/new.mjs',status:'added'},{path:'web/old.mjs',status:'removed'}]};
   const stable='desktop-chromium::e2e/tests/visual-desktop.spec.mjs::full frame',commandId=hash('1');
-  const contract={commands:[{id:commandId,engine:'playwright',expectedTestIds:[stable],dataCapability:'qualification_fixture'}],groups:[{id:'e2e.visual-presentation'},{id:'review.visual-desktop'}],reviews:[{groupId:'review.visual-desktop',commandIds:[commandId],frames:[{frameId:'desktop.initial',stableTestId:stable}]}]};
-  const productDigest=hash('f'),oracleDigest=hash('e'),planDigest=shadowReviewPlanDigest(prCandidate,contract),summaryDigest=hash('9'),frameDigest=hash('8');
+  const publicationFixture=createPublicationProofFixture('qualification_fixture');
+  const publicationFor=protectedBaseSha=>authenticatePublicationProof({publicationProof:publicationFixture.publicationProof,protectedExpectedAuthority:publicationFixture.protectedExpectedAuthority,protectedBaseSha});
+  const reviewedPublication=publicationFor(reviewedBaseSha),currentPublication=publicationFor(currentBaseSha);
+  const contractFor=publication=>({commands:[{id:commandId,engine:'playwright',expectedTestIds:[stable],dataCapability:'qualification_fixture',publication}],groups:[{id:'e2e.visual-presentation'},{id:'review.visual-desktop'}],reviews:[{groupId:'review.visual-desktop',commandIds:[commandId],frames:[{frameId:'desktop.initial',stableTestId:stable}]}]});
+  const reviewedContract=contractFor(reviewedPublication),contract=contractFor(currentPublication);
+  const productDigest=currentPublication.productRootDigest,oracleDigest=hash('e'),planDigest=shadowReviewPlanDigest(prCandidate,reviewedContract),summaryDigest=hash('9'),frameDigest=hash('8');
+  assert.notEqual(shadowReviewPlanDigest(prCandidate,contract),planDigest,'base-bound publication receipt must reproduce the original blocker');
   const capture={schemaVersion:1,kind:'protected-visual-capture',candidate:prCandidate,producer:{workflowPath:'.github/workflows/verification-shadow.yml',sourceSha:reviewedBaseSha,runId:42,jobId:43,runAttempt:1},planDigest,oracleDigest,productDigest,dataCapability:'qualification_fixture',scenarioIds:[stable],summary:{path:'summary.json',digest:summaryDigest},frames:[{frameId:'desktop.initial',scenarioId:stable,path:'user-visual-evidence/desktop/viewport.png',digest:frameDigest}]};
   const captureBytes=Buffer.from(JSON.stringify(capture)),captureDigest=digest(captureBytes),reviewer={id:5,login:'maintainer'};
   const decision={schemaVersion:1,kind:'protected-visual-review',candidate:prCandidate,captureDigest,planDigest,summaryDigest,reviewer,reviewedAllFrames:true,result:'PASS',frames:capture.frames.map(row=>({...row,result:'PASS'}))};
@@ -316,9 +323,12 @@ test('R5 Merge Queue consumes reviewed PR bytes across rename normalization and 
   const protectedRef=`/repos/${repository}/git/ref/heads/main`;
   const responses=new Map([[`/repos/${repository}/actions/runs/100/attempts/1/jobs?per_page=100`,currentJobs],[`/repos/${repository}/actions/runs/100`,currentRun],[`/repos/${repository}/pulls?state=open&per_page=100&page=1`,[hugePr,pr]],[`/repos/${repository}`,repo],[protectedRef,{object:{sha:currentBaseSha}}],[`/repos/${repository}/pulls/346`,hugePr],[`/repos/${repository}/pulls/344`,pr],[`/repos/${repository}/pulls/344/files?per_page=100&page=1`,[{filename:'web/new.mjs',previous_filename:'web/old.mjs',status:'renamed'}]],[`/repos/${repository}/git/commits/${prHead}`,{sha:prHead,tree:{sha:prTreeSha}}],[`/repos/${repository}/git/trees/${prTreeSha}?recursive=1`,sourceTree],[`/repos/${repository}/git/trees/${mqTreeSha}?recursive=1`,syntheticTree],[`/repos/${repository}/pulls/344/reviews?per_page=100&page=1`,[review]],[`/repos/${repository}/actions/runs?event=pull_request_target&head_sha=${prHead}&per_page=100&page=1`,{workflow_runs:[unrelatedRun,priorRun]}],[`/repos/${repository}/actions/runs/42/artifacts?per_page=100&page=1`,{artifacts:[artifact]}],[`/repos/${repository}/actions/runs/42`,priorRun],[`/repos/${repository}/actions/runs/42/attempts/1/jobs?per_page=100`,priorJobs],[`/repos/${repository}/collaborators/maintainer/permission`,{permission:'admin',role_name:'admin',user:reviewer}]]);
   const request=async endpoint=>{if(!responses.has(endpoint))throw new Error(`unexpected endpoint ${endpoint}`);return structuredClone(responses.get(endpoint));};
-  const options={candidate:mqCandidate,currentRunId:100,contract,productDigest,oracleDigest,request,downloadArtifact:()=>[captureBytes],now:'2026-09-06T10:15:00Z'};
+  const options={candidate:mqCandidate,currentRunId:100,contract,productDigest,oracleDigest,qualificationPublicationProof:publicationFixture.publicationProof,qualificationExpectedAuthority:publicationFixture.protectedExpectedAuthority,request,downloadArtifact:()=>[captureBytes],now:'2026-09-06T10:15:00Z'};
+  await assert.rejects(validateShadowReviewGate({...options,qualificationPublicationProof:undefined,qualificationExpectedAuthority:undefined}),/planDigest drift/);
   const result=await validateShadowReviewGate(options);
   assert.equal(result.accepted,true);assert.equal(result.reviewCandidate.prNumber,344);assert.equal(result.reviewCandidate.baseSha,reviewedBaseSha);assert.equal(result.reviewCandidate.treeSha,prTreeSha);assert.equal(result.captureRunId,42);
+  const tamperedContract=structuredClone(contract);tamperedContract.commands[0].publication.trustReceiptDigest=hash('7');
+  await assert.rejects(validateShadowReviewGate({...options,contract:tamperedContract}),/current qualification publication identity/);
   responses.set(`/repos/${repository}/git/trees/${mqTreeSha}?recursive=1`,{...syntheticTree,tree:syntheticTree.tree.map(row=>row.path==='web/new.mjs'?{...row,sha:sha('2')}:row)});
   await assert.rejects(validateShadowReviewGate(options),/no exact changed-content PR association/);
   responses.set(`/repos/${repository}/git/trees/${mqTreeSha}?recursive=1`,syntheticTree);
