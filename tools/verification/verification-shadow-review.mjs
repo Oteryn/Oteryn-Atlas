@@ -5,7 +5,8 @@ import {execFileSync} from 'node:child_process';
 import {canonicalJson} from './verification-plan-schema.mjs';
 import {collectProtectedVisualCapture} from './collect-protected-visual-capture.mjs';
 import {protectedReviewDigest,selectLatestProtectedReview,validateProtectedReviewBundle} from './protected-review-evidence.mjs';
-import {githubRequest,readCandidateSnapshot} from './protected-candidate-snapshot.mjs';
+import {githubRequest} from './protected-candidate-snapshot.mjs';
+import {authenticatePublicationProof} from './proof-provenance.mjs';
 
 const ACTIVE='.github/workflows/verification-shadow.yml';
 const REVIEW_ARTIFACT_PREFIX='atlas-verification-review';
@@ -101,6 +102,22 @@ export function shadowReviewPlanDigest(candidate,contract) {
     commands:(contract.commands??[]).map(({id,...command})=>command),
     reviews:(contract.reviews??[]).map(review=>({groupId:review.groupId,frames:review.frames})),
     groups:(contract.groups??[]).map(group=>group.id)});
+}
+
+function reviewContractForEvidenceBase({candidate,evidenceCandidate,contract,productDigest,qualificationPublicationProof,qualificationExpectedAuthority}) {
+  if(candidate.baseSha===evidenceCandidate.baseSha||!qualificationPublicationProof||!qualificationExpectedAuthority)return contract;
+  const authenticate=protectedBaseSha=>authenticatePublicationProof({publicationProof:qualificationPublicationProof,protectedExpectedAuthority:qualificationExpectedAuthority,protectedBaseSha});
+  const currentPublication=authenticate(candidate.baseSha);
+  if(currentPublication.productRootDigest!==productDigest)fail('current qualification publication product');
+  const evidencePublication=authenticate(evidenceCandidate.baseSha);
+  let rebound=false;
+  const commands=(contract.commands??[]).map(command=>{
+    if(command.dataCapability!=='qualification_fixture'||command.publication==null)return command;
+    if(!same(command.publication,currentPublication))fail('current qualification publication identity');
+    rebound=true;
+    return {...command,publication:evidencePublication};
+  });
+  return rebound?{...contract,commands}:contract;
 }
 
 export function shadowOracleDigest(root) {
@@ -212,16 +229,45 @@ function sameTreeEntry(left,right) {
   return Boolean(left&&right&&left.mode===right.mode&&left.type===right.type&&left.sha===right.sha);
 }
 
+async function liveReviewCandidate(candidate,pr,request,defaultBranch,normalizedChangedCount) {
+  if(!Number.isSafeInteger(pr?.number)||pr.number<1||!exactSha(pr?.head?.sha??'')||!exactSha(pr?.base?.sha??'')
+    ||pr.base?.ref!==defaultBranch||pr.base?.repo?.full_name!==candidate.repository||pr.head?.repo?.full_name!==candidate.repository)return null;
+  const current=await request(`/repos/${candidate.repository}/pulls/${pr.number}`);
+  if(current?.number!==pr.number||current.state!=='open'||current.merged===true||current.head?.sha!==pr.head.sha||!exactSha(current.head?.sha??'')||!exactSha(current.base?.sha??'')
+    ||current.base?.ref!==defaultBranch||current.base?.repo?.full_name!==candidate.repository||current.head?.repo?.full_name!==candidate.repository
+    ||!Number.isSafeInteger(current.changed_files)||current.changed_files<1)return null;
+  if(!Number.isSafeInteger(normalizedChangedCount)||normalizedChangedCount<1)fail('review candidate changed-file census');
+  if(current.changed_files>normalizedChangedCount||current.changed_files*2<normalizedChangedCount)return null;
+  const changedFiles=[];
+  for(let page=1;page<=30;page++) {
+    const rows=await request(`/repos/${candidate.repository}/pulls/${pr.number}/files?per_page=100&page=${page}`);
+    if(!Array.isArray(rows))fail('review PR file enumeration');
+    changedFiles.push(...rows.map(file=>({path:file.filename,status:file.status,...(file.previous_filename?{previousPath:file.previous_filename}:{})})));
+    if(changedFiles.length>current.changed_files)fail('review PR file count drift');
+    if(changedFiles.length===current.changed_files)break;
+    if(rows.length<100)break;
+    if(page===30)fail('review PR file enumeration truncated');
+  }
+  if(changedFiles.length!==current.changed_files)fail('review PR file count drift');
+  const commit=await request(`/repos/${candidate.repository}/git/commits/${current.head.sha}`);
+  if(commit?.sha!==current.head.sha||!exactSha(commit.tree?.sha??''))fail('review PR commit or tree');
+  return {repository:candidate.repository,prNumber:current.number,headSha:current.head.sha,baseSha:candidate.baseSha,treeSha:commit.tree.sha,changedFiles:changedFiles.sort((a,b)=>a.path.localeCompare(b.path))};
+}
+
 async function exactReviewCandidate(candidate,request) {
   if(candidate.prNumber!==null)return candidate;
+  const repo=await request(`/repos/${candidate.repository}`);
+  if(repo?.full_name!==candidate.repository||typeof repo.default_branch!=='string'||!repo.default_branch.length)fail('review repository identity');
+  const protectedEndpoint=`/repos/${candidate.repository}/git/ref/heads/${encodeURIComponent(repo.default_branch)}`;
+  if((await request(protectedEndpoint)).object?.sha!==candidate.baseSha)fail('review association protected base drift');
   const pulls=await pages(request,`/repos/${candidate.repository}/pulls?state=open`);
-  const candidates=pulls.filter(pr=>pr?.base?.sha===candidate.baseSha&&pr.base?.repo?.full_name===candidate.repository&&pr.head?.repo?.full_name===candidate.repository);
+  const candidates=pulls.filter(pr=>exactSha(pr?.base?.sha??'')&&pr.base?.ref===repo.default_branch&&pr.base?.repo?.full_name===candidate.repository&&pr.head?.repo?.full_name===candidate.repository);
   const changedFiles=normalizeShadowReviewChangedFiles(candidate.changedFiles);
   const candidateTree=await exactTreeEntries(request,candidate.repository,candidate.treeSha);
   const matches=[];
   for(const pr of candidates) {
-    const current=await readCandidateSnapshot({request,repository:candidate.repository,baseSha:candidate.baseSha,headSha:pr.head.sha,prNumber:pr.number,changedFiles:[]});
-    if(!same(normalizeShadowReviewChangedFiles(current.changedFiles),changedFiles))continue;
+    const current=await liveReviewCandidate(candidate,pr,request,repo.default_branch,changedFiles.length);
+    if(!current||!same(normalizeShadowReviewChangedFiles(current.changedFiles),changedFiles))continue;
     const sourceTree=await exactTreeEntries(request,candidate.repository,current.treeSha);
     let exact=true;
     for(const change of changedFiles) {
@@ -230,6 +276,7 @@ async function exactReviewCandidate(candidate,request) {
     }
     if(exact)matches.push(current);
   }
+  if((await request(protectedEndpoint)).object?.sha!==candidate.baseSha)fail('review association protected base drift');
   if(matches.length===0)fail('Merge Queue has no exact changed-content PR association');
   if(matches.length!==1)fail('Merge Queue has ambiguous exact changed-content PR association');
   return matches[0];
@@ -286,7 +333,7 @@ function pairCaptures(captureBytesList,expected) {
   return captures;
 }
 
-export async function validateShadowReviewGate({candidate,currentRunId,contract,productDigest,oracleDigest,request=githubRequest,downloadArtifact=downloadShadowCaptureArtifact,now=new Date().toISOString()}) {
+export async function validateShadowReviewGate({candidate,currentRunId,contract,productDigest,oracleDigest,qualificationPublicationProof,qualificationExpectedAuthority,request=githubRequest,downloadArtifact=downloadShadowCaptureArtifact,now=new Date().toISOString()}) {
   await assertCurrentMachineRun(request,currentRunId);
   const currentRun=await request(`/repos/${candidate.repository}/actions/runs/${currentRunId}`);
   if(currentRun?.id!==currentRunId||currentRun.run_attempt!==1||currentRun.path!==ACTIVE||currentRun.status!=='in_progress'||currentRun.conclusion!==null
@@ -321,7 +368,8 @@ export async function validateShadowReviewGate({candidate,currentRunId,contract,
   const repo=await request(`/repos/${candidate.repository}`);
   if(repo.full_name!==candidate.repository||!Number.isSafeInteger(repo.id))fail('review repository identity');
   const artifactName=shadowReviewArtifactName(run.id),liveReview=run.id===currentRunId,failedReviewGate=run.status==='completed'&&run.conclusion==='failure';
-  const expected=expectedCaptureAuthorities({candidate:evidenceCandidate,contract,productDigest,oracleDigest,repositoryId:repo.id,artifactName,liveReview,failedReviewGate});
+  const reviewContract=reviewContractForEvidenceBase({candidate,evidenceCandidate,contract,productDigest,qualificationPublicationProof,qualificationExpectedAuthority});
+  const expected=expectedCaptureAuthorities({candidate:evidenceCandidate,contract:reviewContract,productDigest,oracleDigest,repositoryId:repo.id,artifactName,liveReview,failedReviewGate});
   const captures=pairCaptures(selected.captureBytesList,expected);
   if(captures.length!==wanted.length)fail('review bundle capture count');
   const login=review.user?.login;
