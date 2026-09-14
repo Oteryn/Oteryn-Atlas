@@ -226,6 +226,8 @@ async function liveReviewCandidate(candidate,pr,request,defaultBranch,normalized
     const rows=await request(`/repos/${candidate.repository}/pulls/${pr.number}/files?per_page=100&page=${page}`);
     if(!Array.isArray(rows))fail('review PR file enumeration');
     changedFiles.push(...rows.map(file=>({path:file.filename,status:file.status,...(file.previous_filename?{previousPath:file.previous_filename}:{})})));
+    if(changedFiles.length>current.changed_files)fail('review PR file count drift');
+    if(changedFiles.length===current.changed_files)break;
     if(rows.length<100)break;
     if(page===30)fail('review PR file enumeration truncated');
   }

@@ -334,6 +334,19 @@ test('R5 Merge Queue consumes reviewed PR bytes across rename normalization and 
   const movedRequest=async endpoint=>endpoint===protectedRef?{object:{sha:++protectedReads===1?currentBaseSha:sha('5')}}:request(endpoint);
   await assert.rejects(validateShadowReviewGate({...options,request:movedRequest}),/review association protected base drift/);
 });
+test('R5 Merge Queue accepts a complete 3000-file census before rejecting a nonmatch',async()=>{
+  const repository='Oteryn/Oteryn-Atlas',currentBaseSha=sha('6'),reviewedBaseSha=sha('b'),mqHead=sha('d'),mqTreeSha=sha('e'),prHead=sha('a'),prTreeSha=sha('c');
+  const changedFiles=Array.from({length:3000},(_,index)=>({path:`candidate/${index}.mjs`,status:'modified'}));
+  const candidate={repository,prNumber:null,headSha:mqHead,baseSha:currentBaseSha,treeSha:mqTreeSha,changedFiles};
+  const currentRun={id:100,run_attempt:1,path:'.github/workflows/verification-shadow.yml',event:'merge_group',head_sha:mqHead,status:'in_progress',conclusion:null,repository:{full_name:repository}};
+  const jobs={total_count:3,jobs:[{id:101,run_id:100,run_attempt:1,head_sha:mqHead,name:'plan',status:'completed',conclusion:'success'},{id:102,run_id:100,run_attempt:1,head_sha:mqHead,name:'execute',status:'completed',conclusion:'success'},{id:103,run_id:100,run_attempt:1,head_sha:mqHead,name:'review',status:'in_progress',conclusion:null}]};
+  const repo={id:99,full_name:repository,default_branch:'main'},pr={number:346,state:'open',merged:false,changed_files:3000,base:{sha:reviewedBaseSha,ref:'main',repo:{full_name:repository}},head:{sha:prHead,repo:{full_name:repository}}};
+  const rows=Array.from({length:3000},(_,index)=>({filename:`unrelated/${index}.mjs`,status:'modified'})),protectedRef=`/repos/${repository}/git/ref/heads/main`;
+  const tree={sha:mqTreeSha,truncated:false,tree:changedFiles.map(row=>({path:row.path,mode:'100644',type:'blob',sha:sha('1')}))};
+  const responses=new Map([[`/repos/${repository}/actions/runs/100/attempts/1/jobs?per_page=100`,jobs],[`/repos/${repository}/actions/runs/100`,currentRun],[`/repos/${repository}`,repo],[protectedRef,{object:{sha:currentBaseSha}}],[`/repos/${repository}/pulls?state=open&per_page=100&page=1`,[pr]],[`/repos/${repository}/pulls/346`,pr],[`/repos/${repository}/git/commits/${prHead}`,{sha:prHead,tree:{sha:prTreeSha}}],[`/repos/${repository}/git/trees/${mqTreeSha}?recursive=1`,tree]]);
+  const request=async endpoint=>{const match=endpoint.match(/\/pulls\/346\/files\?per_page=100&page=(\d+)$/);if(match){const page=Number(match[1]);return rows.slice((page-1)*100,page*100);}if(!responses.has(endpoint))throw new Error(`unexpected endpoint ${endpoint}`);return structuredClone(responses.get(endpoint));};
+  await assert.rejects(validateShadowReviewGate({candidate,currentRunId:100,contract:{},productDigest:hash('f'),oracleDigest:hash('e'),request}),/Merge Queue has no exact changed-content PR association/);
+});
 test('R5 review wait is bounded and never waits in Merge Queue',async()=>{
   const candidate={repository:'Oteryn/Oteryn-Atlas',prNumber:1,headSha:sha('a'),baseSha:sha('b'),treeSha:sha('c'),changedFiles:[{path:'web/a',status:'modified'}]},currentRunId=100;
   const jobs={total_count:3,jobs:[{id:1,run_id:100,run_attempt:1,head_sha:candidate.headSha,name:'plan',status:'completed',conclusion:'success'},{id:2,run_id:100,run_attempt:1,head_sha:candidate.headSha,name:'execute',status:'completed',conclusion:'success'},{id:3,run_id:100,run_attempt:1,head_sha:candidate.headSha,name:'review',status:'in_progress',conclusion:null}]};
