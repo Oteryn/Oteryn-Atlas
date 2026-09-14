@@ -180,7 +180,7 @@ function validateDecision(input,decision) {
   if(!isPlainObject(review)||!['COMMENTED','APPROVED'].includes(review.state)||review.commit_id!==c.headSha||review.pull_request_url!==`https://api.github.com/repos/${c.repository}/pulls/${c.prNumber}`)fail('current authenticated review required');
   integer(review.id);integer(review.user?.id);text(review.user?.login);
   const submitted=instant(review.submitted_at);
-  if(submitted<jobEnded||submitted>clock)fail('review must follow complete capture');
+  if(submitted<=jobEnded||submitted>clock)fail('review must follow complete capture');
   if(!isPlainObject(permission)||!((permission.role_name==='admin'&&permission.permission==='admin')||(permission.role_name==='maintain'&&permission.permission==='write')))fail('current reviewer maintainer authority required');
   equal(permission.user?.id,review.user.id,'reviewer permission identity drift');equal(permission.user?.login,review.user.login,'reviewer permission login drift');
   shape(decision,['schemaVersion','kind','candidate','captureDigest','planDigest','summaryDigest','reviewer','reviewedAllFrames','result','frames'],'visual decision');
