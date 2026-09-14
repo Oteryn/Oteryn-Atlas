@@ -6,6 +6,7 @@ import {canonicalJson} from './verification-plan-schema.mjs';
 import {collectProtectedVisualCapture} from './collect-protected-visual-capture.mjs';
 import {protectedReviewDigest,selectLatestProtectedReview,validateProtectedReviewBundle} from './protected-review-evidence.mjs';
 import {githubRequest} from './protected-candidate-snapshot.mjs';
+import {authenticatePublicationProof} from './proof-provenance.mjs';
 
 const ACTIVE='.github/workflows/verification-shadow.yml';
 const REVIEW_ARTIFACT_PREFIX='atlas-verification-review';
@@ -101,6 +102,22 @@ export function shadowReviewPlanDigest(candidate,contract) {
     commands:(contract.commands??[]).map(({id,...command})=>command),
     reviews:(contract.reviews??[]).map(review=>({groupId:review.groupId,frames:review.frames})),
     groups:(contract.groups??[]).map(group=>group.id)});
+}
+
+function reviewContractForEvidenceBase({candidate,evidenceCandidate,contract,productDigest,qualificationPublicationProof,qualificationExpectedAuthority}) {
+  if(candidate.baseSha===evidenceCandidate.baseSha||!qualificationPublicationProof||!qualificationExpectedAuthority)return contract;
+  const authenticate=protectedBaseSha=>authenticatePublicationProof({publicationProof:qualificationPublicationProof,protectedExpectedAuthority:qualificationExpectedAuthority,protectedBaseSha});
+  const currentPublication=authenticate(candidate.baseSha);
+  if(currentPublication.productRootDigest!==productDigest)fail('current qualification publication product');
+  const evidencePublication=authenticate(evidenceCandidate.baseSha);
+  let rebound=false;
+  const commands=(contract.commands??[]).map(command=>{
+    if(command.dataCapability!=='qualification_fixture'||command.publication==null)return command;
+    if(!same(command.publication,currentPublication))fail('current qualification publication identity');
+    rebound=true;
+    return {...command,publication:evidencePublication};
+  });
+  return rebound?{...contract,commands}:contract;
 }
 
 export function shadowOracleDigest(root) {
@@ -316,7 +333,7 @@ function pairCaptures(captureBytesList,expected) {
   return captures;
 }
 
-export async function validateShadowReviewGate({candidate,currentRunId,contract,productDigest,oracleDigest,request=githubRequest,downloadArtifact=downloadShadowCaptureArtifact,now=new Date().toISOString()}) {
+export async function validateShadowReviewGate({candidate,currentRunId,contract,productDigest,oracleDigest,qualificationPublicationProof,qualificationExpectedAuthority,request=githubRequest,downloadArtifact=downloadShadowCaptureArtifact,now=new Date().toISOString()}) {
   await assertCurrentMachineRun(request,currentRunId);
   const currentRun=await request(`/repos/${candidate.repository}/actions/runs/${currentRunId}`);
   if(currentRun?.id!==currentRunId||currentRun.run_attempt!==1||currentRun.path!==ACTIVE||currentRun.status!=='in_progress'||currentRun.conclusion!==null
@@ -351,7 +368,8 @@ export async function validateShadowReviewGate({candidate,currentRunId,contract,
   const repo=await request(`/repos/${candidate.repository}`);
   if(repo.full_name!==candidate.repository||!Number.isSafeInteger(repo.id))fail('review repository identity');
   const artifactName=shadowReviewArtifactName(run.id),liveReview=run.id===currentRunId,failedReviewGate=run.status==='completed'&&run.conclusion==='failure';
-  const expected=expectedCaptureAuthorities({candidate:evidenceCandidate,contract,productDigest,oracleDigest,repositoryId:repo.id,artifactName,liveReview,failedReviewGate});
+  const reviewContract=reviewContractForEvidenceBase({candidate,evidenceCandidate,contract,productDigest,qualificationPublicationProof,qualificationExpectedAuthority});
+  const expected=expectedCaptureAuthorities({candidate:evidenceCandidate,contract:reviewContract,productDigest,oracleDigest,repositoryId:repo.id,artifactName,liveReview,failedReviewGate});
   const captures=pairCaptures(selected.captureBytesList,expected);
   if(captures.length!==wanted.length)fail('review bundle capture count');
   const login=review.user?.login;
