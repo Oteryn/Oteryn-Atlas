@@ -308,11 +308,13 @@ test('R5 Merge Queue consumes reviewed PR bytes across rename normalization and 
   const currentRun={id:100,run_attempt:1,path:'.github/workflows/verification-shadow.yml',event:'merge_group',head_sha:mqHead,status:'in_progress',conclusion:null,repository:{id:99,full_name:repository}};
   const currentJobs={total_count:3,jobs:[{id:101,run_id:100,run_attempt:1,head_sha:mqHead,name:'plan',status:'completed',conclusion:'success'},{id:102,run_id:100,run_attempt:1,head_sha:mqHead,name:'execute',status:'completed',conclusion:'success'},{id:103,run_id:100,run_attempt:1,head_sha:mqHead,name:'review',status:'in_progress',conclusion:null}]};
   const artifact={id:45,name:shadowReviewArtifactName(42),expired:false,size_in_bytes:4096,workflow_run:{id:42,repository_id:99,head_repository_id:99,head_sha:prHead}};
-  const repo={id:99,full_name:repository,default_branch:'main'},pr={number:344,state:'open',merged:false,changed_files:1,base:{sha:currentBaseSha,ref:'main',repo:{full_name:repository}},head:{sha:prHead,repo:{full_name:repository}}};
+  const repo={id:99,full_name:repository,default_branch:'main'},pr={number:344,state:'open',merged:false,changed_files:1,base:{sha:reviewedBaseSha,ref:'main',repo:{full_name:repository}},head:{sha:prHead,repo:{full_name:repository}}};
+  const hugeHead=sha('3'),hugePr={...pr,number:346,changed_files:3001,head:{...pr.head,sha:hugeHead}};
   const unrelatedRun={...priorRun,id:43,path:'.github/workflows/merge-authority-audit.yml',created_at:'2026-09-06T10:06:00Z',updated_at:'2026-09-06T10:07:00Z'};
   const sourceTree={sha:prTreeSha,truncated:false,tree:[{path:'web/new.mjs',mode:'100644',type:'blob',sha:changedBlob},{path:'web/base.mjs',mode:'100644',type:'blob',sha:sha('8')}]};
   const syntheticTree={sha:mqTreeSha,truncated:false,tree:[{path:'web/new.mjs',mode:'100644',type:'blob',sha:changedBlob},{path:'web/base.mjs',mode:'100644',type:'blob',sha:sha('9')}]};
-  const responses=new Map([[`/repos/${repository}/actions/runs/100/attempts/1/jobs?per_page=100`,currentJobs],[`/repos/${repository}/actions/runs/100`,currentRun],[`/repos/${repository}/pulls?state=open&per_page=100&page=1`,[pr]],[`/repos/${repository}`,repo],[`/repos/${repository}/git/ref/heads/main`,{object:{sha:currentBaseSha}}],[`/repos/${repository}/pulls/344`,pr],[`/repos/${repository}/pulls/344/files?per_page=100&page=1`,[{filename:'web/new.mjs',previous_filename:'web/old.mjs',status:'renamed'}]],[`/repos/${repository}/git/commits/${prHead}`,{sha:prHead,tree:{sha:prTreeSha}}],[`/repos/${repository}/git/trees/${prTreeSha}?recursive=1`,sourceTree],[`/repos/${repository}/git/trees/${mqTreeSha}?recursive=1`,syntheticTree],[`/repos/${repository}/pulls/344/reviews?per_page=100&page=1`,[review]],[`/repos/${repository}/actions/runs?event=pull_request_target&head_sha=${prHead}&per_page=100&page=1`,{workflow_runs:[unrelatedRun,priorRun]}],[`/repos/${repository}/actions/runs/42/artifacts?per_page=100&page=1`,{artifacts:[artifact]}],[`/repos/${repository}/actions/runs/42`,priorRun],[`/repos/${repository}/actions/runs/42/attempts/1/jobs?per_page=100`,priorJobs],[`/repos/${repository}/collaborators/maintainer/permission`,{permission:'admin',role_name:'admin',user:reviewer}]]);
+  const protectedRef=`/repos/${repository}/git/ref/heads/main`;
+  const responses=new Map([[`/repos/${repository}/actions/runs/100/attempts/1/jobs?per_page=100`,currentJobs],[`/repos/${repository}/actions/runs/100`,currentRun],[`/repos/${repository}/pulls?state=open&per_page=100&page=1`,[hugePr,pr]],[`/repos/${repository}`,repo],[protectedRef,{object:{sha:currentBaseSha}}],[`/repos/${repository}/pulls/346`,hugePr],[`/repos/${repository}/pulls/344`,pr],[`/repos/${repository}/pulls/344/files?per_page=100&page=1`,[{filename:'web/new.mjs',previous_filename:'web/old.mjs',status:'renamed'}]],[`/repos/${repository}/git/commits/${prHead}`,{sha:prHead,tree:{sha:prTreeSha}}],[`/repos/${repository}/git/trees/${prTreeSha}?recursive=1`,sourceTree],[`/repos/${repository}/git/trees/${mqTreeSha}?recursive=1`,syntheticTree],[`/repos/${repository}/pulls/344/reviews?per_page=100&page=1`,[review]],[`/repos/${repository}/actions/runs?event=pull_request_target&head_sha=${prHead}&per_page=100&page=1`,{workflow_runs:[unrelatedRun,priorRun]}],[`/repos/${repository}/actions/runs/42/artifacts?per_page=100&page=1`,{artifacts:[artifact]}],[`/repos/${repository}/actions/runs/42`,priorRun],[`/repos/${repository}/actions/runs/42/attempts/1/jobs?per_page=100`,priorJobs],[`/repos/${repository}/collaborators/maintainer/permission`,{permission:'admin',role_name:'admin',user:reviewer}]]);
   const request=async endpoint=>{if(!responses.has(endpoint))throw new Error(`unexpected endpoint ${endpoint}`);return structuredClone(responses.get(endpoint));};
   const options={candidate:mqCandidate,currentRunId:100,contract,productDigest,oracleDigest,request,downloadArtifact:()=>[captureBytes],now:'2026-09-06T10:15:00Z'};
   const result=await validateShadowReviewGate(options);
@@ -321,12 +323,29 @@ test('R5 Merge Queue consumes reviewed PR bytes across rename normalization and 
   await assert.rejects(validateShadowReviewGate(options),/no exact changed-content PR association/);
   responses.set(`/repos/${repository}/git/trees/${mqTreeSha}?recursive=1`,syntheticTree);
   const secondHead=sha('7'),secondTreeSha=sha('4'),secondPr={...pr,number:345,head:{...pr.head,sha:secondHead}};
-  responses.set(`/repos/${repository}/pulls?state=open&per_page=100&page=1`,[pr,secondPr]);
+  responses.set(`/repos/${repository}/pulls?state=open&per_page=100&page=1`,[hugePr,pr,secondPr]);
   responses.set(`/repos/${repository}/pulls/345`,secondPr);
   responses.set(`/repos/${repository}/pulls/345/files?per_page=100&page=1`,[{filename:'web/new.mjs',previous_filename:'web/old.mjs',status:'renamed'}]);
   responses.set(`/repos/${repository}/git/commits/${secondHead}`,{sha:secondHead,tree:{sha:secondTreeSha}});
   responses.set(`/repos/${repository}/git/trees/${secondTreeSha}?recursive=1`,{...sourceTree,sha:secondTreeSha});
   await assert.rejects(validateShadowReviewGate(options),/ambiguous exact changed-content PR association/);
+  responses.set(`/repos/${repository}/pulls?state=open&per_page=100&page=1`,[pr]);
+  let protectedReads=0;
+  const movedRequest=async endpoint=>endpoint===protectedRef?{object:{sha:++protectedReads===1?currentBaseSha:sha('5')}}:request(endpoint);
+  await assert.rejects(validateShadowReviewGate({...options,request:movedRequest}),/review association protected base drift/);
+});
+test('R5 Merge Queue accepts a complete 3000-file census before rejecting a nonmatch',async()=>{
+  const repository='Oteryn/Oteryn-Atlas',currentBaseSha=sha('6'),reviewedBaseSha=sha('b'),mqHead=sha('d'),mqTreeSha=sha('e'),prHead=sha('a'),prTreeSha=sha('c');
+  const changedFiles=Array.from({length:3000},(_,index)=>({path:`candidate/${index}.mjs`,status:'modified'}));
+  const candidate={repository,prNumber:null,headSha:mqHead,baseSha:currentBaseSha,treeSha:mqTreeSha,changedFiles};
+  const currentRun={id:100,run_attempt:1,path:'.github/workflows/verification-shadow.yml',event:'merge_group',head_sha:mqHead,status:'in_progress',conclusion:null,repository:{full_name:repository}};
+  const jobs={total_count:3,jobs:[{id:101,run_id:100,run_attempt:1,head_sha:mqHead,name:'plan',status:'completed',conclusion:'success'},{id:102,run_id:100,run_attempt:1,head_sha:mqHead,name:'execute',status:'completed',conclusion:'success'},{id:103,run_id:100,run_attempt:1,head_sha:mqHead,name:'review',status:'in_progress',conclusion:null}]};
+  const repo={id:99,full_name:repository,default_branch:'main'},pr={number:346,state:'open',merged:false,changed_files:3000,base:{sha:reviewedBaseSha,ref:'main',repo:{full_name:repository}},head:{sha:prHead,repo:{full_name:repository}}};
+  const rows=Array.from({length:3000},(_,index)=>({filename:`unrelated/${index}.mjs`,status:'modified'})),protectedRef=`/repos/${repository}/git/ref/heads/main`;
+  const tree={sha:mqTreeSha,truncated:false,tree:changedFiles.map(row=>({path:row.path,mode:'100644',type:'blob',sha:sha('1')}))};
+  const responses=new Map([[`/repos/${repository}/actions/runs/100/attempts/1/jobs?per_page=100`,jobs],[`/repos/${repository}/actions/runs/100`,currentRun],[`/repos/${repository}`,repo],[protectedRef,{object:{sha:currentBaseSha}}],[`/repos/${repository}/pulls?state=open&per_page=100&page=1`,[pr]],[`/repos/${repository}/pulls/346`,pr],[`/repos/${repository}/git/commits/${prHead}`,{sha:prHead,tree:{sha:prTreeSha}}],[`/repos/${repository}/git/trees/${mqTreeSha}?recursive=1`,tree]]);
+  const request=async endpoint=>{const match=endpoint.match(/\/pulls\/346\/files\?per_page=100&page=(\d+)$/);if(match){const page=Number(match[1]);return rows.slice((page-1)*100,page*100);}if(!responses.has(endpoint))throw new Error(`unexpected endpoint ${endpoint}`);return structuredClone(responses.get(endpoint));};
+  await assert.rejects(validateShadowReviewGate({candidate,currentRunId:100,contract:{},productDigest:hash('f'),oracleDigest:hash('e'),request}),/Merge Queue has no exact changed-content PR association/);
 });
 test('R5 review wait is bounded and never waits in Merge Queue',async()=>{
   const candidate={repository:'Oteryn/Oteryn-Atlas',prNumber:1,headSha:sha('a'),baseSha:sha('b'),treeSha:sha('c'),changedFiles:[{path:'web/a',status:'modified'}]},currentRunId=100;
