@@ -7,6 +7,32 @@ export function gitChangedFiles(root,base,head) {
   while(rows.length){const status=rows.shift(),path=rows.shift();if(!path||!['A','M','D'].includes(status))fail('unsupported changed-file status');files.push({path,status:{A:'added',M:'modified',D:'removed'}[status]});}
   return files.sort((a,b)=>a.path.localeCompare(b.path));
 }
+const MAX_QUEUE_CHAIN_DEPTH=8;
+async function authenticateQueueBase({request,repository,defaultBranch,baseSha,headSha,headRef,liveBase}) {
+  const queuePrefix=`refs/heads/gh-readonly-queue/${defaultBranch}/`;
+  if(liveBase===baseSha||liveBase===headSha)return;
+  if(!SHA.test(liveBase??'')||typeof headRef!=='string'||!headRef.startsWith(queuePrefix))fail('merge-group protected base moved');
+  let refs;
+  try { refs=await request(`/repos/${repository}/git/matching-refs/heads/gh-readonly-queue/${defaultBranch}/`); }
+  catch { fail('merge-group protected base moved'); }
+  if(!Array.isArray(refs)||!refs.length)fail('merge-group queue ancestry');
+  const active=new Set();
+  for(const ref of refs) {
+    if(typeof ref?.ref!=='string'||!ref.ref.startsWith(queuePrefix)||ref.object?.type!=='commit'||!SHA.test(ref.object?.sha??''))fail('merge-group queue ancestry');
+    active.add(ref.object.sha);
+  }
+  let cursor=baseSha;const chain=new Set([liveBase]);
+  for(let depth=0;depth<MAX_QUEUE_CHAIN_DEPTH&&cursor!==liveBase;depth++) {
+    if(chain.has(cursor)||!active.has(cursor))fail('merge-group queue ancestry');
+    chain.add(cursor);
+    const commit=await request(`/repos/${repository}/git/commits/${cursor}`);
+    if(commit.sha!==cursor||!SHA.test(commit.tree?.sha??'')||!Array.isArray(commit.parents)||!commit.parents.length||commit.parents.some(parent=>!SHA.test(parent?.sha??'')))fail('merge-group queue ancestry');
+    cursor=commit.parents[0].sha;
+  }
+  if(cursor!==liveBase)fail('merge-group queue ancestry');
+  const fresh=(await request(`/repos/${repository}/git/ref/heads/${encodeURIComponent(defaultBranch)}`)).object?.sha;
+  if(fresh!==headSha&&!chain.has(fresh))fail('merge-group protected base moved');
+}
 export async function resolveDirectMergeGroup({request=githubRequest,repository,defaultBranch,event,githubSha,githubRef}) {
   if(!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository??'')||!/^[A-Za-z0-9._/-]+$/.test(defaultBranch??''))fail('merge-group authority');
   if(event?.repository?.full_name!==repository||event.repository.default_branch!==defaultBranch||event.action!=='checks_requested')fail('merge-group event identity');
@@ -15,7 +41,7 @@ export async function resolveDirectMergeGroup({request=githubRequest,repository,
     ||typeof group.head_ref!=='string'||!group.head_ref.startsWith(queuePrefix)||githubSha!==group.head_sha||githubRef!==group.head_ref)fail('merge-group candidate identity');
   const protectedRef=await request(`/repos/${repository}/git/ref/heads/${encodeURIComponent(defaultBranch)}`);
   const liveBase=protectedRef.object?.sha;
-  if(liveBase!==group.base_sha&&liveBase!==group.head_sha)fail('merge-group protected base moved');
+  await authenticateQueueBase({request,repository,defaultBranch,baseSha:group.base_sha,headSha:group.head_sha,headRef:group.head_ref,liveBase});
   const commit=await request(`/repos/${repository}/git/commits/${group.head_sha}`);
   if(commit.sha!==group.head_sha||!SHA.test(commit.tree?.sha??'')||!Array.isArray(commit.parents)||!commit.parents.length
     ||commit.parents[0]?.sha!==group.base_sha||commit.parents.some(parent=>!SHA.test(parent?.sha??'')))fail('merge-group candidate commit');
@@ -29,8 +55,11 @@ export async function readCandidateSnapshot({request=githubRequest,repository,ba
   if(repo.full_name!==repository||typeof repo.default_branch!=='string')fail('repository association');
   const base=await request(`${prefix}/git/ref/heads/${encodeURIComponent(repo.default_branch)}`);
   if(typeof allowJustIntegratedHead!=='boolean'||(allowJustIntegratedHead&&prNumber!==null))fail('integrated MQ readback scope');
-  const directQueueReadback=prNumber===null&&typeof headRef==='string'&&headRef.startsWith(`refs/heads/gh-readonly-queue/${repo.default_branch}/`)&&base.object?.sha===headSha;
-  if(base.object?.sha!==baseSha&&!(allowJustIntegratedHead&&base.object?.sha===headSha)&&!directQueueReadback)fail('protected base moved');
+  const queueReadback=prNumber===null&&typeof headRef==='string'&&headRef.startsWith(`refs/heads/gh-readonly-queue/${repo.default_branch}/`);
+  if(base.object?.sha!==baseSha&&!(allowJustIntegratedHead&&base.object?.sha===headSha)) {
+    if(!queueReadback)fail('protected base moved');
+    await authenticateQueueBase({request,repository,defaultBranch:repo.default_branch,baseSha,headSha,headRef,liveBase:base.object?.sha});
+  }
   if(prNumber!==null){
     const pr=await request(`${prefix}/pulls/${prNumber}`);
     if(pr.number!==prNumber||pr.state!=='open'||pr.merged||pr.head?.sha!==headSha||pr.base?.sha!==baseSha||pr.head?.repo?.full_name!==repository||pr.base?.repo?.full_name!==repository||pr.base?.ref!==repo.default_branch)fail('PR identity drift');
