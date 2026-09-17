@@ -48,6 +48,8 @@ Before selecting a profile, capability, or specialist runner, read `docs/agents/
 
 Require the repository's protected exact-candidate checks and normal Merge Queue integration. Local tests are supporting evidence, not merge authority.
 
+If an already-prepared material candidate cannot use the normal authorized publication path, preserve the candidate and report the publication blocked. Do not reconstruct it through raw Git Data blob/tree/commit/ref operations or per-file Contents API writes as a publication fallback.
+
 Verification success does not authorize publication or deployment. Publication and live deployment are separate lifecycles requiring their own explicit authority. A separately authorized deployment must originate from an exact clean revision already merged to protected `main` and follow `docs/agents/operations/LIVE_DEPLOYMENT.md` plus the current live-operations runbook.
 
 ## Historical material and safety
