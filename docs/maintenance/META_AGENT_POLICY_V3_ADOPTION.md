@@ -2,19 +2,21 @@
 
 ## Current authority
 
-Atlas adopts `OTERYN_ORGANIZATION_AGENT_POLICY` version `3.1.0` from protected META commit `ce20300aa8a9e1017aff722fe0cd628587fadf63`.
+Atlas adopts `OTERYN_ORGANIZATION_AGENT_POLICY` version `3.1.0` from protected META commit `33b212e652c680bd4047be3b414c9a358b8bf26f`.
 
-This is the final app-free META 3.1 authority produced by Oteryn/Oteryn#187. The organization integration contract uses native GitHub REST `merge-async` with the exact qualified `sha` and explicit `merge_action=merge_queue`. A direct authenticated execution surface may invoke that native operation. A custom Oteryn GitHub App is not required or authorized merely to submit Merge Queue work, and built-in workflow `GITHUB_TOKEN` is not used as the queue mutation credential when downstream `merge_group` execution is required.
+The prior protected META 3.1 authority `ce20300aa8a9e1017aff722fe0cd628587fadf63` established the final app-free native Merge Queue contract produced by Oteryn/Oteryn#187. Protected META PR #213 later integrated publication-integrity hardening without changing the policy version, so the current immutable 3.1 provider authority is now `33b212e652c680bd4047be3b414c9a358b8bf26f`.
+
+The organization integration contract continues to use native GitHub REST `merge-async` with the exact qualified `sha` and explicit `merge_action=merge_queue`. A direct authenticated execution surface may invoke that native operation. A custom Oteryn GitHub App is not required or authorized merely to submit Merge Queue work, and built-in workflow `GITHUB_TOKEN` is not used as the queue mutation credential when downstream `merge_group` execution is required.
 
 ## Atlas lifecycle truth
 
 The Atlas verification simplification / legacy-retirement programme Oteryn/Oteryn-Atlas#315 is CLOSED. LR4 retirement PR #444 is protected on current Atlas `main`; historical #315/#457 restoration topology is not standing authority for this adoption.
 
-This repin changes provider policy authority. It does not reactivate retired recovery topology, create a new verification executor, change product/runtime/publication/deployment behavior, alter rulesets or required checks, or authorize a bypass. Atlas continues to use its current protected verification and Merge Queue authority as they exist on the integration candidate.
+This repin changes provider policy authority and activates the protected META publication-integrity contract for Atlas provider consumption. It does not reactivate retired recovery topology, create a new verification executor, change product/runtime/deployment behavior, alter rulesets or required checks, or authorize a bypass. Atlas continues to use its current protected verification and Merge Queue authority as they exist on the integration candidate.
 
 ## Verification-authority effect
 
-`docs/agents/META_AGENT_POLICY_BINDING.json` is an explicit component of the protected Atlas verification-authority identity. Repinning its immutable META commit therefore changes the verification-authority digest even though this PR authors no verification code, workflow, ruleset, required-check or activation change.
+`docs/agents/META_AGENT_POLICY_BINDING.json` is an explicit component of the protected Atlas verification-authority identity. Repinning its immutable META commit therefore changes the verification-authority digest even though this PR authors no verification executor, planner, workflow, ruleset, required-check or activation change.
 
 That authority-identity movement invalidates reuse of verification evidence bound to the previous authority. Under the current protected base-advance contract, `classifyBaseAdvance` must classify this authority movement as `FULL_RERUN`; prior-base verification evidence is not terminal proof for this adoption. The exact candidate must be qualified afresh by the protected Atlas gates after every protected-base advance that changes this authority identity.
 
@@ -24,8 +26,10 @@ This is an evidence-reuse/authority-identity effect, not a reactivation of the c
 
 The authenticated Atlas consumer must resolve the exact bound META commit, validate policy identity/version and canonical human surfaces, and fail closed if the binding cannot be authenticated as protected-META ancestry. Root/reusable prompt validation remains provider-owned; binding success does not itself grant merge, production or cross-repository authority.
 
-Protected prerequisite PR #489 updated the fail-closed provider consumer on Atlas `main` to admit policy `3.1.0` only at the final protected META authority `ce20300aa8a9e1017aff722fe0cd628587fadf63`, while preserving policy `3.0.0` compatibility and rejecting mixed, unknown or malformed coordinates.
+Protected prerequisite PR #489 originally updated the fail-closed provider consumer to admit policy `3.1.0` only at `ce20300aa8a9e1017aff722fe0cd628587fadf63`, while preserving policy `3.0.0` compatibility and rejecting mixed, unknown or malformed coordinates. This publication-integrity adoption atomically supersedes that exact 3.1 coordinate with `33b212e652c680bd4047be3b414c9a358b8bf26f`; the previous `ce20300...` coordinate is no longer accepted for current 3.1 binding, and mixed, unknown or malformed coordinates remain fail-closed.
+
+For an already-prepared material candidate, unavailable normal publication is a custody/blocking outcome. Atlas must preserve the candidate and must not synthesize a substitute through raw Git Data or per-file API reconstruction.
 
 ## Integration
 
-Before integration, refresh GitHub LIVE state and require the current Atlas repository gates plus fresh independent exact-head review. Submit only through the protected META-governed native exact-head `merge-async` route and require real Merge Queue/`merge_group` plus protected-main readback. Direct merge, generic auto-merge, GraphQL enqueue, custom-App/PAT bridge creation, bypass, force/reset and protection weakening are forbidden substitutes.
+Before integration, refresh GitHub LIVE state and require the current Atlas repository gates plus any applicable fresh independent exact-head review. Submit only through the protected META-governed native exact-head `merge-async` route and require real Merge Queue/`merge_group` plus protected-main readback. Direct merge, generic auto-merge, GraphQL enqueue, custom-App/PAT bridge creation, bypass, force/reset and protection weakening are forbidden substitutes.
