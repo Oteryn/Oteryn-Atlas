@@ -16,8 +16,8 @@ SPEC.loader.exec_module(atlas)
 
 LEGACY_VERSION = "3.0.0"
 PIN = "1dedfc0f264fe0e23e5365dbe9280c2d96df50c5"
-PREVIOUS_TARGET_PIN = "ce20300aa8a9e1017aff722fe0cd628587fadf63"
-TARGET_PIN = "33b212e652c680bd4047be3b414c9a358b8bf26f"
+PREVIOUS_TARGET_PIN = "33b212e652c680bd4047be3b414c9a358b8bf26f"
+TARGET_PIN = "21bc49bccef4874b037aabcbde9732b904187c32"
 MAIN = PIN
 
 
@@ -185,15 +185,17 @@ class AtlasMetaPolicyTests(unittest.TestCase):
             errors = atlas.validate_repository(root, valid_binding(), self.resolved())
             self.assertTrue(any("bad.md: copied global policy" in error for error in errors))
 
-    def test_current_provider_publication_fallback_is_fail_closed(self) -> None:
+    def test_current_provider_publication_fallback_is_bound_to_meta_new_candidate_route(self) -> None:
         binding = atlas.load_binding()
         self.assertEqual(binding["policy_version"], "3.1.0")
         self.assertEqual(binding["authority_commit"], TARGET_PIN)
         text = (atlas.ROOT / atlas.AGENTS_PATH).read_text(encoding="utf-8")
         for value in (
-            "preserve the candidate and report the publication blocked",
-            "raw Git Data blob/tree/commit/ref operations",
-            "per-file Contents API writes",
+            "API-native **new candidate** route permitted by the bound META policy",
+            "bounded connector-compatible Git Data mode",
+            "one-writer/predecessor/one-commit/non-force/post-readback conditions",
+            "Ad-hoc raw Git Data reconstruction",
+            "sequential per-file API publication",
         ):
             self.assertIn(value, text)
 
