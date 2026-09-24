@@ -48,7 +48,7 @@ Before selecting a profile, capability, or specialist runner, read `docs/agents/
 
 Require the repository's protected exact-candidate checks and normal Merge Queue integration. Local tests are supporting evidence, not merge authority.
 
-If an already-prepared material candidate cannot use the normal authorized publication path, preserve the candidate and report the publication blocked. Do not reconstruct it through raw Git Data blob/tree/commit/ref operations or per-file Contents API writes as a publication fallback.
+If an already-prepared material candidate cannot use the normal authorized publication path, do not silently reconstruct or relabel that selected candidate. Preserve its custody and return publication control to the active control plane. The control plane may select only an API-native **new candidate** route permitted by the bound META policy, including the bounded connector-compatible Git Data mode only under its exact one-writer/predecessor/one-commit/non-force/post-readback conditions. Ad-hoc raw Git Data reconstruction, sequential per-file API publication, force/ref replacement, reset and rebase remain forbidden.
 
 Verification success does not authorize publication or deployment. Publication and live deployment are separate lifecycles requiring their own explicit authority. A separately authorized deployment must originate from an exact clean revision already merged to protected `main` and follow `docs/agents/operations/LIVE_DEPLOYMENT.md` plus the current live-operations runbook.
 

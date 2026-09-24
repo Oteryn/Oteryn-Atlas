@@ -1,17 +1,17 @@
 # ATLAS-PUBLICATION-INTEGRITY-PROVIDER-ADOPTION
 
-Governing Issue: #509
+Governing Issue: #512
 
 ```yaml
 status: validating
 repository: Oteryn/Oteryn-Atlas
 base_branch: main
-base_sha: cfec1189fa658598111d9a6d63f1a11057772ae9
-branch: governance/publication-integrity-adoption-509
-pr: 510
+base_sha: 495c5e3c8581642468660eb7dfad60698b59a575
+branch: governance/bounded-connector-publication-512
+pr: 513
 owner: coordination-agent
-created_at: 2026-09-17T05:46:56Z
-updated_at: 2026-09-17T05:59:30Z
+created_at: 2026-09-24T14:04:06Z
+updated_at: 2026-09-24T14:29:00Z
 owned_paths:
   - AGENTS.md
   - docs/agents/META_AGENT_POLICY_BINDING.json
@@ -21,45 +21,45 @@ owned_paths:
   - docs/maintenance/META_AGENT_POLICY_V3_ADOPTION.md
   - docs/agents/tasks/active/ATLAS-PUBLICATION-INTEGRITY-PROVIDER-ADOPTION.md
 depends_on:
-  - Oteryn/Oteryn#212
-  - Oteryn/Oteryn#213
+  - Oteryn/Oteryn#223
+  - Oteryn/Oteryn-Game#838
 cross_repository_coordination_id: PUBLICATION-INTEGRITY-PROVIDER-ROLLOUT
 ```
 
 ## Outcome
 
-Atlas consumes protected META publication-integrity authority `33b212e652c680bd4047be3b414c9a358b8bf26f` while preserving the current selective-verification architecture, protected Merge Queue route and retired verification-topology boundaries.
+Atlas consumes protected META bounded-connector publication authority `21bc49bccef4874b037aabcbde9732b904187c32` while preserving selective-verification authority, protected Merge Queue and deployment boundaries.
 
 ## Evidence
 
-- PROVEN: protected META PR #213 integrated at `Oteryn/Oteryn@33b212e652c680bd4047be3b414c9a358b8bf26f`.
-- PROVEN: Atlas protected main at task creation is `cfec1189fa658598111d9a6d63f1a11057772ae9`.
-- PROVEN: Atlas's consumer intentionally binds each supported policy version to one exact META commit; `3.1.0` must therefore move atomically from superseded `ce20300...` to `33b212e...`.
-- PROVEN: binding movement is part of Atlas verification-authority identity and requires fresh protected qualification rather than evidence reuse.
-- PROVEN: Draft PR #510 owns this exact provider-adoption lineage.
+- PROVEN: protected META PR #223 integrated as `Oteryn/Oteryn@21bc49bccef4874b037aabcbde9732b904187c32`.
+- PROVEN: Game-first provider adoption #838 merged before this Atlas rollout.
+- PROVEN: Atlas protected main at task start is `495c5e3c8581642468660eb7dfad60698b59a575`.
+- PROVEN: Atlas binds policy `3.1.0` to one exact META coordinate; the supported coordinate therefore moves from `33b212e652c680bd4047be3b414c9a358b8bf26f` to `21bc49bccef4874b037aabcbde9732b904187c32`.
+- PROVEN: binding movement is part of Atlas verification-authority identity and requires fresh protected qualification.
 
 ## Acceptance
 
-- [ ] `META_AGENT_POLICY_BINDING.json` binds exact `33b212e...` at policy `3.1.0`.
-- [ ] `validate_meta_agent_policy.py` accepts only that exact current 3.1 coordinate while retaining legacy 3.0 compatibility.
-- [ ] deterministic Python and Node governance tests reject the superseded/mixed coordinates.
-- [ ] root/bootstrap and maintenance truth require candidate preservation/report-blocked rather than raw Git Data/per-file publication reconstruction.
-- [ ] protected Atlas verification/merge-authority gates are fresh and green on the exact final head.
-- [ ] applicable independent review is clean.
-- [ ] integration occurs only through governed/native Merge Queue, real `merge_group`, and protected-main readback.
+- [ ] binding and fail-closed supported `3.1.0` coordinate equal exact `21bc49bccef4874b037aabcbde9732b904187c32`;
+- [ ] Python and Node governance regressions reject the superseded/mixed coordinates;
+- [ ] root and maintenance wording permit only the bound META API-native **new candidate** route, including bounded connector mode under exact one-writer/predecessor/one-commit/non-force/post-readback conditions;
+- [ ] ad-hoc raw Git Data reconstruction, sequential per-file API publication, force/ref replacement, reset and rebase remain forbidden;
+- [ ] protected Atlas verification / merge-authority gates are fresh and green on the exact final head;
+- [ ] applicable independent review is clean;
+- [ ] integration occurs only through protected Merge Queue, real `merge_group`, and protected-main readback.
 
 ## Excluded
 
-No Atlas runtime/product/verification executor/planner/catalog/ruleset/protection/deployment/production/secret mutation. No #315/#457 topology revival. No direct merge, generic auto-merge, force/rebase/reset, gate weakening or retry inflation.
+No Atlas runtime/product/verification executor/planner/catalog/ruleset/protection/deployment/production/secret mutation. No retired verification-topology revival. No direct merge, generic auto-merge, force/rebase/reset, gate weakening or retry inflation.
 
 ## Checkpoint
 
 ```yaml
-last_progress: PR #510 opened; exact binding, fail-closed validator coordinate, publication boundary and deterministic tests prepared
-head_sha: null
-pr: 510
+last_progress: PR #513 opened; exact provider rebind authored and initial protected checks passed
+head_sha: 5e54fa060ef51f6d17bce77312e50b9f29219853
+pr: 513
 status: validating
-validation: pending fresh exact-head protected CI after this lifecycle-metadata correction
+validation: exact-head protected Merge authority audit and Atlas verification shadow passed on predecessor 5e54fa060ef51f6d17bce77312e50b9f29219853; fresh successor qualification required after this checkpoint correction
 blocker: null
-next_action: consume fresh exact-head protected qualification and independent review evidence where representative
+next_action: consume fresh exact-head protected checks and independent review, then integrate through Merge Queue
 ```
