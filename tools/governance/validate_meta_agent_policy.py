@@ -22,7 +22,7 @@ AUTHORITY_REPOSITORY = "Oteryn/Oteryn"
 POLICY_ID = "OTERYN_ORGANIZATION_AGENT_POLICY"
 SUPPORTED_POLICY_COORDINATES = {
     "3.0.0": "1dedfc0f264fe0e23e5365dbe9280c2d96df50c5",
-    "3.1.0": "33b212e652c680bd4047be3b414c9a358b8bf26f",
+    "3.1.0": "1bfb5ff98c8aa156e73669a14e083a1d464c29fb",
 }
 CENTRAL_POLICY_PATH = "ecosystem/organization-agent-policy.json"
 CENTRAL_VALIDATOR_PATH = "tools/governance/central_agent_policy.py"
