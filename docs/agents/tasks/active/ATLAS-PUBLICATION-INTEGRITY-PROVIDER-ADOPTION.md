@@ -3,12 +3,12 @@
 Governing Issue: #512
 
 ```yaml
-status: implementing
+status: validating
 repository: Oteryn/Oteryn-Atlas
 base_branch: main
 base_sha: 495c5e3c8581642468660eb7dfad60698b59a575
 branch: governance/bounded-connector-publication-512
-pr: pending
+pr: 513
 owner: coordination-agent
 created_at: 2026-09-24T14:04:06Z
 updated_at: 2026-09-24T14:06:00Z
@@ -55,11 +55,11 @@ No Atlas runtime/product/verification executor/planner/catalog/ruleset/protectio
 ## Checkpoint
 
 ```yaml
-last_progress: bounded connector provider rebind authored on dedicated branch
-head_sha: pending
+last_progress: PR #513 opened; exact provider rebind authored and initial protected checks passed
+head_sha: 9ba294ed6eb691807585c9e138355edbb593f6b8
 pr: pending
 status: implementing
-validation: pending PR creation and exact-head protected qualification
+validation: initial exact-head protected Merge authority audit and Atlas verification shadow passed; fresh successor qualification required after this lifecycle metadata correction
 blocker: null
-next_action: open PR, bind its identity here, then consume exact-head protected checks and review
+next_action: consume fresh exact-head protected checks and independent review, then integrate through Merge Queue
 ```
