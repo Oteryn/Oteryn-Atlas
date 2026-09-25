@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readCandidateSnapshot } from '../../tools/verification/protected-candidate-snapshot.mjs';
+import { readCandidateSnapshot, resolveDirectMergeGroup } from '../../tools/verification/protected-candidate-snapshot.mjs';
 const repository='Example/Atlas',baseSha='a'.repeat(40),headSha='b'.repeat(40),treeSha='c'.repeat(40),prNumber=7;
 function fixture() {
   const prefix=`/repos/${repository}`;
@@ -59,4 +59,53 @@ test('completed MQ may read back exactly its just-integrated head but cannot wid
  await assert.rejects(readCandidateSnapshot({...input,allowJustIntegratedHead:false}),/base moved/);
  f.responses[`/repos/${repository}/git/ref/heads/stable%2Fnext`].object.sha='d'.repeat(40);
  await assert.rejects(readCandidateSnapshot(input),/base moved/);
+});
+
+
+const qrepo='Example/Atlas',qmain='1'.repeat(40),qfirst='2'.repeat(40),qsecond='3'.repeat(40),qhead='4'.repeat(40),qtree='5'.repeat(40);
+function mergeGroupFixture({live=qmain,base=qmain,head=qhead,tree=qtree,refs=[]}={}) {
+  const prefix=`/repos/${qrepo}`,headRef='refs/heads/gh-readonly-queue/main/pr-9-fixture',refEndpoint=`${prefix}/git/ref/heads/main`,matchEndpoint=`${prefix}/git/matching-refs/heads/gh-readonly-queue/main/`;
+  const responses={
+    [prefix]:{full_name:qrepo,default_branch:'main'},
+    [refEndpoint]:{object:{sha:live}},
+    [matchEndpoint]:refs,
+    [`${prefix}/git/commits/${head}`]:{sha:head,tree:{sha:tree},parents:[{sha:base}]},
+  };
+  const event={repository:{full_name:qrepo,default_branch:'main'},action:'checks_requested',merge_group:{base_ref:'refs/heads/main',base_sha:base,head_ref:headRef,head_sha:head}};
+  const request=async endpoint=>{assert.ok(Object.hasOwn(responses,endpoint),endpoint);const value=responses[endpoint];return structuredClone(typeof value==='function'?value():value);};
+  return {responses,refEndpoint,matchEndpoint,headRef,event,input:{request,repository:qrepo,defaultBranch:'main',event,githubSha:head,githubRef:headRef}};
+}
+
+test('direct Merge Queue candidate remains bound directly to protected main',async()=>{
+  const f=mergeGroupFixture();const result=await resolveDirectMergeGroup(f.input);
+  assert.equal(result.baseSha,qmain);assert.equal(result.headSha,qhead);
+});
+test('chained Merge Queue base is accepted only through an active queue ref rooted at protected main',async()=>{
+  const ref={ref:'refs/heads/gh-readonly-queue/main/pr-8-fixture',object:{type:'commit',sha:qfirst}};
+  const f=mergeGroupFixture({base:qfirst,refs:[ref]});
+  f.responses[`/repos/${qrepo}/git/commits/${qfirst}`]={sha:qfirst,tree:{sha:'6'.repeat(40)},parents:[{sha:qmain}]};
+  const result=await resolveDirectMergeGroup(f.input);assert.equal(result.baseSha,qfirst);
+  const snapshot=await readCandidateSnapshot({request:f.input.request,repository:qrepo,baseSha:qfirst,headSha:qhead,prNumber:null,headRef:f.headRef,changedFiles:[{path:'docs/a.md',status:'modified'}]});
+  assert.equal(snapshot.baseSha,qfirst);assert.equal(snapshot.treeSha,qtree);
+});
+test('bounded multi-candidate queue chain resolves to protected main',async()=>{
+  const refs=[qfirst,qsecond].map((sha,index)=>({ref:`refs/heads/gh-readonly-queue/main/pr-${7+index}-fixture`,object:{type:'commit',sha}}));
+  const f=mergeGroupFixture({base:qsecond,refs});
+  f.responses[`/repos/${qrepo}/git/commits/${qsecond}`]={sha:qsecond,tree:{sha:'7'.repeat(40)},parents:[{sha:qfirst}]};
+  f.responses[`/repos/${qrepo}/git/commits/${qfirst}`]={sha:qfirst,tree:{sha:'6'.repeat(40)},parents:[{sha:qmain}]};
+  assert.equal((await resolveDirectMergeGroup(f.input)).baseSha,qsecond);
+});
+test('unreferenced, cyclic and overlong queue ancestry fail closed',async()=>{
+  const missing=mergeGroupFixture({base:qfirst,refs:[]});await assert.rejects(resolveDirectMergeGroup(missing.input),/queue ancestry/);
+  const refs=[qfirst,qsecond].map((sha,index)=>({ref:`refs/heads/gh-readonly-queue/main/pr-${7+index}-fixture`,object:{type:'commit',sha}}));
+  const cycle=mergeGroupFixture({base:qsecond,refs});cycle.responses[`/repos/${qrepo}/git/commits/${qsecond}`]={sha:qsecond,tree:{sha:'7'.repeat(40)},parents:[{sha:qfirst}]};cycle.responses[`/repos/${qrepo}/git/commits/${qfirst}`]={sha:qfirst,tree:{sha:'6'.repeat(40)},parents:[{sha:qsecond}]};await assert.rejects(resolveDirectMergeGroup(cycle.input),/queue ancestry/);
+  const nodes='23456789a'.split('').map(c=>c.repeat(40)),long=mergeGroupFixture({base:nodes.at(-1),refs:nodes.map((sha,i)=>({ref:`refs/heads/gh-readonly-queue/main/pr-${i+1}-fixture`,object:{type:'commit',sha}}))});
+  nodes.forEach((sha,i)=>{long.responses[`/repos/${qrepo}/git/commits/${sha}`]={sha,tree:{sha:'b'.repeat(40)},parents:[{sha:i?nodes[i-1]:qmain}]};});
+  await assert.rejects(resolveDirectMergeGroup(long.input),/queue ancestry/);
+});
+test('protected main movement outside authenticated queue chain fails closed',async()=>{
+  const ref={ref:'refs/heads/gh-readonly-queue/main/pr-8-fixture',object:{type:'commit',sha:qfirst}},f=mergeGroupFixture({base:qfirst,refs:[ref]});
+  let reads=0;f.responses[f.refEndpoint]=()=>({object:{sha:++reads===1?qmain:'e'.repeat(40)}});
+  f.responses[`/repos/${qrepo}/git/commits/${qfirst}`]={sha:qfirst,tree:{sha:'6'.repeat(40)},parents:[{sha:qmain}]};
+  await assert.rejects(resolveDirectMergeGroup(f.input),/protected base moved/);
 });
