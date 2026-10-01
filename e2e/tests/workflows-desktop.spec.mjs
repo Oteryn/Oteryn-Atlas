@@ -22,6 +22,8 @@ function uniqueNavigableRecord(index) {
 }
 
 test('published semantic result navigates, survives reload, and restores through history', async ({ page }) => {
+  const marker = await page.request.get('/web/__mq-terminal-canary-marker.txt', { failOnStatusCode: false });
+  expect(marker.status(), 'Merge Queue causal marker must be absent on the frozen probe base').toBe(404);
   const runtime = captureRuntimeFailures(page);
   await gotoAtlas(page, DESKTOP_ENTRY);
   await waitForAtlas(page);
